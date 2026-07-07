@@ -1,0 +1,27 @@
+{
+  "name": "@upstand/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "@upstand/auth": "workspace:*",
+    "@upstand/db": "workspace:*",
+    "@upstand/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@upstand/config": "workspace:*",
+    "hono": "catalog:",
+    "typescript": "catalog:"
+  }
+}
