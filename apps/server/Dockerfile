@@ -15,6 +15,8 @@ COPY packages/config/package.json ./packages/config/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/
+COPY packages/domain/package.json ./packages/domain/
+COPY packages/usecases/package.json ./packages/usecases/
 
 # Install all dependencies without running postinstall scripts (which require source files)
 RUN bun install --ignore-scripts --frozen-lockfile
@@ -29,6 +31,8 @@ COPY packages/config ./packages/config
 COPY packages/ui ./packages/ui
 COPY packages/redis ./packages/redis
 COPY packages/repositories ./packages/repositories
+COPY packages/domain ./packages/domain
+COPY packages/usecases ./packages/usecases
 
 # Run postinstall scripts now that source code is copied
 RUN cd apps/fumadocs && bun run postinstall
@@ -54,6 +58,8 @@ COPY packages/config/package.json ./packages/config/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/
+COPY packages/domain/package.json ./packages/domain/
+COPY packages/usecases/package.json ./packages/usecases/
 
 # Install only production dependencies without running postinstall scripts
 RUN bun install --production --ignore-scripts --frozen-lockfile

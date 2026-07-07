@@ -1,5 +1,7 @@
+import type { ServiceScope } from "@circulo-ai/di";
 import { trpcServer } from "@hono/trpc-server";
 import { createContext } from "@upstand/api/context";
+import { serviceProvider } from "@upstand/api/di";
 import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
 import { env } from "@upstand/env/server";
@@ -21,9 +23,26 @@ const identifyUser = createAuthMiddleware(auth as BetterAuthInstance, {
   maskEmail: true,
 });
 
-const app = new Hono<EvlogVariables>();
+type AppEnv = EvlogVariables & {
+  Variables: {
+    scope: ServiceScope;
+  };
+};
+
+const app = new Hono<AppEnv>();
 
 app.use(evlog());
+
+app.use("*", async (c, next) => {
+  const scope = serviceProvider.createScope();
+  c.set("scope", scope);
+  try {
+    await next();
+  } finally {
+    await scope.dispose();
+  }
+});
+
 app.use("*", async (c, next) => {
   await identifyUser(c.get("log"), c.req.raw.headers, c.req.path);
   await next();

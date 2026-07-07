@@ -529,5 +529,5 @@ export function useAISearchContext() {
 }
 
 function useChatContext() {
-  return use(Context)!.chat;
+  return use(Context)?.chat;
 }

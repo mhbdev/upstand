@@ -4,6 +4,8 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 
 import * as schema from "./schema";
 
+export * from "./schema";
+
 export function createDb() {
   return drizzle(env.DATABASE_URL, { schema });
 }

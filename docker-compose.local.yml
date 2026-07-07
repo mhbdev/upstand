@@ -36,6 +36,8 @@ services:
       - /app/apps/web/node_modules
       - /app/apps/fumadocs/node_modules
       - /app/packages/repositories/node_modules
+      - /app/packages/domain/node_modules
+      - /app/packages/usecases/node_modules
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:password@postgres:5432/upstand
@@ -64,6 +66,8 @@ services:
       - /app/apps/web/node_modules
       - /app/apps/fumadocs/node_modules
       - /app/packages/repositories/node_modules
+      - /app/packages/domain/node_modules
+      - /app/packages/usecases/node_modules
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_SERVER_URL: http://localhost:3000
@@ -86,6 +90,8 @@ services:
       - /app/apps/web/node_modules
       - /app/apps/fumadocs/node_modules
       - /app/packages/repositories/node_modules
+      - /app/packages/domain/node_modules
+      - /app/packages/usecases/node_modules
     environment:
       NODE_ENV: development
     depends_on:

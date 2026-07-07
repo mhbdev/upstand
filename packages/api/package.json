@@ -16,8 +16,12 @@
   "dependencies": {
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
+    "@circulo-ai/di": "catalog:",
     "@upstand/auth": "workspace:*",
     "@upstand/db": "workspace:*",
+    "@upstand/domain": "workspace:*",
+    "@upstand/usecases": "workspace:*",
+    "@upstand/repositories": "workspace:*",
     "@upstand/env": "workspace:*",
     "dotenv": "catalog:",
     "zod": "catalog:"

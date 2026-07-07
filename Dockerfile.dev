@@ -13,6 +13,8 @@ COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/repositories/package.json ./packages/repositories/
+COPY packages/domain/package.json ./packages/domain/
+COPY packages/usecases/package.json ./packages/usecases/
 
 # Install workspace dependencies without running postinstall scripts (which require source files)
 RUN bun install --ignore-scripts

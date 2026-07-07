@@ -18,6 +18,12 @@
       "skillPath": "skills/hono/SKILL.md",
       "computedHash": "24bad73932f309cec73a5a9171b838f59050990a634d8590c2d2c204507e64f9"
     },
+    "opentui": {
+      "source": "anomalyco/opentui",
+      "sourceType": "github",
+      "skillPath": "packages/web/src/content/SKILL.md",
+      "computedHash": "d658b7d3539484430b3c5f145d656e0071d2aadb544e29859635177fd9ddc909"
+    },
     "review-logging-patterns": {
       "source": "evlog.dev",
       "sourceType": "well-known",
