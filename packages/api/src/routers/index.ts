@@ -2,7 +2,9 @@ import { CreateUserInputSchema } from "@upstand/usecases";
 import { CreateUserUseCaseToken } from "../di";
 import { handleUseCaseError } from "../errors";
 import { protectedProcedure, publicProcedure, router } from "../index";
+import { projectRouter } from "./project.router";
 import { userRouter } from "./user.router";
+
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
     return "OK";
@@ -23,7 +25,8 @@ export const appRouter = router({
         handleUseCaseError(error);
       }
     }),
-  user: userRouter
+  user: userRouter,
+  project: projectRouter,
 });
 
 export type AppRouter = typeof appRouter;

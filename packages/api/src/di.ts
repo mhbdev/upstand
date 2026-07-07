@@ -1,12 +1,16 @@
 import { createToken, ServiceCollection } from "@circulo-ai/di";
 import { type DatabaseExecutor, db } from "@upstand/db";
 import {
+  ProjectRepositoryToken,
   UnitOfWorkToken,
-  UserRepositoryToken } from "@upstand/domain";
+  UserRepositoryToken,
+} from "@upstand/domain";
 import {
+  DrizzleProjectRepository,
   DrizzleUnitOfWork,
-  DrizzleUserRepository } from "@upstand/repositories";
-import { CreateUserUseCase } from "@upstand/usecases";
+  DrizzleUserRepository,
+} from "@upstand/repositories";
+import { CreateProjectUseCase, CreateUserUseCase } from "@upstand/usecases";
 
 export const DbToken = createToken<DatabaseExecutor>("DatabaseExecutor");
 export const CreateUserUseCaseToken =
@@ -21,6 +25,17 @@ services.addScoped(UserRepositoryToken, (c) => {
   const executor = c.resolve(DbToken);
   return new DrizzleUserRepository(executor);
 });
+export const CreateProjectUseCaseToken = createToken<CreateProjectUseCase>(
+  "CreateProjectUseCase",
+);
+services.addScoped(
+  ProjectRepositoryToken,
+  (c) => new DrizzleProjectRepository(c.resolve(DbToken)),
+);
+services.addTransient(
+  CreateProjectUseCaseToken,
+  (c) => new CreateProjectUseCase(c.resolve(UnitOfWorkToken)),
+);
 // 3. Unit of Work (scoped per request)
 services.addScoped(UnitOfWorkToken, (c) => {
   const executor = c.resolve(DbToken);

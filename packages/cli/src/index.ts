@@ -577,7 +577,7 @@ const showCreateStep2 = (state: ModuleConfig) => {
       { name: "date", description: "z.date()", value: "date" },
       { name: "uuid", description: "z.uuid()", value: "uuid" },
       { name: "json", description: "z.any()", value: "json" },
-      { name: "email", description: "z.string().email()", value: "email" },
+      { name: "email", description: "z.email()", value: "email" },
     ];
 
     leftPane.add(

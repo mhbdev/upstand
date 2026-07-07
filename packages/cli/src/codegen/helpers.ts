@@ -26,7 +26,7 @@ export function zodExpr(zodType: ZodTypeName, optional: boolean): string {
   } else if (zodType === "date") {
     base = "z.date()";
   } else if (zodType === "email") {
-    base = "z.string().email()";
+    base = "z.email()";
   } else if (zodType === "json") {
     base = "z.any()";
   } else {
