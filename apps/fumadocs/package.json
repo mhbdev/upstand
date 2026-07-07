@@ -6,9 +6,9 @@
     "build": "next build",
     "dev": "next dev --port=4000",
     "start": "next start",
-    "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
+    "check-types": "fumadocs-mdx && next typegen && tsc --noEmit",
     "postinstall": "fumadocs-mdx",
-    "lint": "biome check",
+    "lint": "biome check .",
     "format": "biome format --write"
   },
   "dependencies": {
@@ -42,6 +42,7 @@
     "@types/react-dom": "^19.2.3",
     "postcss": "^8.5.16",
     "tailwindcss": "^4.3.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "^6.0.0"
   }
 }

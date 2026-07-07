@@ -1,0 +1,28 @@
+{
+  "name": "@upstand/redis",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "biome check .",
+    "redis:start": "docker compose up -d",
+    "redis:watch": "docker compose up",
+    "redis:stop": "docker compose stop",
+    "redis:down": "docker compose down"
+  },
+  "dependencies": {
+    "evlog": "catalog:",
+    "ioredis": "^5.6.1"
+  },
+  "devDependencies": {
+    "@upstand/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

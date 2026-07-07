@@ -1,18 +1,67 @@
 name: upstand
 
 services:
+  postgres:
+    image: postgres:18
+    container_name: upstand-postgres
+    environment:
+      POSTGRES_DB: upstand
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - upstand_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: upstand-server
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: apps/server/.env
+        required: false
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/upstand
+      REDIS_URL: redis://redis:6379
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+    container_name: upstand-web
     init: true
     ports:
       - "3001:3001"
     env_file:
       - path: apps/web/.env
         required: false
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SERVER_URL: http://localhost:3000
     healthcheck:
       test:
         [
@@ -25,25 +74,48 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    depends_on:
+      server:
+        condition: service_started
     restart: unless-stopped
 
-  postgres:
-    image: postgres:18
-    container_name: upstand-postgres
-    environment:
-      POSTGRES_DB: upstand
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+  fumadocs:
+    build:
+      context: .
+      dockerfile: apps/fumadocs/Dockerfile
+    container_name: upstand-fumadocs
+    init: true
     ports:
-      - "5432:5432"
-    volumes:
-      - upstand_postgres_data:/var/lib/postgresql
+      - "4000:4000"
+    env_file:
+      - path: apps/fumadocs/.env.local
+        required: false
+    environment:
+      NODE_ENV: production
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:4000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    depends_on:
+      server:
+        condition: service_started
+  redis:
+    image: redis:7-alpine
+    container_name: upstand-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - upstand_redis_data:/data
     restart: unless-stopped
 
 volumes:
   upstand_postgres_data:
+  upstand_redis_data:

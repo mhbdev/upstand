@@ -1,0 +1,106 @@
+version: "3.8"
+
+name: upstand-local
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: upstand-postgres-local
+    environment:
+      POSTGRES_DB: upstand
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: upstand-server-local
+    command: bun run dev:server
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/server/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/fumadocs/node_modules
+      - /app/packages/repositories/node_modules
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/upstand
+      BETTER_AUTH_SECRET: OwpMUEpPLgl1JdIDBpMbWRBquWnbYv7O
+      BETTER_AUTH_URL: http://localhost:3000
+      CORS_ORIGIN: http://localhost:3001
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: upstand-web-local
+    command: bun run dev:web
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/server/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/fumadocs/node_modules
+      - /app/packages/repositories/node_modules
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+    depends_on:
+      server:
+        condition: service_started
+
+  fumadocs:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: upstand-fumadocs-local
+    command: bun run dev -F fumadocs
+    ports:
+      - "4000:4000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/server/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/fumadocs/node_modules
+      - /app/packages/repositories/node_modules
+    environment:
+      NODE_ENV: development
+    depends_on:
+      server:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    container_name: upstand-redis-local
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

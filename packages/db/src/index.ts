@@ -1,5 +1,6 @@
 import { env } from "@upstand/env/server";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 
 import * as schema from "./schema";
 
@@ -8,3 +9,6 @@ export function createDb() {
 }
 
 export const db = createDb();
+
+export type DatabaseExecutor = NodePgDatabase<typeof schema>;
+export type DatabaseTransactionClient = PgTransaction<any, typeof schema, any>;

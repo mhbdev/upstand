@@ -4,8 +4,11 @@ import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
 import { env } from "@upstand/env/server";
 import { initLogger } from "evlog";
-import { createAuthMiddleware, type BetterAuthInstance } from "evlog/better-auth";
-import { evlog, type EvlogVariables } from "evlog/hono";
+import {
+  type BetterAuthInstance,
+  createAuthMiddleware,
+} from "evlog/better-auth";
+import { type EvlogVariables, evlog } from "evlog/hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 

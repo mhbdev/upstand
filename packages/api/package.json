@@ -9,7 +9,10 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "biome check ."
+  },
   "dependencies": {
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",

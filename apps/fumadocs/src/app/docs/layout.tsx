@@ -2,7 +2,11 @@ import { buttonVariants } from "fumadocs-ui/components/ui/button";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { MessageCircleIcon } from "lucide-react";
 
-import { AISearch, AISearchPanel, AISearchTrigger } from "@/components/ai/search";
+import {
+  AISearch,
+  AISearchPanel,
+  AISearchTrigger,
+} from "@/components/ai/search";
 import { cn } from "@/lib/cn";
 import { baseOptions } from "@/lib/layout.shared";
 import { source } from "@/lib/source";
@@ -17,7 +21,7 @@ export default function Layout({ children }: LayoutProps<"/docs">) {
           className={cn(
             buttonVariants({
               variant: "secondary",
-              className: "text-fd-muted-foreground rounded-2xl",
+              className: "rounded-2xl text-fd-muted-foreground",
             }),
           )}
         >

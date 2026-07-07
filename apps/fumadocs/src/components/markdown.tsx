@@ -55,7 +55,10 @@ export function rehypeWrapWords() {
 }
 
 function createProcessor(): Processor {
-  const processor = remark().use(remarkGfm).use(remarkRehype).use(rehypeWrapWords);
+  const processor = remark()
+    .use(remarkGfm)
+    .use(remarkRehype)
+    .use(rehypeWrapWords);
 
   return {
     async process(content) {
