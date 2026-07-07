@@ -18,6 +18,7 @@ export async function createContext({ context }: CreateContextOptions) {
     auth: null,
     session,
     scope,
+    honoContext: context,
   };
 }
 

@@ -11,7 +11,7 @@
   },
   "scripts": {
     "db:push": "drizzle-kit push",
-    "db:generate": "SKIP_ENV_VALIDATION=1 bun x @better-auth/cli generate --config ../auth/src/index.ts --output src/schema/auth.ts --yes && drizzle-kit generate",
+    "db:generate": "SKIP_ENV_VALIDATION=1 better-auth generate --config ../auth/src/index.ts --output src/schema/auth.ts --yes && drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
     "check-types": "tsc --noEmit",
@@ -25,6 +25,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@types/pg": "^8.20.0",
     "@upstand/config": "workspace:*",
     "drizzle-kit": "^0.31.10",

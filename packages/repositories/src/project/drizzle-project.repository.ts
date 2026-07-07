@@ -4,6 +4,7 @@ import type {
   IProjectRepository,
   Project,
 } from "@upstand/domain";
+import { eq } from "drizzle-orm";
 import { BaseRepository } from "../shared/base.repository";
 import type { Executor } from "../shared/types";
 
@@ -13,5 +14,11 @@ export class DrizzleProjectRepository
 {
   constructor(executor: Executor) {
     super(executor, project);
+  }
+
+  async findByOrganizationId(organizationId: string): Promise<Project[]> {
+    return this.findMany({
+      where: eq(project.organizationId, organizationId),
+    });
   }
 }

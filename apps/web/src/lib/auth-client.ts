@@ -1,4 +1,5 @@
 import { env } from "@upstand/env/web";
+import { organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 function getServerUrl(url: string) {
@@ -37,4 +38,5 @@ export const authClient = createAuthClient({
     "/api/auth",
     getServerUrl(env.NEXT_PUBLIC_SERVER_URL),
   ).toString(),
+  plugins: [organizationClient()],
 });

@@ -1,25 +1,77 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-
+import { redis } from "@upstand/redis";
 import type { Context } from "./context";
 
 export const t = initTRPC.context<Context>().create();
 
 export const router = t.router;
 
-export const publicProcedure = t.procedure;
+// Centralized Rate Limit Middleware using Redis
+export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
+  const ip =
+    ctx.honoContext.req.header("x-forwarded-for") ||
+    ctx.honoContext.req.header("x-real-ip") ||
+    "127.0.0.1";
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
-  if (!ctx.session) {
+  // Use user id if logged in, otherwise fall back to IP address
+  const identifier = ctx.session ? `user:${ctx.session.user.id}` : `ip:${ip}`;
+  const key = `ratelimit:${path}:${identifier}`;
+
+  // Configure limit: 60 requests per 60 seconds
+  const limit = 60;
+  const windowSize = 60; // 1 minute
+  const now = Math.floor(Date.now() / 1000);
+  const currentWindow = now - (now % windowSize);
+  const redisKey = `${key}:${currentWindow}`;
+
+  let count = 0;
+  try {
+    count = await redis.incr(redisKey);
+    if (count === 1) {
+      await redis.expire(redisKey, windowSize);
+    }
+  } catch (error) {
+    // Fail-open logging to avoid blocking users if Redis is down
+    console.error("Rate limit check failed (Redis error):", error);
+    return next();
+  }
+
+  const remaining = Math.max(0, limit - count);
+  const reset = currentWindow + windowSize;
+
+  // Set standard rate limit headers on Hono context
+  ctx.honoContext.header("X-RateLimit-Limit", limit.toString());
+  ctx.honoContext.header("X-RateLimit-Remaining", remaining.toString());
+  ctx.honoContext.header("X-RateLimit-Reset", reset.toString());
+
+  if (count > limit) {
     throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Authentication required",
-      cause: "No session",
+      code: "TOO_MANY_REQUESTS",
+      message: "Rate limit exceeded. Please try again in a minute.",
     });
   }
-  return next({
-    ctx: {
-      ...ctx,
-      session: ctx.session,
-    },
-  });
+
+  return next();
 });
+
+// All public procedures run through the rate limiter
+export const publicProcedure = t.procedure.use(rateLimitMiddleware);
+
+// Protected procedures run through rate limiter and check session
+export const protectedProcedure = t.procedure
+  .use(rateLimitMiddleware)
+  .use(({ ctx, next }) => {
+    if (!ctx.session) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+        cause: "No session",
+      });
+    }
+    return next({
+      ctx: {
+        ...ctx,
+        session: ctx.session,
+      },
+    });
+  });

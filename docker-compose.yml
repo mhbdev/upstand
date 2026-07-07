@@ -2,7 +2,7 @@ name: upstand
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:16-alpine
     container_name: upstand-postgres
     environment:
       POSTGRES_DB: upstand

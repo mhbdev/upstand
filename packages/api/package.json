@@ -23,6 +23,8 @@
     "@upstand/usecases": "workspace:*",
     "@upstand/repositories": "workspace:*",
     "@upstand/env": "workspace:*",
+    "@upstand/redis": "workspace:*",
+    "drizzle-orm": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },

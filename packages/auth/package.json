@@ -16,7 +16,9 @@
   "dependencies": {
     "@upstand/db": "workspace:*",
     "@upstand/env": "workspace:*",
+    "@upstand/redis": "workspace:*",
     "better-auth": "catalog:",
+    "drizzle-orm": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
