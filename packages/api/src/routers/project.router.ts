@@ -1,7 +1,7 @@
 import { CreateProjectInputSchema } from "@upstand/usecases";
 import { CreateProjectUseCaseToken } from "../di";
 import { handleUseCaseError } from "../errors";
-import { protectedProcedure, router } from "../index";
+import { protectedProcedure, router, publicProcedure } from "../index";
 
 export const projectRouter = router({
   create: protectedProcedure
@@ -13,5 +13,5 @@ export const projectRouter = router({
       } catch (error) {
         handleUseCaseError(error);
       }
-    }),
+    })
 });

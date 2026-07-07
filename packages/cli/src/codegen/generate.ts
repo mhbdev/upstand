@@ -7,7 +7,7 @@ import {
   VariableDeclarationKind,
 } from "ts-morph";
 import { PATHS } from "../config";
-import type { ModuleConfig, ProcedureConfig } from "../types";
+import type { FieldDef, ModuleConfig, ProcedureConfig } from "../types";
 import {
   buildDrizzleSchemaBody,
   buildDtoBody,
@@ -763,6 +763,255 @@ export function unpatchRoutersIndex(name: string, log: string[]): void {
   log.push("[MOD] packages/api/src/routers/index.ts");
 }
 
+export function generateCustomUseCaseFile(
+  moduleName: string,
+  usecaseName: string,
+  fields: FieldDef[],
+  log: string[],
+): void {
+  const lcModule = moduleName.toLowerCase();
+  const lcName = usecaseName.toLowerCase();
+  const capName = capitalize(usecaseName);
+  const project = getProject();
+  const filePath = join(PATHS.usecasesSrc, lcModule, `${lcName}.usecase.ts`);
+  ensureDir(filePath);
+
+  const stale = project.getSourceFile(filePath);
+  if (stale) project.removeSourceFile(stale);
+
+  const file = project.createSourceFile(
+    filePath,
+    `import type { IUnitOfWork } from "@upstand/domain";\n` +
+      `import { z } from "zod";\n\n` +
+      `export const ${capName}InputSchema = z.object({\n${buildInputSchemaBody(fields)}\n});\n\n` +
+      `export type ${capName}Input = z.infer<typeof ${capName}InputSchema>;\n\n` +
+      `export class ${capName}UseCase {\n` +
+      "  constructor(private readonly uow: IUnitOfWork) {}\n\n" +
+      `  async execute(_input: ${capName}Input): Promise<any> {\n` +
+      "    return this.uow.transaction(async (_tx) => {\n" +
+      "      // TODO: implement business logic\n" +
+      '      throw new Error("Not implemented");\n' +
+      "    });\n" +
+      "  }\n" +
+      "}\n",
+    { overwrite: true },
+  );
+  file.saveSync();
+  log.push(`[NEW] packages/usecases/src/${lcModule}/${lcName}.usecase.ts`);
+}
+
+export function removeCustomUseCaseFile(
+  moduleName: string,
+  usecaseName: string,
+  log: string[],
+): void {
+  const lcModule = moduleName.toLowerCase();
+  const lcName = usecaseName.toLowerCase();
+  const filePath = join(PATHS.usecasesSrc, lcModule, `${lcName}.usecase.ts`);
+  if (!existsSync(filePath)) return;
+  const sf = getProject().getSourceFile(filePath);
+  if (sf) getProject().removeSourceFile(sf);
+  rmSync(filePath);
+  log.push(`[DEL] packages/usecases/src/${lcModule}/${lcName}.usecase.ts`);
+}
+
+export function patchCustomUseCaseExport(
+  moduleName: string,
+  usecaseName: string,
+  log: string[],
+): void {
+  const lcModule = moduleName.toLowerCase();
+  const lcName = usecaseName.toLowerCase();
+  const project = getProject();
+  if (!existsSync(PATHS.usecasesIndex)) {
+    ensureDir(PATHS.usecasesIndex);
+    project
+      .createSourceFile(
+        PATHS.usecasesIndex,
+        `export * from "./user/create-user.usecase";\n`,
+      )
+      .saveSync();
+  }
+  const file =
+    project.getSourceFile(PATHS.usecasesIndex) ??
+    project.addSourceFileAtPath(PATHS.usecasesIndex);
+  const spec = `./${lcModule}/${lcName}.usecase`;
+  const already = file
+    .getExportDeclarations()
+    .some((e) => e.getModuleSpecifierValue() === spec);
+  if (!already) {
+    file.addExportDeclaration({ moduleSpecifier: spec });
+  }
+  file.saveSync();
+  log.push("[MOD] packages/usecases/src/index.ts");
+}
+
+export function unpatchCustomUseCaseExport(
+  moduleName: string,
+  usecaseName: string,
+  log: string[],
+): void {
+  const lcModule = moduleName.toLowerCase();
+  const lcName = usecaseName.toLowerCase();
+  const project = getProject();
+  if (!existsSync(PATHS.usecasesIndex)) return;
+  const file =
+    project.getSourceFile(PATHS.usecasesIndex) ??
+    project.addSourceFileAtPath(PATHS.usecasesIndex);
+  const spec = `./${lcModule}/${lcName}.usecase`;
+  const decl = file
+    .getExportDeclarations()
+    .find((e) => e.getModuleSpecifierValue() === spec);
+  if (decl) decl.remove();
+  file.saveSync();
+  log.push("[MOD] packages/usecases/src/index.ts");
+}
+
+export function patchCustomUseCaseDi(usecaseName: string, log: string[]): void {
+  const cap = capitalize(usecaseName);
+  const project = getProject();
+  if (!existsSync(PATHS.diTs)) {
+    ensureDir(PATHS.diTs);
+  }
+  const file =
+    project.getSourceFile(PATHS.diTs) ??
+    project.addSourceFileAtPath(PATHS.diTs);
+  addNamedImport(file, "@upstand/usecases", `${cap}UseCase`);
+  if (!file.getVariableDeclaration(`${cap}UseCaseToken`)) {
+    const spIdx = serviceProviderIndex(file);
+    file.insertStatements(spIdx, [
+      `export const ${cap}UseCaseToken = createToken<${cap}UseCase>("${cap}UseCase");`,
+    ]);
+  }
+  const alreadyRegistered = file
+    .getStatements()
+    .some(
+      (s) =>
+        s.getText().includes(`${cap}UseCaseToken`) &&
+        s.getText().includes("addTransient"),
+    );
+  if (!alreadyRegistered) {
+    const spIdx = serviceProviderIndex(file);
+    file.insertStatements(spIdx, [
+      `services.addTransient(${cap}UseCaseToken, (c) => new ${cap}UseCase(c.resolve(UnitOfWorkToken)));`,
+    ]);
+  }
+  file.saveSync();
+  log.push("[MOD] packages/api/src/di.ts");
+}
+
+export function unpatchCustomUseCaseDi(
+  usecaseName: string,
+  log: string[],
+): void {
+  const cap = capitalize(usecaseName);
+  const project = getProject();
+  if (!existsSync(PATHS.diTs)) return;
+  const file =
+    project.getSourceFile(PATHS.diTs) ??
+    project.addSourceFileAtPath(PATHS.diTs);
+  file
+    .getVariableDeclaration(`${cap}UseCaseToken`)
+    ?.getFirstAncestorByKind(SyntaxKind.VariableStatement)
+    ?.remove();
+  for (const stmt of [...file.getStatements()]) {
+    const text = stmt.getText();
+    if (text.includes(`${cap}UseCaseToken`) && text.includes("addTransient")) {
+      stmt.remove();
+    }
+  }
+  removeNamedImportAnywhere(file, `${cap}UseCase`);
+  file.saveSync();
+  log.push("[MOD] packages/api/src/di.ts");
+}
+
+export function patchCustomUseCaseRouter(
+  moduleName: string,
+  usecaseName: string,
+  procedureAccess: "public" | "protected",
+  procedureKind: "query" | "mutation",
+  log: string[],
+): void {
+  const lcModule = moduleName.toLowerCase();
+  const lcName = usecaseName.toLowerCase();
+  const capName = capitalize(usecaseName);
+  const project = getProject();
+  const filePath = join(PATHS.routersSrc, `${lcModule}.router.ts`);
+  if (!existsSync(filePath)) {
+    log.push(`[ERR] Router file not found: ${filePath}`);
+    return;
+  }
+  const file =
+    project.getSourceFile(filePath) ?? project.addSourceFileAtPath(filePath);
+  const procedure =
+    procedureAccess === "public" ? "publicProcedure" : "protectedProcedure";
+  addNamedImport(file, "../index", procedure);
+  addNamedImport(file, "../di", `${capName}UseCaseToken`);
+  addNamedImport(file, "@upstand/usecases", `${capName}InputSchema`);
+
+  const routerVar = file.getVariableDeclaration(`${lcModule}Router`);
+  if (!routerVar) {
+    log.push(`[ERR] Could not find ${lcModule}Router variable`);
+    return;
+  }
+  const callExpr = routerVar.getInitializerIfKind(SyntaxKind.CallExpression);
+  if (!callExpr) {
+    log.push(`[ERR] ${lcModule}Router initializer is not a call expression`);
+    return;
+  }
+  const arg = callExpr.getArguments()[0];
+  if (!arg?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+    log.push("[ERR] Expected object literal as router() argument");
+    return;
+  }
+  const routerObj = arg.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+  if (routerObj.getProperty(lcName)) {
+    log.push(
+      `[SKIP] Procedure '${lcName}' already exists in ${lcModule}Router`,
+    );
+    return;
+  }
+
+  const inputLine = `    .input(${capName}InputSchema)\n`;
+  const body = `    .${procedureKind}(async ({ ctx, input }) => {\n      const useCase = ctx.scope.resolve(${capName}UseCaseToken);\n      try {\n        return await useCase.execute(input);\n      } catch (error) {\n        handleUseCaseError(error);\n      }\n    })`;
+  const initializer = `${procedure}\n${inputLine}${body}`;
+  routerObj.addPropertyAssignment({ name: lcName, initializer });
+  file.saveSync();
+  log.push(
+    `[MOD] packages/api/src/routers/${lcModule}.router.ts — added '${lcName}'`,
+  );
+}
+
+export function unpatchCustomUseCaseRouter(
+  moduleName: string,
+  usecaseName: string,
+  log: string[],
+): void {
+  const lcModule = moduleName.toLowerCase();
+  const lcName = usecaseName.toLowerCase();
+  const capName = capitalize(usecaseName);
+  const project = getProject();
+  const filePath = join(PATHS.routersSrc, `${lcModule}.router.ts`);
+  if (!existsSync(filePath)) return;
+  const file =
+    project.getSourceFile(filePath) ?? project.addSourceFileAtPath(filePath);
+  const routerVar = file.getVariableDeclaration(`${lcModule}Router`);
+  const callExpr = routerVar?.getInitializerIfKind(SyntaxKind.CallExpression);
+  const arg = callExpr?.getArguments()[0];
+  if (arg?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+    arg
+      .asKindOrThrow(SyntaxKind.ObjectLiteralExpression)
+      .getProperty(lcName)
+      ?.remove();
+  }
+  removeNamedImport(file, "../di", `${capName}UseCaseToken`);
+  removeNamedImport(file, "@upstand/usecases", `${capName}InputSchema`);
+  file.saveSync();
+  log.push(
+    `[MOD] packages/api/src/routers/${lcModule}.router.ts — removed '${lcName}'`,
+  );
+}
+
 export function generateDrizzleSchemaFile(
   config: ModuleConfig,
   log: string[],
@@ -849,5 +1098,14 @@ export function getActiveModules(): string[] {
   return readdirSync(dir)
     .filter((f: string) => f.endsWith(".ts") && f !== "user.ts")
     .map((f: string) => f.replace(".ts", ""))
+    .sort();
+}
+
+export function getModuleUseCases(moduleName: string): string[] {
+  const dir = join(PATHS.usecasesSrc, moduleName.toLowerCase());
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".usecase.ts"))
+    .map((f) => f.replace(".usecase.ts", ""))
     .sort();
 }
