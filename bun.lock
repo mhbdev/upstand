@@ -193,18 +193,6 @@
         "typescript": "catalog:",
       },
     },
-    "packages/cli": {
-      "name": "@upstand/cli",
-      "version": "0.0.0",
-      "dependencies": {
-        "@opentui/core": "^0.4.3",
-        "ts-morph": "^28.0.0",
-      },
-      "devDependencies": {
-        "@upstand/config": "workspace:*",
-        "typescript": "catalog:",
-      },
-    },
     "packages/config": {
       "name": "@upstand/config",
       "version": "0.0.0",
@@ -1193,8 +1181,6 @@
     "@upstand/api": ["@upstand/api@workspace:packages/api"],
 
     "@upstand/auth": ["@upstand/auth@workspace:packages/auth"],
-
-    "@upstand/cli": ["@upstand/cli@workspace:packages/cli"],
 
     "@upstand/config": ["@upstand/config@workspace:packages/config"],
 

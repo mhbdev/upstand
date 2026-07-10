@@ -45,8 +45,6 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "check-types": "turbo run check-types",
-    "cli": "bun run packages/cli/src/index.ts",
-    "gc": "bun run packages/cli/src/index.ts create",
     "lint": "turbo run lint",
     "format": "biome format --write .",
     "dev:web": "turbo run dev -F web",
