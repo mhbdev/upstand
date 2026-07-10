@@ -1,0 +1,523 @@
+"use client";
+
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Badge } from "@upstand/ui/components/badge";
+import { Button } from "@upstand/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@upstand/ui/components/card";
+import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
+import { Spinner } from "@upstand/ui/components/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@upstand/ui/components/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@upstand/ui/components/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@upstand/ui/components/dialog";
+import {
+  Activity,
+  Play,
+  Settings,
+  Server,
+  Clock,
+  Trash2,
+  Terminal,
+  RefreshCw,
+  Search,
+  XCircle,
+  Copy,
+  CheckCircle,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { trpc } from "@/utils/trpc";
+
+export default function DeploymentsPage() {
+  const [activeTab, setActiveTab] = useState("history");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
+  const [concurrencyInputs, setConcurrencyInputs] = useState<Record<string, number>>({});
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Queries
+  const {
+    data: deployments = [],
+    isPending: loadingDeployments,
+    refetch: refetchDeployments,
+  } = useQuery({
+    ...trpc.deployment.getDeployments.queryOptions(),
+    refetchInterval: activeTab === "history" ? 5000 : false,
+  });
+
+  const {
+    data: queueJobs = [],
+    isPending: loadingQueue,
+    refetch: refetchQueue,
+  } = useQuery({
+    ...trpc.deployment.getQueue.queryOptions(),
+    refetchInterval: activeTab === "queue" ? 3000 : false,
+  });
+
+  const {
+    data: servers = [],
+    isPending: loadingServers,
+    refetch: refetchServers,
+  } = useQuery({
+    ...trpc.deployment.getServerSettings.queryOptions(),
+  });
+
+  // Sync concurrency inputs from DB settings
+  useEffect(() => {
+    if (servers.length > 0) {
+      const inputs: Record<string, number> = {};
+      for (const server of servers) {
+        inputs[server.id] = server.concurrency;
+      }
+      setConcurrencyInputs(inputs);
+    }
+  }, [servers]);
+
+  // Auto-scroll logs modal to bottom
+  useEffect(() => {
+    if (selectedDeployment) {
+      setTimeout(() => {
+        logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, [selectedDeployment]);
+
+  // Live update log details if modal is open
+  useEffect(() => {
+    if (selectedDeployment) {
+      const liveDep = deployments.find((d) => d.id === selectedDeployment.id);
+      if (liveDep && liveDep.logs !== selectedDeployment.logs) {
+        setSelectedDeployment(liveDep);
+      }
+    }
+  }, [deployments, selectedDeployment]);
+
+  // Mutations
+  const updateConcurrencyMutation = useMutation({
+    ...trpc.deployment.updateServerConcurrency.mutationOptions(),
+    onSuccess: (data) => {
+      toast.success(`Concurrency updated for server ${data.hostname}`);
+      refetchServers();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update concurrency");
+    },
+  });
+
+  const cancelJobMutation = useMutation({
+    ...trpc.deployment.cancelDeploymentJob.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Deployment cancelled successfully");
+      refetchQueue();
+      refetchDeployments();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to cancel deployment");
+    },
+  });
+
+  const handleUpdateConcurrency = (serverId: string) => {
+    const val = concurrencyInputs[serverId];
+    if (!val || val < 1) {
+      toast.error("Concurrency must be at least 1");
+      return;
+    }
+    const serverObj = servers.find((s) => s.id === serverId);
+    updateConcurrencyMutation.mutate({
+      serverId,
+      concurrency: val,
+      hostname: serverObj?.hostname,
+      ip: serverObj?.ip,
+    });
+  };
+
+  const handleCancelJob = (serverId: string, jobId: string) => {
+    if (confirm("Are you sure you want to cancel this deployment?")) {
+      cancelJobMutation.mutate({ serverId, jobId });
+    }
+  };
+
+  // Filter deployments
+  const filteredDeployments = deployments.filter((dep) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      dep.resourceName.toLowerCase().includes(query) ||
+      dep.title.toLowerCase().includes(query) ||
+      dep.status.toLowerCase().includes(query) ||
+      (dep.serverName && dep.serverName.toLowerCase().includes(query))
+    );
+  });
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "success":
+        return (
+          <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border-emerald-500/30 gap-1">
+            <CheckCircle className="size-3" />
+            Success
+          </Badge>
+        );
+      case "running":
+        return (
+          <Badge className="bg-blue-500/15 text-blue-500 hover:bg-blue-500/25 border-blue-500/30 gap-1 animate-pulse">
+            <Activity className="size-3" />
+            Running
+          </Badge>
+        );
+      case "queued":
+        return (
+          <Badge className="bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 border-amber-500/30 gap-1">
+            <Clock className="size-3" />
+            Queued
+          </Badge>
+        );
+      case "failed":
+        return (
+          <Badge className="bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 border-rose-500/30 gap-1">
+            <XCircle className="size-3" />
+            Failed
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  return (
+    <div className="flex-1 space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Deployments & Queues</h1>
+          <p className="text-muted-foreground mt-1">
+            Observe build histories, monitor live queues, and manage server-level concurrency.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => {
+            refetchDeployments();
+            refetchQueue();
+            refetchServers();
+          }}
+          className="size-9"
+        >
+          <RefreshCw className="size-4" />
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="border-b pb-px">
+          <TabsList className="mb-4">
+            <TabsTrigger value="history" className="gap-2">
+              <Activity className="size-4" />
+              History
+            </TabsTrigger>
+            <TabsTrigger value="queue" className="gap-2">
+              <Clock className="size-4" />
+              Queue ({queueJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="concurrency" className="gap-2">
+              <Settings className="size-4" />
+              Build Concurrency
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Tab 1: History */}
+        <TabsContent value="history" className="space-y-4">
+          <Card className="border-muted/40 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-lg font-semibold">Deployment History</CardTitle>
+                <CardDescription>All deployments executed across the server infrastructure.</CardDescription>
+              </div>
+              <div className="relative w-72">
+                <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filter deployments..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingDeployments ? (
+                <div className="flex h-32 items-center justify-center">
+                  <Spinner className="size-6 text-primary" />
+                </div>
+              ) : filteredDeployments.length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
+                  <Activity className="size-8 stroke-[1.5] mb-2" />
+                  <p>No deployments found.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Service</TableHead>
+                        <TableHead>Environment</TableHead>
+                        <TableHead>Server</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Triggered</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDeployments.map((dep) => (
+                        <TableRow key={dep.id} className="hover:bg-muted/10">
+                          <TableCell className="font-semibold text-foreground">
+                            {dep.resourceName}
+                            <span className="block text-xs font-normal text-muted-foreground capitalize">
+                              {dep.resourceType}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">
+                              {dep.projectName} / <span className="text-muted-foreground">{dep.environmentName}</span>
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">{dep.serverName}</TableCell>
+                          <TableCell className="max-w-[180px] truncate">{dep.title}</TableCell>
+                          <TableCell>{getStatusBadge(dep.status)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(dep.createdAt).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedDeployment(dep)}
+                              className="h-8 gap-1.5"
+                            >
+                              <Terminal className="size-3.5" />
+                              Logs
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 2: Queue */}
+        <TabsContent value="queue" className="space-y-4">
+          <Card className="border-muted/40 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Live Job Queue</CardTitle>
+              <CardDescription>Currently active or waiting deployments in BullMQ.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingQueue ? (
+                <div className="flex h-32 items-center justify-center">
+                  <Spinner className="size-6 text-primary" />
+                </div>
+              ) : queueJobs.length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
+                  <Clock className="size-8 stroke-[1.5] mb-2" />
+                  <p>Queue is empty.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Job ID</TableHead>
+                        <TableHead>Service</TableHead>
+                        <TableHead>Server Queue</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Queue State</TableHead>
+                        <TableHead>Queued At</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {queueJobs.map((job) => (
+                        <TableRow key={job.id} className="hover:bg-muted/10">
+                          <TableCell className="font-mono text-xs">{job.id}</TableCell>
+                          <TableCell className="font-semibold text-foreground">
+                            {job.resourceName}
+                            <span className="block text-xs font-normal text-muted-foreground capitalize">
+                              {job.type}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">{job.serverName}</TableCell>
+                          <TableCell className="max-w-[180px] truncate">{job.label}</TableCell>
+                          <TableCell>
+                            <Badge
+                              className={
+                                job.state === "active"
+                                  ? "bg-blue-500/15 text-blue-500 border-blue-500/30 animate-pulse"
+                                  : job.state === "waiting"
+                                  ? "bg-amber-500/15 text-amber-500 border-amber-500/30"
+                                  : "bg-gray-500/15 text-gray-500 border-gray-500/30"
+                              }
+                            >
+                              {job.state}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(job.addedAt).toLocaleTimeString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleCancelJob(job.serverId, job.id)}
+                              className="size-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                              disabled={cancelJobMutation.isPending}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 3: Concurrency */}
+        <TabsContent value="concurrency" className="space-y-4">
+          <Card className="border-muted/40 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Build Concurrency Settings</CardTitle>
+              <CardDescription>
+                Configure the maximum number of parallel docker builds allowed on each Swarm node / server.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingServers ? (
+                <div className="flex h-32 items-center justify-center">
+                  <Spinner className="size-6 text-primary" />
+                </div>
+              ) : servers.length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
+                  <Server className="size-8 stroke-[1.5] mb-2" />
+                  <p>No active servers detected.</p>
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  {servers.map((server) => (
+                    <Card key={server.id} className="border bg-card/50 hover:bg-card transition-all">
+                      <CardContent className="pt-6 space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-semibold text-base text-foreground">{server.hostname}</h3>
+                            <p className="text-xs text-muted-foreground font-mono mt-0.5">{server.ip}</p>
+                            <span className="inline-block mt-2 text-[10px] font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                              ID: {server.id}
+                            </span>
+                          </div>
+                          <Server className="size-5 text-muted-foreground/60" />
+                        </div>
+
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor={`concurrency-${server.id}`} className="text-xs font-semibold">
+                            Max Parallel Builds
+                          </Label>
+                          <div className="flex items-center gap-3">
+                            <Input
+                              id={`concurrency-${server.id}`}
+                              type="number"
+                              min="1"
+                              max="16"
+                              value={concurrencyInputs[server.id] ?? 1}
+                              onChange={(e) =>
+                                setConcurrencyInputs({
+                                  ...concurrencyInputs,
+                                  [server.id]: parseInt(e.target.value) || 1,
+                                })
+                              }
+                              className="w-24 h-9"
+                            />
+                            <Button
+                              onClick={() => handleUpdateConcurrency(server.id)}
+                              disabled={updateConcurrencyMutation.isPending}
+                              size="sm"
+                              className="h-9 gap-1.5"
+                            >
+                              Save
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Additional deployment triggers for this server will queue up and wait.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Logs Modal */}
+      <Dialog open={!!selectedDeployment} onOpenChange={(open) => !open && setSelectedDeployment(null)}>
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-6 border-muted/40">
+          <DialogHeader className="pb-2 border-b">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-xl flex items-center gap-2">
+                  <Terminal className="size-5 text-primary" />
+                  Deployment Logs: {selectedDeployment?.resourceName}
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  ID: <span className="font-mono text-xs">{selectedDeployment?.id}</span> | Title: {selectedDeployment?.title}
+                </DialogDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedDeployment?.logs || "");
+                  toast.success("Logs copied to clipboard");
+                }}
+                className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                <Copy className="size-3.5" />
+                Copy Logs
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 bg-[#0c0d12] border border-muted/20 rounded-xl p-4 font-mono text-xs text-zinc-300 overflow-y-auto leading-relaxed mt-4 shadow-inner">
+            <pre className="whitespace-pre-wrap">{selectedDeployment?.logs || "No logs available."}</pre>
+            <div ref={logsEndRef} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -1,0 +1,18 @@
+import type {
+  CreateEnvironmentDTO,
+  Environment,
+} from "../entities/environment";
+
+export interface IEnvironmentRepository {
+  findById(id: string): Promise<Environment | null>;
+  findByProjectId(projectId: string): Promise<Environment[]>;
+  create(data: CreateEnvironmentDTO): Promise<Environment>;
+  findMany(options?: unknown): Promise<Environment[]>;
+  createMany(values: CreateEnvironmentDTO[]): Promise<Environment[]>;
+  updateById(
+    id: string,
+    patch: Partial<CreateEnvironmentDTO>,
+  ): Promise<Environment | null>;
+  deleteById(id: string): Promise<boolean>;
+  count(where?: unknown): Promise<number>;
+}

@@ -14,11 +14,23 @@ export class CreateProjectUseCase {
 
   async execute(input: CreateProjectInput): Promise<Project> {
     return this.uow.transaction(async (tx) => {
-      return await tx.projectRepository.create({
+      const project = await tx.projectRepository.create({
         id: randomUUID(),
         name: input.name,
         organizationId: input.organizationId,
       });
+
+      await tx.environmentRepository.create({
+        id: randomUUID(),
+        projectId: project.id,
+        name: "production",
+        slug: "production",
+        isDefault: true,
+        isProtected: true,
+        resourceCount: 0,
+      });
+
+      return project;
     });
   }
 }

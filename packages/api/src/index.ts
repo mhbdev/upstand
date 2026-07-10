@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { redis } from "@upstand/redis";
+import { log } from "evlog";
 import type { Context } from "./context";
 
 export const t = initTRPC.context<Context>().create();
@@ -30,9 +31,12 @@ export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
     if (count === 1) {
       await redis.expire(redisKey, windowSize);
     }
-  } catch (error) {
+  } catch (error: any) {
     // Fail-open logging to avoid blocking users if Redis is down
-    console.error("Rate limit check failed (Redis error):", error);
+    log.error({
+      message: "Rate limit check failed (Redis error)",
+      err: error.message || error,
+    });
     return next();
   }
 
@@ -75,3 +79,22 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+// Two-Factor verified procedures check if user has 2FA enabled and if it's verified in Redis
+export const twoFactorVerifiedProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    if (ctx.session.user.twoFactorEnabled) {
+      const verified = await redis.get(
+        `2fa-verified:${ctx.session.session.id}`,
+      );
+      if (verified !== "true") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "2FA verification required",
+          cause: "2FA_PENDING",
+        });
+      }
+    }
+    return next();
+  },
+);

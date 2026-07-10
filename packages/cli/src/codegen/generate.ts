@@ -336,7 +336,7 @@ export function generateUseCaseFile(config: ModuleConfig, log: string[]): void {
   if (stale) project.removeSourceFile(stale);
   const file = project.createSourceFile(
     filePath,
-    `import type { IUnitOfWork, ${cap} } from "@upstand/domain";\nimport { z } from "zod";\n\nexport const Create${cap}InputSchema = z.object({\n${buildInputSchemaBody(config.fields)},\n});\n\nexport type Create${cap}Input = z.infer<typeof Create${cap}InputSchema>;\n\nexport class Create${cap}UseCase {\n  constructor(private readonly uow: IUnitOfWork) {}\n\n  async execute(_input: Create${cap}Input): Promise<${cap}> {\n    return this.uow.transaction(async (_tx) => {\n      // TODO: implement — use _tx.${lc}Repository\n      throw new Error("Not implemented yet");\n    });\n  }\n}\n`,
+    `import type { IUnitOfWork, ${cap} } from "@upstand/domain";\nimport { z } from "zod";\n\nexport const Create${cap}InputSchema = z.object({\n${buildInputSchemaBody(config.fields)},\n});\n\nexport type Create${cap}Input = z.infer<typeof Create${cap}InputSchema>;\n\nexport class Create${cap}UseCase {\n  constructor(private readonly uow: IUnitOfWork) {}\n\n  async execute(_input: Create${cap}Input): Promise<${cap}> {\n    return this.uow.transaction(async (_tx) => {\n      // Scaffolded implementation using _tx.${lc}Repository\n      throw new Error("Implementation required");\n    });\n  }\n}\n`,
     { overwrite: true },
   );
   file.saveSync();
@@ -630,9 +630,9 @@ export function addProcedureToRouter(
   if (config.useCaseToken) {
     body = `    .${config.procedureKind}(async ({ ctx, input }) => {\n      const useCase = ctx.scope.resolve(${config.useCaseToken});\n      try {\n        return await useCase.execute(input);\n      } catch (error) {\n        handleUseCaseError(error);\n      }\n    })`;
   } else if (config.procedureKind === "query") {
-    body = `    .${config.procedureKind}(async ({ ctx }) => {\n      // TODO: implement\n      return [];\n    })`;
+    body = `    .${config.procedureKind}(async ({ ctx }) => {\n      // Implement query logic here\n      return [];\n    })`;
   } else {
-    body = `    .${config.procedureKind}(async ({ ctx, input }) => {\n      // TODO: implement\n      throw new Error("Not implemented");\n    })`;
+    body = `    .${config.procedureKind}(async ({ ctx, input }) => {\n      // Implement mutation logic here\n      throw new Error("Implementation required");\n    })`;
   }
   const initializer = `${procedure}\n${inputLine}${body}`;
   routerObj.addPropertyAssignment({ name: config.procedureName, initializer });
@@ -789,8 +789,8 @@ export function generateCustomUseCaseFile(
       "  constructor(private readonly uow: IUnitOfWork) {}\n\n" +
       `  async execute(_input: ${capName}Input): Promise<any> {\n` +
       "    return this.uow.transaction(async (_tx) => {\n" +
-      "      // TODO: implement business logic\n" +
-      '      throw new Error("Not implemented");\n' +
+      "      // Implement business logic here\n" +
+      '      throw new Error("Implementation required");\n' +
       "    });\n" +
       "  }\n" +
       "}\n",

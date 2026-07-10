@@ -1,0 +1,263 @@
+# Production Docker Swarm stack. Image variables must point to immutable image
+# digests; the installer refuses mutable tags for the three Upstand services.
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16.4-alpine}
+    environment:
+      POSTGRES_DB: upstand
+      POSTGRES_USER: upstand
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - upstand-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upstand -d upstand"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.upstand.control-plane == true
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+        monitor: 30s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        failure_action: pause
+        monitor: 30s
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4-alpine}
+    command:
+      [
+        "sh",
+        "-ec",
+        "exec redis-server --appendonly yes --appendfsync everysec --maxmemory-policy noeviction --requirepass \"$${REDIS_PASSWORD}\"",
+      ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - redis_data:/data
+    networks:
+      - upstand-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.upstand.control-plane == true
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+        monitor: 30s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        failure_action: pause
+        monitor: 30s
+      resources:
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+        limits:
+          cpus: "0.75"
+          memory: 512M
+
+  server:
+    image: ${UPSTAND_SERVER_IMAGE:?UPSTAND_SERVER_IMAGE is required}
+    init: true
+    stop_grace_period: 5m
+    ports:
+      - target: 3000
+        published: ${UPSTAND_SERVER_PORT:-3000}
+        protocol: tcp
+        mode: host
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://upstand:${POSTGRES_PASSWORD}@postgres:5432/upstand
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL is required}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      SSH_KEY_ENCRYPTION_KEY_V1: ${SSH_KEY_ENCRYPTION_KEY_V1:?SSH_KEY_ENCRYPTION_KEY_V1 is required}
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DOCKER_NETWORK: upstand-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - upstand-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:3000/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.upstand.control-plane == true
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+        monitor: 45s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        failure_action: pause
+        monitor: 45s
+      resources:
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  web:
+    image: ${UPSTAND_WEB_IMAGE:?UPSTAND_WEB_IMAGE is required}
+    ports:
+      - target: 3001
+        published: ${UPSTAND_WEB_PORT:-3001}
+        protocol: tcp
+        mode: host
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?NEXT_PUBLIC_SERVER_URL is required}
+    networks:
+      - upstand-network
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.upstand.control-plane == true
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+        monitor: 45s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        failure_action: pause
+        monitor: 45s
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  fumadocs:
+    image: ${UPSTAND_DOCS_IMAGE:?UPSTAND_DOCS_IMAGE is required}
+    ports:
+      - target: 4000
+        published: ${UPSTAND_DOCS_PORT:-4000}
+        protocol: tcp
+        mode: host
+    environment:
+      NODE_ENV: production
+    networks:
+      - upstand-network
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:4000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.upstand.control-plane == true
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+        monitor: 45s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        failure_action: pause
+        monitor: 45s
+      resources:
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+        limits:
+          cpus: "0.50"
+          memory: 512M
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  upstand-network:
+    external: true
+    name: ${DOCKER_NETWORK:-upstand-network}

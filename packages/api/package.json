@@ -14,18 +14,20 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@circulo-ai/di": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
-    "@circulo-ai/di": "catalog:",
     "@upstand/auth": "workspace:*",
     "@upstand/db": "workspace:*",
     "@upstand/domain": "workspace:*",
-    "@upstand/usecases": "workspace:*",
-    "@upstand/repositories": "workspace:*",
     "@upstand/env": "workspace:*",
     "@upstand/redis": "workspace:*",
-    "drizzle-orm": "catalog:",
+    "@upstand/repositories": "workspace:*",
+    "@upstand/usecases": "workspace:*",
+    "bullmq": "^5.79.3",
     "dotenv": "catalog:",
+    "drizzle-orm": "catalog:",
+    "evlog": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

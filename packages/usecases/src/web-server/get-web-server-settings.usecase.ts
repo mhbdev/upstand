@@ -1,0 +1,58 @@
+import type { IUnitOfWork, WebServerSettings } from "@upstand/domain";
+import type { CaddyService } from "./caddy.service";
+
+export class GetWebServerSettingsUseCase {
+  constructor(
+    private readonly uow: IUnitOfWork,
+    private readonly caddyService: CaddyService,
+  ) {}
+
+  async execute(): Promise<{ settings: WebServerSettings; status: any }> {
+    let settings = await this.uow.webServerSettingsRepository.findGlobal();
+    if (!settings) {
+      settings = await this.uow.webServerSettingsRepository.createGlobal({});
+    }
+
+    if (!settings.serverIp) {
+      let detectedIp = "";
+      try {
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = (await res.json()) as { ip: string };
+        if (data.ip) {
+          detectedIp = data.ip;
+        }
+      } catch {
+        try {
+          const os = await import("node:os");
+          const interfaces = os.networkInterfaces();
+          for (const name of Object.keys(interfaces)) {
+            for (const net of interfaces[name] || []) {
+              if (net.family === "IPv4" && !net.internal) {
+                detectedIp = net.address;
+                break;
+              }
+            }
+            if (detectedIp) break;
+          }
+        } catch {}
+      }
+
+      if (detectedIp) {
+        const updated = await this.uow.webServerSettingsRepository.updateGlobal(
+          {
+            serverIp: detectedIp,
+          },
+        );
+        if (updated) {
+          settings = updated;
+        }
+      }
+    }
+
+    const resources = await this.uow.resourceRepository.findMany();
+    await this.caddyService.initializeCaddy(settings);
+    await this.caddyService.syncResourceConfigs(resources, settings);
+    const status = await this.caddyService.getStatus();
+    return { settings, status };
+  }
+}

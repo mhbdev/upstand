@@ -1,0 +1,142 @@
+"use client";
+
+import { Shield01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@upstand/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@upstand/ui/components/card";
+import { Field, FieldLabel } from "@upstand/ui/components/field";
+import { Input } from "@upstand/ui/components/input";
+import { Separator } from "@upstand/ui/components/separator";
+import { Spinner } from "@upstand/ui/components/spinner";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { PageBackdrop } from "@/components/marketing/page-backdrop";
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/utils/trpc";
+
+export default function TwoFactorVerifyPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const { data: session } = authClient.useSession();
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+
+    setVerifying(true);
+    try {
+      const { error } = await authClient.twoFactor.verifyTotp({
+        code: code.trim(),
+      });
+
+      if (error) {
+        toast.error(error.message || "Invalid two-factor code");
+      } else {
+        // Invalidate the 2FA verification query so the layout doesn't redirect back
+        await queryClient.invalidateQueries({
+          queryKey: trpc.auth.isSession2faVerified.queryKey(),
+        });
+        toast.success("Authentication successful!");
+        router.push("/dashboard");
+      }
+    } catch {
+      toast.error("Failed to verify code. Please try again.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await authClient.signOut();
+      router.push("/login");
+    } catch {
+      toast.error("Failed to sign out");
+    }
+  };
+
+  if (session === undefined) {
+    return (
+      <div className="flex min-h-svh items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4">
+      <PageBackdrop />
+
+      <Card className="relative w-full max-w-sm">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
+            <HugeiconsIcon
+              icon={Shield01Icon}
+              className="size-6 text-primary"
+            />
+          </div>
+          <CardTitle>Two-Factor Verification</CardTitle>
+          <CardDescription>
+            Enter the 6-digit code from your authenticator app to continue.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <form onSubmit={handleVerify} className="flex flex-col gap-4">
+            <Field>
+              <FieldLabel htmlFor="mfa-code">Verification Code</FieldLabel>
+              <Input
+                id="mfa-code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                autoComplete="one-time-code"
+                className="text-center font-mono text-2xl tracking-[0.5em] placeholder:font-normal placeholder:tracking-normal"
+                required
+                autoFocus
+              />
+            </Field>
+
+            <Button
+              type="submit"
+              size="lg"
+              disabled={verifying || code.length !== 6}
+              className="w-full"
+            >
+              {verifying && <Spinner data-icon="inline-start" />}
+              Verify Code
+            </Button>
+          </form>
+
+          <Separator className="my-4" />
+
+          <div className="flex items-center justify-between text-muted-foreground text-xs">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="transition-colors hover:text-destructive"
+            >
+              Sign out
+            </button>
+            <span>Secured by Upstand MFA</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

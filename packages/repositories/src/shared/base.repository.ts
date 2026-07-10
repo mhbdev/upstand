@@ -37,6 +37,7 @@ export interface IRepository<TSelect, TInsert> {
   createMany(values: TInsert[]): Promise<TSelect[]>;
   updateById(id: string, patch: Partial<TInsert>): Promise<TSelect | null>;
   deleteById(id: string): Promise<boolean>;
+  deleteByIdReturning(id: string): Promise<TSelect | null>;
   count(where?: SQL): Promise<number>;
 }
 
@@ -165,6 +166,16 @@ export abstract class BaseRepository<
       .where(eq(this.pk, id))
       .returning({ id: this.pk });
     return deleted.length > 0;
+  }
+
+  async deleteByIdReturning(id: string): Promise<TSelect | null> {
+    const [row] = this.rows(
+      await this.executor
+        .delete(this.entity)
+        .where(eq(this.pk, id))
+        .returning(),
+    );
+    return row ?? null;
   }
 
   protected async deleteMany(where: SQL): Promise<number> {

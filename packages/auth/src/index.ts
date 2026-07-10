@@ -7,6 +7,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { organization } from "better-auth/plugins";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { eq } from "drizzle-orm";
 
 export function createAuth() {
@@ -19,13 +20,16 @@ export function createAuth() {
     }),
     trustedOrigins: [env.CORS_ORIGIN],
     emailAndPassword: {
-      enabled: false, // Only Google Sign In is supported
+      enabled: true,
     },
     socialProviders: {
-      google: {
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-      },
+      google:
+        env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+          ? {
+              clientId: env.GOOGLE_CLIENT_ID,
+              clientSecret: env.GOOGLE_CLIENT_SECRET,
+            }
+          : undefined,
     },
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
@@ -88,6 +92,27 @@ export function createAuth() {
       },
     },
     hooks: {
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path.endsWith("/two-factor/verify-totp")) {
+          if (!ctx.request) return;
+          const res = ctx.context.returned;
+          const isSuccess =
+            !res || (res instanceof Response ? res.ok : !(res as any).error);
+          if (isSuccess) {
+            const session = await auth.api.getSession({
+              headers: ctx.request.headers,
+            });
+            if (session) {
+              await redis.set(
+                `2fa-verified:${session.session.id}`,
+                "true",
+                "EX",
+                60 * 60 * 24 * 30, // 30 days
+              );
+            }
+          }
+        }
+      }),
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path.startsWith("/organization/delete")) {
           if (!ctx.request) return;
@@ -126,7 +151,13 @@ export function createAuth() {
         }
       }),
     },
-    plugins: [organization()],
+    plugins: [
+      organization(),
+      twoFactor({
+        issuer: "Upstand",
+        allowPasswordless: true,
+      }),
+    ],
   });
 }
 

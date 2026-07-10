@@ -20,9 +20,12 @@
   },
   "dependencies": {
     "@circulo-ai/di": "catalog:",
+    "micro-key-producer": "^0.9.0",
+    "sshpk": "^1.18.0",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/sshpk": "^1.17.5",
     "@upstand/config": "workspace:*",
     "typescript": "catalog:"
   }

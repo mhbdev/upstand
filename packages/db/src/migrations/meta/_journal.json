@@ -8,6 +8,104 @@
       "when": 1783455395683,
       "tag": "0000_late_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783459770461,
+      "tag": "0001_third_squadron_supreme",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783465416290,
+      "tag": "0002_gifted_the_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783470281084,
+      "tag": "0003_numerous_firebird",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783474899936,
+      "tag": "0004_conscious_rafael_vega",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783524897251,
+      "tag": "0005_wooden_magma",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783616621104,
+      "tag": "0006_broken_goliath",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783617410520,
+      "tag": "0007_windy_lockheed",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783618606076,
+      "tag": "0008_fresh_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783620205207,
+      "tag": "0009_serious_nuke",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783629387471,
+      "tag": "0010_worthless_warbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783630584937,
+      "tag": "0011_parallel_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783643466684,
+      "tag": "0012_opposite_nico_minoru",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1783697968323,
+      "tag": "0013_rainy_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1783698437143,
+      "tag": "0014_demonic_leech",
+      "breakpoints": true
     }
   ]
 }

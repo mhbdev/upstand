@@ -26,7 +26,18 @@
       "@types/react-dom": "^19.2.3",
       "tailwindcss": "^4.3.2",
       "drizzle-orm": "^0.45.2",
-      "@circulo-ai/di": "3.1.0"
+      "@circulo-ai/di": "3.1.0",
+      "@hugeicons/core-free-icons": "^4.2.2",
+      "@hugeicons/react": "^1.1.9",
+      "react-day-picker": "^10.0.1",
+      "embla-carousel-react": "^8.6.0",
+      "recharts": "3.8.0",
+      "cmdk": "^1.1.1",
+      "input-otp": "^1.4.2",
+      "react-resizable-panels": "^4.12.1",
+      "@better-auth-ui/core": "^1.1.9",
+      "@better-auth-ui/react": "^1.1.9",
+      "bullmq": "^5.41.3"
     }
   },
   "type": "module",

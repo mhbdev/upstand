@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { DomainError } from "@upstand/domain";
+import { log } from "evlog";
 
 export function handleUseCaseError(error: unknown): never {
   if (error instanceof DomainError) {
@@ -37,7 +38,10 @@ export function handleUseCaseError(error: unknown): never {
 
   // Clean Architecture: Log raw internal errors for server troubleshooting
   // but mask details to avoid leaking database/system internals to client
-  console.error("[UNEXPECTED SYSTEM ERROR]:", error);
+  log.error({
+    message: "Unexpected system error in router",
+    err: error instanceof Error ? error.message : String(error),
+  });
 
   throw new TRPCError({
     code: "INTERNAL_SERVER_ERROR",

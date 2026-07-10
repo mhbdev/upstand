@@ -529,5 +529,9 @@ export function useAISearchContext() {
 }
 
 function useChatContext() {
-  return use(Context)?.chat;
+  const context = use(Context);
+  if (!context) {
+    throw new Error("useChatContext must be used within an AISearchProvider");
+  }
+  return context.chat;
 }

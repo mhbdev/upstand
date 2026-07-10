@@ -1,9 +1,12 @@
-import * as React from "react"
-
-import { cn } from "@upstand/ui/lib/utils"
-import { Button } from "@upstand/ui/components/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon, ArrowRight01Icon, MoreHorizontalCircle01Icon } from "@hugeicons/core-free-icons"
+import {
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  MoreHorizontalCircle01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@upstand/ui/components/button";
+import { cn } from "@upstand/ui/lib/utils";
+import type * as React from "react";
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -14,7 +17,7 @@ function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
       className={cn("mx-auto flex w-full justify-center", className)}
       {...props}
     />
-  )
+  );
 }
 
 function PaginationContent({
@@ -27,17 +30,17 @@ function PaginationContent({
       className={cn("flex items-center gap-1", className)}
       {...props}
     />
-  )
+  );
 }
 
 function PaginationItem({ ...props }: React.ComponentProps<"li">) {
-  return <li data-slot="pagination-item" {...props} />
+  return <li data-slot="pagination-item" {...props} />;
 }
 
 type PaginationLinkProps = {
-  isActive?: boolean
+  isActive?: boolean;
 } & Pick<React.ComponentProps<typeof Button>, "size"> &
-  React.ComponentProps<"a">
+  React.ComponentProps<"a">;
 
 function PaginationLink({
   className,
@@ -60,7 +63,7 @@ function PaginationLink({
         />
       }
     />
-  )
+  );
 }
 
 function PaginationPrevious({
@@ -72,13 +75,17 @@ function PaginationPrevious({
     <PaginationLink
       aria-label="Go to previous page"
       size="default"
-      className={cn("pl-1.5!", className)}
+      className={cn("pl-2!", className)}
       {...props}
     >
-      <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} data-icon="inline-start" />
+      <HugeiconsIcon
+        icon={ArrowLeft01Icon}
+        strokeWidth={2}
+        data-icon="inline-start"
+      />
       <span className="hidden sm:block">{text}</span>
     </PaginationLink>
-  )
+  );
 }
 
 function PaginationNext({
@@ -90,13 +97,17 @@ function PaginationNext({
     <PaginationLink
       aria-label="Go to next page"
       size="default"
-      className={cn("pr-1.5!", className)}
+      className={cn("pr-2!", className)}
       {...props}
     >
       <span className="hidden sm:block">{text}</span>
-      <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} data-icon="inline-end" />
+      <HugeiconsIcon
+        icon={ArrowRight01Icon}
+        strokeWidth={2}
+        data-icon="inline-end"
+      />
     </PaginationLink>
-  )
+  );
 }
 
 function PaginationEllipsis({
@@ -108,15 +119,15 @@ function PaginationEllipsis({
       aria-hidden
       data-slot="pagination-ellipsis"
       className={cn(
-        "flex size-8 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
-        className
+        "flex size-9 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
+        className,
       )}
       {...props}
     >
       <HugeiconsIcon icon={MoreHorizontalCircle01Icon} strokeWidth={2} />
       <span className="sr-only">More pages</span>
     </span>
-  )
+  );
 }
 
 export {
@@ -127,4 +138,4 @@ export {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-}
+};

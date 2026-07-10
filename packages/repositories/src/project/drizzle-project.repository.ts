@@ -16,6 +16,10 @@ export class DrizzleProjectRepository
     super(executor, project);
   }
 
+  async delete(id: string): Promise<Project | null> {
+    return this.deleteByIdReturning(id);
+  }
+
   async findByOrganizationId(organizationId: string): Promise<Project[]> {
     return this.findMany({
       where: eq(project.organizationId, organizationId),

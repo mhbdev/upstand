@@ -69,7 +69,7 @@ export function buildDtoBody(fields: FieldDef[]): string {
 
 export function buildInputSchemaBody(fields: FieldDef[]): string {
   const required = fields.filter((f) => !f.optional);
-  if (required.length === 0) return "  // TODO: add input fields";
+  if (required.length === 0) return "  // Add input fields here";
   return required
     .map((f) => `  ${f.name}: ${zodExpr(f.zodType, false)}`)
     .join(",\n");

@@ -38,6 +38,8 @@ services:
       - /app/packages/repositories/node_modules
       - /app/packages/domain/node_modules
       - /app/packages/usecases/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.docker/caddy:/etc/caddy
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:password@postgres:5432/upstand
