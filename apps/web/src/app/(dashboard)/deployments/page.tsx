@@ -10,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
@@ -21,27 +28,25 @@ import {
   TableHeader,
   TableRow,
 } from "@upstand/ui/components/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@upstand/ui/components/tabs";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@upstand/ui/components/dialog";
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@upstand/ui/components/tabs";
 import {
   Activity,
-  Play,
-  Settings,
-  Server,
+  CheckCircle,
   Clock,
-  Trash2,
-  Terminal,
+  Copy,
+  Play,
   RefreshCw,
   Search,
+  Server,
+  Settings,
+  Terminal,
+  Trash2,
   XCircle,
-  Copy,
-  CheckCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -51,7 +56,9 @@ export default function DeploymentsPage() {
   const [activeTab, setActiveTab] = useState("history");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
-  const [concurrencyInputs, setConcurrencyInputs] = useState<Record<string, number>>({});
+  const [concurrencyInputs, setConcurrencyInputs] = useState<
+    Record<string, number>
+  >({});
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Queries
@@ -171,28 +178,28 @@ export default function DeploymentsPage() {
     switch (status) {
       case "success":
         return (
-          <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border-emerald-500/30 gap-1">
+          <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25">
             <CheckCircle className="size-3" />
             Success
           </Badge>
         );
       case "running":
         return (
-          <Badge className="bg-blue-500/15 text-blue-500 hover:bg-blue-500/25 border-blue-500/30 gap-1 animate-pulse">
+          <Badge className="animate-pulse gap-1 border-blue-500/30 bg-blue-500/15 text-blue-500 hover:bg-blue-500/25">
             <Activity className="size-3" />
             Running
           </Badge>
         );
       case "queued":
         return (
-          <Badge className="bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 border-amber-500/30 gap-1">
+          <Badge className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25">
             <Clock className="size-3" />
             Queued
           </Badge>
         );
       case "failed":
         return (
-          <Badge className="bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 border-rose-500/30 gap-1">
+          <Badge className="gap-1 border-rose-500/30 bg-rose-500/15 text-rose-500 hover:bg-rose-500/25">
             <XCircle className="size-3" />
             Failed
           </Badge>
@@ -206,9 +213,12 @@ export default function DeploymentsPage() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Deployments & Queues</h1>
-          <p className="text-muted-foreground mt-1">
-            Observe build histories, monitor live queues, and manage server-level concurrency.
+          <h1 className="font-bold text-3xl tracking-tight">
+            Deployments & Queues
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Observe build histories, monitor live queues, and manage
+            server-level concurrency.
           </p>
         </div>
         <Button
@@ -248,16 +258,20 @@ export default function DeploymentsPage() {
           <Card className="border-muted/40 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div>
-                <CardTitle className="text-lg font-semibold">Deployment History</CardTitle>
-                <CardDescription>All deployments executed across the server infrastructure.</CardDescription>
+                <CardTitle className="font-semibold text-lg">
+                  Deployment History
+                </CardTitle>
+                <CardDescription>
+                  All deployments executed across the server infrastructure.
+                </CardDescription>
               </div>
               <div className="relative w-72">
-                <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+                <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
                 <Input
                   placeholder="Filter deployments..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9"
+                  className="h-9 pl-9"
                 />
               </div>
             </CardHeader>
@@ -268,7 +282,7 @@ export default function DeploymentsPage() {
                 </div>
               ) : filteredDeployments.length === 0 ? (
                 <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
-                  <Activity className="size-8 stroke-[1.5] mb-2" />
+                  <Activity className="mb-2 size-8 stroke-[1.5]" />
                   <p>No deployments found.</p>
                 </div>
               ) : (
@@ -290,19 +304,26 @@ export default function DeploymentsPage() {
                         <TableRow key={dep.id} className="hover:bg-muted/10">
                           <TableCell className="font-semibold text-foreground">
                             {dep.resourceName}
-                            <span className="block text-xs font-normal text-muted-foreground capitalize">
+                            <span className="block font-normal text-muted-foreground text-xs capitalize">
                               {dep.resourceType}
                             </span>
                           </TableCell>
                           <TableCell>
                             <span className="text-sm">
-                              {dep.projectName} / <span className="text-muted-foreground">{dep.environmentName}</span>
+                              {dep.projectName} /{" "}
+                              <span className="text-muted-foreground">
+                                {dep.environmentName}
+                              </span>
                             </span>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{dep.serverName}</TableCell>
-                          <TableCell className="max-w-[180px] truncate">{dep.title}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {dep.serverName}
+                          </TableCell>
+                          <TableCell className="max-w-[180px] truncate">
+                            {dep.title}
+                          </TableCell>
                           <TableCell>{getStatusBadge(dep.status)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
+                          <TableCell className="text-muted-foreground text-xs">
                             {new Date(dep.createdAt).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right">
@@ -330,8 +351,12 @@ export default function DeploymentsPage() {
         <TabsContent value="queue" className="space-y-4">
           <Card className="border-muted/40 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Live Job Queue</CardTitle>
-              <CardDescription>Currently active or waiting deployments in BullMQ.</CardDescription>
+              <CardTitle className="font-semibold text-lg">
+                Live Job Queue
+              </CardTitle>
+              <CardDescription>
+                Currently active or waiting deployments in BullMQ.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingQueue ? (
@@ -340,7 +365,7 @@ export default function DeploymentsPage() {
                 </div>
               ) : queueJobs.length === 0 ? (
                 <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
-                  <Clock className="size-8 stroke-[1.5] mb-2" />
+                  <Clock className="mb-2 size-8 stroke-[1.5]" />
                   <p>Queue is empty.</p>
                 </div>
               ) : (
@@ -360,37 +385,45 @@ export default function DeploymentsPage() {
                     <TableBody>
                       {queueJobs.map((job) => (
                         <TableRow key={job.id} className="hover:bg-muted/10">
-                          <TableCell className="font-mono text-xs">{job.id}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {job.id}
+                          </TableCell>
                           <TableCell className="font-semibold text-foreground">
                             {job.resourceName}
-                            <span className="block text-xs font-normal text-muted-foreground capitalize">
+                            <span className="block font-normal text-muted-foreground text-xs capitalize">
                               {job.type}
                             </span>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{job.serverName}</TableCell>
-                          <TableCell className="max-w-[180px] truncate">{job.label}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {job.serverName}
+                          </TableCell>
+                          <TableCell className="max-w-[180px] truncate">
+                            {job.label}
+                          </TableCell>
                           <TableCell>
                             <Badge
                               className={
                                 job.state === "active"
-                                  ? "bg-blue-500/15 text-blue-500 border-blue-500/30 animate-pulse"
+                                  ? "animate-pulse border-blue-500/30 bg-blue-500/15 text-blue-500"
                                   : job.state === "waiting"
-                                  ? "bg-amber-500/15 text-amber-500 border-amber-500/30"
-                                  : "bg-gray-500/15 text-gray-500 border-gray-500/30"
+                                    ? "border-amber-500/30 bg-amber-500/15 text-amber-500"
+                                    : "border-gray-500/30 bg-gray-500/15 text-gray-500"
                               }
                             >
                               {job.state}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
+                          <TableCell className="text-muted-foreground text-xs">
                             {new Date(job.addedAt).toLocaleTimeString()}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleCancelJob(job.serverId, job.id)}
-                              className="size-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                              onClick={() =>
+                                handleCancelJob(job.serverId, job.id)
+                              }
+                              className="size-8 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
                               disabled={cancelJobMutation.isPending}
                             >
                               <Trash2 className="size-4" />
@@ -410,9 +443,12 @@ export default function DeploymentsPage() {
         <TabsContent value="concurrency" className="space-y-4">
           <Card className="border-muted/40 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Build Concurrency Settings</CardTitle>
+              <CardTitle className="font-semibold text-lg">
+                Build Concurrency Settings
+              </CardTitle>
               <CardDescription>
-                Configure the maximum number of parallel docker builds allowed on each Swarm node / server.
+                Configure the maximum number of parallel docker builds allowed
+                on each Swarm node / server.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -422,19 +458,26 @@ export default function DeploymentsPage() {
                 </div>
               ) : servers.length === 0 ? (
                 <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
-                  <Server className="size-8 stroke-[1.5] mb-2" />
+                  <Server className="mb-2 size-8 stroke-[1.5]" />
                   <p>No active servers detected.</p>
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2">
                   {servers.map((server) => (
-                    <Card key={server.id} className="border bg-card/50 hover:bg-card transition-all">
-                      <CardContent className="pt-6 space-y-4">
+                    <Card
+                      key={server.id}
+                      className="border bg-card/50 transition-all hover:bg-card"
+                    >
+                      <CardContent className="space-y-4 pt-6">
                         <div className="flex items-start justify-between">
                           <div>
-                            <h3 className="font-semibold text-base text-foreground">{server.hostname}</h3>
-                            <p className="text-xs text-muted-foreground font-mono mt-0.5">{server.ip}</p>
-                            <span className="inline-block mt-2 text-[10px] font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                            <h3 className="font-semibold text-base text-foreground">
+                              {server.hostname}
+                            </h3>
+                            <p className="mt-0.5 font-mono text-muted-foreground text-xs">
+                              {server.ip}
+                            </p>
+                            <span className="mt-2 inline-block rounded bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
                               ID: {server.id}
                             </span>
                           </div>
@@ -442,7 +485,10 @@ export default function DeploymentsPage() {
                         </div>
 
                         <div className="space-y-2 pt-2">
-                          <Label htmlFor={`concurrency-${server.id}`} className="text-xs font-semibold">
+                          <Label
+                            htmlFor={`concurrency-${server.id}`}
+                            className="font-semibold text-xs"
+                          >
                             Max Parallel Builds
                           </Label>
                           <div className="flex items-center gap-3">
@@ -455,10 +501,11 @@ export default function DeploymentsPage() {
                               onChange={(e) =>
                                 setConcurrencyInputs({
                                   ...concurrencyInputs,
-                                  [server.id]: parseInt(e.target.value) || 1,
+                                  [server.id]:
+                                    Number.parseInt(e.target.value) || 1,
                                 })
                               }
-                              className="w-24 h-9"
+                              className="h-9 w-24"
                             />
                             <Button
                               onClick={() => handleUpdateConcurrency(server.id)}
@@ -469,8 +516,9 @@ export default function DeploymentsPage() {
                               Save
                             </Button>
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            Additional deployment triggers for this server will queue up and wait.
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Additional deployment triggers for this server will
+                            queue up and wait.
                           </p>
                         </div>
                       </CardContent>
@@ -484,17 +532,24 @@ export default function DeploymentsPage() {
       </Tabs>
 
       {/* Logs Modal */}
-      <Dialog open={!!selectedDeployment} onOpenChange={(open) => !open && setSelectedDeployment(null)}>
-        <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-6 border-muted/40">
-          <DialogHeader className="pb-2 border-b">
+      <Dialog
+        open={!!selectedDeployment}
+        onOpenChange={(open) => !open && setSelectedDeployment(null)}
+      >
+        <DialogContent className="flex h-[80vh] max-w-4xl flex-col border-muted/40 p-6">
+          <DialogHeader className="border-b pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle className="text-xl flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 text-xl">
                   <Terminal className="size-5 text-primary" />
                   Deployment Logs: {selectedDeployment?.resourceName}
                 </DialogTitle>
                 <DialogDescription className="mt-1">
-                  ID: <span className="font-mono text-xs">{selectedDeployment?.id}</span> | Title: {selectedDeployment?.title}
+                  ID:{" "}
+                  <span className="font-mono text-xs">
+                    {selectedDeployment?.id}
+                  </span>{" "}
+                  | Title: {selectedDeployment?.title}
                 </DialogDescription>
               </div>
               <Button
@@ -512,8 +567,10 @@ export default function DeploymentsPage() {
             </div>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 bg-[#0c0d12] border border-muted/20 rounded-xl p-4 font-mono text-xs text-zinc-300 overflow-y-auto leading-relaxed mt-4 shadow-inner">
-            <pre className="whitespace-pre-wrap">{selectedDeployment?.logs || "No logs available."}</pre>
+          <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-muted/20 bg-[#0c0d12] p-4 font-mono text-xs text-zinc-300 leading-relaxed shadow-inner">
+            <pre className="whitespace-pre-wrap">
+              {selectedDeployment?.logs || "No logs available."}
+            </pre>
             <div ref={logsEndRef} />
           </div>
         </DialogContent>

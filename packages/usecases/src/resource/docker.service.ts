@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import yaml from "yaml";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,6 +10,7 @@ import {
 } from "@upstand/domain";
 import type Docker from "dockerode";
 import { log } from "evlog";
+import yaml from "yaml";
 import {
   ensureUpstandOverlayNetwork,
   isManager,
@@ -900,7 +900,9 @@ export class DockerService {
           composeContent = yaml.stringify(parsed);
         }
       } catch (err) {
-        onLog(`Warning: Failed to inject Swarm placement constraints: ${err instanceof Error ? err.message : String(err)}\n`);
+        onLog(
+          `Warning: Failed to inject Swarm placement constraints: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
       }
     }
 

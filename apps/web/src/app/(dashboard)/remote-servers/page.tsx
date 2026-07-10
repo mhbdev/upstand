@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  ServerStack01Icon,
-  PlusSignIcon,
   Delete02Icon,
+  PlusSignIcon,
+  ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
-import { toast } from "sonner";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -26,8 +25,9 @@ import {
 } from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
-import { Badge } from "@upstand/ui/components/badge";
 import { NativeSelect } from "@upstand/ui/components/native-select";
+import { useState } from "react";
+import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -174,17 +174,17 @@ export default function RemoteServersPage() {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <CardTitle className="text-base font-semibold">
+                      <CardTitle className="font-semibold text-base">
                         {srv.name}
                       </CardTitle>
                       <Badge
                         variant={getStatusBadgeVariant(srv.status)}
-                        className="capitalize text-[10px] h-4 px-1.5 font-medium"
+                        className="h-4 px-1.5 font-medium text-[10px] capitalize"
                       >
                         {srv.status.replace("_", " ")}
                       </Badge>
                     </div>
-                    <CardDescription className="text-xs text-muted-foreground">
+                    <CardDescription className="text-muted-foreground text-xs">
                       {srv.description || "Deploy server"}
                     </CardDescription>
                   </div>
@@ -197,7 +197,7 @@ export default function RemoteServersPage() {
                     <HugeiconsIcon icon={Delete02Icon} className="size-4" />
                   </Button>
                 </CardHeader>
-                <CardContent className="pt-2 text-xs text-muted-foreground space-y-4">
+                <CardContent className="space-y-4 pt-2 text-muted-foreground text-xs">
                   <div className="flex flex-col gap-1.5">
                     <div>
                       <span className="font-medium text-foreground">
@@ -232,7 +232,7 @@ export default function RemoteServersPage() {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      className="w-full text-xs font-semibold"
+                      className="w-full font-semibold text-xs"
                       variant={srv.status === "ready" ? "outline" : "default"}
                       onClick={() => handleSetup(srv.id)}
                       disabled={srv.status === "setting_up"}
@@ -370,17 +370,17 @@ export default function RemoteServersPage() {
                 type="checkbox"
                 checked={enableDockerCleanup}
                 onChange={(e) => setEnableDockerCleanup(e.target.checked)}
-                className="size-4 rounded border-border/40 text-indigo-600 focus:ring-indigo-500 animate-none transition-none cursor-pointer"
+                className="size-4 animate-none cursor-pointer rounded border-border/40 text-indigo-600 transition-none focus:ring-indigo-500"
               />
               <Label
                 htmlFor="enableDockerCleanup"
-                className="text-xs select-none cursor-pointer"
+                className="cursor-pointer select-none text-xs"
               >
                 Enable automatic daily Docker cleanup
               </Label>
             </div>
 
-            <div className="flex gap-3 pt-4 justify-end">
+            <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"

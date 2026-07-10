@@ -1,14 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Database01Icon,
-  PlusSignIcon,
   Delete02Icon,
+  PlusSignIcon,
 } from "@hugeicons/core-free-icons";
-import { toast } from "sonner";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -26,6 +24,8 @@ import {
 } from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
+import { useState } from "react";
+import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -130,10 +130,14 @@ export default function DockerRegistryPage() {
         <div>
           <h1 className="font-bold text-3xl tracking-tight">Docker Registry</h1>
           <p className="text-muted-foreground text-sm">
-            Configure external Docker registries to publish and pull images during deployments.
+            Configure external Docker registries to publish and pull images
+            during deployments.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="gap-2 self-start sm:self-auto">
+        <Button
+          onClick={() => setDialogOpen(true)}
+          className="gap-2 self-start sm:self-auto"
+        >
           <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
           Add External Registry
         </Button>
@@ -142,11 +146,18 @@ export default function DockerRegistryPage() {
       {registries && registries.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {registries.map((reg: any) => (
-            <Card key={reg.id} className="relative overflow-hidden border-border/40 bg-card/30">
+            <Card
+              key={reg.id}
+              className="relative overflow-hidden border-border/40 bg-card/30"
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div className="space-y-1">
-                  <CardTitle className="text-base font-semibold">{reg.name}</CardTitle>
-                  <CardDescription className="font-mono text-xs text-muted-foreground">{reg.registryUrl || "Docker Hub"}</CardDescription>
+                  <CardTitle className="font-semibold text-base">
+                    {reg.name}
+                  </CardTitle>
+                  <CardDescription className="font-mono text-muted-foreground text-xs">
+                    {reg.registryUrl || "Docker Hub"}
+                  </CardDescription>
                 </div>
                 <Button
                   variant="ghost"
@@ -157,14 +168,18 @@ export default function DockerRegistryPage() {
                   <HugeiconsIcon icon={Delete02Icon} className="size-4" />
                 </Button>
               </CardHeader>
-              <CardContent className="pt-2 text-xs text-muted-foreground">
+              <CardContent className="pt-2 text-muted-foreground text-xs">
                 <div className="flex flex-col gap-1">
                   <div>
-                    <span className="font-medium text-foreground">Username: </span>
+                    <span className="font-medium text-foreground">
+                      Username:{" "}
+                    </span>
                     {reg.username || "Anonymous"}
                   </div>
                   <div>
-                    <span className="font-medium text-foreground">Image Prefix: </span>
+                    <span className="font-medium text-foreground">
+                      Image Prefix:{" "}
+                    </span>
                     {reg.imagePrefix || "None"}
                   </div>
                 </div>
@@ -182,7 +197,8 @@ export default function DockerRegistryPage() {
             No External Registries
           </h2>
           <p className="mt-2 max-w-sm text-muted-foreground text-sm">
-            Add custom Docker registries (such as GHCR, Amazon ECR, self-hosted registries, etc.) to configure deployment pipelines.
+            Add custom Docker registries (such as GHCR, Amazon ECR, self-hosted
+            registries, etc.) to configure deployment pipelines.
           </p>
           <Button onClick={() => setDialogOpen(true)} className="mt-6 gap-2">
             <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
@@ -196,7 +212,8 @@ export default function DockerRegistryPage() {
           <DialogHeader>
             <DialogTitle>Add External Registry</DialogTitle>
             <DialogDescription>
-              Provide connection details to link and authenticate with your custom Docker registry.
+              Provide connection details to link and authenticate with your
+              custom Docker registry.
             </DialogDescription>
           </DialogHeader>
 
@@ -263,14 +280,16 @@ export default function DockerRegistryPage() {
               />
             </div>
 
-            <div className="flex gap-3 pt-4 justify-end">
+            <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleTestConnection}
                 disabled={testConnectionMutation.isPending}
               >
-                {testConnectionMutation.isPending ? "Testing..." : "Test Registry"}
+                {testConnectionMutation.isPending
+                  ? "Testing..."
+                  : "Test Registry"}
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create"}

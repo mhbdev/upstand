@@ -3,8 +3,8 @@ import {
   type IUnitOfWork,
   parseDomainMappings,
   type Resource,
-  serializeDomainMappings,
   serializeApplicationBuildConfig,
+  serializeDomainMappings,
   ValidationError,
 } from "@upstand/domain";
 import { encryptSecret } from "@upstand/domain/crypto/secret-box";

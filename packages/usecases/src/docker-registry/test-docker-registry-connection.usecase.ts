@@ -19,11 +19,14 @@ export class TestDockerRegistryConnectionUseCase {
     try {
       const url = input.registryUrl || "https://index.docker.io/v2/";
       const response = await fetch(url, {
-        headers: input.username && input.password ? {
-          Authorization: `Basic ${Buffer.from(
-            `${input.username}:${input.password}`,
-          ).toString("base64")}`,
-        } : {},
+        headers:
+          input.username && input.password
+            ? {
+                Authorization: `Basic ${Buffer.from(
+                  `${input.username}:${input.password}`,
+                ).toString("base64")}`,
+              }
+            : {},
       });
       if (response.status === 200 || response.status === 401) {
         return {

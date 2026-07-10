@@ -18,7 +18,9 @@ export const resource = pgTable("resource", {
   dockerImage: text("docker_image"),
   credentials: text("credentials"),
   buildConfig: text("build_config")
-    .default('{"type":"dockerfile","dockerfilePath":"Dockerfile","dockerContextPath":"."}')
+    .default(
+      '{"type":"dockerfile","dockerfilePath":"Dockerfile","dockerContextPath":"."}',
+    )
     .notNull(),
   envVars: text("env_vars").default("{}").notNull(),
   domains: text("domains").default("[]").notNull(),

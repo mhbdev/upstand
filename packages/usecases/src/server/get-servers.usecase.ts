@@ -1,4 +1,4 @@
-import { type IUnitOfWork, type Server } from "@upstand/domain";
+import type { IUnitOfWork, Server } from "@upstand/domain";
 import { z } from "zod";
 
 export const GetServersInputSchema = z.object({

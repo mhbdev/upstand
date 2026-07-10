@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type IUnitOfWork, type DockerRegistry } from "@upstand/domain";
+import type { DockerRegistry, IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
 
 export const CreateDockerRegistryInputSchema = z.object({
@@ -12,7 +12,9 @@ export const CreateDockerRegistryInputSchema = z.object({
   serverId: z.string().optional().nullable(),
 });
 
-export type CreateDockerRegistryInput = z.infer<typeof CreateDockerRegistryInputSchema>;
+export type CreateDockerRegistryInput = z.infer<
+  typeof CreateDockerRegistryInputSchema
+>;
 
 export class CreateDockerRegistryUseCase {
   constructor(private readonly uow: IUnitOfWork) {}

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type IUnitOfWork, type Server } from "@upstand/domain";
+import type { IUnitOfWork, Server } from "@upstand/domain";
 import { z } from "zod";
 
 export const CreateServerInputSchema = z.object({

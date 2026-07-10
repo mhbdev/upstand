@@ -57,7 +57,9 @@ export class CreateResourceUseCase {
             message: "Failed to encrypt database credentials",
             err: error instanceof Error ? error.message : String(error),
           });
-          throw new ValidationError("Database credentials could not be encrypted");
+          throw new ValidationError(
+            "Database credentials could not be encrypted",
+          );
         }
       }
 

@@ -1057,15 +1057,15 @@ export default function WebServerDashboard({
             </CardHeader>
             <CardContent className="border-border/10 border-t pt-4">
               {loadingCaddyLogs && !caddyLogs ? (
-                  <div className="flex h-full items-center justify-center text-muted-foreground">
-                    <Spinner className="mr-2 size-4" /> Loading log stream...
-                  </div>
-                ) : (
-                  <ShowDockerLogs
-                    containerId="caddy"
-                    logs={caddyLogs?.split("\n") ?? []}
-                  />
-                )}
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  <Spinner className="mr-2 size-4" /> Loading log stream...
+                </div>
+              ) : (
+                <ShowDockerLogs
+                  containerId="caddy"
+                  logs={caddyLogs?.split("\n") ?? []}
+                />
+              )}
             </CardContent>
           </Card>
         </div>

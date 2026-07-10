@@ -80,7 +80,9 @@ export const dockerRegistryRouter = router({
   testConnection: twoFactorVerifiedProcedure
     .input(TestDockerRegistryConnectionInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const useCase = ctx.scope.resolve(TestDockerRegistryConnectionUseCaseToken);
+      const useCase = ctx.scope.resolve(
+        TestDockerRegistryConnectionUseCaseToken,
+      );
       try {
         return await useCase.execute(input);
       } catch (error) {
