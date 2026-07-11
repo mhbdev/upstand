@@ -10,8 +10,20 @@ import { organization } from "better-auth/plugins";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { count, eq } from "drizzle-orm";
 
+function getSharedCookieDomain(): string | undefined {
+  const dashboardHost = new URL(env.CORS_ORIGIN).hostname;
+  const apiHost = new URL(env.BETTER_AUTH_URL).hostname;
+  if (dashboardHost === apiHost) return undefined;
+
+  // Protected pages are rendered by the dashboard hostname while sessions are
+  // issued by the API hostname. Only sibling subdomains may share a cookie.
+  const domain = dashboardHost.split(".").slice(1).join(".");
+  return domain && apiHost.endsWith(`.${domain}`) ? domain : undefined;
+}
+
 export function createAuth() {
   const db = createDb();
+  const sharedCookieDomain = getSharedCookieDomain();
 
   return betterAuth({
     database: drizzleAdapter(db, {
@@ -34,8 +46,14 @@ export function createAuth() {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     advanced: {
+      crossSubDomainCookies: sharedCookieDomain
+        ? {
+            enabled: true,
+            domain: sharedCookieDomain,
+          }
+        : undefined,
       defaultCookieAttributes: {
-        sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
         secure: env.NODE_ENV === "production",
         httpOnly: true,
       },
