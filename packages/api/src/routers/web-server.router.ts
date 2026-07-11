@@ -59,6 +59,112 @@ function cleanDockerLogs(buffer: Buffer): string {
   return result || buffer.toString("utf8");
 }
 
+async function dockerLogBuffer(logs: unknown): Promise<Buffer> {
+  if (Buffer.isBuffer(logs)) return logs;
+  if (
+    !logs ||
+    typeof logs !== "object" ||
+    !("getReader" in logs) ||
+    typeof logs.getReader !== "function"
+  ) {
+    throw new Error("Docker returned an unsupported logs stream");
+  }
+  const reader = logs.getReader() as {
+    read(): Promise<{ done: boolean; value?: Uint8Array }>;
+    releaseLock(): void;
+  };
+  const chunks: Uint8Array[] = [];
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks);
+}
+
+const UPSTAND_SERVER_SERVICE = "upstand_server";
+const UPSTAND_REDIS_SERVICE = "upstand_redis";
+
+async function getRunningServiceContainer(serviceName: string) {
+  const docker = getDockerInstance();
+  const tasks = await docker.listTasks({
+    filters: JSON.stringify({
+      service: [serviceName],
+      "desired-state": ["running"],
+    }),
+  });
+  const task = tasks.find(
+    (candidate) =>
+      candidate.Status?.State === "running" &&
+      candidate.Status?.ContainerStatus?.ContainerID,
+  );
+  const containerId = task?.Status?.ContainerStatus?.ContainerID;
+  if (!containerId) {
+    throw new Error(`No running task is available for ${serviceName}`);
+  }
+  return docker.getContainer(containerId);
+}
+
+async function forceServiceUpdate(serviceName: string): Promise<void> {
+  const docker = getDockerInstance();
+  const service = docker.getService(serviceName);
+  const inspect = await service.inspect();
+  const taskTemplate = inspect.Spec.TaskTemplate;
+  if (!taskTemplate) throw new Error(`Service ${serviceName} has no task spec`);
+
+  await service.update({
+    version: inspect.Version.Index,
+    Name: inspect.Spec.Name,
+    TaskTemplate: {
+      ...taskTemplate,
+      ForceUpdate: (taskTemplate.ForceUpdate || 0) + 1,
+    },
+    Mode: inspect.Spec.Mode,
+    UpdateConfig: inspect.Spec.UpdateConfig,
+    RollbackConfig: inspect.Spec.RollbackConfig,
+    Networks: inspect.Spec.Networks,
+    EndpointSpec: inspect.Spec.EndpointSpec,
+  });
+}
+
+async function execInContainer(
+  container: ReturnType<ReturnType<typeof getDockerInstance>["getContainer"]>,
+  command: string[],
+): Promise<void> {
+  const execution = await container.exec({
+    Cmd: command,
+    AttachStdout: true,
+    AttachStderr: true,
+  });
+  const stream = await execution.start({});
+  await new Promise<void>((resolve, reject) => {
+    stream.on("end", resolve);
+    stream.on("error", reject);
+  });
+  const result = await execution.inspect();
+  if (result.ExitCode !== 0) {
+    throw new Error(
+      `Command '${command[0]}' failed with exit code ${result.ExitCode}`,
+    );
+  }
+}
+
+async function getRedisPassword(): Promise<string> {
+  const service = getDockerInstance().getService(UPSTAND_REDIS_SERVICE);
+  const inspect = await service.inspect();
+  const entry = inspect.Spec.TaskTemplate?.ContainerSpec?.Env?.find(
+    (value: string) => value.startsWith("REDIS_PASSWORD="),
+  );
+  const password = entry?.slice("REDIS_PASSWORD=".length);
+  if (!password)
+    throw new Error("Redis password is not configured on the service");
+  return password;
+}
+
 async function checkGpuStatus() {
   const { exec } = await import("node:child_process");
   const { promisify } = await import("node:util");
@@ -218,13 +324,13 @@ export const webServerRouter = router({
     .query(async ({ input }) => {
       const docker = getDockerInstance();
       try {
-        const container = docker.getContainer("upstand-server");
-        const logBuffer = await container.logs({
+        const service = docker.getService(UPSTAND_SERVER_SERVICE);
+        const logBuffer = await service.logs({
           stdout: true,
           stderr: true,
           tail: input.tail || 100,
         });
-        return cleanDockerLogs(logBuffer);
+        return cleanDockerLogs(await dockerLogBuffer(logBuffer));
       } catch (err: any) {
         return `Failed to fetch server logs: ${err.message}`;
       }
@@ -242,12 +348,8 @@ export const webServerRouter = router({
     }),
 
   reloadServer: twoFactorVerifiedProcedure.mutation(async () => {
-    const docker = getDockerInstance();
     try {
-      const container = docker.getContainer("upstand-server");
-      setTimeout(() => {
-        container.restart().catch(() => {});
-      }, 500);
+      await forceServiceUpdate(UPSTAND_SERVER_SERVICE);
       return { success: true };
     } catch (error: any) {
       throw new Error(error?.message || "Failed to restart server container");
@@ -256,18 +358,17 @@ export const webServerRouter = router({
 
   cleanRedis: twoFactorVerifiedProcedure.mutation(async () => {
     try {
-      const { exec } = await import("node:child_process");
-      const { promisify } = await import("node:util");
-      const execAsync = promisify(exec);
-
-      const { stdout } = await execAsync(
-        'docker ps --filter "name=upstand-redis" --filter "status=running" -q | head -n 1',
-      );
-      const redisContainerId = stdout.trim();
-      if (!redisContainerId) {
-        throw new Error("Redis container not found or not running");
-      }
-      await execAsync(`docker exec -i ${redisContainerId} redis-cli flushall`);
+      const [container, password] = await Promise.all([
+        getRunningServiceContainer(UPSTAND_REDIS_SERVICE),
+        getRedisPassword(),
+      ]);
+      await execInContainer(container, [
+        "redis-cli",
+        "--no-auth-warning",
+        "-a",
+        password,
+        "FLUSHALL",
+      ]);
       return { success: true };
     } catch (error: any) {
       throw new Error(error?.message || "Failed to flush Redis");
@@ -275,10 +376,8 @@ export const webServerRouter = router({
   }),
 
   reloadRedis: twoFactorVerifiedProcedure.mutation(async () => {
-    const docker = getDockerInstance();
     try {
-      const container = docker.getContainer("upstand-redis");
-      await container.restart();
+      await forceServiceUpdate(UPSTAND_REDIS_SERVICE);
       return { success: true };
     } catch (error: any) {
       throw new Error(error?.message || "Failed to restart Redis container");
