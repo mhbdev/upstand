@@ -7,6 +7,7 @@ umask 077
 
 readonly INSTALL_DIR="/etc/upstand"
 readonly ENV_FILE="$INSTALL_DIR/.env"
+readonly SOURCE_DIR="$INSTALL_DIR/source"
 readonly NETWORK_NAME="${DOCKER_NETWORK:-upstand-network}"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly STACK_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
@@ -28,6 +29,37 @@ require_digest_image() {
   local name="$1"
   local image="${!name:-}"
   [[ "$image" == *@sha256:* ]] || fail "$name must be set to an immutable image digest (for example ghcr.io/acme/image@sha256:...)"
+}
+
+ensure_git() {
+  if command -v git >/dev/null 2>&1; then
+    return
+  fi
+  command -v apt-get >/dev/null 2>&1 || fail "git is required to build from GitHub source; install git or provide immutable image digests"
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y git
+}
+
+build_source_images() {
+  local repository="${UPSTAND_REPOSITORY:-https://github.com/mhbdev/upstand.git}"
+  local ref="${UPSTAND_REF:-master}"
+  [[ "$repository" == https://github.com/*/*.git ]] || fail "UPSTAND_REPOSITORY must be a public HTTPS GitHub repository URL"
+  [[ "$ref" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "UPSTAND_REF contains unsupported characters"
+
+  ensure_git
+  rm -rf "$SOURCE_DIR"
+  git clone --depth 1 --branch "$ref" "$repository" "$SOURCE_DIR"
+  local revision
+  revision="$(git -C "$SOURCE_DIR" rev-parse --verify HEAD)"
+
+  UPSTAND_SERVER_IMAGE="upstand-server:source-${revision}"
+  UPSTAND_WEB_IMAGE="upstand-web:source-${revision}"
+  UPSTAND_DOCS_IMAGE="upstand-docs:source-${revision}"
+
+  docker build --file "$SOURCE_DIR/apps/server/Dockerfile" --tag "$UPSTAND_SERVER_IMAGE" "$SOURCE_DIR"
+  docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
+  docker build --file "$SOURCE_DIR/apps/fumadocs/Dockerfile" --tag "$UPSTAND_DOCS_IMAGE" "$SOURCE_DIR"
+  SOURCE_BUILD=true
 }
 
 detect_advertise_address() {
@@ -110,9 +142,18 @@ write_environment() {
   [[ "$BETTER_AUTH_URL" == https://* ]] || fail "BETTER_AUTH_URL must use HTTPS"
   [[ "$CORS_ORIGIN" == https://* ]] || fail "CORS_ORIGIN must use HTTPS"
   [[ "$NEXT_PUBLIC_SERVER_URL" == https://* ]] || fail "NEXT_PUBLIC_SERVER_URL must use HTTPS"
-  require_digest_image UPSTAND_SERVER_IMAGE
-  require_digest_image UPSTAND_WEB_IMAGE
-  require_digest_image UPSTAND_DOCS_IMAGE
+  UPSTAND_DASHBOARD_HOST="${CORS_ORIGIN#https://}"
+  UPSTAND_API_HOST="${BETTER_AUTH_URL#https://}"
+  [[ "$UPSTAND_DASHBOARD_HOST" != */* && "$UPSTAND_API_HOST" != */* ]] || fail "dashboard and API origins must not include a path"
+
+  if [[ -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE" ]]; then
+    build_source_images
+  fi
+  if [[ "${SOURCE_BUILD:-false}" != true ]]; then
+    require_digest_image UPSTAND_SERVER_IMAGE
+    require_digest_image UPSTAND_WEB_IMAGE
+    require_digest_image UPSTAND_DOCS_IMAGE
+  fi
 
   cat >"$ENV_FILE" <<EOF
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
@@ -123,6 +164,8 @@ DOCKER_NETWORK=$DOCKER_NETWORK
 BETTER_AUTH_URL=$BETTER_AUTH_URL
 CORS_ORIGIN=$CORS_ORIGIN
 NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL
+UPSTAND_DASHBOARD_HOST=$UPSTAND_DASHBOARD_HOST
+UPSTAND_API_HOST=$UPSTAND_API_HOST
 UPSTAND_SERVER_IMAGE=$UPSTAND_SERVER_IMAGE
 UPSTAND_WEB_IMAGE=$UPSTAND_WEB_IMAGE
 UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE
@@ -136,20 +179,32 @@ EOF
 }
 
 deploy_stack() {
-  [[ -f "$STACK_FILE" ]] || fail "docker-compose.prod.yml must be present beside install.sh"
-  install -m 0600 "$STACK_FILE" "$INSTALL_DIR/docker-compose.yml"
+  local stack_file="$STACK_FILE"
+  if [[ "${SOURCE_BUILD:-false}" == true ]]; then
+    stack_file="$SOURCE_DIR/docker-compose.prod.yml"
+  fi
+  [[ -f "$stack_file" ]] || fail "docker-compose.prod.yml is unavailable"
+  install -m 0600 "$stack_file" "$INSTALL_DIR/docker-compose.yml"
 
   set -a
   # shellcheck disable=SC1090
   source "$ENV_FILE"
   set +a
 
-  docker stack deploy \
-    --compose-file "$INSTALL_DIR/docker-compose.yml" \
-    --with-registry-auth \
-    --prune \
-    --resolve-image always \
-    upstand
+  if [[ "${SOURCE_BUILD:-false}" == true ]]; then
+    docker stack deploy \
+      --compose-file "$INSTALL_DIR/docker-compose.yml" \
+      --prune \
+      --resolve-image never \
+      upstand
+  else
+    docker stack deploy \
+      --compose-file "$INSTALL_DIR/docker-compose.yml" \
+      --with-registry-auth \
+      --prune \
+      --resolve-image always \
+      upstand
+  fi
 }
 
 wait_for_stack() {

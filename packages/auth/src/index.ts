@@ -8,7 +8,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { organization } from "better-auth/plugins";
 import { twoFactor } from "better-auth/plugins/two-factor";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 
 export function createAuth() {
   const db = createDb();
@@ -114,6 +114,31 @@ export function createAuth() {
         }
       }),
       before: createAuthMiddleware(async (ctx) => {
+        // A fresh self-hosted installation has no external identity provider to
+        // bootstrap an administrator. Permit exactly that first email/password
+        // account, then make the instance sign-in only. The database trigger in
+        // migration 0015 is the race-safe enforcement; this hook returns a
+        // useful API error before the database has to reject the request.
+        if (ctx.path.endsWith("/sign-up/email")) {
+          const result = await db.select({ value: count() }).from(schema.user);
+          const userCount = result[0]?.value ?? 0;
+
+          if (userCount > 0) {
+            return {
+              response: new Response(
+                JSON.stringify({
+                  error:
+                    "This Upstand instance has already been configured. Sign in with the owner account.",
+                }),
+                {
+                  status: 403,
+                  headers: { "content-type": "application/json" },
+                },
+              ),
+            };
+          }
+        }
+
         if (ctx.path.startsWith("/organization/delete")) {
           if (!ctx.request) return;
           const body = (await ctx.request.json().catch(() => ({}))) as Record<

@@ -114,6 +114,8 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL is required}
       CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
       SSH_KEY_ENCRYPTION_KEY_V1: ${SSH_KEY_ENCRYPTION_KEY_V1:?SSH_KEY_ENCRYPTION_KEY_V1 is required}
+      UPSTAND_DASHBOARD_HOST: ${UPSTAND_DASHBOARD_HOST:-}
+      UPSTAND_API_HOST: ${UPSTAND_API_HOST:-}
       DOCKER_HOST: unix:///var/run/docker.sock
       DOCKER_NETWORK: upstand-network
     volumes:

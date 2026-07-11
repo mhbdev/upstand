@@ -14,5 +14,11 @@ export interface IWebServerSettingsRepository {
     httpsPort?: number;
     enableHttp3?: boolean;
     globalCaddyfile?: string | null;
+    caddySnippets?: string;
+    serverIp?: string | null;
+    dailyDockerCleanup?: boolean;
+    caddyEnvironment?: string;
+    caddyPorts?: string;
+    caddyDashboardEnabled?: boolean;
   }): Promise<WebServerSettings>;
 }

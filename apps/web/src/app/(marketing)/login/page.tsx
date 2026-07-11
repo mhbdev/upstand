@@ -7,10 +7,13 @@ import { Card, CardContent } from "@upstand/ui/components/card";
 import { Spinner } from "@upstand/ui/components/spinner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
 import { PageBackdrop } from "@/components/marketing/page-backdrop";
 import { authClient } from "@/lib/auth-client";
+import { env } from "@upstand/env/web";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -36,7 +39,27 @@ const GoogleIcon = () => (
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [needsOwnerSetup, setNeedsOwnerSetup] = useState<boolean | null>(null);
   const { data: session, isPending: sessionPending } = authClient.useSession();
+
+  useEffect(() => {
+    let active = true;
+    fetch(`${env.NEXT_PUBLIC_SERVER_URL}/api/setup/status`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to check instance setup");
+        return (await response.json()) as { needsOwnerSetup: boolean };
+      })
+      .then((status) => {
+        if (!active) return;
+        setNeedsOwnerSetup(status.needsOwnerSetup);
+      })
+      .catch((error) => {
+        if (active) toast.error(error.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -118,24 +141,35 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
+          ) : needsOwnerSetup === null ? (
+            <div className="flex flex-col items-center justify-center space-y-4 py-12">
+              <Spinner />
+              <p className="text-muted-foreground text-sm">
+                Checking instance setup…
+              </p>
+            </div>
           ) : (
             <>
               <div className="space-y-2 text-center">
                 {/* Fixed: added bg-clip-text */}
                 <h1 className="bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text font-extrabold text-3xl text-transparent tracking-tight">
-                  Welcome back
+                  {needsOwnerSetup ? "Set up Upstand" : "Welcome back"}
                 </h1>
                 <p className="text-muted-foreground text-sm">
-                  Sign in to manage your multi-tenant workspace
+                  {needsOwnerSetup
+                    ? "Create the owner account for this self-hosted instance"
+                    : "Sign in to manage your workspace"}
                 </p>
               </div>
 
               <div className="space-y-4">
+                {needsOwnerSetup ? <SignUpForm /> : <SignInForm />}
+
                 <Button
                   variant="outline"
                   size="lg"
                   onClick={handleGoogleSignIn}
-                  disabled={loading}
+                  disabled={loading || needsOwnerSetup}
                   className="w-full gap-3 border-border bg-muted/40 font-semibold text-foreground hover:bg-accent hover:text-accent-foreground"
                 >
                   {loading ? (

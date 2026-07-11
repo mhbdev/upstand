@@ -10,7 +10,9 @@ export class GetWebServerSettingsUseCase {
   async execute(): Promise<{ settings: WebServerSettings; status: any }> {
     let settings = await this.uow.webServerSettingsRepository.findGlobal();
     if (!settings) {
-      settings = await this.uow.webServerSettingsRepository.createGlobal({});
+      settings = await this.uow.webServerSettingsRepository.createGlobal({
+        caddySnippets: this.getControlPlaneRoutes(),
+      });
     }
 
     if (!settings.serverIp) {
@@ -54,5 +56,27 @@ export class GetWebServerSettingsUseCase {
     await this.caddyService.syncResourceConfigs(resources, settings);
     const status = await this.caddyService.getStatus();
     return { settings, status };
+  }
+
+  private getControlPlaneRoutes(): string {
+    const dashboardHost = process.env.UPSTAND_DASHBOARD_HOST?.trim();
+    const apiHost = process.env.UPSTAND_API_HOST?.trim();
+    const validHost = (host: string | undefined) =>
+      host && /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(host);
+
+    if (!validHost(dashboardHost) || !validHost(apiHost)) return "";
+
+    // These routes make the control plane reachable through the same managed
+    // Caddy instance that later fronts deployed resources. They are seeded only
+    // for a new installation; operator-authored snippets remain untouched.
+    return `${dashboardHost} {
+\tencode zstd gzip
+\treverse_proxy upstand_web:3001
+}
+
+${apiHost} {
+\tencode zstd gzip
+\treverse_proxy upstand_server:3000
+}`;
   }
 }

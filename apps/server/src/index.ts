@@ -9,6 +9,8 @@ import {
 } from "@upstand/api/di";
 import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
+import { db } from "@upstand/db";
+import * as authSchema from "@upstand/db/schema/auth";
 import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";
@@ -27,6 +29,7 @@ import {
 import { type EvlogVariables, evlog } from "evlog/hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { count } from "drizzle-orm";
 import { runDatabaseMigrations } from "./startup";
 
 initLogger({
@@ -93,6 +96,14 @@ app.use(
 );
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// This endpoint deliberately exposes only whether an owner exists. It lets the
+// web app provide a deterministic first-run flow without leaking user details.
+app.get("/api/setup/status", async (c) => {
+  const result = await db.select({ value: count() }).from(authSchema.user);
+  const userCount = result[0]?.value ?? 0;
+  return c.json({ needsOwnerSetup: userCount === 0 });
+});
 
 app.get("/api/providers/github/setup", async (c) => {
   const code = c.req.query("code");
