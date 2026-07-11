@@ -9,7 +9,7 @@ readonly INSTALL_DIR="/etc/upstand"
 readonly ENV_FILE="$INSTALL_DIR/.env"
 readonly SOURCE_DIR="$INSTALL_DIR/source"
 readonly NETWORK_NAME="${DOCKER_NETWORK:-upstand-network}"
-readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 readonly STACK_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
 
 fail() {
@@ -146,7 +146,7 @@ write_environment() {
   UPSTAND_API_HOST="${BETTER_AUTH_URL#https://}"
   [[ "$UPSTAND_DASHBOARD_HOST" != */* && "$UPSTAND_API_HOST" != */* ]] || fail "dashboard and API origins must not include a path"
 
-  if [[ -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE" ]]; then
+  if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE" ]]; then
     build_source_images
   fi
   if [[ "${SOURCE_BUILD:-false}" != true ]]; then
