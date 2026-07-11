@@ -26,6 +26,7 @@
     "drizzle-orm": "catalog:",
     "evlog": "catalog:",
     "hono": "catalog:",
+    "ssh2": "^1.17.0",
     "zod": "catalog:"
   },
   "devDependencies": {
