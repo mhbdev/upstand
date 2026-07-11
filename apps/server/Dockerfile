@@ -14,7 +14,6 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/env/package.json ./packages/env/
 COPY packages/api/package.json ./packages/api/
 COPY packages/auth/package.json ./packages/auth/
-COPY packages/cli/package.json ./packages/cli/
 COPY packages/config/package.json ./packages/config/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/redis/package.json ./packages/redis/
@@ -95,7 +94,6 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/env/package.json ./packages/env/
 COPY packages/api/package.json ./packages/api/
 COPY packages/auth/package.json ./packages/auth/
-COPY packages/cli/package.json ./packages/cli/
 COPY packages/config/package.json ./packages/config/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/redis/package.json ./packages/redis/
