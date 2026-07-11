@@ -33,6 +33,7 @@ import {
 import {
   BackupScheduler,
   CaddyService,
+  CaddyServiceToken,
   ControlResourceUseCase,
   CreateBackupScheduleUseCase,
   CreateDockerRegistryUseCase,
@@ -58,6 +59,7 @@ import {
   DeliverNotificationUseCase,
   DeployResourceUseCase,
   DockerService,
+  DockerServiceToken,
   ExecuteBackupRunUseCase,
   GetBackupRunsUseCase,
   GetBackupSchedulesUseCase,
@@ -93,6 +95,7 @@ import {
   ListGitRepositoriesUseCase,
   NotificationTransportRegistry,
   PublishNotificationUseCase,
+  PublishNotificationUseCaseToken,
   ReloadWebServerUseCase,
   RemoveSwarmNodeUseCase,
   RestoreBackupRunUseCase,
@@ -156,7 +159,6 @@ export const UpdateResourceUseCaseToken = createToken<UpdateResourceUseCase>(
 export const DeleteResourceUseCaseToken = createToken<DeleteResourceUseCase>(
   "DeleteResourceUseCase",
 );
-export const DockerServiceToken = createToken<DockerService>("DockerService");
 export const DeployResourceUseCaseToken = createToken<DeployResourceUseCase>(
   "DeployResourceUseCase",
 );
@@ -238,7 +240,6 @@ export const ListBackupVolumesUseCaseToken =
   createToken<ListBackupVolumesUseCase>("ListBackupVolumesUseCase");
 
 // Caddy Web Server Tokens
-export const CaddyServiceToken = createToken<CaddyService>("CaddyService");
 export const GetWebServerSettingsUseCaseToken =
   createToken<GetWebServerSettingsUseCase>("GetWebServerSettingsUseCase");
 export const UpdateWebServerSettingsUseCaseToken =
@@ -323,8 +324,6 @@ export const DeleteNotificationChannelUseCaseToken =
   );
 export const TestNotificationChannelUseCaseToken =
   createToken<TestNotificationChannelUseCase>("TestNotificationChannelUseCase");
-export const PublishNotificationUseCaseToken =
-  createToken<PublishNotificationUseCase>("PublishNotificationUseCase");
 export const DeliverNotificationUseCaseToken =
   createToken<DeliverNotificationUseCase>("DeliverNotificationUseCase");
 

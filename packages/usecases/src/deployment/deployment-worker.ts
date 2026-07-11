@@ -1,16 +1,23 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createToken } from "@circulo-ai/di";
 import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
 import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
 import { getInstallationToken } from "../git-provider/github-client";
+import type { PublishNotificationUseCase } from "../notification/publish-notification.usecase";
 import type { DockerService } from "../resource/docker.service";
 import { getDockerInstance } from "../resource/docker-client";
 import type { CaddyService } from "../web-server/caddy.service";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 import { ResourceLock } from "./resource-lock";
+
+export const DockerServiceToken = createToken<DockerService>("DockerService");
+export const CaddyServiceToken = createToken<CaddyService>("CaddyService");
+export const PublishNotificationUseCaseToken =
+  createToken<PublishNotificationUseCase>("PublishNotificationUseCase");
 
 export class DeploymentWorker {
   private worker: Worker | null = null;
@@ -210,10 +217,8 @@ export class DeploymentWorker {
     let caddyService: CaddyService;
     try {
       uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-      dockerService = scope.resolve(
-        Symbol.for("DockerService"),
-      ) as DockerService;
-      caddyService = scope.resolve(Symbol.for("CaddyService")) as CaddyService;
+      dockerService = scope.resolve(DockerServiceToken) as DockerService;
+      caddyService = scope.resolve(CaddyServiceToken) as CaddyService;
     } catch (error) {
       await scope.dispose();
       await resourceLock.release();
@@ -232,9 +237,7 @@ export class DeploymentWorker {
       );
       if (!project) return;
 
-      const publisher = scope.resolve(
-        Symbol.for("PublishNotificationUseCase"),
-      ) as {
+      const publisher = scope.resolve(PublishNotificationUseCaseToken) as {
         execute: (input: {
           organizationId: string;
           event: "deployment_succeeded" | "deployment_failed";

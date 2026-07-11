@@ -19,6 +19,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@circulo-ai/di": "^3.1.0",
     "@upstand/domain": "workspace:*",
     "@upstand/redis": "workspace:*",
     "bullmq": "catalog:",
