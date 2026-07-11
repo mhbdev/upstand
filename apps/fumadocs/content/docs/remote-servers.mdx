@@ -1,0 +1,32 @@
+---
+title: Add a remote server
+description: Safely connect a worker node and target deployments to it.
+---
+
+Remote servers are Swarm worker nodes. Upstand connects over SSH, installs Docker if necessary, verifies the cluster, joins the worker, and then uses a Swarm placement constraint to target deployments.
+
+## Prerequisites
+
+- The control-plane manager is healthy and reachable from the worker on TCP 2377, TCP/UDP 7946, and UDP 4789.
+- The worker accepts SSH from the control plane.
+- You have an SSH key pair. Add the **public** key to the worker's `~/.ssh/authorized_keys`; store the private key in **SSH Keys** in Upstand.
+- The server is not already joined to another Swarm. Leave a previous cluster deliberately with `docker swarm leave --force` before adding it.
+
+## Guided setup
+
+1. In **SSH Keys**, create or import a key. Copy its public key to the target server.
+2. In **Remote Servers**, choose **Add Server** and supply a descriptive name, IP address, SSH port, user, and the SSH key.
+3. Choose **Setup Server**. The status moves from `idle` to `setting_up` and then to `ready` or `failed`.
+4. Verify from the manager: `docker node ls`. The new node must be `Ready` and `Active`.
+5. When creating an application, Compose stack, or database resource, select this server. Deployment logs show the matched Swarm node and placement constraint.
+
+## Failure guide
+
+| Symptom | Meaning | Fix |
+| --- | --- | --- |
+| SSH authentication failed | The saved private key is not accepted | Re-copy the matching public key, verify owner and file permissions, and retry |
+| Connection timed out | Control plane cannot reach SSH | Check IP, port, firewall, security groups, and VPN routing |
+| Different Swarm cluster | The target already belongs to another cluster | Remove it from the old cluster intentionally, then retry |
+| No matching Swarm node in deployment logs | The node did not join or its address differs | Check `docker node ls`, then use the worker's reachable address/hostname |
+
+Upstand does not store an SSH password for remote provisioning. Key authentication is deliberate: it is auditable, rotatable, and avoids persisting a reusable root password.

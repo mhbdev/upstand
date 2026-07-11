@@ -1,0 +1,13 @@
+{
+  "title": "Upstand documentation",
+  "pages": [
+    "index",
+    "getting-started",
+    "self-hosting",
+    "remote-servers",
+    "deployments",
+    "docker-swarm",
+    "updates",
+    "troubleshooting"
+  ]
+}

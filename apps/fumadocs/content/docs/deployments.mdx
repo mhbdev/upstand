@@ -1,0 +1,34 @@
+---
+title: Deploy applications, Compose stacks, and databases
+description: How resources are built, scheduled, routed, and recovered.
+---
+
+## Application deployment
+
+Create a project, environment, and application resource. Connect GitHub, GitLab, Gitea, Bitbucket, or a generic Git URL, select a branch, configure environment variables, and deploy.
+
+Upstand queues every deployment, locks each resource to prevent overlapping builds, records live logs, builds the image, creates or updates the Swarm service, and finally validates/reloads Caddy routing. A failed deployment preserves the error in deployment history.
+
+For a private generic Git repository, attach an SSH key to the resource. The private key is decrypted only for the build and the temporary key file is removed after the job.
+
+## Compose stacks
+
+Compose resources deploy through `docker stack deploy`. Service names are prefixed by the stack name. When adding a domain route, select the exact service that should receive traffic; Upstand cannot infer it for a multi-service Compose file.
+
+## Databases
+
+Supported database resources deploy as Swarm services with persistent named volumes. Save generated credentials immediately; secrets are encrypted at rest. Do not publish a database port publicly unless you understand the network exposure. Prefer connecting application services over the private `upstand-network` overlay.
+
+## Domains and HTTPS
+
+Assign a hostname, target port, optional path, and (for Compose) service name. Caddy validates the complete generated configuration before reloading it. A bad mapping does not replace the last working configuration.
+
+For automatic HTTPS, DNS must point to the manager and ports 80/443 must reach Caddy. All routes on one hostname must consistently use either HTTPS or HTTP.
+
+## Deployment troubleshooting
+
+- Read the deployment log first; it includes clone, build, scheduling, and routing stages.
+- Check the selected server is `ready` and appears in `docker node ls`.
+- Check service state with `docker service ps <service>`.
+- Check resource logs in the dashboard or with `docker service logs <service>`.
+- If a service starts but is unreachable, verify its target port and domain mapping before rebuilding.

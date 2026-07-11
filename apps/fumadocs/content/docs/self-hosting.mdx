@@ -1,0 +1,43 @@
+---
+title: Self-hosting and operations
+description: Installation modes, secrets, TLS, upgrades, and recovery.
+---
+
+## Installation modes
+
+The installer supports two modes.
+
+| Mode | When to use it | Image source |
+| --- | --- | --- |
+| GitHub source build | First evaluation or a simple single-manager installation | Builds the public `mhbdev/upstand` repository on the manager |
+| Release images | Repeatable production rollout | Immutable GHCR image digests supplied through `UPSTAND_*_IMAGE` |
+
+Use release images for a production fleet once a release is published. Source builds are intentionally pinned to the checked-out Git commit and stay on the manager node.
+
+## Secrets and state
+
+`/etc/upstand/.env` is mode `0600` and contains generated database, Redis, authentication, and encryption secrets. Back it up securely. Losing `SSH_KEY_ENCRYPTION_KEY_V1` means stored SSH-key and credential secrets cannot be decrypted.
+
+Persistent Docker volumes hold Postgres and Redis. They are local volumes, so do not move the `upstand.control-plane=true` label to another machine without migrating state.
+
+## TLS and DNS
+
+Caddy obtains certificates only after DNS points at the manager and port 80 is reachable. If issuance fails:
+
+1. Confirm `dig +short app.example.com` and `dig +short api.example.com` return the manager IP.
+2. Confirm no other process owns ports 80 or 443: `ss -ltnp '( sport = :80 or sport = :443 )'`.
+3. Inspect `docker logs upstand-caddy --tail 100`.
+
+Use real domains in production. `nip.io` is useful only for a temporary validation environment.
+
+## Backup and recovery
+
+Back up `/etc/upstand/.env` and the Postgres volume before upgrades. Configure an S3 destination in the dashboard before relying on scheduled database or volume backups. A restore overwrites its target, so test it in a disposable resource first.
+
+## Security checklist
+
+- Use a unique owner password and enable 2FA.
+- Keep port 22 limited to administrators.
+- Restrict Swarm ports to private node networks; never expose 2377, 7946, or 4789 broadly to the internet.
+- Keep the dashboard/API behind HTTPS and do not publish database ports unless a resource explicitly requires it.
+- Rotate Swarm join tokens after a node is lost or an operator leaves.

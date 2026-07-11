@@ -1,0 +1,44 @@
+---
+title: Get started
+description: Go from a fresh Linux server to your first Upstand deployment.
+---
+
+Upstand is a self-hosted control plane for deploying applications, Docker Compose stacks, and databases to Docker Swarm. The first installation runs on one manager node; add workers after the control plane is healthy.
+
+## Before you start
+
+Prepare these four things:
+
+1. A fresh Linux VM with at least 2 vCPU, 4 GB RAM, and 30 GB free disk. Ubuntu 22.04+ or Debian 12+ is the supported starting point.
+2. A DNS name for the dashboard and API, such as `app.example.com` and `api.example.com`, both pointing at the manager's public IP.
+3. Inbound TCP 80 and 443 open to the internet. For a multi-node cluster, also allow TCP 2377, TCP/UDP 7946, and UDP 4789 **between cluster nodes only**.
+4. Root or passwordless-sudo SSH access to the manager.
+
+Do not expose PostgreSQL, Redis, or the Upstand API directly. The installer keeps control-plane services private and Caddy exposes HTTPS entry points.
+
+## Install
+
+Run this on the manager. Replace the example hosts before pasting it.
+
+```bash
+export BETTER_AUTH_URL=https://api.example.com
+export CORS_ORIGIN=https://app.example.com
+export NEXT_PUBLIC_SERVER_URL=https://api.example.com
+
+curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash
+```
+
+The first run installs Docker when required, initializes Swarm, creates an attachable `upstand-network`, builds the public GitHub source, generates secrets in `/etc/upstand/.env`, and waits for Postgres, Redis, API, dashboard, and docs health checks.
+
+Open `https://app.example.com/login`. The first person to open a new installation creates its owner account. Store that account securely: later visitors can sign in but cannot create a second bootstrap owner.
+
+## Verify
+
+```bash
+docker stack services upstand
+curl -fsS https://api.example.com/health/ready
+```
+
+Every service should report `1/1`; the health response must report database, Redis, workers, and Caddy as ready.
+
+Next: [self-hosting](/docs/self-hosting), [remote servers](/docs/remote-servers), or [deployments](/docs/deployments).
