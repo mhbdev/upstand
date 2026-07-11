@@ -9,7 +9,9 @@ readonly INSTALL_DIR="/etc/upstand"
 readonly ENV_FILE="$INSTALL_DIR/.env"
 readonly SOURCE_DIR="$INSTALL_DIR/source"
 readonly NETWORK_NAME="${DOCKER_NETWORK:-upstand-network}"
-readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# BASH_SOURCE is an array only when Bash executes a file. A curl | bash install
+# has no array element, so use the scalar expansion with a safe $0 fallback.
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE:-$0}")" && pwd)"
 readonly STACK_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
 
 fail() {
