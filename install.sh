@@ -231,10 +231,16 @@ wait_for_stack() {
       fi
     done
 
+    local server_container web_container docs_container
+    server_container="$(docker ps -q --filter label=com.docker.swarm.service.name=upstand_server | head -n1)"
+    web_container="$(docker ps -q --filter label=com.docker.swarm.service.name=upstand_web | head -n1)"
+    docs_container="$(docker ps -q --filter label=com.docker.swarm.service.name=upstand_fumadocs | head -n1)"
+
     if [[ "$converged" == true ]] \
-      && curl --fail --silent "http://127.0.0.1:${UPSTAND_SERVER_PORT:-3000}/health/ready" >/dev/null \
-      && curl --fail --silent "http://127.0.0.1:${UPSTAND_WEB_PORT:-3001}/" >/dev/null \
-      && curl --fail --silent "http://127.0.0.1:${UPSTAND_DOCS_PORT:-4000}/" >/dev/null; then
+      && [[ -n "$server_container" && -n "$web_container" && -n "$docs_container" ]] \
+      && docker exec "$server_container" curl --fail --silent http://127.0.0.1:3000/health/ready >/dev/null \
+      && docker exec "$web_container" node -e "fetch('http://127.0.0.1:3001/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" \
+      && docker exec "$docs_container" node -e "fetch('http://127.0.0.1:4000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
       return
     fi
     sleep 5
