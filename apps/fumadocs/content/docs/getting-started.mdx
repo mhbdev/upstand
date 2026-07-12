@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | 
 
 If you already have domains, export `BETTER_AUTH_URL`, `CORS_ORIGIN`, and `NEXT_PUBLIC_SERVER_URL` before running the command. If you omit them, interactive installs ask for them and non-interactive installs derive temporary HTTPS `nip.io` origins from the public IPv4 address. You can replace them in `/etc/upstand/.env` and rerun the installer after DNS is ready.
 
-The first run installs Docker when required, initializes Swarm, creates an attachable `upstand-network`, builds the public GitHub source, generates secrets in `/etc/upstand/.env`, and waits for Postgres, Redis, API, dashboard, and docs health checks.
+The first run installs Docker when required, initializes Swarm, creates an attachable `upstand-network`, pulls immutable release images, generates Docker secrets under `/etc/upstand/secrets/`, and waits for Postgres, Redis, API, dashboard, and docs health checks.
 
 Open `https://app.example.com/login`. The first person to open a new installation creates its owner account. Store that account securely: later visitors can sign in but cannot create a second bootstrap owner.
 

@@ -33,6 +33,8 @@ COPY packages/usecases ./packages/usecases
 
 ARG NEXT_PUBLIC_SERVER_URL
 ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
+ARG NEXT_PUBLIC_UPSTAND_VERSION=development
+ENV NEXT_PUBLIC_UPSTAND_VERSION=${NEXT_PUBLIC_UPSTAND_VERSION}
 ENV NODE_ENV=production
 RUN cd apps/web && node node_modules/next/dist/bin/next build
 # standalone output excludes public/; ensure it exists so the runner copy never fails

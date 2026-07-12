@@ -393,7 +393,7 @@ export default function WebServerDashboard({
       });
     } else {
       toast.success(
-        `Upstand is up to date (${res.data?.currentVersion || "v0.1.0"})`,
+        `Upstand is up to date (${res.data?.currentVersion || "unknown"})`,
         {
           description: "No new updates found.",
         },
@@ -1106,7 +1106,7 @@ export default function WebServerDashboard({
                     setCaddyLogsTail(Number(e.target.value));
                     setTimeout(() => refetchCaddyLogs(), 50);
                   }}
-                  className="rounded-md border border-border/40 bg-card px-2.5 py-1 text-foreground text-xs focus:outline-none"
+                  className="rounded-md border border-border/40 bg-card px-2.5 py-1 text-foreground text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value={50}>Last 50 lines</option>
                   <option value={100}>Last 100 lines</option>

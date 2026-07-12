@@ -57,6 +57,7 @@ jobs:
           tags: ghcr.io/${{ steps.image.outputs.repository }}-web:canary
           build-args: |
             NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
+            NEXT_PUBLIC_UPSTAND_VERSION=canary
           cache-from: type=gha,scope=upstand-web
           cache-to: type=gha,scope=upstand-web,mode=max
       - uses: docker/build-push-action@v7

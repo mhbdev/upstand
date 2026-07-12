@@ -11,7 +11,7 @@
   },
   "scripts": {
     "db:push": "drizzle-kit push",
-    "db:generate": "SKIP_ENV_VALIDATION=1 better-auth generate --config ../auth/src/index.ts --output src/schema/auth.ts --yes && drizzle-kit generate",
+    "db:generate": "SKIP_ENV_VALIDATION=1 BETTER_AUTH_URL=http://localhost:3000 CORS_ORIGIN=http://localhost:3001 BETTER_AUTH_SECRET=local-development-secret-please-change-32 DATABASE_URL=postgresql://upstand:upstand@localhost:5432/upstand better-auth generate --config ../auth/src/index.ts --output src/schema/auth.ts --yes && drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
     "check-types": "tsc --noEmit",

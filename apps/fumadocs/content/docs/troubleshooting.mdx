@@ -30,3 +30,6 @@ Confirm it is `ready` in Upstand and `Ready` in `docker node ls`. Deployment log
 ## A deployment is stuck
 
 Review deployment logs and service tasks. Upstand restores queued jobs after a restart, but a build that actually failed must be corrected and redeployed. Use the dashboard's queue cleanup only after confirming no legitimate deployment is active.
+## Database schema generation on Windows
+
+Run `bun db:generate` from the repository root. The command supplies safe local Better Auth URLs automatically, so a local `.env` file is not required for schema generation. If you override the command, provide `BETTER_AUTH_URL`, `CORS_ORIGIN`, `BETTER_AUTH_SECRET`, and `DATABASE_URL` as valid values.

@@ -6,7 +6,9 @@ services:
     environment:
       POSTGRES_DB: upstand
       POSTGRES_USER: upstand
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -49,20 +51,15 @@ services:
 
   redis:
     image: ${REDIS_IMAGE:-redis:7.4-alpine}
-    command:
-      [
-        "sh",
-        "-ec",
-        "exec redis-server --appendonly yes --appendfsync everysec --maxmemory-policy noeviction --requirepass \"$${REDIS_PASSWORD}\"",
-      ]
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    command: ["sh", "-ec", "exec redis-server --appendonly yes --appendfsync everysec --maxmemory-policy noeviction --requirepass \"$$(cat /run/secrets/redis_password)\""]
+    secrets:
+      - redis_password
     volumes:
       - redis_data:/data
     networks:
       - upstand-network
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -103,18 +100,26 @@ services:
     stop_grace_period: 5m
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://upstand:${POSTGRES_PASSWORD}@postgres:5432/upstand
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      DATABASE_HOST: postgres
+      DATABASE_NAME: upstand
+      DATABASE_USER: upstand
+      REDIS_HOST: redis
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL is required}
       CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
-      SSH_KEY_ENCRYPTION_KEY_V1: ${SSH_KEY_ENCRYPTION_KEY_V1:?SSH_KEY_ENCRYPTION_KEY_V1 is required}
+      SSH_KEY_ENCRYPTION_KEY_V1_FILE: /run/secrets/ssh_key_encryption_key
       UPSTAND_DASHBOARD_HOST: ${UPSTAND_DASHBOARD_HOST:-}
       UPSTAND_API_HOST: ${UPSTAND_API_HOST:-}
       UPSTAND_SERVER_IMAGE: ${UPSTAND_SERVER_IMAGE:?UPSTAND_SERVER_IMAGE is required}
+      UPSTAND_VERSION: ${UPSTAND_VERSION:-}
       UPSTAND_AUTO_UPDATE: ${UPSTAND_AUTO_UPDATE:-false}
       DOCKER_HOST: unix:///var/run/docker.sock
       DOCKER_NETWORK: upstand-network
+    secrets:
+      - postgres_password
+      - redis_password
+      - better_auth_secret
+      - ssh_key_encryption_key
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -245,6 +250,16 @@ volumes:
     driver: local
   redis_data:
     driver: local
+
+secrets:
+  postgres_password:
+    file: /etc/upstand/secrets/postgres_password
+  redis_password:
+    file: /etc/upstand/secrets/redis_password
+  better_auth_secret:
+    file: /etc/upstand/secrets/better_auth_secret
+  ssh_key_encryption_key:
+    file: /etc/upstand/secrets/ssh_key_encryption_key
 
 networks:
   upstand-network:

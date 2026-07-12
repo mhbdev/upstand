@@ -93,7 +93,7 @@ export default function LoginPage() {
     <div className="relative flex min-h-[calc(100svh-64px)] flex-col items-center justify-center overflow-hidden bg-background px-4">
       <PageBackdrop />
 
-      <Card className="relative w-full max-w-md rounded-2xl border-border bg-card/40 p-8 shadow-2xl backdrop-blur-md">
+      <Card className="relative w-full max-w-md rounded-3xl border-border/70 bg-card/70 p-7 shadow-2xl shadow-primary/5 backdrop-blur-md sm:p-8">
         <CardContent className="space-y-8 p-0">
           {sessionPending ? (
             <div className="flex flex-col items-center justify-center space-y-4 py-12">
@@ -162,7 +162,7 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {needsOwnerSetup ? <SignUpForm /> : <SignInForm />}
 
                 <Button

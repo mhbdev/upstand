@@ -18,7 +18,7 @@ The installer accepts omitted origins for a first-run evaluation. It asks for AP
 
 ## Secrets and state
 
-`/etc/upstand/.env` is mode `0600` and contains generated database, Redis, authentication, and encryption secrets. Back it up securely. Losing `SSH_KEY_ENCRYPTION_KEY_V1` means stored SSH-key and credential secrets cannot be decrypted.
+`/etc/upstand/.env` is mode `0600` and contains origins and immutable image references. The installer stores database, Redis, authentication, and encryption material as individual mode `0600` Docker secret files under `/etc/upstand/secrets/`. Back up both locations securely. Losing the SSH-key secret means stored SSH-key and credential secrets cannot be decrypted.
 
 Persistent Docker volumes hold Postgres and Redis. They are local volumes, so do not move the `upstand.control-plane=true` label to another machine without migrating state.
 

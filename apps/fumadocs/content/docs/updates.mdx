@@ -7,7 +7,7 @@ description: Choose stable releases or canary builds without losing rollback saf
 
 `master` is the release branch. A `vX.Y.Z` Git tag produces versioned release images; those are the only images recommended for a production control plane. The `canary` branch produces a rolling canary image for test environments.
 
-Never promote a mutable `latest` or `canary` tag directly into a production stack. Resolve the release image to its digest and set `UPSTAND_SERVER_IMAGE`, `UPSTAND_WEB_IMAGE`, and `UPSTAND_DOCS_IMAGE` in `/etc/upstand/.env`.
+Never promote a mutable `latest` or `canary` tag directly into a production stack. Resolve the release image to its digest and set `UPSTAND_SERVER_IMAGE`, `UPSTAND_WEB_IMAGE`, and `UPSTAND_DOCS_IMAGE` in `/etc/upstand/.env`. Set `UPSTAND_VERSION` to the matching release tag so the dashboard can report the installed version without guessing from a package file.
 
 ## Safe update procedure
 
@@ -27,4 +27,4 @@ Both **Web Server → Check for updates** and **Settings → Check for Updates**
 
 ## Rollback
 
-Keep the previous image digests. Restore them in `/etc/upstand/.env`, rerun the installer, and verify readiness. Do not rotate `BETTER_AUTH_SECRET`, database credentials, Redis credentials, or `SSH_KEY_ENCRYPTION_KEY_V1` during a normal image rollback.
+Keep the previous image digests. Restore them in `/etc/upstand/.env`, rerun the installer, and verify readiness. Do not rotate the Docker secret files under `/etc/upstand/secrets/` during a normal image rollback.

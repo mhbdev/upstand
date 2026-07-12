@@ -27,7 +27,7 @@ export class GetUpdateStatusUseCase {
         const rootPkgPath = path.join(process.cwd(), "package.json");
         if (fs.existsSync(rootPkgPath)) {
           const pkg = JSON.parse(fs.readFileSync(rootPkgPath, "utf8"));
-          currentVersion = `v${pkg.version || "0.1.0"}`;
+          currentVersion = pkg.version ? `v${pkg.version}` : undefined;
         }
       } catch {}
     }

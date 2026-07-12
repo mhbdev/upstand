@@ -30,7 +30,7 @@ export UPSTAND_DOCS_IMAGE=ghcr.io/upstand/upstand-fumadocs@sha256:<digest>
 sudo bash ./install.sh
 ```
 
-The installer writes the generated credentials and resolved image references to `/etc/upstand/.env` with mode `0600`. Treat that file as a secret. It also uses `docker stack deploy --resolve-image always --with-registry-auth --prune` so a rollout has a resolved image digest and stale services are removed.
+The installer writes origins and resolved image references to `/etc/upstand/.env` with mode `0600`, and writes each generated credential to `/etc/upstand/secrets/` as a Docker secret source file. Treat both paths as sensitive. It also uses `docker stack deploy --resolve-image always --with-registry-auth --prune` so a rollout has a resolved image digest and stale services are removed.
 
 ## Cluster dashboard
 

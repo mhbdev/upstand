@@ -56,16 +56,14 @@ export default function SignUpForm({
   }
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
-      <h1 className="mb-6 text-center font-bold text-3xl">Create Account</h1>
-
+    <div className="w-full">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="space-y-4"
+        className="space-y-5"
       >
         <div>
           <form.Field name="name">
@@ -80,7 +78,7 @@ export default function SignUpForm({
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="text-destructive text-xs" role="alert">
                     {error?.message}
                   </p>
                 ))}
@@ -98,12 +96,15 @@ export default function SignUpForm({
                   id={field.name}
                   name={field.name}
                   type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  required
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="text-destructive text-xs" role="alert">
                     {error?.message}
                   </p>
                 ))}
@@ -121,12 +122,15 @@ export default function SignUpForm({
                   id={field.name}
                   name={field.name}
                   type="password"
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                  required
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="text-destructive text-xs" role="alert">
                     {error?.message}
                   </p>
                 ))}
@@ -147,7 +151,7 @@ export default function SignUpForm({
               className="w-full"
               disabled={!canSubmit || isSubmitting}
             >
-              {isSubmitting ? "Submitting..." : "Sign Up"}
+              {isSubmitting ? "Creating account…" : "Create account"}
             </Button>
           )}
         </form.Subscribe>
@@ -158,7 +162,7 @@ export default function SignUpForm({
           <Button
             variant="link"
             onClick={onSwitchToSignIn}
-            className="text-indigo-600 hover:text-indigo-800"
+            className="text-muted-foreground hover:text-primary"
           >
             Already have an account? Sign In
           </Button>
@@ -167,3 +171,6 @@ export default function SignUpForm({
     </div>
   );
 }
+                  autoComplete="name"
+                  placeholder="Your name"
+                  required

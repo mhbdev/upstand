@@ -48,7 +48,7 @@ Production self-hosting requires a Linux Docker Swarm manager with a routable ad
 git clone https://github.com/mhbdev/upstand.git
 cd upstand
 bun install --frozen-lockfile
-cp .env.example .env  # if maintaining a local env file; see packages/env for required values
+cp .env.example .env
 bun run db:start
 bun run db:push
 bun run dev
@@ -74,7 +74,7 @@ Use `bun run check` only when you intentionally want Biome to write formatting c
 
 ## Configuration
 
-Server variables are validated in `packages/env`. At minimum, development needs a PostgreSQL URL, Redis connection details, Better Auth URL/secret, CORS origin, and the SSH-key encryption key. Production values are generated and persisted by `install.sh` in `/etc/upstand/.env`; protect that file as a secret.
+Server variables are validated in `packages/env`. At minimum, development needs a PostgreSQL URL, Redis connection details, Better Auth URL/secret, CORS origin, and the SSH-key encryption key. Production secrets are generated as Docker secrets under `/etc/upstand/secrets/`; non-secret origins and image metadata remain in `/etc/upstand/.env`. Protect both paths.
 
 The public web build receives `NEXT_PUBLIC_SERVER_URL` at image build time. In production it must be the HTTPS API origin, never `localhost`. Release images should be pinned by digest. `UPSTAND_AUTO_UPDATE=true` enables opt-in stable-channel checks every 30 minutes; source installations are intentionally not auto-updated.
 

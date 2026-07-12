@@ -125,6 +125,7 @@ ensure_swarm() {
 
 write_environment() {
   install -d -m 0700 "$INSTALL_DIR"
+  install -d -m 0700 "$INSTALL_DIR/secrets"
 
   local advertise_address="${1:-}"
 
@@ -135,6 +136,7 @@ write_environment() {
   local requested_web_image="${UPSTAND_WEB_IMAGE:-}"
   local requested_docs_image="${UPSTAND_DOCS_IMAGE:-}"
   local requested_auto_update="${UPSTAND_AUTO_UPDATE:-}"
+  local requested_version="${UPSTAND_VERSION:-}"
 
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
@@ -164,10 +166,19 @@ write_environment() {
     fi
   fi
 
+  [[ -r "$INSTALL_DIR/secrets/postgres_password" ]] && POSTGRES_PASSWORD="$(cat "$INSTALL_DIR/secrets/postgres_password")"
+  [[ -r "$INSTALL_DIR/secrets/redis_password" ]] && REDIS_PASSWORD="$(cat "$INSTALL_DIR/secrets/redis_password")"
+  [[ -r "$INSTALL_DIR/secrets/better_auth_secret" ]] && BETTER_AUTH_SECRET="$(cat "$INSTALL_DIR/secrets/better_auth_secret")"
+  [[ -r "$INSTALL_DIR/secrets/ssh_key_encryption_key" ]] && SSH_KEY_ENCRYPTION_KEY_V1="$(cat "$INSTALL_DIR/secrets/ssh_key_encryption_key")"
   POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 32)}"
   REDIS_PASSWORD="${REDIS_PASSWORD:-$(openssl rand -hex 32)}"
   BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-$(openssl rand -hex 32)}"
   SSH_KEY_ENCRYPTION_KEY_V1="${SSH_KEY_ENCRYPTION_KEY_V1:-$(openssl rand -base64 32 | tr -d '\n')}"
+  printf '%s' "$POSTGRES_PASSWORD" >"$INSTALL_DIR/secrets/postgres_password"
+  printf '%s' "$REDIS_PASSWORD" >"$INSTALL_DIR/secrets/redis_password"
+  printf '%s' "$BETTER_AUTH_SECRET" >"$INSTALL_DIR/secrets/better_auth_secret"
+  printf '%s' "$SSH_KEY_ENCRYPTION_KEY_V1" >"$INSTALL_DIR/secrets/ssh_key_encryption_key"
+  chmod 0600 "$INSTALL_DIR/secrets"/*
   DOCKER_NETWORK="$NETWORK_NAME"
 
   BETTER_AUTH_URL="${requested_better_auth_url:-${BETTER_AUTH_URL:-}}"
@@ -198,10 +209,6 @@ write_environment() {
   fi
 
   cat >"$ENV_FILE" <<EOF
-POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-REDIS_PASSWORD=$REDIS_PASSWORD
-BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
-SSH_KEY_ENCRYPTION_KEY_V1=$SSH_KEY_ENCRYPTION_KEY_V1
 DOCKER_NETWORK=$DOCKER_NETWORK
 BETTER_AUTH_URL=$BETTER_AUTH_URL
 CORS_ORIGIN=$CORS_ORIGIN
@@ -212,6 +219,7 @@ UPSTAND_SERVER_IMAGE=$UPSTAND_SERVER_IMAGE
 UPSTAND_WEB_IMAGE=$UPSTAND_WEB_IMAGE
 UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE
 UPSTAND_AUTO_UPDATE=$UPSTAND_AUTO_UPDATE
+UPSTAND_VERSION=$requested_version
 POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16.4-alpine}
 REDIS_IMAGE=${REDIS_IMAGE:-redis:7.4-alpine}
 UPSTAND_SERVER_PORT=${UPSTAND_SERVER_PORT:-3000}

@@ -6,6 +6,18 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.9 - 2026-07-13
+
+### Added
+
+- Docker Swarm secret-file handling for database, Redis, Better Auth, and SSH encryption credentials.
+- A checked-in `.env.example` and portable local database-generation defaults for contributors.
+
+### Fixed
+
+- The local `bun db:generate` command no longer fails when Better Auth URLs are not configured.
+- Dashboard and landing-page version reporting no longer falls back to stale hardcoded release numbers.
+
 ## 0.1.7 - 2026-07-12
 
 ### Fixed

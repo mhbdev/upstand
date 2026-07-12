@@ -78,7 +78,7 @@ export default function TwoFactorVerifyPage() {
     <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4">
       <PageBackdrop />
 
-      <Card className="relative w-full max-w-sm">
+      <Card className="relative w-full max-w-sm rounded-3xl border-border/70 bg-card/70 shadow-2xl shadow-primary/5 backdrop-blur-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
             <HugeiconsIcon
@@ -86,7 +86,7 @@ export default function TwoFactorVerifyPage() {
               className="size-6 text-primary"
             />
           </div>
-          <CardTitle>Two-Factor Verification</CardTitle>
+          <CardTitle className="text-xl">Two-factor verification</CardTitle>
           <CardDescription>
             Enter the 6-digit code from your authenticator app to continue.
           </CardDescription>
@@ -119,7 +119,7 @@ export default function TwoFactorVerifyPage() {
               className="w-full"
             >
               {verifying && <Spinner data-icon="inline-start" />}
-              Verify Code
+              Verify code
             </Button>
           </form>
 
@@ -133,7 +133,7 @@ export default function TwoFactorVerifyPage() {
             >
               Sign out
             </button>
-            <span>Secured by Upstand MFA</span>
+            <span>Protected by Upstand MFA</span>
           </div>
         </CardContent>
       </Card>

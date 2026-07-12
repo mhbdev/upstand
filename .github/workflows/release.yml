@@ -107,6 +107,7 @@ jobs:
             ghcr.io/${{ steps.meta.outputs.repo }}-web:${{ steps.meta.outputs.tag }}
           build-args: |
             NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
+            NEXT_PUBLIC_UPSTAND_VERSION=${{ steps.meta.outputs.tag }}
           cache-from: type=gha,scope=upstand-web
           cache-to: type=gha,scope=upstand-web,mode=max
 
