@@ -1,6 +1,5 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { getServerSession } from "@/lib/server-session";
 import ResourceDetail from "./resource-detail";
 
 export const dynamic = "force-dynamic";
@@ -17,12 +16,7 @@ export default async function ResourcePage({ params }: PageProps) {
   const { projectId, environmentId, resourceId } = await params;
   let session = null;
   try {
-    session = await authClient.getSession({
-      fetchOptions: {
-        headers: await headers(),
-        throw: true,
-      },
-    });
+    session = await getServerSession();
   } catch (error) {
     console.error("Failed to fetch session on server side:", error);
   }

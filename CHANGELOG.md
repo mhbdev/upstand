@@ -6,6 +6,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.16 - 2026-07-13
+
+### Fixed
+
+- Dashboard server-rendered routes now resolve the API origin from the incoming self-hosted dashboard host, so authenticated users are not sent back to `/login` when release images were built with the CI placeholder URL.
+- Server-side session checks forward the browser session cookie directly to Better Auth and fail clearly when the API cannot be reached.
+
 ## 0.1.15 - 2026-07-13
 
 ### Fixed

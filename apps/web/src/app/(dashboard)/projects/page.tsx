@@ -1,6 +1,5 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { getServerSession } from "@/lib/server-session";
 import Projects from "./projects";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function ProjectsPage() {
   let session = null;
   try {
-    session = await authClient.getSession({
-      fetchOptions: {
-        headers: await headers(),
-        throw: true,
-      },
-    });
+    session = await getServerSession();
   } catch (error) {
     console.error("Failed to fetch session on server side:", error);
   }
