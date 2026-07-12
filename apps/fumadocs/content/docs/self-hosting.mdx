@@ -14,6 +14,8 @@ The installer supports two modes.
 
 Use release images for a production fleet once a release is published. Source builds are intentionally pinned to the checked-out Git commit and stay on the manager node.
 
+The installer accepts omitted origins for a first-run evaluation. It asks for API and dashboard origins in an interactive terminal, or derives temporary `nip.io` HTTPS origins from a public IPv4 manager in non-interactive mode. For a production rollout, set real HTTPS origins explicitly and rerun the installer after DNS is configured.
+
 ## Secrets and state
 
 `/etc/upstand/.env` is mode `0600` and contains generated database, Redis, authentication, and encryption secrets. Back it up securely. Losing `SSH_KEY_ENCRYPTION_KEY_V1` means stored SSH-key and credential secrets cannot be decrypted.
