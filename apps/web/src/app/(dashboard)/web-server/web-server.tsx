@@ -47,9 +47,9 @@ import {
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
-import { Textarea } from "@upstand/ui/components/textarea";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
 import type { authClient } from "@/lib/auth-client";
@@ -945,14 +945,16 @@ export default function WebServerDashboard({
                       >
                         Custom Global Caddyfile Options (User Overrides)
                       </Label>
-                      <Textarea
-                        id="global-caddyfile-overrides"
-                        rows={4}
-                        value={globalCaddyfile}
-                        onChange={(e) => setGlobalCaddyfile(e.target.value)}
-                        placeholder="# Insert your own global directives here&#10;# e.g. local_certs&#10;# e.g. acme_ca https://acme-v02.api.letsencrypt.org/directory"
-                        className="resize-none border border-border/40 bg-card/30 p-3 font-mono text-xs"
-                      />
+                      <CodeSurface>
+                        <CodeEditor
+                          id="global-caddyfile-overrides"
+                          height="132px"
+                          language="caddy"
+                          value={globalCaddyfile}
+                          onChange={setGlobalCaddyfile}
+                          aria-label="Custom global Caddyfile options"
+                        />
+                      </CodeSurface>
                       <p className="text-[11px] text-muted-foreground">
                         This block is injected directly into Caddy's global
                         option block <code>{"{ ... }"}</code>.
@@ -963,16 +965,16 @@ export default function WebServerDashboard({
                       <Label htmlFor="caddy-snippets" className="text-xs">
                         Reusable Caddy route snippets
                       </Label>
-                      <Textarea
-                        id="caddy-snippets"
-                        rows={6}
-                        value={caddySnippets}
-                        onChange={(e) => setCaddySnippets(e.target.value)}
-                        placeholder={
-                          "(security-headers) {\n\theader {\n\t\t-Server\n\t\tX-Content-Type-Options nosniff\n\t}\n}\n\n(auth) {\n\tforward_auth auth:8080\n}"
-                        }
-                        className="resize-none border border-border/40 bg-card/30 p-3 font-mono text-xs"
-                      />
+                      <CodeSurface>
+                        <CodeEditor
+                          id="caddy-snippets"
+                          height="190px"
+                          language="caddy"
+                          value={caddySnippets}
+                          onChange={setCaddySnippets}
+                          aria-label="Reusable Caddy route snippets"
+                        />
+                      </CodeSurface>
                       <p className="text-[11px] text-muted-foreground">
                         Define named Caddy snippets here, then reference their
                         names from a resource domain. The generated Caddyfile is
@@ -1006,11 +1008,15 @@ export default function WebServerDashboard({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="border-border/10 border-t pt-4">
-                  <div className="rounded-lg border border-border/30 bg-muted/20 p-4">
-                    <pre className="overflow-x-auto font-mono text-[11px] text-zinc-300">
-                      {info?.status?.mainCaddyfile || "# No Caddyfile found."}
-                    </pre>
-                  </div>
+                  <CodeSurface>
+                    <CodeEditor
+                      height="360px"
+                      language="caddy"
+                      value={info?.status?.mainCaddyfile || "# No Caddyfile found."}
+                      disabled
+                      aria-label="Compiled Caddyfile preview"
+                    />
+                  </CodeSurface>
                 </CardContent>
               </Card>
             </div>

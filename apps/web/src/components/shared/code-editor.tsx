@@ -16,6 +16,7 @@ import { githubDark, githubLight } from "@uiw/codemirror-theme-github";
 import CodeMirror, { type ReactCodeMirrorProps } from "@uiw/react-codemirror";
 import { cn } from "@upstand/ui/lib/utils";
 import { useTheme } from "next-themes";
+import type { ReactNode } from "react";
 
 // Docker Compose completion options
 const dockerComposeServices = [
@@ -132,9 +133,30 @@ function dockerComposeComplete(
 interface Props extends ReactCodeMirrorProps {
   wrapperClassName?: string;
   disabled?: boolean;
-  language?: "yaml" | "json" | "properties" | "shell" | "css";
+  language?: "yaml" | "json" | "properties" | "shell" | "css" | "caddy";
   lineWrapping?: boolean;
   lineNumbers?: boolean;
+}
+
+export function CodeSurface({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "min-w-0 overflow-hidden rounded-lg border border-border/40 bg-muted/20 shadow-sm",
+        "[&_.cm-editor]:min-h-36 [&_.cm-editor]:bg-transparent [&_.cm-editor]:py-2",
+        "[&_.cm-scroller]:font-mono [&_.cm-scroller]:text-xs",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 export const CodeEditor = ({
@@ -146,7 +168,7 @@ export const CodeEditor = ({
 }: Props) => {
   const { resolvedTheme } = useTheme();
   return (
-    <div className={cn("overflow-auto", wrapperClassName)}>
+    <div className={cn("min-w-0 overflow-auto", wrapperClassName)}>
       <CodeMirror
         basicSetup={{
           lineNumbers,
