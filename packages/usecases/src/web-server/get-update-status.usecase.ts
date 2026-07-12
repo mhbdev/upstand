@@ -77,7 +77,7 @@ export class GetUpdateStatusUseCase {
         },
       });
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 404) {
         log.warn({
           message: `GitHub API returned ${response.status} when checking for updates.`,
         });
@@ -91,13 +91,33 @@ export class GetUpdateStatusUseCase {
         };
       }
 
-      const data = await response.json();
+      let data: unknown = await response.json();
+      // A repository may publish tags before creating a GitHub Release. Fall
+      // back to the tags endpoint so self-hosted installs do not report a
+      // misleading API error during that short release window.
+      if (response.status === 404) {
+        const tagsResponse = await fetch(
+          `https://api.github.com/repos/${repo}/tags?per_page=30`,
+          {
+            headers: {
+              Accept: "application/vnd.github+json",
+              "User-Agent": "Upstand",
+            },
+          },
+        );
+        if (!tagsResponse.ok) {
+          throw new Error(`GitHub API returned ${tagsResponse.status}`);
+        }
+        data = await tagsResponse.json();
+      }
       const latestVersion =
-        channel === "canary"
-          ? ((data as Array<{ tag_name?: string; prerelease?: boolean }>).find(
-              (release) => release.prerelease && release.tag_name,
-            )?.tag_name ?? currentVersion)
-          : ((data as { tag_name?: string }).tag_name ?? currentVersion);
+        channel === "canary" && Array.isArray(data)
+          ? ((data as Array<{ name?: string }>).find((tag) =>
+              tag.name?.includes("canary"),
+            )?.name ?? currentVersion)
+          : Array.isArray(data)
+            ? ((data as Array<{ name?: string }>)[0]?.name ?? currentVersion)
+            : ((data as { tag_name?: string }).tag_name ?? currentVersion);
 
       const cleanTag = (tag: string) => tag.replace(/^v/, "").trim();
       const updateAvailable =
