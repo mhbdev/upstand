@@ -6,6 +6,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.10 - 2026-07-13
+
+### Changed
+
+- Refined the marketing, authentication, and public navigation surfaces for a clearer responsive experience and direct documentation access.
+
 ## 0.1.9 - 2026-07-13
 
 ### Added

@@ -9,8 +9,9 @@ import { UserAvatar } from "./auth/user/user-avatar";
 import { ModeToggle } from "./mode-toggle";
 
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/", label: "Home", external: false },
+  { href: "/dashboard", label: "Dashboard", external: false },
+  { href: "/docs", label: "Docs", external: true },
 ] as const;
 
 export default function Header() {
@@ -34,9 +35,22 @@ export default function Header() {
             aria-label="Main navigation"
             className="hidden items-center gap-1 sm:flex"
           >
-            {NAV_LINKS.map(({ href, label }) => {
+            {NAV_LINKS.map(({ href, label, external }) => {
               const isActive = pathname === href;
-              return (
+              return external ? (
+                <a
+                  key={href}
+                  href={href}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                    isActive
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {label}
+                </a>
+              ) : (
                 <Link
                   key={href}
                   href={href}

@@ -2,6 +2,7 @@
 
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import { Card, CardContent } from "@upstand/ui/components/card";
 import { Spinner } from "@upstand/ui/components/spinner";
@@ -9,11 +10,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { PageBackdrop } from "@/components/marketing/page-backdrop";
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
-import { PageBackdrop } from "@/components/marketing/page-backdrop";
 import { authClient } from "@/lib/auth-client";
-import { env } from "@upstand/env/web";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">

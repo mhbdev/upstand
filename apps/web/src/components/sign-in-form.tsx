@@ -79,7 +79,11 @@ export default function SignInForm({
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-destructive text-xs" role="alert">
+                  <p
+                    key={error?.message}
+                    className="text-destructive text-xs"
+                    role="alert"
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -105,7 +109,11 @@ export default function SignInForm({
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-destructive text-xs" role="alert">
+                  <p
+                    key={error?.message}
+                    className="text-destructive text-xs"
+                    role="alert"
+                  >
                     {error?.message}
                   </p>
                 ))}

@@ -73,12 +73,19 @@ export default function SignUpForm({
                 <Input
                   id={field.name}
                   name={field.name}
+                  autoComplete="name"
+                  placeholder="Your name"
+                  required
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-destructive text-xs" role="alert">
+                  <p
+                    key={error?.message}
+                    className="text-destructive text-xs"
+                    role="alert"
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -104,7 +111,11 @@ export default function SignUpForm({
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-destructive text-xs" role="alert">
+                  <p
+                    key={error?.message}
+                    className="text-destructive text-xs"
+                    role="alert"
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -130,7 +141,11 @@ export default function SignUpForm({
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-destructive text-xs" role="alert">
+                  <p
+                    key={error?.message}
+                    className="text-destructive text-xs"
+                    role="alert"
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -171,6 +186,3 @@ export default function SignUpForm({
     </div>
   );
 }
-                  autoComplete="name"
-                  placeholder="Your name"
-                  required
