@@ -15,6 +15,25 @@ export const ApplicationBuildTypeSchema = z.enum([
   "static",
 ]);
 
+export const DATABASE_IMAGE_OPTIONS = {
+  postgres: ["postgres:16-alpine", "postgres:17-alpine"],
+  mysql: ["mysql:8.0", "mysql:8.4"],
+  mariadb: ["mariadb:10.11", "mariadb:11"],
+  mongodb: ["mongo:6.0", "mongo:7.0"],
+  redis: ["redis:7-alpine", "redis:8-alpine"],
+} as const;
+
+export type DatabaseType = keyof typeof DATABASE_IMAGE_OPTIONS;
+
+export function isSupportedDatabaseImage(
+  databaseType: string | undefined,
+  image: string | null | undefined,
+): boolean {
+  if (!databaseType || !image) return false;
+  const options = DATABASE_IMAGE_OPTIONS[databaseType as DatabaseType];
+  return Boolean((options as readonly string[] | undefined)?.includes(image));
+}
+
 const ResourcePortSchema = z.object({
   publishedPort: z.number().int().min(1).max(65535),
   targetPort: z.number().int().min(1).max(65535),

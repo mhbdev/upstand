@@ -4,6 +4,7 @@ import {
   DEFAULT_APPLICATION_BUILD_CONFIG,
   DEFAULT_RESOURCE_ADVANCED_CONFIG,
   type IUnitOfWork,
+  isSupportedDatabaseImage,
   type Resource,
   serializeApplicationBuildConfig,
   serializeResourceAdvancedConfig,
@@ -33,6 +34,15 @@ export class CreateResourceUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: CreateResourceInput): Promise<Resource> {
+    if (
+      input.type === "database" &&
+      !isSupportedDatabaseImage(input.dbType, input.dockerImage)
+    ) {
+      throw new ValidationError(
+        "Select a supported database image version for the selected database engine",
+      );
+    }
+
     return this.uow.transaction(async (tx) => {
       const environment = await tx.environmentRepository.findById(
         input.environmentId,

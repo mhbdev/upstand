@@ -49,7 +49,13 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { SearchableSelect } from "@/components/shared/searchable-select";
 import { queryClient, trpc } from "@/utils/trpc";
+
+const TIME_ZONE_OPTIONS =
+  typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("timeZone")
+    : ["UTC"];
 
 type BackupKind = "database" | "volume";
 type DatabaseEngine = "postgres" | "mysql" | "mariadb" | "mongodb";
@@ -575,13 +581,12 @@ export function BackupPanel({
               </Field>
               <Field>
                 <FieldLabel htmlFor="backup-timezone">Timezone</FieldLabel>
-                <Input
-                  id="backup-timezone"
+                <SearchableSelect
                   value={form.timezone}
-                  onChange={(event) =>
-                    setForm({ ...form, timezone: event.target.value })
-                  }
-                  placeholder="UTC"
+                  options={TIME_ZONE_OPTIONS}
+                  onValueChange={(timezone) => setForm({ ...form, timezone })}
+                  placeholder="Search time zones"
+                  ariaLabel="Backup timezone"
                 />
               </Field>
               <Field>

@@ -216,6 +216,18 @@ const createBuildConfig = (
   }
 };
 
+const RAILPACK_VERSIONS = [
+  "0.23.0",
+  "0.22.0",
+  "0.21.0",
+  "0.20.0",
+  "0.19.0",
+  "0.18.0",
+  "0.17.0",
+  "0.16.0",
+  "0.15.4",
+] as const;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -1360,18 +1372,58 @@ services:
                         <Label htmlFor="railpack-version">
                           Railpack version
                         </Label>
-                        <Input
-                          id="railpack-version"
-                          value={buildConfig.railpackVersion}
-                          onChange={(event) =>
-                            setBuildConfig({
-                              ...buildConfig,
-                              railpackVersion: event.target.value,
-                            })
+                        <Select
+                          value={
+                            RAILPACK_VERSIONS.includes(
+                              (buildConfig.railpackVersion ??
+                                "") as (typeof RAILPACK_VERSIONS)[number],
+                            )
+                              ? (buildConfig.railpackVersion ?? "")
+                              : "custom"
                           }
-                          placeholder="0.23.0"
-                          className="bg-background"
-                        />
+                          onValueChange={(value) => {
+                            if (value !== "custom") {
+                              setBuildConfig({
+                                ...buildConfig,
+                                railpackVersion: value ?? "",
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger
+                            id="railpack-version"
+                            className="bg-background"
+                          >
+                            <SelectValue placeholder="Select Railpack version" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RAILPACK_VERSIONS.map((version) => (
+                              <SelectItem key={version} value={version}>
+                                {version}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="custom">
+                              Custom version
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {!RAILPACK_VERSIONS.includes(
+                          (buildConfig.railpackVersion ??
+                            "") as (typeof RAILPACK_VERSIONS)[number],
+                        ) && (
+                          <Input
+                            value={buildConfig.railpackVersion ?? ""}
+                            onChange={(event) =>
+                              setBuildConfig({
+                                ...buildConfig,
+                                railpackVersion: event.target.value,
+                              })
+                            }
+                            placeholder="0.23.0"
+                            className="bg-background"
+                            aria-label="Custom Railpack version"
+                          />
+                        )}
                       </div>
                     )}
 

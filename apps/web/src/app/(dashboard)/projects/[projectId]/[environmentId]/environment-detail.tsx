@@ -12,6 +12,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { DATABASE_IMAGE_OPTIONS, type DatabaseType } from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -340,14 +341,6 @@ const generatePassword = (length = 16) => {
   return pwd;
 };
 
-const DB_IMAGE_MAP: Record<string, string> = {
-  postgres: "postgres:16-alpine",
-  mysql: "mysql:8.0",
-  mariadb: "mariadb:10.11",
-  mongodb: "mongo:6.0",
-  redis: "redis:7-alpine",
-};
-
 function CreateDbDialog({
   open,
   onOpenChange,
@@ -365,10 +358,10 @@ function CreateDbDialog({
 }) {
   const [name, setName] = useState("");
   const [appName, setAppName] = useState("");
-  const [dbType, setDbType] = useState<
-    "postgres" | "mysql" | "mariadb" | "mongodb" | "redis"
-  >("postgres");
-  const [dockerImage, setDockerImage] = useState("postgres:16-alpine");
+  const [dbType, setDbType] = useState<DatabaseType>("postgres");
+  const [dockerImage, setDockerImage] = useState<string>(
+    DATABASE_IMAGE_OPTIONS.postgres[0],
+  );
   const [description, setDescription] = useState("");
   const [serverId, setServerId] = useState("local");
 
@@ -392,9 +385,10 @@ function CreateDbDialog({
     setAppName(prefix + suffix);
   };
 
-  const handleDbTypeChange = (val: any) => {
+  const handleDbTypeChange = (val: DatabaseType | null) => {
+    if (!val) return;
     setDbType(val);
-    setDockerImage(DB_IMAGE_MAP[val] || "");
+    setDockerImage(DATABASE_IMAGE_OPTIONS[val][0]);
     const pass = generatePassword();
     const rootPass = generatePassword();
     setDbPassword(pass);
@@ -511,15 +505,29 @@ function CreateDbDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="db-image">Docker Image Tag</Label>
-              <Input
-                id="db-image"
+              <Label htmlFor="db-image">Image version</Label>
+              <Select
                 value={dockerImage}
-                onChange={(e) => setDockerImage(e.target.value)}
-                placeholder="e.g. postgres:16-alpine"
-                autoComplete="off"
-                className="border-border/40 focus:border-primary"
-              />
+                onValueChange={(value) => {
+                  if (value) setDockerImage(value);
+                }}
+              >
+                <SelectTrigger id="db-image" className="border-border/40">
+                  <SelectValue placeholder="Select image version" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {DATABASE_IMAGE_OPTIONS[dbType].map((image) => (
+                      <SelectItem key={image} value={image}>
+                        {image}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                Choose a supported official image for this engine.
+              </p>
             </div>
           </div>
           <div className="space-y-2">

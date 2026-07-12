@@ -52,6 +52,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
+import {
+  KeyValueEditor,
+  validateKeyValuePairs,
+} from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -403,28 +407,12 @@ export default function WebServerDashboard({
     });
   };
 
-  // Environment variables helpers
-  const handleAddEnv = () => {
-    setEnvVars([...envVars, { key: "", value: "" }]);
-  };
-
-  const handleUpdateEnv = (
-    idx: number,
-    field: "key" | "value",
-    val: string,
-  ) => {
-    const next = [...envVars];
-    if (next[idx]) {
-      next[idx][field] = val;
-      setEnvVars(next);
-    }
-  };
-
-  const handleRemoveEnv = (idx: number) => {
-    setEnvVars(envVars.filter((_, i) => i !== idx));
-  };
-
   const handleSaveEnv = () => {
+    const issues = validateKeyValuePairs(envVars);
+    if (issues.length > 0) {
+      toast.error(issues[0]?.message ?? "Fix the environment variables");
+      return;
+    }
     const obj: Record<string, string> = {};
     for (const item of envVars) {
       if (item.key.trim()) {
@@ -1330,55 +1318,14 @@ export default function WebServerDashboard({
               Configure global environment variables for the Caddy container.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="flex justify-end">
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1 text-xs"
-                onClick={handleAddEnv}
-              >
-                <HugeiconsIcon icon={PlusSignIcon} className="size-3.5" />
-                Add Variable
-              </Button>
-            </div>
-            {envVars.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground text-xs">
-                No environment variables configured.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {envVars.map((env, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <Input
-                      placeholder="KEY"
-                      value={env.key}
-                      onChange={(e) =>
-                        handleUpdateEnv(idx, "key", e.target.value)
-                      }
-                      className="font-mono text-xs uppercase"
-                    />
-                    <span className="text-muted-foreground">=</span>
-                    <Input
-                      placeholder="value"
-                      value={env.value}
-                      onChange={(e) =>
-                        handleUpdateEnv(idx, "value", e.target.value)
-                      }
-                      className="font-mono text-xs"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveEnv(idx)}
-                      className="size-9 shrink-0 text-destructive hover:bg-destructive/10"
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="py-2">
+            <KeyValueEditor
+              value={envVars}
+              onChange={setEnvVars}
+              keyLabel="Variable name"
+              valuePlaceholder="value"
+              addLabel="Add variable"
+            />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEnvModalOpen(false)}>

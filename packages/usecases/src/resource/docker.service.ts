@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   type ApplicationBuildConfig,
   ConflictError,
+  isSupportedDatabaseImage,
   parseApplicationBuildConfig,
   parseResourceAdvancedConfig,
   type Resource,
@@ -71,8 +72,6 @@ export class DockerService {
   private readonly docker = getDockerInstance();
   private readonly networkName =
     process.env.DOCKER_NETWORK || "upstand-network";
-
-  constructor() {}
 
   private applyAdvancedConfig(
     resource: Resource,
@@ -234,7 +233,11 @@ export class DockerService {
 
     const dbType = resource.dbType?.toLowerCase() || "";
     if (dbType === "postgres") {
-      image = "postgres:16-alpine";
+      image =
+        resource.dockerImage &&
+        isSupportedDatabaseImage(dbType, resource.dockerImage)
+          ? resource.dockerImage
+          : "postgres:16-alpine";
       targetPath = "/var/lib/postgresql/data";
       ports.push(5432);
       defaultEnv.POSTGRES_USER = envVars.POSTGRES_USER || "upstand";
@@ -242,7 +245,13 @@ export class DockerService {
         envVars.POSTGRES_PASSWORD || "upstand-password";
       defaultEnv.POSTGRES_DB = envVars.POSTGRES_DB || "upstand";
     } else if (dbType === "mysql" || dbType === "mariadb") {
-      image = dbType === "mysql" ? "mysql:8.0" : "mariadb:11";
+      image =
+        resource.dockerImage &&
+        isSupportedDatabaseImage(dbType, resource.dockerImage)
+          ? resource.dockerImage
+          : dbType === "mysql"
+            ? "mysql:8.0"
+            : "mariadb:11";
       targetPath = "/var/lib/mysql";
       ports.push(3306);
       defaultEnv.MYSQL_ROOT_PASSWORD =
@@ -251,7 +260,11 @@ export class DockerService {
       defaultEnv.MYSQL_USER = envVars.MYSQL_USER || "upstand";
       defaultEnv.MYSQL_PASSWORD = envVars.MYSQL_PASSWORD || "upstand-password";
     } else if (dbType === "mongodb") {
-      image = "mongo:7.0";
+      image =
+        resource.dockerImage &&
+        isSupportedDatabaseImage(dbType, resource.dockerImage)
+          ? resource.dockerImage
+          : "mongo:7.0";
       targetPath = "/data/db";
       ports.push(27017);
       defaultEnv.MONGO_INITDB_ROOT_USERNAME =
@@ -259,7 +272,11 @@ export class DockerService {
       defaultEnv.MONGO_INITDB_ROOT_PASSWORD =
         envVars.MONGO_INITDB_ROOT_PASSWORD || "upstand-password";
     } else if (dbType === "redis") {
-      image = "redis:7-alpine";
+      image =
+        resource.dockerImage &&
+        isSupportedDatabaseImage(dbType, resource.dockerImage)
+          ? resource.dockerImage
+          : "redis:7-alpine";
       targetPath = "/data";
       ports.push(6379);
     } else {
@@ -623,9 +640,7 @@ export class DockerService {
       // Docusaurus binds its development server to localhost by default. A
       // Swarm service must listen on the task interface for Caddy to reach it.
       if (packageJson.scripts?.start?.includes("docusaurus start")) {
-        // Nixpacks uses `bash -l -c` as the entrypoint, so pass one complete
-        // shell command rather than separate argv entries.
-        return ["npm run start -- --host 0.0.0.0"];
+        return ["npm", "run", "start", "--", "--host", "0.0.0.0"];
       }
     } catch {
       // A repository without package metadata keeps the image's native CMD.
