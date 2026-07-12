@@ -623,7 +623,9 @@ export class DockerService {
       // Docusaurus binds its development server to localhost by default. A
       // Swarm service must listen on the task interface for Caddy to reach it.
       if (packageJson.scripts?.start?.includes("docusaurus start")) {
-        return ["npm", "run", "start", "--", "--host", "0.0.0.0"];
+        // Nixpacks uses `bash -l -c` as the entrypoint, so pass one complete
+        // shell command rather than separate argv entries.
+        return ["npm run start -- --host 0.0.0.0"];
       }
     } catch {
       // A repository without package metadata keeps the image's native CMD.
