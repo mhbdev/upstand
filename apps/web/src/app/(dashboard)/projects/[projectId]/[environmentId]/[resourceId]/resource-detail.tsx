@@ -108,7 +108,7 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { env } from "@upstand/env/web";
+import { env as webEnv } from "@upstand/env/web";
 import { BackupPanel } from "@/components/resource/backup-panel";
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
@@ -2725,7 +2725,7 @@ services:
                     readOnly
                     value={
                       typeof window !== "undefined"
-                        ? `${env.NEXT_PUBLIC_SERVER_URL}/api/deploy/rc-${resource.id}`
+                        ? `${webEnv.NEXT_PUBLIC_SERVER_URL}/api/deploy/rc-${resource.id}`
                         : ""
                     }
                     className="select-all border-border/40 bg-black/40 font-mono text-xs text-zinc-300"
@@ -2734,7 +2734,7 @@ services:
                     onClick={() => {
                       if (typeof window !== "undefined") {
                         navigator.clipboard.writeText(
-                          `${env.NEXT_PUBLIC_SERVER_URL}/api/deploy/rc-${resource.id}`,
+                          `${webEnv.NEXT_PUBLIC_SERVER_URL}/api/deploy/rc-${resource.id}`,
                         );
                         toast.success("Webhook URL copied to clipboard");
                       }
