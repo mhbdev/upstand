@@ -755,10 +755,12 @@ async function shutdown(signal: string): Promise<void> {
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 process.once("SIGINT", () => void shutdown("SIGINT"));
 
-void Bun.serve({
+// Export the Bun server configuration so the runtime starts exactly one
+// listener. Calling Bun.serve here as well would make the compiled bundle
+// attempt to bind port 3000 twice.
+export default {
   port: Number(process.env.PORT || 3000),
-  fetch: (request, bunServer) => app.fetch(request, { server: bunServer }),
+  fetch: (request: Request, bunServer: Bun.Server<unknown>) =>
+    app.fetch(request, { server: bunServer }),
   websocket,
-});
-
-export default app;
+};
