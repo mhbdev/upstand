@@ -31,6 +31,12 @@ Changes after the latest tag are collected here until the next release.
 - Made Docker resource deployment typing compatible with the production web image type-check.
 - Allowed update checks to use Git tags when a GitHub Release object has not been created yet.
 
+## 0.1.2 - 2026-07-12
+
+### Fixed
+
+- Pass the installed server image and automatic-update policy into the API container so source/channel detection and opt-in updates behave consistently in production.
+
 ## Release process
 
 Maintainers should move the relevant Unreleased entries into a versioned section, run the full verification suite, create a signed or protected `vMAJOR.MINOR.PATCH` tag, and verify the GitHub release workflow and image digests before announcing the release.
