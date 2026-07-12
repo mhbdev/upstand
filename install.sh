@@ -65,7 +65,6 @@ build_source_images() {
 }
 
 ensure_stack_file() {
-  [[ -f "$STACK_FILE" ]] && return
   install -d -m 0700 "$INSTALL_DIR"
   local repository="${UPSTAND_REPOSITORY:-https://github.com/mhbdev/upstand.git}"
   local ref="${UPSTAND_REF:-${UPSTAND_VERSION:-master}}"

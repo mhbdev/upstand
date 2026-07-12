@@ -6,6 +6,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.12 - 2026-07-13
+
+### Fixed
+
+- Stable installer upgrades now refresh the Compose manifest from the selected release instead of reusing an older source-era manifest.
+
 ## 0.1.11 - 2026-07-13
 
 ### Fixed
