@@ -86,7 +86,9 @@ export class DockerService {
     if (config.args.length) containerSpec.Args = config.args;
     if (config.environment && Object.keys(config.environment).length) {
       const currentEnv = Array.isArray(containerSpec.Env)
-        ? containerSpec.Env.filter((value): value is string => typeof value === "string")
+        ? containerSpec.Env.filter(
+            (value): value is string => typeof value === "string",
+          )
         : [];
       const overrides = new Map(
         currentEnv.map((value) => {
@@ -162,8 +164,12 @@ export class DockerService {
     taskTemplate.RestartPolicy = {
       Condition: restart.condition,
       ...(restart.maxAttempts ? { MaxAttempts: restart.maxAttempts } : {}),
-      ...(restart.delaySeconds ? { Delay: restart.delaySeconds * 1_000_000_000 } : {}),
-      ...(restart.windowSeconds ? { Window: restart.windowSeconds * 1_000_000_000 } : {}),
+      ...(restart.delaySeconds
+        ? { Delay: restart.delaySeconds * 1_000_000_000 }
+        : {}),
+      ...(restart.windowSeconds
+        ? { Window: restart.windowSeconds * 1_000_000_000 }
+        : {}),
     };
     const constraints = [...baseConstraints, ...config.placementConstraints];
     if (constraints.length) {
@@ -341,6 +347,8 @@ export class DockerService {
       },
     };
 
+    const endpointSpec = spec.EndpointSpec || {};
+    spec.EndpointSpec = endpointSpec;
     this.applyAdvancedConfig(
       resource,
       containerSpec,
@@ -406,11 +414,14 @@ export class DockerService {
       Networks: [{ Target: this.networkName }],
     };
 
+    const endpointSpec = spec.EndpointSpec || {};
+    spec.EndpointSpec = endpointSpec;
     this.applyAdvancedConfig(
       resource,
-      spec.TaskTemplate?.ContainerSpec as Record<string, unknown>,
+      (spec.TaskTemplate as { ContainerSpec?: Record<string, unknown> })
+        .ContainerSpec as Record<string, unknown>,
       spec.TaskTemplate as Record<string, unknown>,
-      (spec.EndpointSpec ??= {}) as Record<string, unknown>,
+      endpointSpec as Record<string, unknown>,
       constraints,
     );
 
@@ -523,11 +534,14 @@ export class DockerService {
         Networks: [{ Target: this.networkName }],
       };
 
+      const endpointSpec = spec.EndpointSpec || {};
+      spec.EndpointSpec = endpointSpec;
       this.applyAdvancedConfig(
         resource,
-        spec.TaskTemplate?.ContainerSpec as Record<string, unknown>,
+        (spec.TaskTemplate as { ContainerSpec?: Record<string, unknown> })
+          .ContainerSpec as Record<string, unknown>,
         spec.TaskTemplate as Record<string, unknown>,
-        (spec.EndpointSpec ??= {}) as Record<string, unknown>,
+        endpointSpec as Record<string, unknown>,
         constraints,
       );
 
@@ -626,6 +640,9 @@ export class DockerService {
     const args = ["build", "--file", dockerfilePath, "--tag", imageName];
     if (config.dockerBuildStage) {
       args.push("--target", config.dockerBuildStage);
+    }
+    for (const [key, value] of Object.entries(config.dockerBuildArgs)) {
+      args.push("--build-arg", `${key}=${value}`);
     }
     args.push(contextPath);
 

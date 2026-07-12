@@ -1,0 +1,27 @@
+---
+title: Integrations & infrastructure operations
+description: Connect source providers, registries, servers, Swarm clusters, storage, notifications, and monitoring.
+---
+
+## Source integrations
+
+Git providers are configured at the organization level. Applications can select GitHub, GitLab, Bitbucket, Gitea, or generic Git. Repository and branch selectors use provider APIs when credentials allow it; generic Git can use an encrypted SSH key. Watch paths, submodules, auto-deploy, and raw Compose input are resource-level settings.
+
+## Docker registries
+
+Docker registries are reusable organization-level credentials with URL, username, password, and connection testing. Use them for private image resources and registry-backed application deployments. Credentials are not displayed after save; test connectivity from the Docker Registry page before using a private image.
+
+## Servers & clusters
+
+Remote Servers manages Docker hosts that can receive builds or deployments. Docker Swarm manages the active manager, workers, node availability, drain/active state, join commands, and join-token rotation. Protect manager ports and keep an odd number of managers for production quorum.
+
+Build concurrency is configured per server so expensive builds do not overwhelm a node. Resource placement constraints in the Advanced tab can further restrict where a service runs.
+
+## Storage, backups & notifications
+
+S3 Destinations store backup targets and testable credentials. Backup schedules and runs are managed per resource, with restore operations requiring an explicit confirmation. Notifications can deliver deployment, backup, and cleanup events through configured channels.
+
+## Monitoring & maintenance
+
+Monitoring exposes server/runtime metrics, active containers, Docker storage usage, and network totals. The Web Server page also provides Caddy/server logs, configuration reload/restart controls, and safe Docker cleanup actions. Use the deployment queue and resource locks to diagnose overlapping builds before restarting workers.
+

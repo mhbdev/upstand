@@ -23,7 +23,10 @@ const ResourcePortSchema = z.object({
 
 const ResourceVolumeSchema = z.object({
   source: z.string().trim().min(1).max(512),
-  target: z.string().trim().regex(/^\/.+/, "Volume targets must be absolute paths"),
+  target: z
+    .string()
+    .trim()
+    .regex(/^\/.+/, "Volume targets must be absolute paths"),
   readOnly: z.boolean().default(false),
 });
 
@@ -42,19 +45,31 @@ export const ResourceAdvancedConfigSchema = z.object({
   volumes: z.array(ResourceVolumeSchema).max(32).default([]),
   environment: z.record(z.string(), z.string()).default({}),
   labels: z.record(z.string(), z.string()).default({}),
-  placementConstraints: z.array(z.string().trim().min(1).max(256)).max(32).default([]),
-  resources: z.object({
-    cpuLimit: z.number().positive().max(1024).optional(),
-    cpuReservation: z.number().positive().max(1024).optional(),
-    memoryLimitMb: z.number().int().positive().max(1_048_576).optional(),
-    memoryReservationMb: z.number().int().positive().max(1_048_576).optional(),
-  }).default({}),
-  restartPolicy: z.object({
-    condition: z.enum(["none", "on-failure", "any"]).default("any"),
-    maxAttempts: z.number().int().min(0).max(1000).optional(),
-    delaySeconds: z.number().int().min(0).max(86400).optional(),
-    windowSeconds: z.number().int().min(0).max(86400).optional(),
-  }).default({ condition: "any" }),
+  placementConstraints: z
+    .array(z.string().trim().min(1).max(256))
+    .max(32)
+    .default([]),
+  resources: z
+    .object({
+      cpuLimit: z.number().positive().max(1024).optional(),
+      cpuReservation: z.number().positive().max(1024).optional(),
+      memoryLimitMb: z.number().int().positive().max(1_048_576).optional(),
+      memoryReservationMb: z
+        .number()
+        .int()
+        .positive()
+        .max(1_048_576)
+        .optional(),
+    })
+    .default({}),
+  restartPolicy: z
+    .object({
+      condition: z.enum(["none", "on-failure", "any"]).default("any"),
+      maxAttempts: z.number().int().min(0).max(1000).optional(),
+      delaySeconds: z.number().int().min(0).max(86400).optional(),
+      windowSeconds: z.number().int().min(0).max(86400).optional(),
+    })
+    .default({ condition: "any" }),
   healthcheck: ResourceHealthcheckSchema.nullable().default(null),
   init: z.boolean().default(false),
   readOnlyRootFilesystem: z.boolean().default(false),
@@ -62,7 +77,9 @@ export const ResourceAdvancedConfigSchema = z.object({
   privileged: z.boolean().default(false),
 });
 
-export type ResourceAdvancedConfig = z.infer<typeof ResourceAdvancedConfigSchema>;
+export type ResourceAdvancedConfig = z.infer<
+  typeof ResourceAdvancedConfigSchema
+>;
 
 export const DEFAULT_RESOURCE_ADVANCED_CONFIG: ResourceAdvancedConfig =
   ResourceAdvancedConfigSchema.parse({});
@@ -87,6 +104,7 @@ export const DockerfileBuildConfigSchema = z.object({
   dockerfilePath: RelativeBuildPathSchema.default("Dockerfile"),
   dockerContextPath: RelativeBuildPathSchema.default("."),
   dockerBuildStage: z.string().trim().min(1).max(128).optional(),
+  dockerBuildArgs: z.record(z.string(), z.string()).default({}),
 });
 
 export const RailpackBuildConfigSchema = z.object({
@@ -138,6 +156,7 @@ export const DEFAULT_APPLICATION_BUILD_CONFIG: ApplicationBuildConfig = {
   type: "dockerfile",
   dockerfilePath: "Dockerfile",
   dockerContextPath: ".",
+  dockerBuildArgs: {},
 };
 
 export const serializeApplicationBuildConfig = (
@@ -172,7 +191,7 @@ export const ResourceSchema = z.object({
   dockerImage: z.string().nullable().optional(),
   credentials: z.string().nullable().optional(),
   buildConfig: z.string(),
-  advancedConfig: z.string(),
+  advancedConfig: z.string().optional(),
   envVars: z.string(),
   domains: z.string(),
   deployments: z.string(),

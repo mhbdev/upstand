@@ -109,7 +109,8 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { BackupPanel } from "@/components/resource/backup-panel";
-import { CodeEditor } from "@/components/shared/code-editor";
+import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
+import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -199,6 +200,7 @@ const createBuildConfig = (
         type,
         dockerfilePath: "Dockerfile",
         dockerContextPath: ".",
+        dockerBuildArgs: {},
       };
     case "railpack":
       return { type, railpackVersion: "0.23.0" };
@@ -1079,6 +1081,9 @@ services:
           <TabsTrigger value="environment" className="gap-2">
             <Code className="size-4" /> Environment
           </TabsTrigger>
+          <TabsTrigger value="advanced" className="gap-2">
+            <Settings className="size-4" /> Advanced
+          </TabsTrigger>
           <TabsTrigger value="domains" className="gap-2">
             <Globe className="size-4" /> Domains
           </TabsTrigger>
@@ -1245,63 +1250,108 @@ services:
                     </FieldGroup>
 
                     {buildConfig.type === "dockerfile" && (
-                      <div className="grid gap-4 sm:grid-cols-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="dockerfile-path">
-                            Dockerfile path
-                          </Label>
-                          <Input
-                            id="dockerfile-path"
-                            value={buildConfig.dockerfilePath}
-                            onChange={(event) =>
-                              setBuildConfig({
-                                ...buildConfig,
-                                dockerfilePath: event.target.value,
-                              })
-                            }
-                            placeholder="Dockerfile"
-                            className="bg-background"
-                          />
+                      <>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="dockerfile-path">
+                              Dockerfile path
+                            </Label>
+                            <Input
+                              id="dockerfile-path"
+                              value={buildConfig.dockerfilePath}
+                              onChange={(event) =>
+                                setBuildConfig({
+                                  ...buildConfig,
+                                  dockerfilePath: event.target.value,
+                                })
+                              }
+                              placeholder="Dockerfile"
+                              className="bg-background"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="docker-context-path">
+                              Docker context path
+                            </Label>
+                            <Input
+                              id="docker-context-path"
+                              value={buildConfig.dockerContextPath}
+                              onChange={(event) =>
+                                setBuildConfig({
+                                  ...buildConfig,
+                                  dockerContextPath: event.target.value,
+                                })
+                              }
+                              placeholder="."
+                              className="bg-background"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="docker-build-stage">
+                              Build stage{" "}
+                              <span className="text-muted-foreground">
+                                (optional)
+                              </span>
+                            </Label>
+                            <Input
+                              id="docker-build-stage"
+                              value={buildConfig.dockerBuildStage ?? ""}
+                              onChange={(event) =>
+                                setBuildConfig({
+                                  ...buildConfig,
+                                  dockerBuildStage:
+                                    event.target.value || undefined,
+                                })
+                              }
+                              placeholder="production"
+                              className="bg-background"
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="docker-context-path">
-                            Docker context path
-                          </Label>
-                          <Input
-                            id="docker-context-path"
-                            value={buildConfig.dockerContextPath}
-                            onChange={(event) =>
-                              setBuildConfig({
-                                ...buildConfig,
-                                dockerContextPath: event.target.value,
-                              })
-                            }
-                            placeholder="."
-                            className="bg-background"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="docker-build-stage">
-                            Build stage{" "}
-                            <span className="text-muted-foreground">
-                              (optional)
-                            </span>
-                          </Label>
-                          <Input
-                            id="docker-build-stage"
-                            value={buildConfig.dockerBuildStage ?? ""}
-                            onChange={(event) =>
-                              setBuildConfig({
-                                ...buildConfig,
-                                dockerBuildStage:
-                                  event.target.value || undefined,
-                              })
-                            }
-                            placeholder="production"
-                            className="bg-background"
-                          />
-                        </div>
-                      </div>
+                        <Field>
+                          <FieldLabel htmlFor="docker-build-args">
+                            Docker build arguments
+                          </FieldLabel>
+                          <FieldDescription>
+                            Configure values passed to the Dockerfile builder.
+                          </FieldDescription>
+                          <CodeSurface>
+                            <CodeEditor
+                              id="docker-build-args"
+                              language="json"
+                              height="130px"
+                              value={JSON.stringify(
+                                buildConfig.dockerBuildArgs ?? {},
+                                null,
+                                2,
+                              )}
+                              onChange={(value) => {
+                                try {
+                                  const parsed = JSON.parse(value) as unknown;
+                                  if (
+                                    parsed &&
+                                    typeof parsed === "object" &&
+                                    !Array.isArray(parsed)
+                                  ) {
+                                    const args = Object.fromEntries(
+                                      Object.entries(parsed).filter(
+                                        ([, item]) => typeof item === "string",
+                                      ),
+                                    );
+                                    setBuildConfig({
+                                      ...buildConfig,
+                                      dockerBuildArgs: args,
+                                    });
+                                  }
+                                } catch {
+                                  // Keep the editor responsive while the user is typing incomplete JSON.
+                                }
+                              }}
+                              aria-label="Docker build arguments JSON"
+                            />
+                          </CodeSurface>
+                        </Field>
+                      </>
                     )}
 
                     {buildConfig.type === "railpack" && (
@@ -2198,6 +2248,14 @@ services:
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="advanced" className="space-y-6 outline-none">
+          <ResourceAdvancedSettings
+            resourceId={resourceId}
+            resourceType={resource.type}
+            advancedConfig={resource.advancedConfig}
+          />
         </TabsContent>
 
         {/* ─── ENVIRONMENT TAB ───────────────────────────────────────────────────── */}

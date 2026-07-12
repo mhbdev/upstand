@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { CodeSurface } from "@/components/shared/code-editor";
 
 // Log parser and style rules
 export type LogType = "error" | "warning" | "success" | "info" | "debug";
@@ -537,26 +538,28 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
       )}
 
       {/* Terminal log panel */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="custom-logs-scrollbar h-96 space-y-0.5 overflow-y-auto rounded-lg border bg-muted/30 p-3 font-mono text-[11px]"
-      >
-        {filteredLogs.length > 0 ? (
-          filteredLogs.map((logItem, index) => (
-            <TerminalLine
-              key={`${logItem.rawTimestamp ?? "untimed"}-${index}`}
-              log={logItem}
-              noTimestamp={!showTimestamp}
-              searchTerm={searchQuery}
-            />
-          ))
-        ) : (
-          <div className="flex h-full items-center justify-center font-sans text-muted-foreground text-xs">
-            No matching logs found.
-          </div>
-        )}
-      </div>
+      <CodeSurface>
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="custom-logs-scrollbar h-96 space-y-0.5 overflow-y-auto bg-muted/30 p-3 font-mono text-[11px]"
+        >
+          {filteredLogs.length > 0 ? (
+            filteredLogs.map((logItem, index) => (
+              <TerminalLine
+                key={`${logItem.rawTimestamp ?? "untimed"}-${index}`}
+                log={logItem}
+                noTimestamp={!showTimestamp}
+                searchTerm={searchQuery}
+              />
+            ))
+          ) : (
+            <div className="flex h-full items-center justify-center font-sans text-muted-foreground text-xs">
+              No matching logs found.
+            </div>
+          )}
+        </div>
+      </CodeSurface>
     </div>
   );
 };

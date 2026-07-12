@@ -3,6 +3,7 @@
 import {
   Alert02Icon,
   ArrowRight01Icon,
+  Certificate01Icon,
   CheckmarkCircle02Icon,
   Copy01Icon,
   Delete02Icon,
@@ -997,6 +998,64 @@ export default function WebServerDashboard({
                 </Card>
               </form>
 
+              {/* HTTPS & certificates */}
+              <Card className="border border-border/40 bg-card/20 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 font-semibold text-lg">
+                    <HugeiconsIcon
+                      icon={Certificate01Icon}
+                      className="size-5 text-primary"
+                    />
+                    HTTPS &amp; Certificates
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Caddy provisions and renews Let&apos;s Encrypt certificates
+                    for every HTTPS domain route.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 border-t pt-4 sm:grid-cols-3">
+                  <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
+                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      Issuer
+                    </p>
+                    <p className="mt-1 font-semibold text-sm">
+                      Let&apos;s Encrypt ACME
+                    </p>
+                    <p className="mt-1 text-muted-foreground text-xs">
+                      Automatic renewal is handled by Caddy.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
+                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      Configured email
+                    </p>
+                    <p className="mt-1 truncate font-semibold text-sm">
+                      {email || "Not configured"}
+                    </p>
+                    <p className="mt-1 text-muted-foreground text-xs">
+                      Used for ACME expiry notifications.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
+                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      Active HTTPS routes
+                    </p>
+                    <p className="mt-1 font-semibold text-sm tabular-nums">
+                      {info?.status?.activeDomainsCount || 0}
+                    </p>
+                    <p className="mt-1 text-muted-foreground text-xs">
+                      Domains are managed from each resource&apos;s Domains tab.
+                    </p>
+                  </div>
+                  <div className="sm:col-span-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-muted-foreground text-xs">
+                    DNS for each hostname must resolve to this server and TCP
+                    ports 80 and 443 must be reachable. Use the Caddyfile editor
+                    below for advanced ACME settings such as a staging CA or
+                    internal certificates.
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Compiled Caddyfile Preview Card */}
               <Card className="border border-border/40 bg-card/20 shadow-sm">
                 <CardHeader className="pb-3">
@@ -1012,7 +1071,9 @@ export default function WebServerDashboard({
                     <CodeEditor
                       height="360px"
                       language="caddy"
-                      value={info?.status?.mainCaddyfile || "# No Caddyfile found."}
+                      value={
+                        info?.status?.mainCaddyfile || "# No Caddyfile found."
+                      }
                       disabled
                       aria-label="Compiled Caddyfile preview"
                     />

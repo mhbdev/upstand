@@ -1,0 +1,36 @@
+---
+title: Domains, Caddy & certificates
+description: Add safe domain mappings and operate automatic HTTPS with Caddy and Let’s Encrypt.
+---
+
+## Add a domain mapping
+
+Open a resource and choose **Domains**. A mapping contains:
+
+- a fully-qualified public hostname;
+- a public path and optional internal path rewrite;
+- the target Swarm service and internal port;
+- optional path stripping;
+- HTTPS enablement;
+- reusable administrator-defined Caddy snippets.
+
+Compose resources must select the exact service name. Upstand normalizes hostnames and paths and rejects IP addresses, localhost, wildcard hosts, malformed paths, traversal segments, and ports outside `1–65535`.
+
+The API validates the complete candidate resource set before committing a change. Duplicate hostname/path ownership and conflicting HTTP/HTTPS modes are rejected, and the last known-good Caddy configuration is restored if persistence fails.
+
+## Let’s Encrypt
+
+The **Web Server → HTTPS & Certificates** section configures the ACME email used by Caddy. Caddy obtains and renews certificates automatically for HTTPS routes. DNS for each hostname must resolve to the server and TCP ports 80 and 443 must reach the Caddy service.
+
+Upstand does not store private certificate material in resource metadata. For staging or internal environments, use the global Caddyfile editor to configure an alternate ACME CA or `local_certs`, then validate the generated configuration before reloading.
+
+## Caddy configuration
+
+The Web Server page provides one reusable CodeMirror surface for:
+
+- global Caddy options;
+- named route snippets;
+- the compiled read-only Caddyfile preview.
+
+Snippets can be referenced by name from a resource domain mapping. Caddy configuration is syntax-checked and health-checked before it replaces the active configuration.
+

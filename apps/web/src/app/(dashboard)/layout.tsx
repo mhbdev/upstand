@@ -12,7 +12,6 @@ import {
   Layers01Icon,
   Notification01Icon,
   Rocket01Icon,
-  ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -136,7 +135,7 @@ export default function DashboardLayout({
   if (pathname === "/2fa-verify") return <>{children}</>;
 
   const currentNav = NAV_ITEMS.find(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
 
   return (
@@ -155,7 +154,7 @@ export default function DashboardLayout({
                     render={<Link href={item.href as Route} />}
                     isActive={
                       pathname === item.href ||
-                      pathname.startsWith(item.href + "/")
+                      pathname.startsWith(`${item.href}/`)
                     }
                     tooltip={item.title}
                   >
