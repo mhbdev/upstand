@@ -62,6 +62,7 @@ const NAV_ITEMS = [
   { title: "Web Server", href: "/web-server", icon: Certificate01Icon },
   { title: "Docker Swarm", href: "/docker-swarm", icon: Layers01Icon },
   { title: "AI Settings", href: "/settings/ai", icon: Certificate01Icon },
+  { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },
 ];
 
 export default function DashboardLayout({

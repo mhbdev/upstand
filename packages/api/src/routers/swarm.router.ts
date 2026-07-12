@@ -1,3 +1,4 @@
+import type { ServiceScope } from "@circulo-ai/di";
 import {
   InitSwarmInputSchema,
   RemoveSwarmNodeInputSchema,
@@ -13,6 +14,7 @@ import {
   GetSwarmJoinCommandsUseCaseToken,
   GetSwarmNodesUseCaseToken,
   InitSwarmUseCaseToken,
+  PublishNotificationUseCaseToken,
   RemoveSwarmNodeUseCaseToken,
   RotateSwarmJoinTokenUseCaseToken,
   UpdateSwarmNodeUseCaseToken,
@@ -46,6 +48,41 @@ function auditClusterOperation({
     userId,
     ...(target ? { target } : {}),
   });
+}
+
+async function notifyClusterOperation(
+  scope: Pick<ServiceScope, "resolve">,
+  input: {
+    organizationId: string;
+    event:
+      | "cluster_initialized"
+      | "cluster_node_updated"
+      | "cluster_node_removed"
+      | "cluster_token_rotated";
+    title: string;
+    message: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  await (
+    scope.resolve(PublishNotificationUseCaseToken) as {
+      execute: (
+        value: typeof input & { idempotencyKey: string },
+      ) => Promise<number>;
+    }
+  )
+    .execute({
+      ...input,
+      idempotencyKey: `cluster:${input.event}:${input.organizationId}:${JSON.stringify(input.metadata ?? {})}`,
+    })
+    .catch((error) => {
+      log.error({
+        message: "Unable to queue cluster notification",
+        event: input.event,
+        organizationId: input.organizationId,
+        err: error instanceof Error ? error.message : String(error),
+      });
+    });
 }
 
 export const swarmRouter = router({
@@ -86,6 +123,17 @@ export const swarmRouter = router({
           userId: ctx.session.user.id,
           target: input.nodeId,
         });
+        await notifyClusterOperation(ctx.scope, {
+          organizationId: input.organizationId,
+          event: "cluster_node_updated",
+          title: "Docker Swarm node updated",
+          message: `Swarm node ${input.nodeId} was updated.`,
+          metadata: {
+            nodeId: input.nodeId,
+            availability: input.availability,
+            role: input.role,
+          },
+        });
         return result;
       } catch (error) {
         handleUseCaseError(error);
@@ -105,6 +153,17 @@ export const swarmRouter = router({
           userId: ctx.session.user.id,
           target: input.advertiseAddr,
         });
+        await notifyClusterOperation(ctx.scope, {
+          organizationId: input.organizationId,
+          event: "cluster_initialized",
+          title: "Docker Swarm cluster initialized",
+          message:
+            "Upstand initialized Docker Swarm and prepared its overlay network.",
+          metadata: {
+            swarmId: result.swarmId,
+            networkName: result.networkName,
+          },
+        });
         return result;
       } catch (error) {
         handleUseCaseError(error);
@@ -123,6 +182,13 @@ export const swarmRouter = router({
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
           target: input.nodeId,
+        });
+        await notifyClusterOperation(ctx.scope, {
+          organizationId: input.organizationId,
+          event: "cluster_node_removed",
+          title: "Docker Swarm node removed",
+          message: `Swarm node ${input.nodeId} was drained and removed.`,
+          metadata: { nodeId: input.nodeId },
         });
         return result;
       } catch (error) {
@@ -148,6 +214,32 @@ export const swarmRouter = router({
       }
     }),
 
+  getJoinCommand: twoFactorVerifiedProcedure
+    .input(
+      SwarmOrganizationInputSchema.extend({
+        role: z.enum(["worker", "manager"]),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      const result = await ctx.scope
+        .resolve(GetSwarmJoinCommandsUseCaseToken)
+        .execute();
+      auditClusterOperation({
+        action: `join-credentials.reveal.${input.role}`,
+        organizationId: input.organizationId,
+        userId: ctx.session.user.id,
+      });
+      return {
+        role: input.role,
+        command:
+          input.role === "worker"
+            ? result.workerCommand
+            : result.managerCommand,
+        advertiseAddress: result.advertiseAddress,
+      };
+    }),
+
   rotateJoinToken: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema.merge(RotateSwarmJoinTokenInputSchema))
     .mutation(async ({ ctx, input }) => {
@@ -159,6 +251,13 @@ export const swarmRouter = router({
           action: `join-token.rotate.${input.role}`,
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
+        });
+        await notifyClusterOperation(ctx.scope, {
+          organizationId: input.organizationId,
+          event: "cluster_token_rotated",
+          title: `Docker Swarm ${input.role} token rotated`,
+          message: `The ${input.role} join token was rotated.`,
+          metadata: { role: input.role },
         });
         return result;
       } catch (error) {

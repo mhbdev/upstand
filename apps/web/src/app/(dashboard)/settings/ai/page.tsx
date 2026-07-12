@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Bot,
-  KeyRound,
   Loader2,
   Save,
   ShieldCheck,
@@ -54,27 +53,10 @@ export default function AiSettingsPage() {
     ...trpc.ai.testSettings.mutationOptions(),
     onSuccess: () => toast.success("Provider connection works"),
   });
-  const keys = useQuery({
-    ...trpc.ai.apiKeys.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
-  });
-  const createKey = useMutation({
-    ...trpc.ai.createApiKey.mutationOptions(),
-    onSuccess: (result) => {
-      setCreatedKey(result.secret);
-      void keys.refetch();
-    },
-  });
-  const revokeKey = useMutation({
-    ...trpc.ai.revokeApiKey.mutationOptions(),
-    onSuccess: () => void keys.refetch(),
-  });
   const [provider, setProvider] = useState<AIProvider>("openai");
   const [model, setModel] = useState("gpt-5.4-mini");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [keyName, setKeyName] = useState("");
-  const [createdKey, setCreatedKey] = useState<string>();
 
   useEffect(() => {
     if (!settings.data) return;
@@ -196,75 +178,6 @@ export default function AiSettingsPage() {
                   Remove provider
                 </Button>
               </>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="size-5" />
-            External MCP keys
-          </CardTitle>
-          <CardDescription>
-            Create narrowly scoped keys for Claude, Cursor, or other MCP
-            clients. The secret is shown only once.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={keyName}
-              onChange={(event) => setKeyName(event.target.value)}
-              placeholder="Key name, e.g. Cursor"
-            />
-            <Button
-              disabled={!keyName || createKey.isPending}
-              onClick={() =>
-                createKey.mutate({
-                  organizationId,
-                  name: keyName,
-                  scopes: ["*"],
-                })
-              }
-            >
-              Create key
-            </Button>
-          </div>
-          {createdKey ? (
-            <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-              <p className="font-medium">
-                Copy this secret now; it cannot be recovered.
-              </p>
-              <code className="mt-2 block break-all">{createdKey}</code>
-            </div>
-          ) : null}
-          <div className="divide-y rounded-md border">
-            {keys.data
-              ?.filter((key) => !key.revokedAt)
-              .map((key) => (
-                <div key={key.id} className="flex items-center gap-3 p-3">
-                  <div className="mr-auto">
-                    <p className="font-medium">{key.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {key.prefix} · {key.scopes.join(", ")}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      revokeKey.mutate({ organizationId, id: key.id })
-                    }
-                  >
-                    Revoke
-                  </Button>
-                </div>
-              ))}
-            {!keys.data?.some((key) => !key.revokedAt) ? (
-              <p className="p-4 text-sm text-muted-foreground">
-                No external keys yet.
-              </p>
             ) : null}
           </div>
         </CardContent>

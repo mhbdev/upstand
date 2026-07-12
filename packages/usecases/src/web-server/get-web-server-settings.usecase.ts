@@ -13,6 +13,21 @@ export class GetWebServerSettingsUseCase {
       settings = await this.uow.webServerSettingsRepository.createGlobal({
         caddySnippets: this.getControlPlaneRoutes(),
       });
+    } else {
+      const docsHost = process.env.UPSTAND_DOCS_HOST?.trim();
+      if (
+        docsHost &&
+        /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(docsHost) &&
+        !settings.caddySnippets.includes(`${docsHost} {`)
+      ) {
+        const docsRoute = `${docsHost} {
+\tencode zstd gzip
+\treverse_proxy upstand_fumadocs:4000`;
+        settings =
+          (await this.uow.webServerSettingsRepository.updateGlobal({
+            caddySnippets: `${settings.caddySnippets.trim()}\n\n${docsRoute}\n}`,
+          })) ?? settings;
+      }
     }
 
     if (!settings.serverIp) {
@@ -59,6 +74,7 @@ export class GetWebServerSettingsUseCase {
   private getControlPlaneRoutes(): string {
     const dashboardHost = process.env.UPSTAND_DASHBOARD_HOST?.trim();
     const apiHost = process.env.UPSTAND_API_HOST?.trim();
+    const docsHost = process.env.UPSTAND_DOCS_HOST?.trim();
     const validHost = (host: string | undefined) =>
       host && /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(host);
 
@@ -75,6 +91,11 @@ export class GetWebServerSettingsUseCase {
 ${apiHost} {
 \tencode zstd gzip
 \treverse_proxy upstand_server:3000
-}`;
+}${validHost(docsHost) ? `
+
+${docsHost} {
+	encode zstd gzip
+	reverse_proxy upstand_fumadocs:4000
+}` : ""}`;
   }
 }

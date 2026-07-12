@@ -238,6 +238,7 @@ export class DeploymentWorker {
       const publisher = scope.resolve(PublishNotificationUseCaseToken) as {
         execute: (input: {
           organizationId: string;
+          idempotencyKey: string;
           event: "deployment_succeeded" | "deployment_failed";
           title: string;
           message: string;
@@ -248,6 +249,7 @@ export class DeploymentWorker {
       await publisher.execute({
         organizationId: project.organizationId,
         event: succeeded ? "deployment_succeeded" : "deployment_failed",
+        idempotencyKey: `deployment:${deploymentId}:${status}`,
         title: `${resource.name} deployment ${succeeded ? "succeeded" : "failed"}`,
         message: succeeded
           ? `The deployment for ${resource.name} completed successfully.`

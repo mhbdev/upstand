@@ -1,6 +1,11 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { redis } from "@upstand/redis";
 import { log } from "evlog";
+import {
+  enforceApiKeyRoute,
+  isApiKeyPrincipal,
+  setApiKeyRateLimitHeaders,
+} from "./api-key-auth";
 import type { Context } from "./context";
 
 export const t = initTRPC.context<Context>().create();
@@ -9,6 +14,12 @@ export const router = t.router;
 
 // Centralized Rate Limit Middleware using Redis
 export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
+  if (isApiKeyPrincipal(ctx.actor)) {
+    setApiKeyRateLimitHeaders(ctx.actor, (name, value) =>
+      ctx.honoContext.header(name, value),
+    );
+    return next();
+  }
   const ip =
     ctx.honoContext.req.header("x-forwarded-for") ||
     ctx.honoContext.req.header("x-real-ip") ||
@@ -31,11 +42,11 @@ export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
     if (count === 1) {
       await redis.expire(redisKey, windowSize);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Fail-open logging to avoid blocking users if Redis is down
     log.error({
       message: "Rate limit check failed (Redis error)",
-      err: error.message || error,
+      err: error instanceof Error ? error.message : String(error),
     });
     return next();
   }
@@ -65,7 +76,7 @@ export const publicProcedure = t.procedure.use(rateLimitMiddleware);
 export const protectedProcedure = t.procedure
   .use(rateLimitMiddleware)
   .use(({ ctx, next }) => {
-    if (!ctx.session) {
+    if (!ctx.session || !ctx.actor) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "Authentication required",
@@ -78,11 +89,20 @@ export const protectedProcedure = t.procedure
         session: ctx.session,
       },
     });
+  })
+  .use(async ({ ctx, path, getRawInput, next }) => {
+    if (isApiKeyPrincipal(ctx.actor)) {
+      await enforceApiKeyRoute(path, ctx.actor, await getRawInput());
+    }
+    return next();
   });
 
 // Two-Factor verified procedures check if user has 2FA enabled and if it's verified in Redis
 export const twoFactorVerifiedProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
+    if (isApiKeyPrincipal(ctx.actor)) {
+      return next();
+    }
     if (ctx.session.user.twoFactorEnabled) {
       const verified = await redis.get(
         `2fa-verified:${ctx.session.session.id}`,

@@ -53,7 +53,10 @@ import {
   UPGAL_TOOL_METADATA,
   type UpGalUIMessage,
 } from "@upstand/api/ai/upgal";
-import { authenticateExternalKey } from "@upstand/api/ai/external-key";
+import {
+  authenticateApiKey,
+  setApiKeyRateLimitHeaders,
+} from "@upstand/api/api-key-auth";
 import { ensureOrganizationAccess } from "@upstand/api/access-control";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -118,7 +121,12 @@ app.use(
   cors({
     origin: env.CORS_ORIGIN,
     allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+    exposeHeaders: [
+      "X-RateLimit-Limit",
+      "X-RateLimit-Remaining",
+      "X-RateLimit-Reset",
+    ],
     credentials: true,
   }),
 );
@@ -339,8 +347,11 @@ app.all("/api/mcp", async (c) => {
   const token = authorization.startsWith("Bearer ")
     ? authorization.slice(7)
     : "";
-  const key = await authenticateExternalKey(token, c.get("scope"));
+  const key = token
+    ? await authenticateApiKey(new Headers({ "x-api-key": token }))
+    : null;
   if (!key) return c.json({ error: "Invalid or expired API key" }, 401);
+  setApiKeyRateLimitHeaders(key, (name, value) => c.header(name, value));
   const bodyResult = z
     .object({
       id: z.union([z.string(), z.number(), z.null()]).optional(),
@@ -376,7 +387,9 @@ app.all("/api/mcp", async (c) => {
       result: {
         tools: UPGAL_TOOL_METADATA.filter(
           ([name]) =>
-            key.scopes.includes("*") || key.scopes.includes(`tool:${name}`),
+            key.permissions.mcp.includes("*") ||
+            key.permissions.mcp.includes("read") ||
+            key.permissions.mcp.includes(`tool:${name}`),
         ).map(([name, description, mutation]) => ({
           name,
           description,
@@ -405,7 +418,11 @@ app.all("/api/mcp", async (c) => {
     if (
       !metadata ||
       !isUpGalToolName(name) ||
-      !(key.scopes.includes("*") || key.scopes.includes(`tool:${name}`))
+      !(
+        key.permissions.mcp.includes("*") ||
+        key.permissions.mcp.includes("read") ||
+        key.permissions.mcp.includes(`tool:${name}`)
+      )
     )
       return c.json({
         jsonrpc: "2.0",
@@ -431,7 +448,7 @@ app.all("/api/mcp", async (c) => {
       });
     const result = await executeUpGalReadTool(name, args, {
       organizationId: key.organizationId,
-      userId: key.createdBy,
+      userId: key.userId,
       conversationId: randomUUID(),
       runId: randomUUID(),
       scope: c.get("scope"),
@@ -919,6 +936,7 @@ dockerCleanupTimer = setInterval(
           ) as {
             execute: (input: {
               event: "docker_cleanup_completed";
+              idempotencyKey: string;
               title: string;
               message: string;
             }) => Promise<number>;
@@ -926,6 +944,7 @@ dockerCleanupTimer = setInterval(
           await publisher
             .execute({
               event: "docker_cleanup_completed",
+              idempotencyKey: `docker-cleanup:${now.toISOString().slice(0, 10)}`,
               title: "Daily Docker cleanup completed",
               message:
                 "Upstand completed the scheduled cleanup of unused Docker resources.",

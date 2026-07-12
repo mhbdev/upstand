@@ -52,16 +52,6 @@ export default function Home() {
       <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-16 pb-20 md:px-10 md:pt-24 md:pb-28">
         <section className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20">
           <div className="max-w-2xl">
-            <Badge
-              variant="outline"
-              className="mb-6 gap-1.5 rounded-full px-3 py-1"
-            >
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-primary" />
-              </span>
-              Open-source · Self-hosted · v0.1.10
-            </Badge>
             <h1 className="text-balance font-bold text-5xl tracking-[-0.04em] sm:text-7xl">
               Your servers.
               <br />

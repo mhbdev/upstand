@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
 
@@ -46,6 +47,7 @@ export const notificationDelivery = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     event: text("event").notNull(),
+    idempotencyKey: text("idempotency_key"),
     title: text("title").notNull(),
     message: text("message").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
@@ -53,6 +55,9 @@ export const notificationDelivery = pgTable(
     attempts: integer("attempts").notNull().default(0),
     error: text("error"),
     deliveredAt: timestamp("delivered_at"),
+    processingStartedAt: timestamp("processing_started_at"),
+    lastAttemptAt: timestamp("last_attempt_at"),
+    nextAttemptAt: timestamp("next_attempt_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -66,6 +71,9 @@ export const notificationDelivery = pgTable(
       table.createdAt,
     ),
     index("notification_delivery_status_idx").on(table.status),
+    uniqueIndex("notification_delivery_idempotency_uidx").on(
+      table.idempotencyKey,
+    ),
   ],
 );
 

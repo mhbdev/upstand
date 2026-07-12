@@ -17,6 +17,7 @@
     "@upstand/db": "workspace:*",
     "@upstand/env": "workspace:*",
     "@upstand/redis": "workspace:*",
+    "@better-auth/api-key": "catalog:",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "dotenv": "catalog:",

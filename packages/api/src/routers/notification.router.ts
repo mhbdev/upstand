@@ -132,4 +132,30 @@ export const notificationRouter = router({
         handleUseCaseError(error);
       }
     }),
+
+  deliveries: twoFactorVerifiedProcedure
+    .input(
+      OrganizationInputSchema.extend({
+        status: z
+          .enum(["queued", "processing", "delivered", "failed", "dead_letter"])
+          .optional(),
+        limit: z.number().int().min(1).max(100).default(25),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "notification:view",
+      );
+      const deliveries = await ctx.scope
+        .resolve(UnitOfWorkToken)
+        .notificationDeliveryRepository.findRecentByOrganizationId(
+          input.organizationId,
+          input.limit,
+        );
+      return input.status
+        ? deliveries.filter((delivery) => delivery.status === input.status)
+        : deliveries;
+    }),
 });

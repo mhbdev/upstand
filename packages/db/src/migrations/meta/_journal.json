@@ -127,6 +127,20 @@
       "when": 1783885071574,
       "tag": "0017_public_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783893006017,
+      "tag": "0018_api_keys_notifications_cluster",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783893089505,
+      "tag": "0019_vengeful_vapor",
+      "breakpoints": true
     }
   ]
 }

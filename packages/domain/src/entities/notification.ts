@@ -27,6 +27,10 @@ export const NotificationEventTypeSchema = z.enum([
   "platform_restart",
   "platform_backup_completed",
   "docker_cleanup_completed",
+  "cluster_initialized",
+  "cluster_node_updated",
+  "cluster_node_removed",
+  "cluster_token_rotated",
 ]);
 
 export type NotificationEventType = z.infer<typeof NotificationEventTypeSchema>;
@@ -132,7 +136,7 @@ export type NotificationConfiguration = z.infer<
 export const CreateNotificationChannelInputSchema = z.object({
   organizationId: z.string().min(1),
   name: z.string().trim().min(1).max(120),
-  events: z.array(NotificationEventTypeSchema).min(1).max(7),
+  events: z.array(NotificationEventTypeSchema).min(1).max(11),
   configuration: NotificationConfigurationSchema,
 });
 
@@ -143,7 +147,7 @@ export type CreateNotificationChannelInput = z.infer<
 export const UpdateNotificationChannelInputSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(120).optional(),
-  events: z.array(NotificationEventTypeSchema).min(1).max(7).optional(),
+  events: z.array(NotificationEventTypeSchema).min(1).max(11).optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -175,6 +179,7 @@ export const NotificationDeliveryStatusSchema = z.enum([
   "processing",
   "delivered",
   "failed",
+  "dead_letter",
 ]);
 
 export const NotificationDeliverySchema = z.object({
@@ -182,6 +187,7 @@ export const NotificationDeliverySchema = z.object({
   channelId: z.string(),
   organizationId: z.string(),
   event: NotificationEventTypeSchema,
+  idempotencyKey: z.string().nullable(),
   title: z.string(),
   message: z.string(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
@@ -189,6 +195,9 @@ export const NotificationDeliverySchema = z.object({
   attempts: z.number().int().nonnegative(),
   error: z.string().nullable(),
   deliveredAt: z.date().nullable(),
+  processingStartedAt: z.date().nullable(),
+  lastAttemptAt: z.date().nullable(),
+  nextAttemptAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -200,6 +209,7 @@ export interface CreateNotificationDeliveryDTO {
   channelId: string;
   organizationId: string;
   event: NotificationEventType;
+  idempotencyKey?: string | null;
   title: string;
   message: string;
   metadata?: Record<string, unknown> | null;
@@ -207,6 +217,9 @@ export interface CreateNotificationDeliveryDTO {
   attempts?: number;
   error?: string | null;
   deliveredAt?: Date | null;
+  processingStartedAt?: Date | null;
+  lastAttemptAt?: Date | null;
+  nextAttemptAt?: Date | null;
 }
 
 const SensitiveConfigurationKeys = new Set([

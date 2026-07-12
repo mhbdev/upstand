@@ -232,6 +232,25 @@ describe("Swarm use cases", () => {
     expect(calls.nodeRemove).toEqual([{ force: true }]);
   });
 
+  test("refuses removing the last manager", async () => {
+    const { docker } = createDockerMock({
+      listNodes: async () => [
+        {
+          ID: "node-1",
+          Spec: { Role: "manager", Availability: "active" },
+          Status: { State: "ready" },
+        } as never,
+      ],
+    });
+    await expect(
+      new RemoveSwarmNodeUseCase(docker).execute({
+        nodeId: "node-1",
+        version: 5,
+        confirmation: "manager-1",
+      }),
+    ).rejects.toThrow("last manager");
+  });
+
   test("rotates a role token and returns only the replacement command", async () => {
     const { calls, docker } = createDockerMock();
     const result = await new RotateSwarmJoinTokenUseCase(docker).execute({

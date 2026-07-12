@@ -1,6 +1,8 @@
 import type { NotificationConfiguration } from "@upstand/domain";
 import nodemailer from "nodemailer";
 
+const NOTIFICATION_REQUEST_TIMEOUT_MS = 15_000;
+
 export interface NotificationMessage {
   title: string;
   message: string;
@@ -27,6 +29,22 @@ async function ensureSuccess(
   throw new Error(
     `${provider} rejected the notification (${response.status} ${response.statusText})${body ? `: ${body}` : ""}`,
   );
+}
+
+async function fetchWithTimeout(
+  input: string | URL,
+  init: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    NOTIFICATION_REQUEST_TIMEOUT_MS,
+  );
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -79,7 +97,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "slack" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(configuration.webhookUrl, {
+    const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -104,7 +122,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "telegram" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://api.telegram.org/bot${configuration.botToken}/sendMessage`,
       {
         method: "POST",
@@ -126,7 +144,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "discord" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(configuration.webhookUrl, {
+    const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -146,7 +164,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "lark" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(configuration.webhookUrl, {
+    const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -161,7 +179,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "teams" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(configuration.webhookUrl, {
+    const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -202,20 +220,24 @@ export class NotificationTransportRegistry implements NotificationTransport {
       auth: { user: configuration.username, pass: configuration.password },
     });
 
-    await transport.sendMail({
-      from: configuration.fromAddress,
-      to: configuration.toAddresses.join(", "),
-      subject: message.title,
-      text: message.message,
-      html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(message.message).replace(/\n/g, "<br />")}</p>`,
-    });
+    try {
+      await transport.sendMail({
+        from: configuration.fromAddress,
+        to: configuration.toAddresses.join(", "),
+        subject: message.title,
+        text: message.message,
+        html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(message.message).replace(/\n/g, "<br />")}</p>`,
+      });
+    } finally {
+      transport.close();
+    }
   }
 
   private async sendResend(
     configuration: Extract<NotificationConfiguration, { type: "resend" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetchWithTimeout("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${configuration.apiKey}`,
@@ -236,7 +258,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "gotify" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${trimTrailingSlash(configuration.serverUrl)}/message`,
       {
         method: "POST",
@@ -258,7 +280,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "ntfy" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${trimTrailingSlash(configuration.serverUrl)}/${encodeURIComponent(configuration.topic)}`,
       {
         method: "POST",
@@ -279,7 +301,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "mattermost" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(configuration.webhookUrl, {
+    const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -309,11 +331,14 @@ export class NotificationTransportRegistry implements NotificationTransport {
       form.set("expire", String(configuration.expire));
     }
 
-    const response = await fetch("https://api.pushover.net/1/messages.json", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form,
-    });
+    const response = await fetchWithTimeout(
+      "https://api.pushover.net/1/messages.json",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form,
+      },
+    );
     await ensureSuccess(response, "Pushover");
   }
 
@@ -321,7 +346,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "custom" }>,
     message: NotificationMessage,
   ): Promise<void> {
-    const response = await fetch(configuration.endpoint, {
+    const response = await fetchWithTimeout(configuration.endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

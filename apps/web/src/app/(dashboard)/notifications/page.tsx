@@ -394,6 +394,26 @@ const EVENT_OPTIONS: Array<{
     label: "Upstand restart",
     description: "When a platform update starts a restart.",
   },
+  {
+    value: "cluster_initialized",
+    label: "Cluster initialized",
+    description: "When Docker Swarm is initialized.",
+  },
+  {
+    value: "cluster_node_updated",
+    label: "Cluster node updated",
+    description: "When a node role or availability changes.",
+  },
+  {
+    value: "cluster_node_removed",
+    label: "Cluster node removed",
+    description: "When a node is drained and removed.",
+  },
+  {
+    value: "cluster_token_rotated",
+    label: "Cluster token rotated",
+    description: "When a worker or manager join token is rotated.",
+  },
 ];
 
 function providerValues(

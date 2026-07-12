@@ -6,6 +6,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.11 - 2026-07-13
+
+### Fixed
+
+- Added a managed HTTPS Caddy route for the Fumadocs service and backfilled it for existing installations, fixing the documentation subdomain TLS/proxy failure.
+
 ## 0.1.10 - 2026-07-13
 
 ### Changed

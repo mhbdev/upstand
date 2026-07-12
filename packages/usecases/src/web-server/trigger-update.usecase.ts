@@ -100,6 +100,7 @@ export class TriggerUpdateUseCase {
       await this.notificationPublisher
         ?.execute({
           event: "platform_restart",
+          idempotencyKey: `platform-restart:${version}`,
           title: "Upstand platform update started",
           message: `Upstand is applying version ${version} and will restart its services.`,
           metadata: { version, updatedServices: updatedCount },

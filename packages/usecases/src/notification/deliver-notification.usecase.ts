@@ -1,4 +1,4 @@
-import { type IUnitOfWork, ValidationError } from "@upstand/domain";
+import type { IUnitOfWork } from "@upstand/domain";
 import { decryptNotificationConfiguration } from "./notification-configuration";
 import type { NotificationTransport } from "./notification-transport";
 
@@ -10,20 +10,24 @@ export class DeliverNotificationUseCase {
 
   async execute(deliveryId: string): Promise<void> {
     const delivery =
-      await this.uow.notificationDeliveryRepository.findById(deliveryId);
-    if (!delivery) throw new ValidationError("Notification delivery not found");
+      await this.uow.notificationDeliveryRepository.claimForDelivery(
+        deliveryId,
+        new Date(),
+        5 * 60_000,
+      );
+    if (!delivery) return;
 
     const channel = await this.uow.notificationChannelRepository.findById(
       delivery.channelId,
     );
-    if (!channel)
-      throw new ValidationError("Notification channel no longer exists");
-
-    await this.uow.notificationDeliveryRepository.updateById(delivery.id, {
-      status: "processing",
-      attempts: delivery.attempts + 1,
-      error: null,
-    });
+    if (!channel) {
+      await this.uow.notificationDeliveryRepository.updateById(delivery.id, {
+        status: "dead_letter",
+        processingStartedAt: null,
+        error: "Notification channel no longer exists",
+      });
+      return;
+    }
 
     try {
       await this.transport.send(decryptNotificationConfiguration(channel), {
@@ -34,14 +38,20 @@ export class DeliverNotificationUseCase {
       await this.uow.notificationDeliveryRepository.updateById(delivery.id, {
         status: "delivered",
         deliveredAt: new Date(),
+        processingStartedAt: null,
+        nextAttemptAt: null,
         error: null,
       });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown delivery error";
       await this.uow.notificationDeliveryRepository.updateById(delivery.id, {
-        status: "failed",
+        status: delivery.attempts >= 3 ? "dead_letter" : "failed",
         error: message.slice(0, 1_000),
+        processingStartedAt: null,
+        nextAttemptAt: new Date(
+          Date.now() + Math.min(60_000, 2 ** delivery.attempts * 1_000),
+        ),
       });
       throw error;
     }

@@ -28,3 +28,9 @@ Monitoring exposes server/runtime metrics, active containers, Docker storage usa
 ## AI and MCP operations
 
 UpGal uses the same project, resource, deployment, and server use cases as the dashboard. This keeps assistant actions subject to the platform’s organization ownership checks. Read-only inspection can be automated; mutations require an approval in the dashboard. See the [UpGal AI assistant guide](/docs/upgal) for provider keys, MCP scopes, conversation persistence, and incident guidance.
+
+## Organization API keys
+
+Create organization API keys from **Settings → API Keys**. Keys are hashed by Better Auth, shown only once, expire according to the selected policy, and are rate limited through Redis. Use either `x-api-key: upk_...` or `Authorization: Bearer upk_...` for supported API and MCP endpoints.
+
+Choose a read-only, deployment, operations, MCP read-only, or full-access preset, or use the advanced permission editor. API keys never create browser sessions and cannot access authentication, 2FA, terminal, or other session-only flows. Revoke a key immediately when an integration is retired or compromised.

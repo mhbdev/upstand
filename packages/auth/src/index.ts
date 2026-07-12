@@ -6,6 +6,7 @@ import { redis } from "@upstand/redis";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
+import { apiKey } from "@better-auth/api-key";
 import { organization } from "better-auth/plugins";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { count, eq } from "drizzle-orm";
@@ -196,6 +197,41 @@ export function createAuth() {
     },
     plugins: [
       organization(),
+      apiKey({
+        configId: "upstand",
+        references: "organization",
+        defaultPrefix: "upk_",
+        defaultKeyLength: 48,
+        requireName: true,
+        minimumNameLength: 1,
+        maximumNameLength: 120,
+        startingCharactersConfig: {
+          shouldStore: true,
+          charactersLength: 12,
+        },
+        enableMetadata: true,
+        keyExpiration: {
+          defaultExpiresIn: 90 * 24 * 60 * 60 * 1000,
+          minExpiresIn: 1,
+          maxExpiresIn: 365,
+        },
+        rateLimit: {
+          enabled: true,
+          timeWindow: 60 * 60 * 1000,
+          maxRequests: 1_000,
+        },
+        storage: "secondary-storage",
+        fallbackToDatabase: true,
+        customAPIKeyGetter: (ctx) => {
+          if (!ctx.request) return null;
+          const explicit = ctx.request.headers.get("x-api-key")?.trim();
+          if (explicit) return explicit;
+          const authorization = ctx.request.headers.get("authorization") || "";
+          return authorization.startsWith("Bearer ")
+            ? authorization.slice("Bearer ".length).trim() || null
+            : null;
+        },
+      }),
       twoFactor({
         issuer: "Upstand",
         allowPasswordless: true,

@@ -140,6 +140,7 @@ export class ExecuteBackupRunUseCase {
       .execute({
         organizationId: input.organizationId,
         event,
+        idempotencyKey: `backup:${input.run.id}:${input.run.status}`,
         title: `${label} backup ${input.succeeded ? "completed" : "failed"}`,
         message: input.succeeded
           ? `${label} backup for ${input.resourceName} completed successfully.`

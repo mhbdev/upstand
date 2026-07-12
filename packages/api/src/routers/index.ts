@@ -4,6 +4,7 @@ import { handleUseCaseError } from "../errors";
 import { protectedProcedure, publicProcedure, router } from "../index";
 import { authRouter } from "./auth.router";
 import { aiRouter } from "./ai.router";
+import { apiKeyRouter } from "./api-key.router";
 import { backupRouter } from "./backup.router";
 import { deploymentRouter } from "./deployment.router";
 import { dockerRegistryRouter } from "./docker-registry.router";
@@ -55,6 +56,7 @@ export const appRouter = router({
   notification: notificationRouter,
   backup: backupRouter,
   ai: aiRouter,
+  apiKey: apiKeyRouter,
 });
 
 export type AppRouter = typeof appRouter;

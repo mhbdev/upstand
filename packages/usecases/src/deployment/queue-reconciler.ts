@@ -19,11 +19,20 @@ export interface QueueReconciliationResult {
 export async function reconcileQueuedJobs(
   uow: IUnitOfWork,
 ): Promise<QueueReconciliationResult> {
-  const [backups, deployments, notifications] = await Promise.all([
+  const [backups, deployments, queuedNotifications, processingNotifications] = await Promise.all([
     uow.backupRunRepository.findByStatus("queued", 500),
     uow.deploymentRepository.findByStatus("queued", 500),
     uow.notificationDeliveryRepository.findByStatus("queued", 500),
+    uow.notificationDeliveryRepository.findByStatus("processing", 500),
   ]);
+  const notifications = [
+    ...queuedNotifications,
+    ...processingNotifications.filter(
+      (delivery) =>
+        !delivery.processingStartedAt ||
+        delivery.processingStartedAt.getTime() < Date.now() - 5 * 60_000,
+    ),
+  ];
 
   const deploymentQueues = new Map<string, Queue>();
   const notificationQueue = new Queue(NOTIFICATION_DELIVERY_QUEUE, {

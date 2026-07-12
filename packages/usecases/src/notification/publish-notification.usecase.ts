@@ -9,6 +9,7 @@ export interface PublishNotificationInput {
   message: string;
   organizationId?: string;
   metadata?: Record<string, unknown>;
+  idempotencyKey?: string;
 }
 
 const NOTIFICATION_DELIVERY_QUEUE = "notification-delivery";
@@ -32,6 +33,7 @@ export class PublishNotificationUseCase {
           event: input.event,
           title: input.title,
           message: input.message,
+          idempotencyKey: `${input.idempotencyKey ?? randomUUID()}:${channel.id}`,
           metadata: input.metadata ?? null,
           status: "queued",
         })),

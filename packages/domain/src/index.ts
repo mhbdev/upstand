@@ -2,6 +2,7 @@
 
 export * from "./crypto/secret-box";
 export * from "./ai";
+export * from "./api-key";
 export * from "./entities/backup";
 export * from "./entities/deployment";
 export * from "./entities/deployment";

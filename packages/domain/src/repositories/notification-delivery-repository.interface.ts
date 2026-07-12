@@ -10,6 +10,11 @@ export interface INotificationDeliveryRepository {
     limit?: number,
   ): Promise<NotificationDelivery[]>;
   findByStatus(status: string, limit?: number): Promise<NotificationDelivery[]>;
+  claimForDelivery(
+    id: string,
+    now: Date,
+    leaseMs: number,
+  ): Promise<NotificationDelivery | null>;
   create(data: CreateNotificationDeliveryDTO): Promise<NotificationDelivery>;
   createMany(
     data: CreateNotificationDeliveryDTO[],

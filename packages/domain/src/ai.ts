@@ -59,35 +59,11 @@ export type AIMessageRecord = {
   createdAt: Date;
 };
 
-export type AIExternalApiKeyRecord = {
-  id: string;
-  organizationId: string;
-  createdBy: string;
-  name: string;
-  prefix: string;
-  scopes: string[];
-  expiresAt: Date | null;
-  lastUsedAt: Date | null;
-  revokedAt: Date | null;
-  createdAt: Date;
-};
-
 export type CreateAIConversation = {
   id: string;
   organizationId: string;
   userId: string;
   context: JsonObject;
-};
-
-export type CreateAIExternalApiKey = {
-  id: string;
-  organizationId: string;
-  createdBy: string;
-  name: string;
-  prefix: string;
-  secretHash: string;
-  scopes: string[];
-  expiresAt: Date | null;
 };
 
 export type CreateAIRun = {
@@ -126,14 +102,4 @@ export interface IAIRepository {
     runId: string,
     patch: { stepCount?: number; status?: string; finishedAt?: Date },
   ): Promise<void>;
-  listExternalApiKeys(
-    organizationId: string,
-  ): Promise<AIExternalApiKeyRecord[]>;
-  createExternalApiKey(input: CreateAIExternalApiKey): Promise<void>;
-  revokeExternalApiKey(organizationId: string, id: string): Promise<void>;
-  findActiveExternalApiKey(
-    secretHash: string,
-    now: Date,
-  ): Promise<AIExternalApiKeyRecord | null>;
-  markExternalApiKeyUsed(id: string, usedAt: Date): Promise<void>;
 }

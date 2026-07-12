@@ -217,6 +217,7 @@
     "packages/auth": {
       "name": "@upstand/auth",
       "dependencies": {
+        "@better-auth/api-key": "catalog:",
         "@upstand/db": "workspace:*",
         "@upstand/env": "workspace:*",
         "@upstand/redis": "workspace:*",
@@ -367,6 +368,7 @@
   "catalog": {
     "@better-auth-ui/core": "^1.1.9",
     "@better-auth-ui/react": "^1.1.9",
+    "@better-auth/api-key": "1.6.23",
     "@circulo-ai/di": "3.1.0",
     "@hugeicons/core-free-icons": "^4.2.2",
     "@hugeicons/react": "^1.1.9",

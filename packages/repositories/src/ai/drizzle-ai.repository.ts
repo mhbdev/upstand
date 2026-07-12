@@ -3,22 +3,19 @@ import {
   aiMessage,
   aiProviderConfig,
   aiRun,
-  externalApiKey,
 } from "@upstand/db";
 import { randomUUID } from "node:crypto";
 import type {
   AIConversationRecord,
-  AIExternalApiKeyRecord,
   AIMessageRecord,
   AIProviderConfigRecord,
   CreateAIConversation,
-  CreateAIExternalApiKey,
   CreateAIRun,
   IAIRepository,
   JsonValue,
   SaveAIProviderConfig,
 } from "@upstand/domain";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Executor } from "../shared/types";
 
 export class DrizzleAIRepository implements IAIRepository {
@@ -173,81 +170,4 @@ export class DrizzleAIRepository implements IAIRepository {
     await this.executor.update(aiRun).set(patch).where(eq(aiRun.id, runId));
   }
 
-  async listExternalApiKeys(
-    organizationId: string,
-  ): Promise<AIExternalApiKeyRecord[]> {
-    return this.executor
-      .select({
-        id: externalApiKey.id,
-        organizationId: externalApiKey.organizationId,
-        createdBy: externalApiKey.createdBy,
-        name: externalApiKey.name,
-        prefix: externalApiKey.prefix,
-        scopes: externalApiKey.scopes,
-        expiresAt: externalApiKey.expiresAt,
-        lastUsedAt: externalApiKey.lastUsedAt,
-        revokedAt: externalApiKey.revokedAt,
-        createdAt: externalApiKey.createdAt,
-      })
-      .from(externalApiKey)
-      .where(eq(externalApiKey.organizationId, organizationId))
-      .orderBy(desc(externalApiKey.createdAt));
-  }
-
-  async createExternalApiKey(input: CreateAIExternalApiKey): Promise<void> {
-    await this.executor.insert(externalApiKey).values(input);
-  }
-
-  async revokeExternalApiKey(
-    organizationId: string,
-    id: string,
-  ): Promise<void> {
-    await this.executor
-      .update(externalApiKey)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(externalApiKey.id, id),
-          eq(externalApiKey.organizationId, organizationId),
-          isNull(externalApiKey.revokedAt),
-        ),
-      );
-  }
-
-  async findActiveExternalApiKey(
-    secretHash: string,
-    now: Date,
-  ): Promise<AIExternalApiKeyRecord | null> {
-    const row = await this.executor
-      .select({
-        id: externalApiKey.id,
-        organizationId: externalApiKey.organizationId,
-        createdBy: externalApiKey.createdBy,
-        name: externalApiKey.name,
-        prefix: externalApiKey.prefix,
-        scopes: externalApiKey.scopes,
-        expiresAt: externalApiKey.expiresAt,
-        lastUsedAt: externalApiKey.lastUsedAt,
-        revokedAt: externalApiKey.revokedAt,
-        createdAt: externalApiKey.createdAt,
-      })
-      .from(externalApiKey)
-      .where(
-        and(
-          eq(externalApiKey.secretHash, secretHash),
-          isNull(externalApiKey.revokedAt),
-        ),
-      )
-      .limit(1)
-      .then((rows) => rows[0]);
-    if (!row || (row.expiresAt !== null && row.expiresAt < now)) return null;
-    return row;
-  }
-
-  async markExternalApiKeyUsed(id: string, usedAt: Date): Promise<void> {
-    await this.executor
-      .update(externalApiKey)
-      .set({ lastUsedAt: usedAt })
-      .where(eq(externalApiKey.id, id));
-  }
 }

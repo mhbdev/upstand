@@ -129,31 +129,6 @@ export const aiApproval = pgTable(
   ],
 );
 
-export const externalApiKey = pgTable(
-  "external_api_key",
-  {
-    id: text("id").primaryKey(),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    createdBy: text("created_by")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    prefix: text("prefix").notNull(),
-    secretHash: text("secret_hash").notNull(),
-    scopes: jsonb("scopes").$type<string[]>().notNull(),
-    expiresAt: timestamp("expires_at"),
-    lastUsedAt: timestamp("last_used_at"),
-    revokedAt: timestamp("revoked_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex("external_api_key_hash_uidx").on(table.secretHash),
-    index("external_api_key_org_idx").on(table.organizationId, table.revokedAt),
-  ],
-);
-
 export const aiRelations = relations(aiConversation, ({ many }) => ({
   messages: many(aiMessage),
   runs: many(aiRun),

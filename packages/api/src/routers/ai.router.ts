@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { encryptSecret } from "@upstand/domain/crypto/secret-box";
 import { AI_PROVIDERS } from "@upstand/domain";
 import { AIRepositoryToken } from "@upstand/repositories";
@@ -136,62 +136,4 @@ export const aiRouter = router({
       return { conversation, messages: messages.reverse() };
     }),
 
-  apiKeys: protectedProcedure
-    .input(organizationInput)
-    .query(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(
-        ctx.session.user.id,
-        input.organizationId,
-        ["owner", "admin"],
-      );
-      return ctx.scope
-        .resolve(AIRepositoryToken)
-        .listExternalApiKeys(input.organizationId);
-    }),
-
-  createApiKey: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string().min(1),
-        name: z.string().min(1).max(80),
-        scopes: z.array(z.string().min(1)).min(1),
-        expiresAt: z.coerce.date().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(
-        ctx.session.user.id,
-        input.organizationId,
-        ["owner", "admin"],
-      );
-      const secret = `upg_${randomBytes(24).toString("hex")}`;
-      const prefix = secret.slice(0, 12);
-      await ctx.scope.resolve(AIRepositoryToken).createExternalApiKey({
-        id: randomUUID(),
-        organizationId: input.organizationId,
-        createdBy: ctx.session.user.id,
-        name: input.name,
-        prefix,
-        secretHash: createHash("sha256").update(secret).digest("hex"),
-        scopes: input.scopes,
-        expiresAt: input.expiresAt ?? null,
-      });
-      return { secret, prefix };
-    }),
-
-  revokeApiKey: protectedProcedure
-    .input(
-      z.object({ organizationId: z.string().min(1), id: z.string().min(1) }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(
-        ctx.session.user.id,
-        input.organizationId,
-        ["owner", "admin"],
-      );
-      await ctx.scope
-        .resolve(AIRepositoryToken)
-        .revokeExternalApiKey(input.organizationId, input.id);
-      return { revoked: true };
-    }),
 });

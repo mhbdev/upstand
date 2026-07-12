@@ -4,7 +4,7 @@ import type {
   INotificationDeliveryRepository,
   NotificationDelivery,
 } from "@upstand/domain";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { Executor } from "../shared/types";
 
 export class DrizzleNotificationDeliveryRepository
@@ -64,7 +64,44 @@ export class DrizzleNotificationDeliveryRepository
     return (await this.executor
       .insert(notificationDelivery)
       .values(data)
+      .onConflictDoNothing({ target: notificationDelivery.idempotencyKey })
       .returning()) as NotificationDelivery[];
+  }
+
+  async claimForDelivery(
+    id: string,
+    now: Date,
+    leaseMs: number,
+  ): Promise<NotificationDelivery | null> {
+    const staleBefore = new Date(now.getTime() - leaseMs);
+    const [delivery] = await this.executor
+      .update(notificationDelivery)
+      .set({
+        status: "processing",
+        attempts: sql`${notificationDelivery.attempts} + 1`,
+        processingStartedAt: now,
+        lastAttemptAt: now,
+        nextAttemptAt: null,
+        error: null,
+      })
+      .where(
+        and(
+          eq(notificationDelivery.id, id),
+          or(
+            eq(notificationDelivery.status, "queued"),
+            eq(notificationDelivery.status, "failed"),
+            and(
+              eq(notificationDelivery.status, "processing"),
+              or(
+                isNull(notificationDelivery.processingStartedAt),
+                lt(notificationDelivery.processingStartedAt, staleBefore),
+              ),
+            ),
+          ),
+        ),
+      )
+      .returning();
+    return (delivery as NotificationDelivery | undefined) ?? null;
   }
 
   async updateById(
