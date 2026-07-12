@@ -12,7 +12,7 @@ readonly NETWORK_NAME="${DOCKER_NETWORK:-upstand-network}"
 # BASH_SOURCE is an array only when Bash executes a file. A curl | bash install
 # has no array element, so use the scalar expansion with a safe $0 fallback.
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE:-$0}")" && pwd)"
-readonly STACK_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
+STACK_FILE="$INSTALL_DIR/docker-compose.prod.yml"
 
 fail() {
   echo "error: $*" >&2
@@ -62,6 +62,19 @@ build_source_images() {
   docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/fumadocs/Dockerfile" --tag "$UPSTAND_DOCS_IMAGE" "$SOURCE_DIR"
   SOURCE_BUILD=true
+}
+
+ensure_stack_file() {
+  [[ -f "$STACK_FILE" ]] && return
+  install -d -m 0700 "$INSTALL_DIR"
+  local repository="${UPSTAND_REPOSITORY:-https://github.com/mhbdev/upstand.git}"
+  local ref="${UPSTAND_REF:-${UPSTAND_VERSION:-master}}"
+  local raw_repository="${repository%.git}"
+  raw_repository="${raw_repository#https://github.com/}"
+  curl --fail --show-error --silent --location \
+    "https://raw.githubusercontent.com/${raw_repository}/${ref}/docker-compose.prod.yml" \
+    --output "$STACK_FILE"
+  chmod 0600 "$STACK_FILE"
 }
 
 detect_advertise_address() {
@@ -289,6 +302,7 @@ main() {
   ensure_docker
   local advertise_address
   advertise_address="$(detect_advertise_address)"
+  ensure_stack_file
   write_environment "$advertise_address"
   ensure_swarm "$advertise_address"
   deploy_stack

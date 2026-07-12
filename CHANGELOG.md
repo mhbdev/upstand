@@ -6,6 +6,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.5 - 2026-07-12
+
+### Fixed
+
+- Made the curl-based installer fetch its production Compose manifest from the selected release when launched outside the repository.
+
 ## 0.1.4 - 2026-07-12
 
 ### Added
