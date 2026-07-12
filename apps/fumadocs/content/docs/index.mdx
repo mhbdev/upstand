@@ -11,17 +11,18 @@ Welcome to the official production guide for the **Upstand PaaS Platform**. This
 
 Upstand is a modern, container-first self-hosted Platform-as-a-Service (PaaS) designed to orchestrate application builds, compose stacks, and databases across single-node or multi-node Docker Swarm clusters.
 
-```mermaid
+<Mermaid 
+    chart="
 graph TD
-    User([Platform Admin]) -->|HTTPS / tRPC| Web[Web App Dashboard]
-    Web --> Server[Hono REST/tRPC Server]
-    Server --> DB[(PostgreSQL Database)]
-    Server --> Queue[(Redis / BullMQ Queue)]
-    Queue --> Worker[Deployment Worker]
-    Worker -->|Docker Socket| Engine[Docker Swarm Engine]
-    Worker -->|Config Write| Caddy[Caddy Reverse Proxy]
-    Engine -->|Overlay Network| Containers[App/DB Swarm Tasks]
-```
+User([Platform Admin]) -->|HTTPS / tRPC| Web[Web App Dashboard]
+Web --> Server[Hono REST/tRPC Server]
+Server --> DB[(PostgreSQL Database)]
+Server --> Queue[(Redis / BullMQ Queue)]
+Queue --> Worker[Deployment Worker]
+Worker -->|Docker Socket| Engine[Docker Swarm Engine]
+Worker -->|Config Write| Caddy[Caddy Reverse Proxy]
+Engine -->|Overlay Network| Containers[App/DB Swarm Tasks]"
+/>
 
 ### 1. Control Plane & API Server
 The core application server is written in **TypeScript** using the high-performance **Hono** framework. It acts as the API control plane, serving:
