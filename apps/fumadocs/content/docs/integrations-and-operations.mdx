@@ -7,6 +7,8 @@ description: Connect source providers, registries, servers, Swarm clusters, stor
 
 Git providers are configured at the organization level. Applications can select GitHub, GitLab, Bitbucket, Gitea, or generic Git. Repository and branch selectors use provider APIs when credentials allow it; generic Git can use an encrypted SSH key. Watch paths, submodules, auto-deploy, and raw Compose input are resource-level settings.
 
+After a provider is connected, use **Manage access** on its card to open that provider’s own installation or OAuth permissions page. GitHub opens the specific App installation, GitLab and Gitea open authorized-application settings, and Bitbucket opens app-password management. Changes made there are reflected the next time Upstand refreshes provider access.
+
 ## Docker registries
 
 Docker registries are reusable organization-level credentials with URL, username, password, and connection testing. Use them for private image resources and registry-backed application deployments. Credentials are not displayed after save; test connectivity from the Docker Registry page before using a private image.

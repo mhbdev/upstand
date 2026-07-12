@@ -69,7 +69,7 @@ export function createAuth() {
       provider: "pg",
       schema: schema,
     }),
-    trustedOrigins: [env.CORS_ORIGIN],
+    trustedOrigins: [env.CORS_ORIGIN, env.BETTER_AUTH_URL],
     emailAndPassword: {
       enabled: true,
     },
@@ -84,7 +84,15 @@ export function createAuth() {
     },
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    session: {
+      // Keep sessions short-lived and rotate the token on a daily activity
+      // boundary. Database persistence provides recovery if Redis is rebuilt.
+      expiresIn: 60 * 60 * 24 * 7,
+      updateAge: 60 * 60 * 24,
+      storeSessionInDatabase: true,
+    },
     advanced: {
+      useSecureCookies: env.NODE_ENV === "production",
       crossSubDomainCookies: sharedCookieDomain
         ? {
             enabled: true,

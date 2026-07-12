@@ -30,10 +30,10 @@ sequenceDiagram
 
 Organization owners and administrators configure UpGal from **Settings → AI**.
 
-1. Choose OpenAI, Anthropic, Google, or the OpenAI-compatible AI Gateway.
-2. Enter the model identifier supported by that provider.
+1. Choose OpenAI, Anthropic, Google, OpenRouter, or the OpenAI-compatible AI Gateway.
+2. Enter the model identifier supported by that provider. For OpenRouter, use **Load models** to fetch the current catalog; custom model IDs are also accepted.
 3. Enter the API key and, when required, a custom base URL.
-4. Save the settings and use **Test connection** to verify the configuration.
+4. Save the settings and use **Test connection** to verify the configuration. The test uses the values currently in the form, so you can validate a new key before saving it.
 
 The API key is encrypted before persistence. The browser only receives provider, model, base URL, enabled state, and a boolean indicating whether a key is configured. The plaintext key is never returned by the API.
 

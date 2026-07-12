@@ -1,15 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
 import { AI_PROVIDERS } from "@upstand/domain";
+import { encryptSecret } from "@upstand/domain/crypto/secret-box";
 import { AIRepositoryToken } from "@upstand/repositories";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
-import { protectedProcedure, router } from "../index";
 import {
   getConversationForUser,
   listConversations,
+  listOpenRouterModels,
   testUpGalProvider,
 } from "../ai/upgal";
+import { protectedProcedure, router } from "../index";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
 
@@ -74,14 +75,51 @@ export const aiRouter = router({
     }),
 
   testSettings: protectedProcedure
-    .input(organizationInput)
+    .input(
+      organizationInput.extend({
+        provider: z.enum(AI_PROVIDERS).optional(),
+        model: z.string().min(1).max(160).optional(),
+        baseUrl: z.url().optional().or(z.literal("")),
+        apiKey: z.string().min(1).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       await ensureOrganizationAccess(
         ctx.session.user.id,
         input.organizationId,
         ["owner", "admin"],
       );
-      return testUpGalProvider(input.organizationId, ctx.scope);
+      return testUpGalProvider(input.organizationId, ctx.scope, {
+        provider: input.provider,
+        model: input.model,
+        baseUrl: input.baseUrl,
+        apiKey: input.apiKey,
+      });
+    }),
+
+  listModels: protectedProcedure
+    .input(
+      organizationInput.extend({
+        provider: z.enum(AI_PROVIDERS),
+        apiKey: z.string().min(1).optional(),
+        baseUrl: z.url().optional().or(z.literal("")),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureOrganizationAccess(
+        ctx.session.user.id,
+        input.organizationId,
+        ["owner", "admin"],
+      );
+      if (input.provider !== "openrouter") {
+        throw new Error(
+          "Dynamic model discovery is currently available for OpenRouter only.",
+        );
+      }
+      return listOpenRouterModels(input.organizationId, ctx.scope, {
+        apiKey: input.apiKey,
+        baseUrl: input.baseUrl,
+      });
     }),
 
   conversations: protectedProcedure
@@ -135,5 +173,4 @@ export const aiRouter = router({
         .listMessages(conversation.id);
       return { conversation, messages: messages.reverse() };
     }),
-
 });

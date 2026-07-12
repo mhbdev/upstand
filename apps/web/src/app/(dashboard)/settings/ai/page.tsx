@@ -1,14 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Bot,
-  Loader2,
-  Save,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { type AIProvider, isAIProvider } from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -23,8 +16,9 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@upstand/ui/components/native-select";
+import { Bot, Loader2, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { isAIProvider, type AIProvider } from "@upstand/domain";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -53,10 +47,21 @@ export default function AiSettingsPage() {
     ...trpc.ai.testSettings.mutationOptions(),
     onSuccess: () => toast.success("Provider connection works"),
   });
+  const listModels = useMutation({
+    ...trpc.ai.listModels.mutationOptions(),
+    onSuccess: (models) => {
+      setModels(models);
+      toast.success(`Loaded ${models.length} OpenRouter models`);
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const [provider, setProvider] = useState<AIProvider>("openai");
   const [model, setModel] = useState("gpt-5.4-mini");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [models, setModels] = useState<
+    Array<{ id: string; name: string; contextLength?: number }>
+  >([]);
 
   useEffect(() => {
     if (!settings.data) return;
@@ -65,6 +70,16 @@ export default function AiSettingsPage() {
     setModel(settings.data.model);
     setBaseUrl(settings.data.baseUrl || "");
   }, [settings.data]);
+
+  function loadOpenRouterModels() {
+    if (!organizationId) return;
+    listModels.mutate({
+      organizationId,
+      provider: "openrouter",
+      apiKey: apiKey || undefined,
+      baseUrl: baseUrl || undefined,
+    });
+  }
 
   function saveSettings() {
     if (!organizationId) return;
@@ -81,7 +96,7 @@ export default function AiSettingsPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <h1 className="flex items-center gap-2 font-semibold text-2xl">
           <Bot className="size-6" />
           UpGal AI
         </h1>
@@ -115,6 +130,9 @@ export default function AiSettingsPage() {
                 Anthropic
               </NativeSelectOption>
               <NativeSelectOption value="google">Google</NativeSelectOption>
+              <NativeSelectOption value="openrouter">
+                OpenRouter
+              </NativeSelectOption>
               <NativeSelectOption value="gateway">
                 OpenAI-compatible / Gateway
               </NativeSelectOption>
@@ -126,8 +144,38 @@ export default function AiSettingsPage() {
               id="model"
               value={model}
               onChange={(event) => setModel(event.target.value)}
-              placeholder="gpt-5.4-mini"
+              placeholder={
+                provider === "openrouter"
+                  ? "provider/model (or custom)"
+                  : "gpt-5.4-mini"
+              }
+              list={provider === "openrouter" ? "openrouter-models" : undefined}
             />
+            {provider === "openrouter" ? (
+              <>
+                <datalist id="openrouter-models">
+                  {models.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </datalist>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-muted-foreground text-xs">
+                    Load the current catalog or enter any custom model ID.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={loadOpenRouterModels}
+                    disabled={listModels.isPending}
+                  >
+                    {listModels.isPending ? "Loading…" : "Load models"}
+                  </Button>
+                </div>
+              </>
+            ) : null}
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="api-key">
@@ -164,7 +212,15 @@ export default function AiSettingsPage() {
               <>
                 <Button
                   variant="outline"
-                  onClick={() => testProvider.mutate({ organizationId })}
+                  onClick={() =>
+                    testProvider.mutate({
+                      organizationId,
+                      provider,
+                      model,
+                      baseUrl: baseUrl || undefined,
+                      apiKey: apiKey || undefined,
+                    })
+                  }
                   disabled={testProvider.isPending}
                 >
                   {testProvider.isPending ? "Testing…" : "Test connection"}
@@ -182,7 +238,7 @@ export default function AiSettingsPage() {
           </div>
         </CardContent>
       </Card>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-muted-foreground text-sm">
         <ShieldCheck className="size-4" />
         All UpGal mutations require an explicit approval in chat.
       </div>

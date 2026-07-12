@@ -1,45 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGateway } from "@ai-sdk/gateway";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { createGateway } from "@ai-sdk/gateway";
-import {
-  createAgentUIStreamResponse,
-  type FlexibleSchema,
-  generateText,
-  type InferUITools,
-  stepCountIs,
-  type Tool,
-  type ToolExecutionOptions,
-  ToolLoopAgent,
-  type UIMessage,
-} from "ai";
-import { z } from "zod";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import type { ServiceScope, TokenLike } from "@circulo-ai/di";
 import {
+  type AIProvider,
   type IAIRepository,
-  toJsonValue,
-  UnitOfWorkToken,
   type IUnitOfWork,
   type JsonValue,
+  toJsonValue,
+  UnitOfWorkToken,
 } from "@upstand/domain";
+import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { AIRepositoryToken } from "@upstand/repositories";
-import {
-  ControlResourceUseCaseToken,
-  CreateEnvironmentUseCaseToken,
-  CreateProjectUseCaseToken,
-  DeleteProjectUseCaseToken,
-  DeleteResourceUseCaseToken,
-  DeployResourceUseCaseToken,
-  GetDeploymentsUseCaseToken,
-  GetEnvironmentsUseCaseToken,
-  GetProjectsUseCaseToken,
-  GetResourceLogsUseCaseToken,
-  GetResourceStatsUseCaseToken,
-  GetResourcesUseCaseToken,
-  GetServersUseCaseToken,
-} from "../di";
 import type {
   ControlResourceUseCase,
   CreateEnvironmentUseCase,
@@ -55,6 +29,33 @@ import type {
   GetResourcesUseCase,
   GetServersUseCase,
 } from "@upstand/usecases";
+import {
+  createAgentUIStreamResponse,
+  type FlexibleSchema,
+  generateText,
+  type InferUITools,
+  stepCountIs,
+  type Tool,
+  type ToolExecutionOptions,
+  ToolLoopAgent,
+  type UIMessage,
+} from "ai";
+import { z } from "zod";
+import {
+  ControlResourceUseCaseToken,
+  CreateEnvironmentUseCaseToken,
+  CreateProjectUseCaseToken,
+  DeleteProjectUseCaseToken,
+  DeleteResourceUseCaseToken,
+  DeployResourceUseCaseToken,
+  GetDeploymentsUseCaseToken,
+  GetEnvironmentsUseCaseToken,
+  GetProjectsUseCaseToken,
+  GetResourceLogsUseCaseToken,
+  GetResourceStatsUseCaseToken,
+  GetResourcesUseCaseToken,
+  GetServersUseCaseToken,
+} from "../di";
 
 export type UpGalContext = {
   organizationId: string;
@@ -400,24 +401,39 @@ export async function executeUpGalReadTool(
   }
 }
 
-async function getProvider(organizationId: string, ai: IAIRepository) {
-  const config = await ai.findProviderConfig(organizationId);
+type ProviderOverrides = {
+  provider?: AIProvider;
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+};
+
+async function getProvider(
+  organizationId: string,
+  ai: IAIRepository,
+  overrides: ProviderOverrides = {},
+) {
+  const stored = await ai.findProviderConfig(organizationId);
+  const config = stored
+    ? {
+        ...stored,
+        provider: overrides.provider ?? stored.provider,
+        model: overrides.model ?? stored.model,
+        baseUrl: overrides.baseUrl || stored.baseUrl,
+      }
+    : overrides.provider && overrides.model
+      ? {
+          provider: overrides.provider,
+          model: overrides.model,
+          baseUrl: overrides.baseUrl || null,
+          enabled: true,
+        }
+      : null;
   if (!config || !config.enabled)
     throw new Error(
       "Configure an AI provider in Settings → AI before using UpGal.",
     );
-  const apiKey =
-    config.apiKeyCiphertext &&
-    config.apiKeyIv &&
-    config.apiKeyAuthTag &&
-    config.apiKeyVersion
-      ? decryptSecret({
-          ciphertext: config.apiKeyCiphertext,
-          iv: config.apiKeyIv,
-          authTag: config.apiKeyAuthTag,
-          keyVersion: config.apiKeyVersion,
-        })
-      : undefined;
+  const apiKey = overrides.apiKey?.trim() || decryptProviderApiKey(stored);
   if (!apiKey) throw new Error("The configured AI provider has no API key.");
 
   if (config.provider === "gateway") {
@@ -442,6 +458,19 @@ async function getProvider(organizationId: string, ai: IAIRepository) {
       })(config.model),
       modelId: config.model,
     };
+  if (config.provider === "openrouter")
+    return {
+      model: createOpenAI({
+        apiKey,
+        baseURL: config.baseUrl || "https://openrouter.ai/api/v1",
+        headers: {
+          "HTTP-Referer": "https://upstand.dev",
+          "X-Title": "Upstand",
+        },
+        name: "openrouter",
+      })(config.model),
+      modelId: config.model,
+    };
   return {
     model: createOpenAI({ apiKey, baseURL: config.baseUrl || undefined })(
       config.model,
@@ -450,13 +479,83 @@ async function getProvider(organizationId: string, ai: IAIRepository) {
   };
 }
 
+function decryptProviderApiKey(
+  config: Awaited<ReturnType<IAIRepository["findProviderConfig"]>>,
+) {
+  if (
+    !config?.apiKeyCiphertext ||
+    !config.apiKeyIv ||
+    !config.apiKeyAuthTag ||
+    !config.apiKeyVersion
+  ) {
+    return undefined;
+  }
+  return decryptSecret({
+    ciphertext: config.apiKeyCiphertext,
+    iv: config.apiKeyIv,
+    authTag: config.apiKeyAuthTag,
+    keyVersion: config.apiKeyVersion,
+  });
+}
+
+export async function listOpenRouterModels(
+  organizationId: string,
+  scope: ServiceScope,
+  input: { apiKey?: string; baseUrl?: string },
+) {
+  const repository = resolve(scope, AIRepositoryToken);
+  const config = await repository.findProviderConfig(organizationId);
+  const apiKey = input.apiKey?.trim() || decryptProviderApiKey(config);
+  if (!apiKey) throw new Error("Enter an OpenRouter API key first.");
+
+  const endpoint = new URL(
+    "models",
+    (input.baseUrl?.trim() || "https://openrouter.ai/api/v1").replace(
+      /\/$/,
+      "",
+    ) + "/",
+  );
+  const response = await fetch(endpoint, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "application/json",
+      "HTTP-Referer": "https://upstand.dev",
+      "X-Title": "Upstand",
+    },
+  });
+  if (!response.ok) {
+    const message = (await response.text()).slice(0, 500);
+    throw new Error(
+      `OpenRouter model request failed (${response.status}): ${message}`,
+    );
+  }
+  const payload = (await response.json()) as {
+    data?: Array<{ id?: string; name?: string; context_length?: number }>;
+  };
+  return (payload.data ?? [])
+    .filter(
+      (
+        model,
+      ): model is { id: string; name?: string; context_length?: number } =>
+        Boolean(model.id),
+    )
+    .map((model) => ({
+      id: model.id,
+      name: model.name || model.id,
+      contextLength: model.context_length,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function testUpGalProvider(
   organizationId: string,
   scope: ServiceScope,
+  overrides: ProviderOverrides = {},
 ) {
   const provider = await getProvider(
     organizationId,
     resolve(scope, AIRepositoryToken),
+    overrides,
   );
   const result = await generateText({
     model: provider.model,

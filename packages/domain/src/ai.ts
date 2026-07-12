@@ -3,6 +3,7 @@ export const AI_PROVIDERS = [
   "anthropic",
   "google",
   "gateway",
+  "openrouter",
 ] as const;
 export type AIProvider = (typeof AI_PROVIDERS)[number];
 

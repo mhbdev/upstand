@@ -40,8 +40,8 @@ import { Switch } from "@upstand/ui/components/switch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import { trpc } from "@/utils/trpc";
 import { getServerUrl } from "@/lib/server-url";
+import { trpc } from "@/utils/trpc";
 
 type ProviderType = "github" | "gitlab" | "bitbucket" | "gitea";
 
@@ -156,15 +156,14 @@ export default function GitProviders({
     if (!orgId || !session?.user?.id) return;
     const origin = window.location.origin;
     const isLocal =
-      getServerUrl().includes("localhost") || getServerUrl().includes("127.0.0.1");
+      getServerUrl().includes("localhost") ||
+      getServerUrl().includes("127.0.0.1");
 
     const manifestData: Record<string, any> = {
       redirect_url: `${getServerUrl()}/api/providers/github/setup?organizationId=${orgId}&userId=${session.user.id}`,
       name: `Upstand-${new Date().toISOString().split("T")[0]}-${randomString()}`,
       url: origin,
-      callback_urls: [
-        `${getServerUrl()}/api/providers/github/setup`,
-      ],
+      callback_urls: [`${getServerUrl()}/api/providers/github/setup`],
       public: false,
       request_oauth_on_install: true,
       default_permissions: {
@@ -249,6 +248,26 @@ export default function GitProviders({
       return `${config.giteaUrl}/login/oauth/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${providerId}`;
     }
     return "";
+  };
+
+  const getInstallationManagementUrl = (
+    provider: ProviderType,
+    config: Record<string, any>,
+  ) => {
+    if (provider === "github") {
+      // GitHub exposes the installation permissions page for both personal
+      // and organization installations at this URL.
+      return config.githubInstallationId
+        ? `https://github.com/settings/installations/${config.githubInstallationId}`
+        : config.githubAppName || "https://github.com/settings/installations";
+    }
+    if (provider === "gitlab") {
+      return `${String(config.gitlabUrl || "https://gitlab.com").replace(/\/$/, "")}/-/profile/applications`;
+    }
+    if (provider === "gitea") {
+      return `${String(config.giteaUrl || "").replace(/\/$/, "")}/user/settings/applications`;
+    }
+    return "https://bitbucket.org/account/settings/app-passwords/";
   };
 
   return (
@@ -369,16 +388,29 @@ export default function GitProviders({
                         </a>
                       )
                     ) : (
-                      <Badge
-                        variant="secondary"
-                        className="flex items-center gap-1 border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-green-600"
-                      >
-                        <HugeiconsIcon
-                          icon={CheckmarkCircle02Icon}
-                          className="size-3"
-                        />
-                        Active
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant="secondary"
+                          className="flex items-center gap-1 border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-green-600"
+                        >
+                          <HugeiconsIcon
+                            icon={CheckmarkCircle02Icon}
+                            className="size-3"
+                          />
+                          Active
+                        </Badge>
+                        <a
+                          href={getInstallationManagementUrl(
+                            provider.provider as ProviderType,
+                            config,
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-primary text-xs transition-colors hover:bg-primary/20"
+                        >
+                          Manage access
+                        </a>
+                      </div>
                     )}
                     <Button
                       variant="ghost"

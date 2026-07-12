@@ -24,6 +24,12 @@ Persistent Docker volumes hold Postgres and Redis. They are local volumes, so do
 
 If UpGal is enabled, provider credentials are encrypted with the configured application encryption key and stored in Postgres. Back up that key with the database and `.env`; changing or losing it without a migration plan makes existing AI provider credentials unusable. External MCP keys are hashed and can be revoked from **Settings → AI**.
 
+## Session and sign-in security
+
+Upstand uses Better Auth email/password sessions. In production, session cookies are `HttpOnly`, `Secure`, and `SameSite=Lax`, and are scoped only to the sibling dashboard/API domain required by the installation. The API validates the configured dashboard and API origins, and protected API procedures reject requests without a valid session or an explicitly scoped API key. Sessions expire after seven days and rotate after a day of activity; session records are persisted in Postgres and the active session cache is kept in Redis.
+
+Enable 2FA for every administrator from **Settings → Security & 2FA**. API keys do not create browser sessions and cannot access authentication, 2FA, terminal, or other session-only flows. Keep the Better Auth secret, Redis password, and database password private; rotate them only through the documented migration process because changing encryption material can make existing encrypted credentials unreadable.
+
 ## TLS and DNS
 
 Caddy obtains certificates only after DNS points at the manager and port 80 is reachable. If issuance fails:

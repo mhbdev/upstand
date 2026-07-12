@@ -6,6 +6,19 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.17 - 2026-07-13
+
+### Added
+
+- Added OpenRouter as an AI provider with server-side model catalog discovery and support for custom model IDs.
+- Added provider-specific “Manage access” links for GitHub, GitLab, Bitbucket, and Gitea installations or OAuth permissions.
+
+### Fixed
+
+- UpGal now sends chat requests to the API origin in self-hosted deployments instead of the dashboard origin, preventing an HTML 404 response from Next.js.
+- AI connection tests now validate the provider, model, endpoint, and optionally unsaved API key currently shown in the form.
+- Hardened Better Auth production cookies and enabled explicit session rotation and database persistence alongside Redis storage.
+
 ## 0.1.16 - 2026-07-13
 
 ### Fixed

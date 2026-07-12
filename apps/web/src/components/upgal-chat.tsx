@@ -1,5 +1,10 @@
 "use client";
 
+import { useChat } from "@ai-sdk/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import type { UpGalUIMessage } from "@upstand/api/ai/upgal";
+import { Button } from "@upstand/ui/components/button";
+import { Textarea } from "@upstand/ui/components/textarea";
 import {
   DefaultChatTransport,
   getToolName,
@@ -7,7 +12,6 @@ import {
   isToolUIPart,
   lastAssistantMessageIsCompleteWithApprovalResponses,
 } from "ai";
-import { useChat } from "@ai-sdk/react";
 import {
   Bot,
   Check,
@@ -18,11 +22,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button } from "@upstand/ui/components/button";
-import { Textarea } from "@upstand/ui/components/textarea";
-import { trpc } from "@/utils/trpc";
-import type { UpGalUIMessage } from "@upstand/api/ai/upgal";
 import {
   Conversation,
   ConversationContent,
@@ -41,6 +40,8 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import { getServerUrl } from "@/lib/server-url";
+import { trpc } from "@/utils/trpc";
 
 type UpGalChatProps = { organizationId?: string };
 
@@ -51,8 +52,7 @@ function Part({
   part: UpGalUIMessage["parts"][number];
   approve: (id: string, approved: boolean) => void;
 }) {
-  if (isTextUIPart(part))
-    return <MessageResponse>{part.text}</MessageResponse>;
+  if (isTextUIPart(part)) return <MessageResponse>{part.text}</MessageResponse>;
   if (isToolUIPart(part)) {
     const approval = part.approval;
     return (
@@ -73,7 +73,7 @@ function Part({
           <ToolInput input={part.input} />
           {approval && part.state === "approval-requested" ? (
             <div className="flex items-center gap-2 border-t p-3">
-              <span className="mr-auto text-xs text-muted-foreground">
+              <span className="mr-auto text-muted-foreground text-xs">
                 UpGal is waiting for your approval.
               </span>
               <Button
@@ -117,7 +117,10 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
   });
 
   const transport = new DefaultChatTransport<UpGalUIMessage>({
-    api: "/api/ai/chat",
+    // UpGal is served by the API origin in self-hosted deployments. Using a
+    // relative URL sends the request to the Next.js dashboard and returns its
+    // HTML 404 page instead of an AI stream.
+    api: `${getServerUrl()}/api/ai/chat`,
     credentials: "include",
     body: { organizationId },
   });
@@ -161,7 +164,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
       {!open ? (
         <Button
           aria-label="Open UpGal assistant"
-          className="fixed bottom-5 right-5 z-50 size-14 rounded-full shadow-lg"
+          className="fixed right-5 bottom-5 z-50 size-14 rounded-full shadow-lg"
           onClick={() => setOpen(true)}
         >
           <MessageCircle className="size-6" />
@@ -174,7 +177,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
             </div>
             <div className="mr-auto">
               <p className="font-semibold">UpGal</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Your Upstand operations assistant
               </p>
             </div>
@@ -220,13 +223,13 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
                 </Message>
               ))}
               {chat.status === "submitted" || chat.status === "streaming" ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs">
                   <Loader2 className="size-3 animate-spin" />
                   UpGal is working…
                 </div>
               ) : null}
               {chat.error ? (
-                <p className="text-sm text-destructive">{chat.error.message}</p>
+                <p className="text-destructive text-sm">{chat.error.message}</p>
               ) : null}
             </ConversationContent>
             <ConversationScrollButton />
