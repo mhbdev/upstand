@@ -225,7 +225,7 @@ export class DockerService {
     constraints?: string[],
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
-    await this.ensureNetwork();
+    const networkId = await this.ensureNetwork();
 
     let image = "";
     let targetPath = "";
@@ -336,7 +336,7 @@ export class DockerService {
         },
         Placement: constraints ? { Constraints: constraints } : undefined,
       },
-      Networks: [{ Target: this.networkName }],
+      Networks: [{ Target: networkId }],
       EndpointSpec: {
         Ports: ports.map((p) => ({
           Protocol: "tcp",
@@ -367,7 +367,7 @@ export class DockerService {
     constraints?: string[],
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
-    await this.ensureNetwork();
+    const networkId = await this.ensureNetwork();
 
     if (!resource.dockerImage) {
       throw new Error("No Docker image specified for application resource");
@@ -411,7 +411,7 @@ export class DockerService {
         },
         Placement: constraints ? { Constraints: constraints } : undefined,
       },
-      Networks: [{ Target: this.networkName }],
+      Networks: [{ Target: networkId }],
     };
 
     const endpointSpec = spec.EndpointSpec || {};
@@ -438,7 +438,7 @@ export class DockerService {
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     const imageName = `upstand-app-${resource.id}:latest`;
-    await this.ensureNetwork();
+    const networkId = await this.ensureNetwork();
 
     const buildDir = path.join(process.cwd(), ".builds");
     const clonePath = path.join(buildDir, resource.id);
@@ -518,6 +518,7 @@ export class DockerService {
       const envArray = Object.entries(envVars).map(
         ([key, value]) => `${key}=${value}`,
       );
+      const runtimeCommand = this.getRuntimeCommand(clonePath);
 
       const spec: Docker.CreateServiceOptions = {
         Name: serviceName,
@@ -525,13 +526,14 @@ export class DockerService {
           ContainerSpec: {
             Image: imageName,
             Env: envArray,
+            ...(runtimeCommand ? { Command: runtimeCommand } : {}),
           },
           RestartPolicy: {
             Condition: "any",
           },
           Placement: constraints ? { Constraints: constraints } : undefined,
         },
-        Networks: [{ Target: this.networkName }],
+        Networks: [{ Target: networkId }],
       };
 
       const endpointSpec = spec.EndpointSpec || {};
@@ -611,6 +613,22 @@ export class DockerService {
         );
         return;
     }
+  }
+
+  private getRuntimeCommand(clonePath: string): string[] | undefined {
+    try {
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(clonePath, "package.json"), "utf8"),
+      ) as { scripts?: { start?: string } };
+      // Docusaurus binds its development server to localhost by default. A
+      // Swarm service must listen on the task interface for Caddy to reach it.
+      if (packageJson.scripts?.start?.includes("docusaurus start")) {
+        return ["npm", "run", "start", "--", "--host", "0.0.0.0"];
+      }
+    } catch {
+      // A repository without package metadata keeps the image's native CMD.
+    }
+    return undefined;
   }
 
   private async buildDockerfileImage(
