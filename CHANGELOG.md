@@ -6,6 +6,23 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.4 - 2026-07-12
+
+### Added
+
+- AI assistant infrastructure, persisted conversations, and the dashboard assistant surface.
+- Settings navigation and workspace support for the new assistant capabilities.
+- Database migration and API wiring for AI conversations and provider configuration.
+
+### Fixed
+
+- Kept dependency metadata and the Bun lockfile in sync for frozen production installs.
+- Improved resource and environment navigation while preserving existing deployment flows.
+
+### Changed
+
+- Updated server and web dependencies used by the assistant and settings experience.
+
 ## 0.1.0 - 2026-07-12
 
 ### Added

@@ -120,6 +120,13 @@
       "when": 1783880000000,
       "tag": "0016_resource_advanced_config",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1783885071574,
+      "tag": "0017_public_mastermind",
+      "breakpoints": true
     }
   ]
 }

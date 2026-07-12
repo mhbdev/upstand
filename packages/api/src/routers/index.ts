@@ -3,6 +3,7 @@ import { CreateUserUseCaseToken } from "../di";
 import { handleUseCaseError } from "../errors";
 import { protectedProcedure, publicProcedure, router } from "../index";
 import { authRouter } from "./auth.router";
+import { aiRouter } from "./ai.router";
 import { backupRouter } from "./backup.router";
 import { deploymentRouter } from "./deployment.router";
 import { dockerRegistryRouter } from "./docker-registry.router";
@@ -53,6 +54,7 @@ export const appRouter = router({
   server: serverRouter,
   notification: notificationRouter,
   backup: backupRouter,
+  ai: aiRouter,
 });
 
 export type AppRouter = typeof appRouter;

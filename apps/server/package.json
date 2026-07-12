@@ -11,9 +11,13 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.12",
+    "@ai-sdk/gateway": "^4.0.16",
+    "@ai-sdk/google": "^4.0.12",
+    "@ai-sdk/openai": "^4.0.11",
+    "@circulo-ai/di": "catalog:",
     "@hono/trpc-server": "^0.4.2",
     "@trpc/server": "catalog:",
-    "@circulo-ai/di": "catalog:",
     "@upstand/api": "workspace:*",
     "@upstand/auth": "workspace:*",
     "@upstand/db": "workspace:*",
@@ -21,6 +25,7 @@
     "@upstand/env": "workspace:*",
     "@upstand/redis": "workspace:*",
     "@upstand/usecases": "workspace:*",
+    "ai": "^7.0.22",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",

@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./ai";
 export * from "./backup";
 export * from "./deployment";
 export * from "./docker-registry";

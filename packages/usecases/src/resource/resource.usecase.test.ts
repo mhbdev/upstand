@@ -164,6 +164,8 @@ describe("Resource Usecases", () => {
       name: "redis-db",
       type: "database",
       appName: "redis-db",
+      dbType: "redis",
+      dockerImage: "redis:7-alpine",
     });
     expect(res.name).toBe("redis-db");
     expect(res.type).toBe("database");
@@ -290,6 +292,8 @@ describe("Resource Usecases", () => {
       name: "my-db",
       type: "database",
       appName: "my-db",
+      dbType: "postgres",
+      dockerImage: "postgres:16-alpine",
     });
 
     const stopped = await controlUseCase.execute({

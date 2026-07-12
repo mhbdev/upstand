@@ -45,6 +45,7 @@ import { OrganizationSwitcher } from "@/components/auth/organization/organizatio
 import { UserButton } from "@/components/auth/user/user-button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { SettingsDialog } from "@/components/settings-dialog";
+import { UpGalChat } from "@/components/upgal-chat";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -60,6 +61,7 @@ const NAV_ITEMS = [
   { title: "Remote Servers", href: "/remote-servers", icon: CloudServerIcon },
   { title: "Web Server", href: "/web-server", icon: Certificate01Icon },
   { title: "Docker Swarm", href: "/docker-swarm", icon: Layers01Icon },
+  { title: "AI Settings", href: "/settings/ai", icon: Certificate01Icon },
 ];
 
 export default function DashboardLayout({
@@ -205,6 +207,7 @@ export default function DashboardLayout({
         onOpenChange={setCreateOrgOpen}
       />
       <SettingsDialog />
+      <UpGalChat organizationId={activeOrg?.id} />
     </SidebarProvider>
   );
 }

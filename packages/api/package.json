@@ -14,6 +14,10 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.12",
+    "@ai-sdk/gateway": "^4.0.16",
+    "@ai-sdk/google": "^4.0.12",
+    "@ai-sdk/openai": "^4.0.11",
     "@circulo-ai/di": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
@@ -24,6 +28,7 @@
     "@upstand/redis": "workspace:*",
     "@upstand/repositories": "workspace:*",
     "@upstand/usecases": "workspace:*",
+    "ai": "^7.0.22",
     "bullmq": "^5.79.3",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",

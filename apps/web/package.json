@@ -10,6 +10,10 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.12",
+    "@ai-sdk/google": "^4.0.12",
+    "@ai-sdk/openai": "^4.0.11",
+    "@ai-sdk/react": "^4.0.23",
     "@base-ui/react": "^1.6.0",
     "@better-auth-ui/core": "catalog:",
     "@better-auth-ui/react": "catalog:",
