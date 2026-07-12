@@ -1,4 +1,9 @@
-export const AI_PROVIDERS = ["openai", "anthropic", "google", "gateway"] as const;
+export const AI_PROVIDERS = [
+  "openai",
+  "anthropic",
+  "google",
+  "gateway",
+] as const;
 export type AIProvider = (typeof AI_PROVIDERS)[number];
 
 export function isAIProvider(value: string): value is AIProvider {
@@ -94,19 +99,41 @@ export type CreateAIRun = {
 };
 
 export interface IAIRepository {
-  findProviderConfig(organizationId: string): Promise<AIProviderConfigRecord | null>;
+  findProviderConfig(
+    organizationId: string,
+  ): Promise<AIProviderConfigRecord | null>;
   saveProviderConfig(input: SaveAIProviderConfig): Promise<void>;
   deleteProviderConfig(organizationId: string): Promise<void>;
-  createConversation(input: CreateAIConversation): Promise<AIConversationRecord>;
-  findConversation(conversationId: string, organizationId: string, userId: string): Promise<AIConversationRecord | null>;
-  listConversations(organizationId: string, userId: string): Promise<AIConversationRecord[]>;
+  createConversation(
+    input: CreateAIConversation,
+  ): Promise<AIConversationRecord>;
+  findConversation(
+    conversationId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<AIConversationRecord | null>;
+  listConversations(
+    organizationId: string,
+    userId: string,
+  ): Promise<AIConversationRecord[]>;
   listMessages(conversationId: string): Promise<AIMessageRecord[]>;
-  saveMessages(conversationId: string, messages: readonly AIMessageRecord[]): Promise<void>;
+  saveMessages(
+    conversationId: string,
+    messages: readonly AIMessageRecord[],
+  ): Promise<void>;
   createRun(input: CreateAIRun): Promise<void>;
-  updateRun(runId: string, patch: { stepCount?: number; status?: string; finishedAt?: Date }): Promise<void>;
-  listExternalApiKeys(organizationId: string): Promise<AIExternalApiKeyRecord[]>;
+  updateRun(
+    runId: string,
+    patch: { stepCount?: number; status?: string; finishedAt?: Date },
+  ): Promise<void>;
+  listExternalApiKeys(
+    organizationId: string,
+  ): Promise<AIExternalApiKeyRecord[]>;
   createExternalApiKey(input: CreateAIExternalApiKey): Promise<void>;
   revokeExternalApiKey(organizationId: string, id: string): Promise<void>;
-  findActiveExternalApiKey(secretHash: string, now: Date): Promise<AIExternalApiKeyRecord | null>;
+  findActiveExternalApiKey(
+    secretHash: string,
+    now: Date,
+  ): Promise<AIExternalApiKeyRecord | null>;
   markExternalApiKeyUsed(id: string, usedAt: Date): Promise<void>;
 }

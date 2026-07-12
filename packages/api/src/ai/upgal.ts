@@ -81,19 +81,58 @@ export const UPGAL_TOOL_METADATA = [
 ] as const;
 
 export type UpGalTools = {
-  list_projects: UpGalExecutableTool<z.infer<typeof emptySchema>, Awaited<ReturnType<GetProjectsUseCase["execute"]>>>;
-  list_environments: UpGalExecutableTool<z.infer<typeof projectIdSchema>, Awaited<ReturnType<GetEnvironmentsUseCase["execute"]>>>;
-  list_resources: UpGalExecutableTool<z.infer<typeof environmentIdSchema>, Awaited<ReturnType<GetResourcesUseCase["execute"]>>>;
-  get_resource_logs: UpGalExecutableTool<z.infer<typeof resourceLogsSchema>, Awaited<ReturnType<GetResourceLogsUseCase["execute"]>>>;
-  get_resource_stats: UpGalExecutableTool<z.infer<typeof idSchema>, Awaited<ReturnType<GetResourceStatsUseCase["execute"]>>>;
-  list_servers: UpGalExecutableTool<z.infer<typeof emptySchema>, Awaited<ReturnType<GetServersUseCase["execute"]>>>;
-  list_deployments: UpGalExecutableTool<Record<string, never>, Awaited<ReturnType<GetDeploymentsUseCase["execute"]>>>;
-  create_project: UpGalExecutableTool<z.infer<typeof createProjectSchema>, Awaited<ReturnType<CreateProjectUseCase["execute"]>>>;
-  create_environment: UpGalExecutableTool<z.infer<typeof createEnvironmentSchema>, Awaited<ReturnType<CreateEnvironmentUseCase["execute"]>>>;
-  deploy_resource: UpGalExecutableTool<z.infer<typeof idSchema>, Awaited<ReturnType<DeployResourceUseCase["execute"]>>>;
-  control_resource: UpGalExecutableTool<z.infer<typeof controlResourceSchema>, Awaited<ReturnType<ControlResourceUseCase["execute"]>>>;
-  delete_resource: UpGalExecutableTool<z.infer<typeof idSchema>, Awaited<ReturnType<DeleteResourceUseCase["execute"]>>>;
-  delete_project: UpGalExecutableTool<z.infer<typeof idSchema>, Awaited<ReturnType<DeleteProjectUseCase["execute"]>>>;
+  list_projects: UpGalExecutableTool<
+    z.infer<typeof emptySchema>,
+    Awaited<ReturnType<GetProjectsUseCase["execute"]>>
+  >;
+  list_environments: UpGalExecutableTool<
+    z.infer<typeof projectIdSchema>,
+    Awaited<ReturnType<GetEnvironmentsUseCase["execute"]>>
+  >;
+  list_resources: UpGalExecutableTool<
+    z.infer<typeof environmentIdSchema>,
+    Awaited<ReturnType<GetResourcesUseCase["execute"]>>
+  >;
+  get_resource_logs: UpGalExecutableTool<
+    z.infer<typeof resourceLogsSchema>,
+    Awaited<ReturnType<GetResourceLogsUseCase["execute"]>>
+  >;
+  get_resource_stats: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    Awaited<ReturnType<GetResourceStatsUseCase["execute"]>>
+  >;
+  list_servers: UpGalExecutableTool<
+    z.infer<typeof emptySchema>,
+    Awaited<ReturnType<GetServersUseCase["execute"]>>
+  >;
+  list_deployments: UpGalExecutableTool<
+    Record<string, never>,
+    Awaited<ReturnType<GetDeploymentsUseCase["execute"]>>
+  >;
+  create_project: UpGalExecutableTool<
+    z.infer<typeof createProjectSchema>,
+    Awaited<ReturnType<CreateProjectUseCase["execute"]>>
+  >;
+  create_environment: UpGalExecutableTool<
+    z.infer<typeof createEnvironmentSchema>,
+    Awaited<ReturnType<CreateEnvironmentUseCase["execute"]>>
+  >;
+  deploy_resource: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    Awaited<ReturnType<DeployResourceUseCase["execute"]>>
+  >;
+  control_resource: UpGalExecutableTool<
+    z.infer<typeof controlResourceSchema>,
+    Awaited<ReturnType<ControlResourceUseCase["execute"]>>
+  >;
+  delete_resource: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    Awaited<ReturnType<DeleteResourceUseCase["execute"]>>
+  >;
+  delete_project: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    Awaited<ReturnType<DeleteProjectUseCase["execute"]>>
+  >;
 };
 export type UpGalUIMessage = UIMessage<never, never, InferUITools<UpGalTools>>;
 export type UpGalToolName = keyof UpGalTools & string;
@@ -329,15 +368,24 @@ export async function executeUpGalReadTool(
       return toJsonValue(await tools.list_projects.execute({}, options));
     case "list_environments":
       return toJsonValue(
-        await tools.list_environments.execute(projectIdSchema.parse(input), options),
+        await tools.list_environments.execute(
+          projectIdSchema.parse(input),
+          options,
+        ),
       );
     case "list_resources":
       return toJsonValue(
-        await tools.list_resources.execute(environmentIdSchema.parse(input), options),
+        await tools.list_resources.execute(
+          environmentIdSchema.parse(input),
+          options,
+        ),
       );
     case "get_resource_logs":
       return toJsonValue(
-        await tools.get_resource_logs.execute(resourceLogsSchema.parse(input), options),
+        await tools.get_resource_logs.execute(
+          resourceLogsSchema.parse(input),
+          options,
+        ),
       );
     case "get_resource_stats":
       return toJsonValue(
@@ -444,7 +492,10 @@ export async function createUpGalResponse(
       await ai.updateRun(runId, { stepCount: stepNumber + 1 });
     },
     onFinish: async () => {
-      await ai.updateRun(runId, { status: "completed", finishedAt: new Date() });
+      await ai.updateRun(runId, {
+        status: "completed",
+        finishedAt: new Date(),
+      });
     },
   });
 

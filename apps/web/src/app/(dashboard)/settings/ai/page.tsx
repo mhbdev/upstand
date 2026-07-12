@@ -78,7 +78,8 @@ export default function AiSettingsPage() {
 
   useEffect(() => {
     if (!settings.data) return;
-    if (isAIProvider(settings.data.provider)) setProvider(settings.data.provider);
+    if (isAIProvider(settings.data.provider))
+      setProvider(settings.data.provider);
     setModel(settings.data.model);
     setBaseUrl(settings.data.baseUrl || "");
   }, [settings.data]);
@@ -123,7 +124,7 @@ export default function AiSettingsPage() {
               value={provider}
               onChange={(event) => {
                 if (isAIProvider(event.target.value)) {
-                  setProvider(event.target.value)
+                  setProvider(event.target.value);
                 }
               }}
             >

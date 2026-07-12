@@ -333,7 +333,10 @@ export const services = new ServiceCollection();
 
 // 1. Database Infrastructure
 services.addSingleton(DbToken, () => db);
-services.addScoped(AIRepositoryToken, (c) => new DrizzleAIRepository(c.resolve(DbToken)));
+services.addScoped(
+  AIRepositoryToken,
+  (c) => new DrizzleAIRepository(c.resolve(DbToken)),
+);
 services.addSingleton(CaddyServiceToken, () => new CaddyService());
 services.addSingleton(DockerServiceToken, () => new DockerService());
 services.addSingleton(

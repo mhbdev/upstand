@@ -198,7 +198,10 @@ export class DrizzleAIRepository implements IAIRepository {
     await this.executor.insert(externalApiKey).values(input);
   }
 
-  async revokeExternalApiKey(organizationId: string, id: string): Promise<void> {
+  async revokeExternalApiKey(
+    organizationId: string,
+    id: string,
+  ): Promise<void> {
     await this.executor
       .update(externalApiKey)
       .set({ revokedAt: new Date() })

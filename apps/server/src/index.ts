@@ -289,7 +289,8 @@ app.post("/api/ai/chat", async (c) => {
       messages: z.unknown(),
     })
     .safeParse(await c.req.json().catch(() => null));
-  if (!bodyResult.success) return c.json({ error: "Invalid UpGal request" }, 400);
+  if (!bodyResult.success)
+    return c.json({ error: "Invalid UpGal request" }, 400);
   const body = bodyResult.data;
   await ensureOrganizationAccess(session.user.id, body.organizationId);
   const conversationId = body.conversationId || randomUUID();
@@ -335,7 +336,9 @@ app.post("/api/ai/chat", async (c) => {
 
 app.all("/api/mcp", async (c) => {
   const authorization = c.req.header("authorization") || "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const token = authorization.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : "";
   const key = await authenticateExternalKey(token, c.get("scope"));
   if (!key) return c.json({ error: "Invalid or expired API key" }, 401);
   const bodyResult = z
@@ -356,8 +359,31 @@ app.all("/api/mcp", async (c) => {
     );
   const body = bodyResult.data;
   const id = body.id ?? null;
-  if (body.method === "initialize") return c.json({ jsonrpc: "2.0", id, result: { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "upstand-upgal", version: "1.0.0" } } });
-  if (body.method === "tools/list") return c.json({ jsonrpc: "2.0", id, result: { tools: UPGAL_TOOL_METADATA.filter(([name]) => key.scopes.includes("*") || key.scopes.includes(`tool:${name}`)).map(([name, description, mutation]) => ({ name, description, annotations: { destructiveHint: mutation, readOnlyHint: !mutation } })) } });
+  if (body.method === "initialize")
+    return c.json({
+      jsonrpc: "2.0",
+      id,
+      result: {
+        protocolVersion: "2025-03-26",
+        capabilities: { tools: {} },
+        serverInfo: { name: "upstand-upgal", version: "1.0.0" },
+      },
+    });
+  if (body.method === "tools/list")
+    return c.json({
+      jsonrpc: "2.0",
+      id,
+      result: {
+        tools: UPGAL_TOOL_METADATA.filter(
+          ([name]) =>
+            key.scopes.includes("*") || key.scopes.includes(`tool:${name}`),
+        ).map(([name, description, mutation]) => ({
+          name,
+          description,
+          annotations: { destructiveHint: mutation, readOnlyHint: !mutation },
+        })),
+      },
+    });
   if (body.method === "tools/call") {
     const name = body.params?.name;
     const args = body.params?.arguments ?? {};
@@ -373,7 +399,9 @@ app.all("/api/mcp", async (c) => {
         },
         400,
       );
-    const metadata = UPGAL_TOOL_METADATA.find(([toolName]) => toolName === name);
+    const metadata = UPGAL_TOOL_METADATA.find(
+      ([toolName]) => toolName === name,
+    );
     if (
       !metadata ||
       !isUpGalToolName(name) ||
@@ -387,7 +415,20 @@ app.all("/api/mcp", async (c) => {
           message: "Tool is not available for this API key",
         },
       });
-    if (metadata[2]) return c.json({ jsonrpc: "2.0", id, result: { isError: true, content: [{ type: "text", text: "Mutating MCP tools must be approved through the UpGal dashboard." }] } });
+    if (metadata[2])
+      return c.json({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: "Mutating MCP tools must be approved through the UpGal dashboard.",
+            },
+          ],
+        },
+      });
     const result = await executeUpGalReadTool(name, args, {
       organizationId: key.organizationId,
       userId: key.createdBy,
@@ -395,9 +436,20 @@ app.all("/api/mcp", async (c) => {
       runId: randomUUID(),
       scope: c.get("scope"),
     });
-    return c.json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(result) }] } });
+    return c.json({
+      jsonrpc: "2.0",
+      id,
+      result: { content: [{ type: "text", text: JSON.stringify(result) }] },
+    });
   }
-  return c.json({ jsonrpc: "2.0", id, error: { code: -32601, message: "Method not found" } }, 404);
+  return c.json(
+    {
+      jsonrpc: "2.0",
+      id,
+      error: { code: -32601, message: "Method not found" },
+    },
+    404,
+  );
 });
 
 app.get("/api/providers/github/setup", async (c) => {
