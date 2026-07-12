@@ -6,6 +6,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.14 - 2026-07-13
+
+### Fixed
+
+- Fixed the notification event option type after removing the unused platform-backup event.
+- Parallelized stable and canary Docker image publishing with independent Buildx caches to reduce release wall-clock time.
+
 ## 0.1.13 - 2026-07-13
 
 ### Added

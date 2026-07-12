@@ -52,6 +52,24 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: server
+            file: apps/server/Dockerfile
+            scope: upstand-server
+            build_args: ""
+          - name: web
+            file: apps/web/Dockerfile
+            scope: upstand-web
+            build_args: |
+              NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
+              NEXT_PUBLIC_UPSTAND_VERSION=${{ github.ref_name }}
+          - name: fumadocs
+            file: apps/fumadocs/Dockerfile
+            scope: upstand-fumadocs
+            build_args: ""
     permissions:
       contents: read
       packages: write
@@ -84,41 +102,15 @@ jobs:
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "repo=$REPO_LOWER" >> $GITHUB_OUTPUT
 
-      - name: Build and Push Server
+      - name: Build and Push ${{ matrix.name }}
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/server/Dockerfile
+          file: ${{ matrix.file }}
           push: true
           tags: |
-            ghcr.io/${{ steps.meta.outputs.repo }}-server:latest
-            ghcr.io/${{ steps.meta.outputs.repo }}-server:${{ steps.meta.outputs.tag }}
-          cache-from: type=gha,scope=upstand-server
-          cache-to: type=gha,scope=upstand-server,mode=max
-
-      - name: Build and Push Web
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ steps.meta.outputs.repo }}-web:latest
-            ghcr.io/${{ steps.meta.outputs.repo }}-web:${{ steps.meta.outputs.tag }}
-          build-args: |
-            NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
-            NEXT_PUBLIC_UPSTAND_VERSION=${{ steps.meta.outputs.tag }}
-          cache-from: type=gha,scope=upstand-web
-          cache-to: type=gha,scope=upstand-web,mode=max
-
-      - name: Build and Push Fumadocs
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/fumadocs/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ steps.meta.outputs.repo }}-fumadocs:latest
-            ghcr.io/${{ steps.meta.outputs.repo }}-fumadocs:${{ steps.meta.outputs.tag }}
-          cache-from: type=gha,scope=upstand-fumadocs
-          cache-to: type=gha,scope=upstand-fumadocs,mode=max
+            ghcr.io/${{ steps.meta.outputs.repo }}-${{ matrix.name }}:latest
+            ghcr.io/${{ steps.meta.outputs.repo }}-${{ matrix.name }}:${{ steps.meta.outputs.tag }}
+          build-args: ${{ matrix.build_args }}
+          cache-from: type=gha,scope=${{ matrix.scope }}
+          cache-to: type=gha,scope=${{ matrix.scope }},mode=max

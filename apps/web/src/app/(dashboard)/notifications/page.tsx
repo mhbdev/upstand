@@ -375,10 +375,6 @@ const EVENT_OPTIONS: Array<{
     description: "When a database backup completes.",
   },
   {
-    label: "Upstand backup",
-    description: "When a platform backup completes.",
-  },
-  {
     value: "volume_backup_completed",
     label: "Volume backup",
     description: "When a volume backup completes.",
