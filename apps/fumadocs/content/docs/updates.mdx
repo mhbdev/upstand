@@ -19,6 +19,12 @@ Never promote a mutable `latest` or `canary` tag directly into a production stac
 
 The in-dashboard update button is intended for published release images. Source-built installations should be updated by rerunning the GitHub source installer; they do not have a remotely pullable immutable release image to switch to.
 
+## Automatic updates
+
+Automatic updates are opt-in. Add `UPSTAND_AUTO_UPDATE=true` to `/etc/upstand/.env` and rerun the installer. The server checks GitHub every 30 minutes, applies only a published release matching the installed channel, and uses Docker Swarm's rolling update and rollback policy. Source installations are never updated automatically. Leave the variable unset (or set it to `false`) when you want approval through the dashboard only.
+
+Both **Web Server → Check for updates** and **Settings → Check for Updates** read the same status. They show the installed version, channel, release availability, and whether that installation can be updated.
+
 ## Rollback
 
 Keep the previous image digests. Restore them in `/etc/upstand/.env`, rerun the installer, and verify readiness. Do not rotate `BETTER_AUTH_SECRET`, database credentials, Redis credentials, or `SSH_KEY_ENCRYPTION_KEY_V1` during a normal image rollback.

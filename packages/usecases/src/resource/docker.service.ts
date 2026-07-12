@@ -6,6 +6,7 @@ import {
   type ApplicationBuildConfig,
   ConflictError,
   parseApplicationBuildConfig,
+  parseResourceAdvancedConfig,
   type Resource,
 } from "@upstand/domain";
 import type Docker from "dockerode";
@@ -72,6 +73,117 @@ export class DockerService {
     process.env.DOCKER_NETWORK || "upstand-network";
 
   constructor() {}
+
+  private applyAdvancedConfig(
+    resource: Resource,
+    containerSpec: Record<string, unknown>,
+    taskTemplate: Record<string, unknown>,
+    endpointSpec: Record<string, unknown>,
+    baseConstraints: string[] = [],
+  ): void {
+    const config = parseResourceAdvancedConfig(resource.advancedConfig);
+    if (config.command.length) containerSpec.Command = config.command;
+    if (config.args.length) containerSpec.Args = config.args;
+    if (config.environment && Object.keys(config.environment).length) {
+      const currentEnv = Array.isArray(containerSpec.Env)
+        ? containerSpec.Env.filter((value): value is string => typeof value === "string")
+        : [];
+      const overrides = new Map(
+        currentEnv.map((value) => {
+          const split = value.indexOf("=");
+          return [split === -1 ? value : value.slice(0, split), value] as const;
+        }),
+      );
+      for (const [key, value] of Object.entries(config.environment)) {
+        overrides.set(key, `${key}=${value}`);
+      }
+      containerSpec.Env = [...overrides.values()];
+    }
+    if (config.labels && Object.keys(config.labels).length) {
+      containerSpec.Labels = config.labels;
+    }
+    if (config.volumes.length) {
+      const existingMounts = Array.isArray(containerSpec.Mounts)
+        ? containerSpec.Mounts
+        : [];
+      containerSpec.Mounts = [
+        ...existingMounts,
+        ...config.volumes.map((volume) => ({
+          Type: "volume",
+          Source: volume.source,
+          Target: volume.target,
+          ReadOnly: volume.readOnly,
+        })),
+      ];
+    }
+    if (config.healthcheck) {
+      containerSpec.Healthcheck = {
+        Test: ["CMD-SHELL", config.healthcheck.command.join(" ")],
+        Interval: config.healthcheck.intervalSeconds * 1_000_000_000,
+        Timeout: config.healthcheck.timeoutSeconds * 1_000_000_000,
+        Retries: config.healthcheck.retries,
+        StartPeriod: config.healthcheck.startPeriodSeconds * 1_000_000_000,
+      };
+    }
+    containerSpec.Init = config.init;
+    containerSpec.ReadOnly = config.readOnlyRootFilesystem;
+    containerSpec.TTY = config.tty;
+    containerSpec.Privileges = config.privileged ? {} : undefined;
+
+    const resources = config.resources;
+    if (resources.cpuLimit || resources.memoryLimitMb) {
+      taskTemplate.Resources = {
+        ...(taskTemplate.Resources as Record<string, unknown> | undefined),
+        Limits: {
+          ...(resources.cpuLimit
+            ? { NanoCPUs: Math.round(resources.cpuLimit * 1_000_000_000) }
+            : {}),
+          ...(resources.memoryLimitMb
+            ? { MemoryBytes: resources.memoryLimitMb * 1024 * 1024 }
+            : {}),
+        },
+      };
+    }
+    if (resources.cpuReservation || resources.memoryReservationMb) {
+      taskTemplate.Resources = {
+        ...(taskTemplate.Resources as Record<string, unknown> | undefined),
+        Reservations: {
+          ...(resources.cpuReservation
+            ? { NanoCPUs: Math.round(resources.cpuReservation * 1_000_000_000) }
+            : {}),
+          ...(resources.memoryReservationMb
+            ? { MemoryBytes: resources.memoryReservationMb * 1024 * 1024 }
+            : {}),
+        },
+      };
+    }
+
+    const restart = config.restartPolicy;
+    taskTemplate.RestartPolicy = {
+      Condition: restart.condition,
+      ...(restart.maxAttempts ? { MaxAttempts: restart.maxAttempts } : {}),
+      ...(restart.delaySeconds ? { Delay: restart.delaySeconds * 1_000_000_000 } : {}),
+      ...(restart.windowSeconds ? { Window: restart.windowSeconds * 1_000_000_000 } : {}),
+    };
+    const constraints = [...baseConstraints, ...config.placementConstraints];
+    if (constraints.length) {
+      taskTemplate.Placement = {
+        ...(taskTemplate.Placement as Record<string, unknown> | undefined),
+        Constraints: [...new Set(constraints)],
+      };
+    }
+    if (config.ports.length) {
+      endpointSpec.Ports = [
+        ...(Array.isArray(endpointSpec.Ports) ? endpointSpec.Ports : []),
+        ...config.ports.map((port) => ({
+          Protocol: port.protocol,
+          PublishedPort: port.publishedPort,
+          TargetPort: port.targetPort,
+          PublishMode: "ingress",
+        })),
+      ];
+    }
+  }
 
   public sanitizeName(name: string): string {
     return name
@@ -229,6 +341,14 @@ export class DockerService {
       },
     };
 
+    this.applyAdvancedConfig(
+      resource,
+      containerSpec,
+      spec.TaskTemplate as Record<string, unknown>,
+      spec.EndpointSpec as Record<string, unknown>,
+      constraints,
+    );
+
     await this.upsertService(serviceName, spec);
   }
 
@@ -285,6 +405,14 @@ export class DockerService {
       },
       Networks: [{ Target: this.networkName }],
     };
+
+    this.applyAdvancedConfig(
+      resource,
+      spec.TaskTemplate?.ContainerSpec as Record<string, unknown>,
+      spec.TaskTemplate as Record<string, unknown>,
+      (spec.EndpointSpec ??= {}) as Record<string, unknown>,
+      constraints,
+    );
 
     await this.upsertService(serviceName, spec);
   }
@@ -394,6 +522,14 @@ export class DockerService {
         },
         Networks: [{ Target: this.networkName }],
       };
+
+      this.applyAdvancedConfig(
+        resource,
+        spec.TaskTemplate?.ContainerSpec as Record<string, unknown>,
+        spec.TaskTemplate as Record<string, unknown>,
+        (spec.EndpointSpec ??= {}) as Record<string, unknown>,
+        constraints,
+      );
 
       await this.upsertService(serviceName, spec);
     } finally {

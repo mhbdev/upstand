@@ -18,6 +18,11 @@ export class TriggerUpdateUseCase {
 
   async execute(input: TriggerUpdateInput): Promise<{ success: boolean }> {
     const version = input.version;
+    if (!/^v?\d+\.\d+\.\d+(?:[-+].*)?$/.test(version) && version !== "canary") {
+      throw new Error(
+        "Updates must target a published semantic release or canary channel",
+      );
+    }
     log.info({ message: `Triggering self-update to version ${version}...` });
 
     try {
@@ -39,14 +44,22 @@ export class TriggerUpdateUseCase {
 
           if (!currentImage) continue;
 
+          if (currentImage.includes(":source-")) {
+            throw new Error(
+              "This installation was built from source. Run the GitHub installer to update it, or reinstall from a published release image.",
+            );
+          }
+
           let baseImage = currentImage;
           if (baseImage.includes("@sha256:")) {
             baseImage = baseImage.split("@sha256:")[0];
           }
-          if (baseImage.includes(":")) {
-            const parts = baseImage.split(":");
-            parts.pop();
-            baseImage = parts.join(":");
+          const digestSeparator = baseImage.lastIndexOf("@");
+          if (digestSeparator >= 0)
+            baseImage = baseImage.slice(0, digestSeparator);
+          const tagSeparator = baseImage.lastIndexOf(":");
+          if (tagSeparator > baseImage.lastIndexOf("/")) {
+            baseImage = baseImage.slice(0, tagSeparator);
           }
 
           const newImage = `${baseImage}:${version}`;
@@ -63,7 +76,12 @@ export class TriggerUpdateUseCase {
                 ...inspect.Spec.TaskTemplate.ContainerSpec,
                 Image: newImage,
               },
+              ForceUpdate: (inspect.Spec.TaskTemplate.ForceUpdate || 0) + 1,
             },
+            UpdateConfig: inspect.Spec.UpdateConfig,
+            RollbackConfig: inspect.Spec.RollbackConfig,
+            Networks: inspect.Spec.Networks,
+            EndpointSpec: inspect.Spec.EndpointSpec,
           });
           updatedCount++;
         }

@@ -1,10 +1,13 @@
 import type { ServiceScope } from "@circulo-ai/di";
 import { trpcServer } from "@hono/trpc-server";
 import { createContext } from "@upstand/api/context";
+import { ensureOrganizationAccess } from "@upstand/api/access-control";
 import {
   BackupSchedulerToken,
   CreateGitProviderUseCaseToken,
   GetWebServerSettingsUseCaseToken,
+  GetUpdateStatusUseCaseToken,
+  TriggerUpdateUseCaseToken,
   serviceProvider,
 } from "@upstand/api/di";
 import { appRouter } from "@upstand/api/routers/index";
@@ -12,6 +15,7 @@ import { auth } from "@upstand/auth";
 import { db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
 import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
+import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { env } from "@upstand/env/server";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";
 import {
@@ -28,9 +32,11 @@ import {
 } from "evlog/better-auth";
 import { type EvlogVariables, evlog } from "evlog/hono";
 import { Hono } from "hono";
+import { upgradeWebSocket, websocket } from "hono/bun";
 import { cors } from "hono/cors";
 import { count } from "drizzle-orm";
 import { runDatabaseMigrations } from "./startup";
+import { terminalBroker } from "./terminal-broker";
 
 initLogger({
   env: { service: "upstand-server" },
@@ -65,6 +71,8 @@ let deploymentWorkerRefresh: Promise<void> | null = null;
 let workerRefreshInterval: ReturnType<typeof setInterval> | null = null;
 let queueReconcileInterval: ReturnType<typeof setInterval> | null = null;
 let dockerCleanupTimer: ReturnType<typeof setInterval> | null = null;
+let autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
+let autoUpdateInFlight = false;
 let shuttingDown = false;
 let caddyReady = false;
 
@@ -96,6 +104,105 @@ app.use(
 );
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+app.post("/api/terminal/session", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "Authentication required" }, 401);
+
+  const body = (await c.req.json().catch(() => null)) as {
+    organizationId?: string;
+    sshKeyId?: string;
+    username?: string;
+    port?: number;
+  } | null;
+  if (!body?.organizationId || !body.sshKeyId) {
+    return c.json({ error: "Organization and SSH key are required" }, 400);
+  }
+
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const membership = await ensureOrganizationAccess(
+    session.user.id,
+    body.organizationId,
+  );
+  if (membership?.role !== "owner") {
+    return c.json(
+      { error: "Only organization owners can open a server terminal" },
+      403,
+    );
+  }
+
+  const [key, settings] = await Promise.all([
+    uow.sshKeyRepository.findById(body.sshKeyId),
+    uow.webServerSettingsRepository.findGlobal(),
+  ]);
+  if (!key || key.organizationId !== body.organizationId) {
+    return c.json({ error: "SSH key was not found in this organization" }, 404);
+  }
+  if (!settings?.serverIp) {
+    return c.json(
+      { error: "Set the control-plane server IP before opening a terminal" },
+      409,
+    );
+  }
+
+  const privateKey = decryptSecret({
+    ciphertext: key.privateKeyCiphertext,
+    iv: key.privateKeyIv,
+    authTag: key.privateKeyAuthTag,
+    keyVersion: key.privateKeyVersion,
+  });
+  const token = terminalBroker.create({
+    userId: session.user.id,
+    host: settings.serverIp,
+    port: body.port && Number.isInteger(body.port) ? body.port : 22,
+    username: body.username?.trim() || "root",
+    privateKey,
+  });
+  return c.json({ token, expiresIn: 60 });
+});
+
+app.get(
+  "/api/terminal/connect",
+  upgradeWebSocket((c) => {
+    const token = c.req.query("token");
+    return {
+      onOpen: async (_event, ws) => {
+        if (!token) {
+          ws.close(1008, "Missing terminal token");
+          return;
+        }
+        try {
+          await terminalBroker.connect(
+            token,
+            (data) =>
+              ws.send(
+                data.buffer.slice(
+                  data.byteOffset,
+                  data.byteOffset + data.byteLength,
+                ) as ArrayBuffer,
+              ),
+            (message) => ws.close(1000, message),
+          );
+        } catch (error) {
+          ws.close(
+            1011,
+            error instanceof Error
+              ? error.message
+              : "Terminal connection failed",
+          );
+        }
+      },
+      onMessage: (event) => {
+        if (token && typeof event.data === "string")
+          terminalBroker.write(token, event.data);
+      },
+      onClose: () => {
+        if (token) terminalBroker.close(token);
+      },
+    };
+  }),
+);
 
 // This endpoint deliberately exposes only whether an owner exists. It lets the
 // web app provide a deterministic first-run flow without leaking user details.
@@ -484,6 +591,48 @@ await backupScheduler.start();
 await reconcileQueues();
 log.info({ message: "Background job workers and schedulers started" });
 
+// Opt-in release-channel updates. Source installs and canary builds are never
+// updated silently; operators can still use the explicit UI action for those.
+if (process.env.UPSTAND_AUTO_UPDATE === "true") {
+  const checkAndApplyUpdate = async () => {
+    if (
+      autoUpdateInFlight ||
+      process.env.UPSTAND_SERVER_IMAGE?.includes(":source-")
+    )
+      return;
+    autoUpdateInFlight = true;
+    const scope = serviceProvider.createScope();
+    try {
+      const status = await scope.resolve(GetUpdateStatusUseCaseToken).execute();
+      if (
+        status.channel === "stable" &&
+        status.updateAvailable &&
+        status.canUpdate
+      ) {
+        log.info({
+          message: `Automatic update found ${status.latestVersion}; starting rollout`,
+          currentVersion: status.currentVersion,
+        });
+        await scope
+          .resolve(TriggerUpdateUseCaseToken)
+          .execute({ version: status.latestVersion });
+      }
+    } catch (error) {
+      log.error({
+        message: "Automatic update check failed",
+        err: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      autoUpdateInFlight = false;
+      await scope.dispose();
+    }
+  };
+  autoUpdateTimer = setInterval(() => void checkAndApplyUpdate(), 30 * 60_000);
+  autoUpdateTimer.unref?.();
+  setTimeout(() => void checkAndApplyUpdate(), 120_000).unref?.();
+  log.info({ message: "Opt-in automatic release updates enabled" });
+}
+
 workerRefreshInterval = setInterval(
   () =>
     void refreshDeploymentWorkers().catch((error) => {
@@ -576,6 +725,7 @@ async function shutdown(signal: string): Promise<void> {
   if (workerRefreshInterval) clearInterval(workerRefreshInterval);
   if (queueReconcileInterval) clearInterval(queueReconcileInterval);
   if (dockerCleanupTimer) clearInterval(dockerCleanupTimer);
+  if (autoUpdateTimer) clearInterval(autoUpdateTimer);
 
   const drain = Promise.allSettled([
     ...[...deploymentWorkers.values()].map((worker) => worker.stop()),
@@ -604,5 +754,11 @@ async function shutdown(signal: string): Promise<void> {
 
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 process.once("SIGINT", () => void shutdown("SIGINT"));
+
+void Bun.serve({
+  port: Number(process.env.PORT || 3000),
+  fetch: (request, bunServer) => app.fetch(request, { server: bunServer }),
+  websocket,
+});
 
 export default app;

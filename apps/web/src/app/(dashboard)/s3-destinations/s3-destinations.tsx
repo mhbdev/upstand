@@ -441,6 +441,10 @@ export default function S3Destinations({
             <div className="space-y-2">
               <Label htmlFor="provider">Provider</Label>
               <Select
+                items={S3_PROVIDERS.map((p) => ({
+                  value: p.key,
+                  label: p.name,
+                }))}
                 value={provider}
                 onValueChange={(val) => setProvider(val || "")}
               >

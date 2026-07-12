@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import {
   ApplicationBuildConfigSchema,
   DEFAULT_APPLICATION_BUILD_CONFIG,
+  DEFAULT_RESOURCE_ADVANCED_CONFIG,
   type IUnitOfWork,
   type Resource,
   serializeApplicationBuildConfig,
+  serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
 import { encryptSecret } from "@upstand/domain/crypto/secret-box";
@@ -78,6 +80,9 @@ export class CreateResourceUseCase {
         credentials,
         buildConfig: serializeApplicationBuildConfig(
           input.buildConfig ?? DEFAULT_APPLICATION_BUILD_CONFIG,
+        ),
+        advancedConfig: serializeResourceAdvancedConfig(
+          DEFAULT_RESOURCE_ADVANCED_CONFIG,
         ),
         envVars: "{}",
         domains: "[]",

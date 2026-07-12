@@ -6,10 +6,16 @@ export interface UpdateStatusResult {
   currentVersion: string;
   latestVersion: string;
   updateAvailable: boolean;
+  channel: "stable" | "canary" | "source";
+  canUpdate: boolean;
+  checkedAt: string;
 }
 
-let cachedStatus: { result: UpdateStatusResult; expiresAt: number } | null =
-  null;
+let cachedStatus: {
+  result: UpdateStatusResult;
+  expiresAt: number;
+  key: string;
+} | null = null;
 
 export class GetUpdateStatusUseCase {
   constructor() {}
@@ -25,27 +31,51 @@ export class GetUpdateStatusUseCase {
         }
       } catch {}
     }
-    if (!currentVersion) {
-      currentVersion = "v0.1.0";
+    if (!currentVersion) currentVersion = "source-local";
+
+    const currentImage = process.env.UPSTAND_SERVER_IMAGE || "";
+    const channel: UpdateStatusResult["channel"] = currentImage.includes(
+      ":canary",
+    )
+      ? "canary"
+      : currentImage.includes(":source-")
+        ? "source"
+        : "stable";
+    const checkedAt = new Date().toISOString();
+    if (channel === "source") {
+      return {
+        currentVersion,
+        latestVersion: currentVersion,
+        updateAvailable: false,
+        channel,
+        canUpdate: false,
+        checkedAt,
+      };
     }
 
-    const repo = process.env.GITHUB_REPOSITORY || "upstand/upstand";
+    const repo = process.env.GITHUB_REPOSITORY || "mhbdev/upstand";
 
     const now = Date.now();
-    if (cachedStatus && cachedStatus.expiresAt > now) {
+    const cacheKey = `${channel}:${currentVersion}:${repo}`;
+    if (
+      cachedStatus &&
+      cachedStatus.expiresAt > now &&
+      cachedStatus.key === cacheKey
+    ) {
       return cachedStatus.result;
     }
 
     try {
-      const response = await fetch(
-        `https://api.github.com/repos/${repo}/releases/latest`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            "User-Agent": "Upstand",
-          },
+      const endpoint =
+        channel === "canary"
+          ? `https://api.github.com/repos/${repo}/releases?per_page=30`
+          : `https://api.github.com/repos/${repo}/releases/latest`;
+      const response = await fetch(endpoint, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "Upstand",
         },
-      );
+      });
 
       if (!response.ok) {
         log.warn({
@@ -55,11 +85,19 @@ export class GetUpdateStatusUseCase {
           currentVersion,
           latestVersion: currentVersion,
           updateAvailable: false,
+          channel,
+          canUpdate: true,
+          checkedAt,
         };
       }
 
-      const data = (await response.json()) as { tag_name: string };
-      const latestVersion = data.tag_name || currentVersion;
+      const data = await response.json();
+      const latestVersion =
+        channel === "canary"
+          ? ((data as Array<{ tag_name?: string; prerelease?: boolean }>).find(
+              (release) => release.prerelease && release.tag_name,
+            )?.tag_name ?? currentVersion)
+          : ((data as { tag_name?: string }).tag_name ?? currentVersion);
 
       const cleanTag = (tag: string) => tag.replace(/^v/, "").trim();
       const updateAvailable =
@@ -69,11 +107,15 @@ export class GetUpdateStatusUseCase {
         currentVersion,
         latestVersion,
         updateAvailable,
+        channel,
+        canUpdate: true,
+        checkedAt,
       };
 
       cachedStatus = {
         result,
         expiresAt: now + 30 * 60 * 1000,
+        key: cacheKey,
       };
 
       return result;
@@ -86,6 +128,9 @@ export class GetUpdateStatusUseCase {
         currentVersion,
         latestVersion: currentVersion,
         updateAvailable: false,
+        channel,
+        canUpdate: true,
+        checkedAt,
       };
     }
   }

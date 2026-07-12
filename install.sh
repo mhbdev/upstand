@@ -119,6 +119,7 @@ write_environment() {
   local requested_server_image="${UPSTAND_SERVER_IMAGE:-}"
   local requested_web_image="${UPSTAND_WEB_IMAGE:-}"
   local requested_docs_image="${UPSTAND_DOCS_IMAGE:-}"
+  local requested_auto_update="${UPSTAND_AUTO_UPDATE:-}"
 
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
@@ -137,6 +138,7 @@ write_environment() {
   UPSTAND_SERVER_IMAGE="${requested_server_image:-${UPSTAND_SERVER_IMAGE:-}}"
   UPSTAND_WEB_IMAGE="${requested_web_image:-${UPSTAND_WEB_IMAGE:-}}"
   UPSTAND_DOCS_IMAGE="${requested_docs_image:-${UPSTAND_DOCS_IMAGE:-}}"
+  UPSTAND_AUTO_UPDATE="${requested_auto_update:-${UPSTAND_AUTO_UPDATE:-false}}"
 
   : "${BETTER_AUTH_URL:?set BETTER_AUTH_URL to the HTTPS API origin}"
   : "${CORS_ORIGIN:?set CORS_ORIGIN to the HTTPS dashboard origin}"
@@ -171,6 +173,7 @@ UPSTAND_API_HOST=$UPSTAND_API_HOST
 UPSTAND_SERVER_IMAGE=$UPSTAND_SERVER_IMAGE
 UPSTAND_WEB_IMAGE=$UPSTAND_WEB_IMAGE
 UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE
+UPSTAND_AUTO_UPDATE=$UPSTAND_AUTO_UPDATE
 POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16.4-alpine}
 REDIS_IMAGE=${REDIS_IMAGE:-redis:7.4-alpine}
 UPSTAND_SERVER_PORT=${UPSTAND_SERVER_PORT:-3000}

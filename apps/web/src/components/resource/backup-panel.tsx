@@ -505,6 +505,10 @@ export function BackupPanel({
               <Field>
                 <FieldLabel>Backup type</FieldLabel>
                 <Select
+                  items={[
+                    { value: "database", label: "Database dump" },
+                    { value: "volume", label: "Docker volume archive" },
+                  ]}
                   value={form.kind}
                   onValueChange={(value) =>
                     setForm({ ...form, kind: value as BackupKind })
@@ -524,6 +528,10 @@ export function BackupPanel({
               <Field>
                 <FieldLabel>Destination</FieldLabel>
                 <Select
+                  items={destinations.map((destination) => ({
+                    value: destination.id,
+                    label: `${destination.name} (${destination.bucket})`,
+                  }))}
                   value={form.destinationId}
                   onValueChange={(value) =>
                     setForm({ ...form, destinationId: value ?? "" })
@@ -610,6 +618,12 @@ export function BackupPanel({
                   <Field>
                     <FieldLabel>Engine</FieldLabel>
                     <Select
+                      items={[
+                        { value: "postgres", label: "PostgreSQL" },
+                        { value: "mysql", label: "MySQL" },
+                        { value: "mariadb", label: "MariaDB" },
+                        { value: "mongodb", label: "MongoDB" },
+                      ]}
                       value={form.databaseEngine}
                       onValueChange={(value) =>
                         setForm({
@@ -699,6 +713,10 @@ export function BackupPanel({
                   <Field>
                     <FieldLabel>Docker volume</FieldLabel>
                     <Select
+                      items={(volumeQuery.data ?? []).map((volume) => ({
+                        value: volume,
+                        label: volume,
+                      }))}
                       value={form.volumeName}
                       onValueChange={(value) =>
                         setForm({ ...form, volumeName: value ?? "" })

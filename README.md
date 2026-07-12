@@ -1,126 +1,111 @@
-# upstand
+# Upstand
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines Next.js, Hono, TRPC, and more.
+Upstand is a self-hostable control plane for deploying applications and databases, managing Docker resources, configuring Caddy, and operating remote servers from one web interface. It is a Bun/TypeScript monorepo built with Next.js, Hono, tRPC, Drizzle, PostgreSQL, Redis, Docker Swarm, and Better Auth.
 
-## Features
+The repository is public and welcomes focused, well-tested contributions. The documentation site contains the operational guides; this file is the shortest reliable path from checkout to a working development environment.
 
-- **TypeScript** - For type safety and improved developer experience
-- **Next.js** - Full-stack React framework
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
-- **Hono** - Lightweight, performant server framework
-- **tRPC** - End-to-end type-safe APIs
-- **Bun** - Runtime environment
-- **Drizzle** - TypeScript-first ORM
-- **PostgreSQL** - Database engine
-- **Authentication** - Better-Auth
-- **Biome** - Linting and formatting
-- **PWA** - Progressive Web App support
-- **Turborepo** - Optimized monorepo build system
+## What Upstand provides
 
-## Getting Started
+- Owner-first authentication and organization access control.
+- Application and database deployment workflows backed by queues.
+- Remote-server registration, SSH-key management, and an owner-only SSH terminal.
+- Docker Swarm inspection, node operations, cleanup actions, and notifications.
+- Caddy configuration, domains, TLS/ACME settings, route snippets, and access logs.
+- Backups, notification channels, audit-friendly job state, and self-hosted updates.
+- A production installer (`install.sh`) for immutable release images or reproducible source builds.
 
-First, install the dependencies:
+## Repository map
 
-```bash
-bun install
+```text
+apps/web/       Next.js dashboard and PWA
+apps/server/    Hono API, tRPC adapter, workers, migrations, terminal broker
+apps/fumadocs/  User and operator documentation
+packages/api/   tRPC routers and dependency-injection registrations
+packages/usecases/ Domain workflows and integrations
+packages/domain/ Entities, repositories, validation, and crypto contracts
+packages/db/    Drizzle schema, migrations, and database adapter
+packages/auth/  Better Auth configuration
+packages/repositories/ Persistence implementations
+packages/ui/    Shared UI primitives and design tokens
+packages/env/   Validated server/client environment configuration
+install.sh      Self-hosted installation and upgrade entry point
+docker-compose*.yml  Local, development, and production topologies
 ```
 
-## Database Setup
+## Prerequisites
 
-This project uses PostgreSQL with Drizzle ORM.
+For local development install:
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
+- [Bun 1.3.14](https://bun.sh) (the version is pinned in `package.json`).
+- Docker Engine and Docker Compose v2.
+- Git.
 
-3. Apply the schema to your database:
+Production self-hosting requires a Linux Docker Swarm manager with a routable advertise address, DNS or wildcard DNS for the dashboard/API origins, and ports 80/443 plus the Swarm and SSH ports required by your topology. Follow the [self-hosting guide](apps/fumadocs/content/docs/self-hosting.mdx) and [Swarm guide](apps/fumadocs/content/docs/docker-swarm.mdx).
+
+## Local development
 
 ```bash
+git clone https://github.com/mhbdev/upstand.git
+cd upstand
+bun install --frozen-lockfile
+cp .env.example .env  # if maintaining a local env file; see packages/env for required values
+bun run db:start
 bun run db:push
-```
-
-Then, run the development server:
-
-```bash
 bun run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+Open `http://localhost:3001` for the dashboard and `http://localhost:3000` for the API. The first account created in a new database becomes the owner. Local Compose services provide PostgreSQL and Redis; never reuse production credentials locally.
 
-## UI Customization
-
-React web apps in this stack share shadcn/ui primitives through `packages/ui`.
-
-- Change design tokens and global styles in `packages/ui/src/styles/globals.css`
-- Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
-
-### Add more shared components
-
-Run this from the project root to add more primitives to the shared UI package:
+Useful focused commands:
 
 ```bash
-npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
+bun run dev:web
+bun run dev:server
+bun run check-types
+bun run lint
+bun test packages
+bun run build
+bun run db:generate
+bun run db:migrate
+bun run db:studio
 ```
 
-Import shared components like this:
+Use `bun run check` only when you intentionally want Biome to write formatting changes. Before a pull request, prefer the read-only checks above and inspect the resulting diff.
 
-```tsx
-import { Button } from "@upstand/ui/components/button";
+## Configuration
+
+Server variables are validated in `packages/env`. At minimum, development needs a PostgreSQL URL, Redis connection details, Better Auth URL/secret, CORS origin, and the SSH-key encryption key. Production values are generated and persisted by `install.sh` in `/etc/upstand/.env`; protect that file as a secret.
+
+The public web build receives `NEXT_PUBLIC_SERVER_URL` at image build time. In production it must be the HTTPS API origin, never `localhost`. Release images should be pinned by digest. `UPSTAND_AUTO_UPDATE=true` enables opt-in stable-channel checks every 30 minutes; source installations are intentionally not auto-updated.
+
+## Production installation
+
+The supported path is the installer from a tagged GitHub release:
+
+```bash
+curl --fail --location https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh -o install.sh
+chmod 700 install.sh
+sudo ./install.sh
 ```
 
-### Add app-specific blocks
+Set `BETTER_AUTH_URL`, `CORS_ORIGIN`, `NEXT_PUBLIC_SERVER_URL`, and (for immutable deployments) the three `UPSTAND_*_IMAGE` digest variables before running it. The installer validates Swarm, creates the attachable overlay network, generates missing secrets, writes a mode-0600 environment file, deploys the stack, and waits for readiness. Re-running it is the normal upgrade and repair operation. See [updates](apps/fumadocs/content/docs/updates.mdx) for rollback and channel policy.
 
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
+## Architecture and operational docs
 
-## Deployment
+Start with the [documentation index](apps/fumadocs/content/docs/index.mdx):
 
-### Docker Compose
+- [Getting started](apps/fumadocs/content/docs/getting-started.mdx)
+- [Self-hosting](apps/fumadocs/content/docs/self-hosting.mdx)
+- [Remote servers](apps/fumadocs/content/docs/remote-servers.mdx)
+- [Deployments](apps/fumadocs/content/docs/deployments.mdx)
+- [Docker Swarm](apps/fumadocs/content/docs/docker-swarm.mdx)
+- [Updates and channels](apps/fumadocs/content/docs/updates.mdx)
+- [Troubleshooting](apps/fumadocs/content/docs/troubleshooting.mdx)
 
-- Target: web
-- Config: `docker-compose.yml` (app Dockerfiles live in `apps/*/Dockerfile`)
-- Build images: bun run docker:build
-- Start: bun run docker:up
-- Logs: bun run docker:logs
-- Stop: bun run docker:down
+## Contribution and project hygiene
 
-Environment variables are read from each app's `.env` file (baked into web builds for public variables) and overridden in `docker-compose.yml` for container networking.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Security issues belong in [SECURITY.md](SECURITY.md), not in a public issue. The expected community standards are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and support boundaries are in [SUPPORT.md](SUPPORT.md). Release notes are maintained in [CHANGELOG.md](CHANGELOG.md).
 
-For more details, see the guide on [Deploying with Docker Compose](https://www.better-t-stack.dev/docs/guides/docker).
+## License
 
-## Git Hooks and Formatting
-
-- Run checks: `bun run check`
-
-## Project Structure
-
-```
-upstand/
-├── apps/
-│   ├── web/         # Frontend application (Next.js)
-│   └── server/      # Backend API (Hono, TRPC)
-├── packages/
-│   ├── ui/          # Shared shadcn/ui components and styles
-│   ├── api/         # API layer / business logic
-│   ├── auth/        # Authentication configuration & logic
-│   └── db/          # Database schema & queries
-```
-
-## Available Scripts
-
-- `bun run dev`: Start all applications in development mode
-- `bun run build`: Build all applications
-- `bun run dev:web`: Start only the web application
-- `bun run dev:server`: Start only the server
-- `bun run check-types`: Check TypeScript types across all apps
-- `bun run db:push`: Push schema changes to database
-- `bun run db:generate`: Generate database client/types
-- `bun run db:migrate`: Run database migrations
-- `bun run db:studio`: Open database studio UI
-- `bun run check`: Run Biome formatting and linting
-- `cd apps/web && bun run generate-pwa-assets`: Generate PWA assets
-- `bun run docker:build`: Build the Docker Compose images
-- `bun run docker:up`: Build and start the Docker Compose stack
-- `bun run docker:logs`: Tail logs from the Docker Compose stack
-- `bun run docker:down`: Stop the Docker Compose stack
+The repository does not currently declare a license file. Until the project owner publishes one, treat the source as all-rights-reserved and do not redistribute it. Contributions are accepted under the terms selected by the project owner.

@@ -442,6 +442,12 @@ export default function GitProviders({
             <div className="space-y-2">
               <Label>Provider Type</Label>
               <Select
+                items={[
+                  { value: "github", label: "GitHub App (Manifest Flow)" },
+                  { value: "gitlab", label: "GitLab (OAuth Flow)" },
+                  { value: "bitbucket", label: "Bitbucket (Credentials)" },
+                  { value: "gitea", label: "Gitea (OAuth Flow)" },
+                ]}
                 value={providerType as string}
                 onValueChange={(val) => {
                   if (val) setProviderType(val as ProviderType);

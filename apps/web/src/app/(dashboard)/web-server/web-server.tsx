@@ -51,6 +51,7 @@ import { Textarea } from "@upstand/ui/components/textarea";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
+import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -83,6 +84,7 @@ export default function WebServerDashboard({
   const [gpuModalOpen, setGpuModalOpen] = useState(false);
   const [envModalOpen, setEnvModalOpen] = useState(false);
   const [portsModalOpen, setPortsModalOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   // Additional settings states
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
@@ -373,7 +375,11 @@ export default function WebServerDashboard({
   const handleCheckUpdates = async () => {
     toast.info("Checking for Upstand updates...");
     const res = await refetchUpdates();
-    if (res.data?.updateAvailable) {
+    if (res.data?.channel === "source") {
+      toast.info(
+        "This source installation is updated by rerunning the installer.",
+      );
+    } else if (res.data?.updateAvailable) {
       toast.success(`A new version is available: ${res.data.latestVersion}!`, {
         description:
           "You can click 'Update Now' next to the version below to update.",
@@ -549,6 +555,9 @@ export default function WebServerDashboard({
                       <DropdownMenuItem onClick={() => setServerLogsOpen(true)}>
                         View Logs
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTerminalOpen(true)}>
+                        Open Terminal
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setGpuModalOpen(true)}>
                         GPU Setup
                       </DropdownMenuItem>
@@ -715,9 +724,9 @@ export default function WebServerDashboard({
                   <div className="flex items-center gap-2">
                     <span>Version:</span>
                     <span className="font-semibold text-foreground">
-                      {updateData?.currentVersion || "v0.1.0"}
+                      {updateData?.currentVersion || "Loading…"}
                     </span>
-                    {updateData?.updateAvailable && (
+                    {updateData?.updateAvailable && updateData.canUpdate && (
                       <Button
                         size="xs"
                         variant="default"
@@ -739,6 +748,11 @@ export default function WebServerDashboard({
                           ? "Updating..."
                           : `Update to ${updateData.latestVersion}`}
                       </Button>
+                    )}
+                    {updateData?.channel && (
+                      <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {updateData.channel}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1418,6 +1432,10 @@ export default function WebServerDashboard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <WebServerTerminalDialog
+        open={terminalOpen}
+        onOpenChange={setTerminalOpen}
+      />
     </div>
   );
 }

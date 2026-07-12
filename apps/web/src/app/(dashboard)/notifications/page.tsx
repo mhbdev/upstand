@@ -757,6 +757,10 @@ export default function NotificationsPage() {
                   Provider
                 </FieldLabel>
                 <Select
+                  items={providerOptions.map(([value, item]) => ({
+                    value,
+                    label: item.label,
+                  }))}
                   value={provider}
                   onValueChange={(next) =>
                     changeProvider(next as NotificationProviderType)

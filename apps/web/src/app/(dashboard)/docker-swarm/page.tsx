@@ -648,6 +648,11 @@ export default function DockerSwarmPage() {
                                 </TableCell>
                                 <TableCell>
                                   <Select
+                                    items={[
+                                      { value: "active", label: "Active" },
+                                      { value: "pause", label: "Pause" },
+                                      { value: "drain", label: "Drain" },
+                                    ]}
                                     value={node.availability}
                                     onValueChange={(value) =>
                                       setPendingAction({

@@ -545,13 +545,14 @@ export class CaddyService {
       Cmd: command,
       AttachStdout: true,
       AttachStderr: true,
-      Tty: true,
+      // Non-TTY Docker exec streams are multiplexed with an 8-byte header. Keep
+      // the bytes intact and decode them once through cleanDockerLogs; treating
+      // the stream as text produces the control characters visible in the UI.
+      Tty: false,
     });
     const stream = await execution.start({});
-    let output = "";
-    stream.on("data", (chunk) => {
-      output += chunk.toString();
-    });
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
 
     await new Promise<void>((resolve, reject) => {
       stream.on("end", resolve);
@@ -559,12 +560,13 @@ export class CaddyService {
     });
 
     const result = await execution.inspect();
+    const output = this.cleanDockerLogs(Buffer.concat(chunks));
     if (result.ExitCode !== 0) {
       throw new Error(
         output.trim() || `Command failed with exit code ${result.ExitCode}`,
       );
     }
-    return output;
+    return this.cleanDockerLogs(Buffer.concat(chunks));
   }
 
   private async writeFile(

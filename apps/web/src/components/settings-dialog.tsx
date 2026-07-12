@@ -75,9 +75,11 @@ import {
   SidebarProvider,
 } from "@upstand/ui/components/sidebar";
 import { Spinner } from "@upstand/ui/components/spinner";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { cn } from "@upstand/ui/lib/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { trpc } from "@/utils/trpc";
 import { authClient } from "@/lib/auth-client";
 
 /* ─────────────────────────────────────────────────────────────
@@ -591,6 +593,10 @@ function MembersPanel() {
 
             <div className="w-full sm:w-32">
               <Select
+                items={[
+                  { value: "member", label: "Member" },
+                  { value: "admin", label: "Admin" },
+                ]}
                 value={inviteRole}
                 onValueChange={(val) => setInviteRole(String(val) || "member")}
               >
@@ -994,14 +1000,31 @@ function SecurityPanel() {
    ───────────────────────────────────────────────────────────── */
 
 function AppInfoPanel() {
-  const [checking, setChecking] = useState(false);
+  const { data, isFetching, refetch } = useQuery({
+    ...trpc.webServer.getUpdateData.queryOptions(),
+  });
+  const update = useMutation({
+    ...trpc.webServer.triggerUpdate.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Update started; services will roll forward safely.");
+      void refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
-  const handleCheck = () => {
-    setChecking(true);
-    setTimeout(() => {
-      setChecking(false);
-      toast.info("Upstand is already up to date (v0.1.0)");
-    }, 1200);
+  const handleCheck = async () => {
+    const result = await refetch();
+    if (result.data?.updateAvailable) {
+      toast.info(`Upstand ${result.data.latestVersion} is available.`);
+    } else if (result.data?.channel === "source") {
+      toast.info(
+        "This source installation is updated by rerunning the installer.",
+      );
+    } else {
+      toast.success(
+        `Upstand is up to date (${result.data?.currentVersion ?? "unknown"}).`,
+      );
+    }
   };
 
   return (
@@ -1013,8 +1036,8 @@ function AppInfoPanel() {
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col divide-y text-sm">
           {[
-            { label: "Version", value: "v0.1.0" },
-            { label: "Environment", value: "Local Development" },
+            { label: "Version", value: data?.currentVersion ?? "Loading…" },
+            { label: "Channel", value: data?.channel ?? "unknown" },
             { label: "Database", value: "Connected" },
           ].map(({ label, value }) => (
             <div
@@ -1030,12 +1053,23 @@ function AppInfoPanel() {
           <Button
             size="sm"
             variant="outline"
-            disabled={checking}
+            disabled={isFetching}
             onClick={handleCheck}
           >
-            {checking && <Spinner data-icon="inline-start" />}
+            {isFetching && <Spinner data-icon="inline-start" />}
             Check for Updates
           </Button>
+          {data?.updateAvailable && data.canUpdate ? (
+            <Button
+              size="sm"
+              disabled={update.isPending}
+              onClick={() => update.mutate({ version: data.latestVersion })}
+            >
+              {update.isPending
+                ? "Updating…"
+                : `Update to ${data.latestVersion}`}
+            </Button>
+          ) : null}
         </div>
       </CardContent>
     </Card>

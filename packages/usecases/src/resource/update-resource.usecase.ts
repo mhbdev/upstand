@@ -2,9 +2,11 @@ import {
   ApplicationBuildConfigSchema,
   type IUnitOfWork,
   parseDomainMappings,
+  parseResourceAdvancedConfig,
   type Resource,
   serializeApplicationBuildConfig,
   serializeDomainMappings,
+  serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
 import { encryptSecret } from "@upstand/domain/crypto/secret-box";
@@ -21,6 +23,7 @@ export const UpdateResourceInputSchema = z.object({
   provider: z.string().optional(),
   credentials: z.string().optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
+  advancedConfig: z.string().optional(),
   envVars: z.string().optional(),
   domains: z.string().optional(),
   deployments: z.string().optional(),
@@ -66,6 +69,17 @@ export class UpdateResourceUseCase {
       patch.credentials = credentials;
     }
     if (input.envVars !== undefined) patch.envVars = input.envVars;
+    if (input.advancedConfig !== undefined) {
+      try {
+        patch.advancedConfig = serializeResourceAdvancedConfig(
+          parseResourceAdvancedConfig(input.advancedConfig),
+        );
+      } catch (error) {
+        throw new ValidationError(
+          `Invalid advanced resource configuration: ${error instanceof Error ? error.message : "unknown validation error"}`,
+        );
+      }
+    }
     if (input.buildConfig !== undefined) {
       if (resource.type !== "application") {
         throw new ValidationError(

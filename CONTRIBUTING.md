@@ -1,0 +1,70 @@
+# Contributing to Upstand
+
+Thank you for helping improve Upstand. Small, reviewable pull requests are easier to test and release than large rewrites. Please read this guide together with the repository documentation and the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Before you start
+
+1. Search existing issues and pull requests before opening a duplicate.
+2. For a security concern, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+3. For a substantial feature, open an issue first so the design, scope, and backwards-compatibility plan are agreed.
+4. Fork the repository or create a branch from `master`. Keep `master` release-ready; use `canary` only for explicitly experimental integration work.
+
+## Development setup
+
+Install Bun 1.3.14 and Docker, then:
+
+```bash
+git clone https://github.com/mhbdev/upstand.git
+cd upstand
+bun install --frozen-lockfile
+bun run db:start
+bun run db:push
+bun run dev
+```
+
+Use throwaway local credentials. Do not commit `.env` files, private keys, production URLs, database dumps, or generated secrets. If your change touches migrations, run it against a fresh database and an upgraded database.
+
+## Making a change
+
+- Keep business rules in `packages/usecases` or `packages/domain`, not in UI components or transport adapters.
+- Keep API contracts in the tRPC routers and validate external input with Zod.
+- Keep shared UI primitives in `packages/ui`; avoid duplicating accessible components in individual apps.
+- Treat authentication, organization authorization, secret encryption, Docker commands, SSH, and notification delivery as security-sensitive paths.
+- Do not add mocks, fake success states, or unhandled TODOs for user-facing functionality.
+- Preserve rollback behavior and existing database data. Add a migration for schema changes; never edit an applied migration.
+- Add or update tests for changed behavior, especially deployment, update, Caddy, notification, and authorization flows.
+
+## Required checks
+
+Run the relevant focused checks while iterating, then all checks before requesting review:
+
+```bash
+bun run check-types
+bun run lint
+bun test packages
+bun run build
+git diff --check
+```
+
+If a check cannot run locally, say why in the pull request and provide the closest reproducible verification. Do not hide failures by weakening a script or deleting a test.
+
+## Pull requests
+
+Use a clear title in imperative form, for example `fix: preserve Caddy route order`. A pull request should include:
+
+- The problem and user-visible outcome.
+- A concise implementation summary.
+- Tests and commands run, including any limitations.
+- Migration, environment-variable, deployment, or rollback notes.
+- Screenshots or a short recording for UI changes.
+- Explicit security considerations for auth, SSH, secrets, Docker, or external network calls.
+
+Keep unrelated formatting changes out of the PR. Resolve review feedback with follow-up commits while the PR is under review; maintainers may squash when merging.
+
+## Commits and releases
+
+Use conventional prefixes such as `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `build:`, and `chore:`. Release tags use `vMAJOR.MINOR.PATCH` and trigger the release workflow. A release must pass type checks, tests, builds, and image publication before it is announced. See [CHANGELOG.md](CHANGELOG.md) and [updates documentation](apps/fumadocs/content/docs/updates.mdx).
+
+## Maintainer checklist
+
+Before merging, confirm CI is green, migrations are reversible or safely additive, secrets are not logged, notifications are wired for new asynchronous operations, docs cover the operator workflow, and the release/rollback path has been tested in a disposable environment.
