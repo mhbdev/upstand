@@ -2,7 +2,6 @@
 
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import { Card, CardContent } from "@upstand/ui/components/card";
 import { Spinner } from "@upstand/ui/components/spinner";
@@ -14,6 +13,7 @@ import { PageBackdrop } from "@/components/marketing/page-backdrop";
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
 import { authClient } from "@/lib/auth-client";
+import { getServerUrl } from "@/lib/server-url";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -44,7 +44,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     let active = true;
-    fetch(`${env.NEXT_PUBLIC_SERVER_URL}/api/setup/status`)
+    fetch(`${getServerUrl()}/api/setup/status`, { credentials: "include" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to check instance setup");
         return (await response.json()) as { needsOwnerSetup: boolean };

@@ -10,7 +10,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { env } from "@upstand/env/web";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -42,6 +41,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { getServerUrl } from "@/lib/server-url";
 
 type ProviderType = "github" | "gitlab" | "bitbucket" | "gitea";
 
@@ -156,15 +156,14 @@ export default function GitProviders({
     if (!orgId || !session?.user?.id) return;
     const origin = window.location.origin;
     const isLocal =
-      env.NEXT_PUBLIC_SERVER_URL.includes("localhost") ||
-      env.NEXT_PUBLIC_SERVER_URL.includes("127.0.0.1");
+      getServerUrl().includes("localhost") || getServerUrl().includes("127.0.0.1");
 
     const manifestData: Record<string, any> = {
-      redirect_url: `${env.NEXT_PUBLIC_SERVER_URL}/api/providers/github/setup?organizationId=${orgId}&userId=${session.user.id}`,
+      redirect_url: `${getServerUrl()}/api/providers/github/setup?organizationId=${orgId}&userId=${session.user.id}`,
       name: `Upstand-${new Date().toISOString().split("T")[0]}-${randomString()}`,
       url: origin,
       callback_urls: [
-        `${env.NEXT_PUBLIC_SERVER_URL}/api/providers/github/setup`,
+        `${getServerUrl()}/api/providers/github/setup`,
       ],
       public: false,
       request_oauth_on_install: true,
@@ -179,7 +178,7 @@ export default function GitProviders({
 
     if (!isLocal) {
       manifestData.hook_attributes = {
-        url: `${env.NEXT_PUBLIC_SERVER_URL}/api/deploy/github`,
+        url: `${getServerUrl()}/api/deploy/github`,
       };
     }
 
@@ -242,11 +241,11 @@ export default function GitProviders({
     config: any,
   ) => {
     if (provider === "gitlab") {
-      const redirectUri = `${env.NEXT_PUBLIC_SERVER_URL}/api/providers/gitlab/setup`;
+      const redirectUri = `${getServerUrl()}/api/providers/gitlab/setup`;
       return `${config.gitlabUrl}/oauth/authorize?client_id=${config.applicationId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${providerId}&scope=api%20read_user%20read_repository`;
     }
     if (provider === "gitea") {
-      const redirectUri = `${env.NEXT_PUBLIC_SERVER_URL}/api/providers/gitea/setup`;
+      const redirectUri = `${getServerUrl()}/api/providers/gitea/setup`;
       return `${config.giteaUrl}/login/oauth/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${providerId}`;
     }
     return "";

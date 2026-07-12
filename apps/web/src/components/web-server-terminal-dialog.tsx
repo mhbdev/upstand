@@ -23,11 +23,11 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import { env } from "@upstand/env/web";
 import { trpc } from "@/utils/trpc";
+import { getServerUrl } from "@/lib/server-url";
 
 function apiUrl(path: string) {
-  return new URL(path, env.NEXT_PUBLIC_SERVER_URL).toString();
+  return new URL(path, getServerUrl()).toString();
 }
 
 export function WebServerTerminalDialog({

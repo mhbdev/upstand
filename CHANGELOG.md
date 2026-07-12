@@ -6,6 +6,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.15 - 2026-07-13
+
+### Fixed
+
+- Release web images now resolve the self-hosted API origin at runtime instead of calling the CI placeholder host, fixing login/session/setup bootstrap failures.
+
 ## 0.1.14 - 2026-07-13
 
 ### Fixed
