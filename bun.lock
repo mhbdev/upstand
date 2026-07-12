@@ -75,10 +75,12 @@
         "drizzle-orm": "catalog:",
         "evlog": "catalog:",
         "hono": "catalog:",
+        "ssh2": "^1.17.0",
         "zod": "catalog:",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
+        "@types/ssh2": "^1.15.5",
         "@upstand/config": "workspace:*",
         "tsdown": "^0.22.3",
         "typescript": "catalog:",
