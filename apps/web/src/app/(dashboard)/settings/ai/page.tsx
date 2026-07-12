@@ -25,6 +25,7 @@ import {
   NativeSelectOption,
 } from "@upstand/ui/components/native-select";
 import { toast } from "sonner";
+import { isAIProvider, type AIProvider } from "@upstand/domain";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -68,9 +69,7 @@ export default function AiSettingsPage() {
     ...trpc.ai.revokeApiKey.mutationOptions(),
     onSuccess: () => void keys.refetch(),
   });
-  const [provider, setProvider] = useState<
-    "openai" | "anthropic" | "google" | "gateway"
-  >("openai");
+  const [provider, setProvider] = useState<AIProvider>("openai");
   const [model, setModel] = useState("gpt-5.4-mini");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -79,7 +78,7 @@ export default function AiSettingsPage() {
 
   useEffect(() => {
     if (!settings.data) return;
-    setProvider(settings.data.provider as typeof provider);
+    if (isAIProvider(settings.data.provider)) setProvider(settings.data.provider);
     setModel(settings.data.model);
     setBaseUrl(settings.data.baseUrl || "");
   }, [settings.data]);
@@ -122,9 +121,11 @@ export default function AiSettingsPage() {
             <NativeSelect
               id="provider"
               value={provider}
-              onChange={(event) =>
-                setProvider(event.target.value as typeof provider)
-              }
+              onChange={(event) => {
+                if (isAIProvider(event.target.value)) {
+                  setProvider(event.target.value)
+                }
+              }}
             >
               <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
               <NativeSelectOption value="anthropic">

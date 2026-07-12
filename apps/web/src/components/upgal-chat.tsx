@@ -2,6 +2,9 @@
 
 import {
   DefaultChatTransport,
+  getToolName,
+  isTextUIPart,
+  isToolUIPart,
   lastAssistantMessageIsCompleteWithApprovalResponses,
 } from "ai";
 import { useChat } from "@ai-sdk/react";
@@ -19,6 +22,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
 import { Textarea } from "@upstand/ui/components/textarea";
 import { trpc } from "@/utils/trpc";
+import type { UpGalUIMessage } from "@upstand/api/ai/upgal";
 import {
   Conversation,
   ConversationContent,
@@ -44,20 +48,27 @@ function Part({
   part,
   approve,
 }: {
-  part: any;
+  part: UpGalUIMessage["parts"][number];
   approve: (id: string, approved: boolean) => void;
 }) {
-  if (part.type === "text")
+  if (isTextUIPart(part))
     return <MessageResponse>{part.text}</MessageResponse>;
-  if (part.type?.startsWith("tool-")) {
-    const name = part.toolName || part.type.slice(5);
+  if (isToolUIPart(part)) {
     const approval = part.approval;
     return (
       <Tool
         defaultOpen={part.state !== "output-available"}
         className="my-2 w-full"
       >
-        <ToolHeader type={name} state={part.state} />
+        {part.type === "dynamic-tool" ? (
+          <ToolHeader
+            type={part.type}
+            toolName={getToolName(part)}
+            state={part.state}
+          />
+        ) : (
+          <ToolHeader type={part.type} state={part.state} />
+        )}
         <ToolContent>
           <ToolInput input={part.input} />
           {approval && part.state === "approval-requested" ? (
@@ -79,8 +90,10 @@ function Part({
               </Button>
             </div>
           ) : null}
-          {part.output !== undefined ? (
-            <ToolOutput output={part.output} errorText={part.errorText} />
+          {part.state === "output-available" ? (
+            <ToolOutput output={part.output} errorText={undefined} />
+          ) : part.state === "output-error" ? (
+            <ToolOutput output={undefined} errorText={part.errorText} />
           ) : null}
         </ToolContent>
       </Tool>
@@ -103,12 +116,12 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
     enabled: Boolean(organizationId),
   });
 
-  const transport = new DefaultChatTransport({
+  const transport = new DefaultChatTransport<UpGalUIMessage>({
     api: "/api/ai/chat",
     credentials: "include",
     body: { organizationId },
   });
-  const chat = useChat({
+  const chat = useChat<UpGalUIMessage>({
     transport,
     sendAutomaticallyWhen: ({ messages }) =>
       lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),

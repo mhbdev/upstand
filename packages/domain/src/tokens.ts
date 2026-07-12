@@ -10,6 +10,7 @@ import type { IResourceRepository } from "./repositories/resource-repository.int
 import type { IS3DestinationRepository } from "./repositories/s3-destination-repository.interface";
 import type { ISshKeyRepository } from "./repositories/ssh-key-repository.interface";
 import type { IUnitOfWork } from "./repositories/unit-of-work.interface";
+import type { IAIRepository } from "./ai";
 import type { IUserRepository } from "./repositories/user-repository.interface";
 import type { IWebServerSettingsRepository } from "./repositories/web-server-settings-repository.interface";
 
@@ -21,6 +22,7 @@ export const BackupRunRepositoryToken = createToken<IBackupRunRepository>(
   "IBackupRunRepository",
 );
 export const UnitOfWorkToken = createToken<IUnitOfWork>("IUnitOfWork");
+export const AIRepositoryToken = createToken<IAIRepository>("IAIRepository");
 export const ProjectRepositoryToken =
   createToken<IProjectRepository>("IProjectRepository");
 export const EnvironmentRepositoryToken = createToken<IEnvironmentRepository>(

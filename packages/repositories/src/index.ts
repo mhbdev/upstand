@@ -1,4 +1,5 @@
 export * from "./backup/drizzle-backup-run.repository";
+export * from "./ai/drizzle-ai.repository";
 export * from "./backup/drizzle-backup-schedule.repository";
 export * from "./deployment/drizzle-deployment.repository";
 export * from "./docker-registry/drizzle-docker-registry.repository";

@@ -1,4 +1,5 @@
 import type { ServiceScope } from "@circulo-ai/di";
+import { validateUIMessages } from "ai";
 import { trpcServer } from "@hono/trpc-server";
 import { createContext } from "@upstand/api/context";
 import {
@@ -13,7 +14,12 @@ import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
 import { db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
-import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
+import {
+  AIRepositoryToken,
+  isJsonObject,
+  type IUnitOfWork,
+  UnitOfWorkToken,
+} from "@upstand/domain";
 import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { env } from "@upstand/env/server";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";
@@ -37,11 +43,20 @@ import { cors } from "hono/cors";
 import { count } from "drizzle-orm";
 import { runDatabaseMigrations } from "./startup";
 import { terminalBroker } from "./terminal-broker";
-import { aiConversation } from "@upstand/db";
-import { createUpGalResponse, createUpGalTools, UPGAL_TOOL_METADATA, saveIncomingMessages, getConversationForUser } from "@upstand/api/ai/upgal";
+import {
+  createUpGalResponse,
+  createUpGalTools,
+  executeUpGalReadTool,
+  getConversationForUser,
+  isUpGalToolName,
+  saveIncomingMessages,
+  UPGAL_TOOL_METADATA,
+  type UpGalUIMessage,
+} from "@upstand/api/ai/upgal";
 import { authenticateExternalKey } from "@upstand/api/ai/external-key";
 import { ensureOrganizationAccess } from "@upstand/api/access-control";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 
 initLogger({
   env: { service: "upstand-server" },
@@ -267,36 +282,119 @@ app.get("/api/setup/status", async (c) => {
 app.post("/api/ai/chat", async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) return c.json({ error: "Authentication required" }, 401);
-  const body = (await c.req.json().catch(() => null)) as { organizationId?: string; conversationId?: string; messages?: unknown[] } | null;
-  if (!body?.organizationId || !Array.isArray(body.messages)) return c.json({ error: "organizationId and messages are required" }, 400);
+  const bodyResult = z
+    .object({
+      organizationId: z.string().min(1),
+      conversationId: z.string().min(1).optional(),
+      messages: z.unknown(),
+    })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!bodyResult.success) return c.json({ error: "Invalid UpGal request" }, 400);
+  const body = bodyResult.data;
   await ensureOrganizationAccess(session.user.id, body.organizationId);
   const conversationId = body.conversationId || randomUUID();
-  const ownedConversation = await getConversationForUser(conversationId, body.organizationId, session.user.id);
-  if (body.conversationId && !ownedConversation) return c.json({ error: "Conversation not found" }, 404);
-  if (!ownedConversation) await (await import("@upstand/db")).createDb().insert(aiConversation).values({ id: conversationId, organizationId: body.organizationId, userId: session.user.id });
-  await saveIncomingMessages(conversationId, body.messages as Array<{ id?: string; role?: string; parts?: unknown[] }>);
-  return createUpGalResponse({ organizationId: body.organizationId, userId: session.user.id, conversationId, runId: randomUUID(), scope: c.get("scope") }, body.messages, c.req.raw);
+  const ownedConversation = await getConversationForUser(
+    conversationId,
+    body.organizationId,
+    session.user.id,
+    c.get("scope").resolve(AIRepositoryToken),
+  );
+  if (body.conversationId && !ownedConversation)
+    return c.json({ error: "Conversation not found" }, 404);
+  if (!ownedConversation)
+    await c.get("scope").resolve(AIRepositoryToken).createConversation({
+      id: conversationId,
+      organizationId: body.organizationId,
+      userId: session.user.id,
+      context: {},
+    });
+  const context = {
+    organizationId: body.organizationId,
+    userId: session.user.id,
+    conversationId,
+    runId: randomUUID(),
+    scope: c.get("scope"),
+  };
+  const tools = createUpGalTools(context);
+  let messages: UpGalUIMessage[];
+  try {
+    messages = await validateUIMessages<UpGalUIMessage>({
+      messages: body.messages,
+      tools,
+    });
+  } catch {
+    return c.json({ error: "Invalid UpGal messages" }, 400);
+  }
+  await saveIncomingMessages(
+    conversationId,
+    messages,
+    c.get("scope").resolve(AIRepositoryToken),
+  );
+  return createUpGalResponse(context, messages, c.req.raw);
 });
 
 app.all("/api/mcp", async (c) => {
   const authorization = c.req.header("authorization") || "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  const key = await authenticateExternalKey(token);
+  const key = await authenticateExternalKey(token, c.get("scope"));
   if (!key) return c.json({ error: "Invalid or expired API key" }, 401);
-  const body = (await c.req.json().catch(() => ({}))) as { id?: string | number; method?: string; params?: Record<string, unknown> };
+  const bodyResult = z
+    .object({
+      id: z.union([z.string(), z.number(), z.null()]).optional(),
+      method: z.string(),
+      params: z.record(z.string(), z.json()).optional(),
+    })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!bodyResult.success)
+    return c.json(
+      {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32600, message: "Invalid MCP request" },
+      },
+      400,
+    );
+  const body = bodyResult.data;
   const id = body.id ?? null;
   if (body.method === "initialize") return c.json({ jsonrpc: "2.0", id, result: { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "upstand-upgal", version: "1.0.0" } } });
   if (body.method === "tools/list") return c.json({ jsonrpc: "2.0", id, result: { tools: UPGAL_TOOL_METADATA.filter(([name]) => key.scopes.includes("*") || key.scopes.includes(`tool:${name}`)).map(([name, description, mutation]) => ({ name, description, annotations: { destructiveHint: mutation, readOnlyHint: !mutation } })) } });
   if (body.method === "tools/call") {
-    const name = String(body.params?.name || "");
-    const args = (body.params?.arguments || {}) as Record<string, unknown>;
+    const name = body.params?.name;
+    const args = body.params?.arguments ?? {};
+    if (typeof name !== "string" || !isJsonObject(args))
+      return c.json(
+        {
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32602,
+            message: "Tool name and object arguments are required",
+          },
+        },
+        400,
+      );
     const metadata = UPGAL_TOOL_METADATA.find(([toolName]) => toolName === name);
-    if (!metadata || !(key.scopes.includes("*") || key.scopes.includes(`tool:${name}`))) return c.json({ jsonrpc: "2.0", id, error: { code: -32602, message: "Tool is not available for this API key" } });
+    if (
+      !metadata ||
+      !isUpGalToolName(name) ||
+      !(key.scopes.includes("*") || key.scopes.includes(`tool:${name}`))
+    )
+      return c.json({
+        jsonrpc: "2.0",
+        id,
+        error: {
+          code: -32602,
+          message: "Tool is not available for this API key",
+        },
+      });
     if (metadata[2]) return c.json({ jsonrpc: "2.0", id, result: { isError: true, content: [{ type: "text", text: "Mutating MCP tools must be approved through the UpGal dashboard." }] } });
-    const tools = createUpGalTools({ organizationId: key.organizationId, userId: key.createdBy, conversationId: randomUUID(), runId: randomUUID(), scope: c.get("scope") });
-    const selected = (tools as Record<string, { execute?: (input: unknown) => Promise<unknown> }>)[name];
-    if (!selected?.execute) return c.json({ jsonrpc: "2.0", id, error: { code: -32601, message: "Tool not found" } });
-    const result = await selected.execute(args);
+    const result = await executeUpGalReadTool(name, args, {
+      organizationId: key.organizationId,
+      userId: key.createdBy,
+      conversationId: randomUUID(),
+      runId: randomUUID(),
+      scope: c.get("scope"),
+    });
     return c.json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(result) }] } });
   }
   return c.json({ jsonrpc: "2.0", id, error: { code: -32601, message: "Method not found" } }, 404);

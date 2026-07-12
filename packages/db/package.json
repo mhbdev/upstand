@@ -18,6 +18,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@upstand/domain": "workspace:*",
     "@upstand/env": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",

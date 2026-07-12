@@ -1,4 +1,5 @@
 import { relations } from "drizzle-orm";
+import type { AIProvider, JsonObject, JsonValue } from "@upstand/domain";
 import {
   index,
   integer,
@@ -17,7 +18,7 @@ export const aiProviderConfig = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    provider: text("provider").notNull(),
+    provider: text("provider").$type<AIProvider>().notNull(),
     model: text("model").notNull(),
     baseUrl: text("base_url"),
     apiKeyCiphertext: text("api_key_ciphertext"),
@@ -44,7 +45,7 @@ export const aiConversation = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull().default("New UpGal conversation"),
-    context: jsonb("context").$type<Record<string, unknown>>(),
+    context: jsonb("context").$type<JsonObject>(),
     archivedAt: timestamp("archived_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -62,7 +63,7 @@ export const aiMessage = pgTable(
       .notNull()
       .references(() => aiConversation.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
-    parts: jsonb("parts").$type<unknown[]>().notNull(),
+    parts: jsonb("parts").$type<JsonValue[]>().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -113,7 +114,7 @@ export const aiApproval = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     toolCallId: text("tool_call_id").notNull(),
     toolName: text("tool_name").notNull(),
-    input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+    input: jsonb("input").$type<JsonObject>().notNull(),
     status: text("status").notNull().default("pending"),
     decidedBy: text("decided_by").references(() => user.id, {
       onDelete: "set null",

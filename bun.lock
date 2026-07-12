@@ -236,6 +236,7 @@
     "packages/db": {
       "name": "@upstand/db",
       "dependencies": {
+        "@upstand/domain": "workspace:*",
         "@upstand/env": "workspace:*",
         "dotenv": "catalog:",
         "drizzle-orm": "catalog:",

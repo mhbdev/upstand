@@ -25,3 +25,6 @@ S3 Destinations store backup targets and testable credentials. Backup schedules 
 
 Monitoring exposes server/runtime metrics, active containers, Docker storage usage, and network totals. The Web Server page also provides Caddy/server logs, configuration reload/restart controls, and safe Docker cleanup actions. Use the deployment queue and resource locks to diagnose overlapping builds before restarting workers.
 
+## AI and MCP operations
+
+UpGal uses the same project, resource, deployment, and server use cases as the dashboard. This keeps assistant actions subject to the platform’s organization ownership checks. Read-only inspection can be automated; mutations require an approval in the dashboard. See the [UpGal AI assistant guide](/docs/upgal) for provider keys, MCP scopes, conversation persistence, and incident guidance.

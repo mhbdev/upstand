@@ -22,6 +22,8 @@ The installer accepts omitted origins for a first-run evaluation. It asks for AP
 
 Persistent Docker volumes hold Postgres and Redis. They are local volumes, so do not move the `upstand.control-plane=true` label to another machine without migrating state.
 
+If UpGal is enabled, provider credentials are encrypted with the configured application encryption key and stored in Postgres. Back up that key with the database and `.env`; changing or losing it without a migration plan makes existing AI provider credentials unusable. External MCP keys are hashed and can be revoked from **Settings → AI**.
+
 ## TLS and DNS
 
 Caddy obtains certificates only after DNS points at the manager and port 80 is reachable. If issuance fails:

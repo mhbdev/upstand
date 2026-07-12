@@ -1,13 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import {
-  aiConversation,
-  aiMessage,
-  aiProviderConfig,
-  externalApiKey,
-} from "@upstand/db";
-import { createDb } from "@upstand/db";
 import { encryptSecret } from "@upstand/domain/crypto/secret-box";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { AI_PROVIDERS, AIRepositoryToken } from "@upstand/domain";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
 import { protectedProcedure, router } from "../index";
@@ -24,18 +17,15 @@ export const aiRouter = router({
     .input(organizationInput)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
-      const row = await createDb()
-        .select()
-        .from(aiProviderConfig)
-        .where(eq(aiProviderConfig.organizationId, input.organizationId))
-        .limit(1)
-        .then((rows) => rows[0]);
+      const row = await ctx.scope
+        .resolve(AIRepositoryToken)
+        .findProviderConfig(input.organizationId);
       return row
         ? {
             provider: row.provider,
             model: row.model,
             baseUrl: row.baseUrl,
-            enabled: row.enabled === 1,
+            enabled: row.enabled,
             configured: Boolean(row.apiKeyCiphertext),
           }
         : null;
@@ -45,7 +35,7 @@ export const aiRouter = router({
     .input(
       z.object({
         organizationId: z.string().min(1),
-        provider: z.enum(["openai", "anthropic", "google", "gateway"]),
+        provider: z.enum(AI_PROVIDERS),
         model: z.string().min(1).max(160),
         apiKey: z.string().min(1).optional(),
         baseUrl: z.url().optional().or(z.literal("")),
@@ -57,46 +47,14 @@ export const aiRouter = router({
         input.organizationId,
         ["owner", "admin"],
       );
-      const db = createDb();
-      const existing = await db
-        .select()
-        .from(aiProviderConfig)
-        .where(eq(aiProviderConfig.organizationId, input.organizationId))
-        .limit(1)
-        .then((rows) => rows[0]);
       const encrypted = input.apiKey ? encryptSecret(input.apiKey) : null;
-      const patch = {
+      await ctx.scope.resolve(AIRepositoryToken).saveProviderConfig({
+        organizationId: input.organizationId,
         provider: input.provider,
         model: input.model,
         baseUrl: input.baseUrl || null,
-        ...(encrypted
-          ? {
-              apiKeyCiphertext: encrypted.ciphertext,
-              apiKeyIv: encrypted.iv,
-              apiKeyAuthTag: encrypted.authTag,
-              apiKeyVersion: encrypted.keyVersion,
-            }
-          : {}),
-        enabled: 1,
-        updatedAt: new Date(),
-      };
-      if (existing)
-        await db
-          .update(aiProviderConfig)
-          .set(patch)
-          .where(eq(aiProviderConfig.id, existing.id));
-      else
-        await db
-          .insert(aiProviderConfig)
-          .values({
-            id: randomUUID(),
-            organizationId: input.organizationId,
-            ...patch,
-            apiKeyCiphertext: encrypted?.ciphertext ?? null,
-            apiKeyIv: encrypted?.iv ?? null,
-            apiKeyAuthTag: encrypted?.authTag ?? null,
-            apiKeyVersion: encrypted?.keyVersion ?? null,
-          });
+        secret: encrypted,
+      });
       return { saved: true };
     }),
 
@@ -108,9 +66,9 @@ export const aiRouter = router({
         input.organizationId,
         ["owner", "admin"],
       );
-      await createDb()
-        .delete(aiProviderConfig)
-        .where(eq(aiProviderConfig.organizationId, input.organizationId));
+      await ctx.scope
+        .resolve(AIRepositoryToken)
+        .deleteProviderConfig(input.organizationId);
       return { removed: true };
     }),
 
@@ -122,34 +80,36 @@ export const aiRouter = router({
         input.organizationId,
         ["owner", "admin"],
       );
-      return testUpGalProvider(input.organizationId);
+      return testUpGalProvider(input.organizationId, ctx.scope);
     }),
 
   conversations: protectedProcedure
     .input(organizationInput)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
-      return listConversations(input.organizationId, ctx.session.user.id);
+      return listConversations(
+        input.organizationId,
+        ctx.session.user.id,
+        ctx.scope.resolve(AIRepositoryToken),
+      );
     }),
 
   createConversation: protectedProcedure
     .input(
       z.object({
         organizationId: z.string().min(1),
-        context: z.record(z.string(), z.unknown()).optional(),
+        context: z.record(z.string(), z.json()).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
       const id = randomUUID();
-      await createDb()
-        .insert(aiConversation)
-        .values({
-          id,
-          organizationId: input.organizationId,
-          userId: ctx.session.user.id,
-          context: input.context ?? {},
-        });
+      await ctx.scope.resolve(AIRepositoryToken).createConversation({
+        id,
+        organizationId: input.organizationId,
+        userId: ctx.session.user.id,
+        context: input.context ?? {},
+      });
       return { id };
     }),
 
@@ -166,13 +126,12 @@ export const aiRouter = router({
         input.conversationId,
         input.organizationId,
         ctx.session.user.id,
+        ctx.scope.resolve(AIRepositoryToken),
       );
       if (!conversation) return null;
-      const messages = await createDb()
-        .select()
-        .from(aiMessage)
-        .where(eq(aiMessage.conversationId, conversation.id))
-        .orderBy(desc(aiMessage.createdAt));
+      const messages = await ctx.scope
+        .resolve(AIRepositoryToken)
+        .listMessages(conversation.id);
       return { conversation, messages: messages.reverse() };
     }),
 
@@ -184,20 +143,9 @@ export const aiRouter = router({
         input.organizationId,
         ["owner", "admin"],
       );
-      return createDb()
-        .select({
-          id: externalApiKey.id,
-          name: externalApiKey.name,
-          prefix: externalApiKey.prefix,
-          scopes: externalApiKey.scopes,
-          expiresAt: externalApiKey.expiresAt,
-          lastUsedAt: externalApiKey.lastUsedAt,
-          revokedAt: externalApiKey.revokedAt,
-          createdAt: externalApiKey.createdAt,
-        })
-        .from(externalApiKey)
-        .where(eq(externalApiKey.organizationId, input.organizationId))
-        .orderBy(desc(externalApiKey.createdAt));
+      return ctx.scope
+        .resolve(AIRepositoryToken)
+        .listExternalApiKeys(input.organizationId);
     }),
 
   createApiKey: protectedProcedure
@@ -217,18 +165,16 @@ export const aiRouter = router({
       );
       const secret = `upg_${randomBytes(24).toString("hex")}`;
       const prefix = secret.slice(0, 12);
-      await createDb()
-        .insert(externalApiKey)
-        .values({
-          id: randomUUID(),
-          organizationId: input.organizationId,
-          createdBy: ctx.session.user.id,
-          name: input.name,
-          prefix,
-          secretHash: createHash("sha256").update(secret).digest("hex"),
-          scopes: input.scopes,
-          expiresAt: input.expiresAt,
-        });
+      await ctx.scope.resolve(AIRepositoryToken).createExternalApiKey({
+        id: randomUUID(),
+        organizationId: input.organizationId,
+        createdBy: ctx.session.user.id,
+        name: input.name,
+        prefix,
+        secretHash: createHash("sha256").update(secret).digest("hex"),
+        scopes: input.scopes,
+        expiresAt: input.expiresAt ?? null,
+      });
       return { secret, prefix };
     }),
 
@@ -242,16 +188,9 @@ export const aiRouter = router({
         input.organizationId,
         ["owner", "admin"],
       );
-      await createDb()
-        .update(externalApiKey)
-        .set({ revokedAt: new Date() })
-        .where(
-          and(
-            eq(externalApiKey.id, input.id),
-            eq(externalApiKey.organizationId, input.organizationId),
-            isNull(externalApiKey.revokedAt),
-          ),
-        );
+      await ctx.scope
+        .resolve(AIRepositoryToken)
+        .revokeExternalApiKey(input.organizationId, input.id);
       return { revoked: true };
     }),
 });
