@@ -98,7 +98,6 @@ const ROUTE_PERMISSIONS: Record<string, string> = {
   "environment.create": "environment:create",
   "environment.delete": "environment:delete",
   "resource.list": "resource:view",
-  "resource.get": "resource:view",
   "resource.getContainers": "resource:view",
   "resource.getLogs": "resource:view",
   "resource.getStats": "resource:view",
@@ -108,11 +107,6 @@ const ROUTE_PERMISSIONS: Record<string, string> = {
   "resource.deploy": "resource:update",
   "resource.control": "resource:update",
   "resource.delete": "resource:delete",
-  "deployment.getDeployments": "deployment:view",
-  "deployment.getQueue": "deployment:view",
-  "deployment.getServerSettings": "deployment:view",
-  "deployment.updateServerConcurrency": "deployment:manage",
-  "deployment.cancelDeploymentJob": "deployment:manage",
   "backup.listSchedules": "backup:view",
   "backup.listRuns": "backup:view",
   "backup.listVolumes": "backup:view",
@@ -157,8 +151,17 @@ export async function enforceApiKeyRoute(
       message: "This API key has no auditable organization user.",
     });
   }
-  const input = rawInput as { organizationId?: unknown } | null;
-  if (input?.organizationId !== actor.organizationId) {
+  const input = rawInput;
+  // Resource-scoped procedures intentionally resolve the organization from
+  // the resource before calling the existing membership/permission guard.
+  // For organization-scoped inputs, reject cross-organization access here so
+  // a malformed request cannot reach the router implementation.
+  if (
+    typeof input === "object" &&
+    input !== null &&
+    "organizationId" in input &&
+    input.organizationId !== actor.organizationId
+  ) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "The API key cannot access another organization.",

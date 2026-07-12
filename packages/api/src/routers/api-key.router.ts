@@ -15,22 +15,22 @@ const organizationInput = z.object({ organizationId: z.string().min(1) });
 const headersFrom = (ctx: { honoContext: { req: { raw: Request } } }) =>
   ctx.honoContext.req.raw.headers;
 
-const permissionsInput = z
-  .object({
-    preset: ApiKeyPresetSchema.optional(),
-    permissions: ApiKeyPermissionsSchema.optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (!value.preset && !value.permissions) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["permissions"],
-        message: "Choose a permission preset or define advanced permissions.",
-      });
-    }
-  });
+const permissionsInputShape = z.object({
+  preset: ApiKeyPresetSchema.optional(),
+  permissions: ApiKeyPermissionsSchema.optional(),
+});
 
-function resolvePermissions(input: z.infer<typeof permissionsInput>) {
+const permissionsInput = permissionsInputShape.superRefine((value, ctx) => {
+  if (!value.preset && !value.permissions) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["permissions"],
+      message: "Choose a permission preset or define advanced permissions.",
+    });
+  }
+});
+
+function resolvePermissions(input: z.infer<typeof permissionsInputShape>) {
   return apiKeyPermissionsToStatements(
     input.permissions ?? API_KEY_PRESETS[input.preset ?? "read-only"],
   );
@@ -170,7 +170,7 @@ export const apiKeyRouter = router({
             .optional(),
           rateLimitMax: z.number().int().min(1).max(100_000).optional(),
         })
-        .and(permissionsInput.partial()),
+        .and(permissionsInputShape.partial()),
     )
     .mutation(async ({ ctx, input }) => {
       await requireKeyAdmin(ctx.session.user.id, input.organizationId);

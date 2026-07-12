@@ -6,6 +6,16 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.13 - 2026-07-13
+
+### Added
+
+- Added API-key authentication test coverage and tightened notification/API-key integration behavior.
+
+### Fixed
+
+- Removed the unused `platform_backup_completed` notification event so the event catalog contains only events with real producers.
+
 ## 0.1.12 - 2026-07-13
 
 ### Fixed

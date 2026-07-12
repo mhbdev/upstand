@@ -25,7 +25,6 @@ export const NotificationEventTypeSchema = z.enum([
   "database_backup_completed",
   "volume_backup_completed",
   "platform_restart",
-  "platform_backup_completed",
   "docker_cleanup_completed",
   "cluster_initialized",
   "cluster_node_updated",

@@ -2,6 +2,7 @@ import type { NotificationConfiguration } from "@upstand/domain";
 import nodemailer from "nodemailer";
 
 const NOTIFICATION_REQUEST_TIMEOUT_MS = 15_000;
+const MAX_PROVIDER_ERROR_BODY_LENGTH = 500;
 
 export interface NotificationMessage {
   title: string;
@@ -25,10 +26,48 @@ async function ensureSuccess(
   provider: string,
 ): Promise<void> {
   if (response.ok) return;
-  const body = (await response.text()).slice(0, 500);
+  const body = await readResponsePrefix(
+    response,
+    MAX_PROVIDER_ERROR_BODY_LENGTH,
+  );
   throw new Error(
     `${provider} rejected the notification (${response.status} ${response.statusText})${body ? `: ${body}` : ""}`,
   );
+}
+
+async function readResponsePrefix(
+  response: Response,
+  maxLength: number,
+): Promise<string> {
+  if (!response.body) {
+    return (await response.text()).slice(0, maxLength);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+
+  try {
+    while (totalLength <= maxLength) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      chunks.push(value);
+      totalLength += value.byteLength;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  const bytes = new Uint8Array(Math.min(totalLength, maxLength));
+  let offset = 0;
+  for (const chunk of chunks) {
+    if (offset >= bytes.length) break;
+    const length = Math.min(chunk.byteLength, bytes.length - offset);
+    bytes.set(chunk.subarray(0, length), offset);
+    offset += length;
+  }
+
+  return new TextDecoder().decode(bytes);
 }
 
 async function fetchWithTimeout(

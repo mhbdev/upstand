@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { apiKey } from "@better-auth/api-key";
 import { createDb } from "@upstand/db";
 import * as schema from "@upstand/db/schema/auth";
 import { env } from "@upstand/env/server";
@@ -6,8 +7,8 @@ import { redis } from "@upstand/redis";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
-import { apiKey } from "@better-auth/api-key";
 import { organization } from "better-auth/plugins";
+import { createAccessControl } from "better-auth/plugins/access";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { count, eq } from "drizzle-orm";
 
@@ -21,6 +22,43 @@ function getSharedCookieDomain(): string | undefined {
   const domain = dashboardHost.split(".").slice(1).join(".");
   return domain && apiHost.endsWith(`.${domain}`) ? domain : undefined;
 }
+
+const organizationStatement = {
+  organization: ["update", "delete"],
+  member: ["create", "update", "delete"],
+  invitation: ["create", "cancel"],
+  team: ["create", "update", "delete"],
+  ac: ["create", "read", "update", "delete"],
+  apiKey: ["create", "read", "update", "delete"],
+} as const;
+
+const organizationAccessControl = createAccessControl(organizationStatement);
+const organizationRoles = {
+  owner: organizationAccessControl.newRole({
+    organization: ["update", "delete"],
+    member: ["create", "update", "delete"],
+    invitation: ["create", "cancel"],
+    team: ["create", "update", "delete"],
+    ac: ["create", "read", "update", "delete"],
+    apiKey: ["create", "read", "update", "delete"],
+  }),
+  admin: organizationAccessControl.newRole({
+    organization: ["update"],
+    member: ["create", "update", "delete"],
+    invitation: ["create", "cancel"],
+    team: ["create", "update", "delete"],
+    ac: ["create", "read", "update", "delete"],
+    apiKey: ["create", "read", "update", "delete"],
+  }),
+  member: organizationAccessControl.newRole({
+    organization: [],
+    member: [],
+    invitation: [],
+    team: [],
+    ac: ["read"],
+    apiKey: [],
+  }),
+};
 
 export function createAuth() {
   const db = createDb();
@@ -115,8 +153,13 @@ export function createAuth() {
         if (ctx.path.endsWith("/two-factor/verify-totp")) {
           if (!ctx.request) return;
           const res = ctx.context.returned;
+          const hasReturnedError =
+            typeof res === "object" &&
+            res !== null &&
+            "error" in res &&
+            Boolean((res as { error?: unknown }).error);
           const isSuccess =
-            !res || (res instanceof Response ? res.ok : !(res as any).error);
+            !res || (res instanceof Response ? res.ok : !hasReturnedError);
           if (isSuccess) {
             const session = await auth.api.getSession({
               headers: ctx.request.headers,
@@ -196,7 +239,10 @@ export function createAuth() {
       }),
     },
     plugins: [
-      organization(),
+      organization({
+        ac: organizationAccessControl,
+        roles: organizationRoles,
+      }),
       apiKey({
         configId: "upstand",
         references: "organization",
