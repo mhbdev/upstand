@@ -113,6 +113,8 @@ ensure_swarm() {
 write_environment() {
   install -d -m 0700 "$INSTALL_DIR"
 
+  local advertise_address="${1:-}"
+
   local requested_better_auth_url="${BETTER_AUTH_URL:-}"
   local requested_cors_origin="${CORS_ORIGIN:-}"
   local requested_server_url="${NEXT_PUBLIC_SERVER_URL:-}"
@@ -124,6 +126,29 @@ write_environment() {
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
     source "$ENV_FILE"
+  fi
+
+  # A first-run install should be usable without requiring DNS setup up front.
+  # Use nip.io defaults for a public IPv4 manager; operators can replace these
+  # origins in the environment file and rerun the installer later.
+  if [[ -z "${BETTER_AUTH_URL:-}" || -z "${CORS_ORIGIN:-}" || -z "${NEXT_PUBLIC_SERVER_URL:-}" ]]; then
+    if [[ "$advertise_address" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+      local default_api="https://api.${advertise_address}.nip.io"
+      local default_dashboard="https://app.${advertise_address}.nip.io"
+      if [[ -t 0 ]]; then
+        read -r -p "API origin [${BETTER_AUTH_URL:-$default_api}]: " input_api
+        read -r -p "Dashboard origin [${CORS_ORIGIN:-$default_dashboard}]: " input_dashboard
+        BETTER_AUTH_URL="${input_api:-${BETTER_AUTH_URL:-$default_api}}"
+        CORS_ORIGIN="${input_dashboard:-${CORS_ORIGIN:-$default_dashboard}}"
+      else
+        BETTER_AUTH_URL="${BETTER_AUTH_URL:-$default_api}"
+        CORS_ORIGIN="${CORS_ORIGIN:-$default_dashboard}"
+      fi
+      NEXT_PUBLIC_SERVER_URL="${NEXT_PUBLIC_SERVER_URL:-$BETTER_AUTH_URL}"
+      echo "Using default HTTPS origins: API=$BETTER_AUTH_URL dashboard=$CORS_ORIGIN" >&2
+    else
+      fail "set BETTER_AUTH_URL, CORS_ORIGIN, and NEXT_PUBLIC_SERVER_URL, or run on a host with a public IPv4 address for automatic nip.io defaults"
+    fi
   fi
 
   POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 32)}"
@@ -264,7 +289,7 @@ main() {
   ensure_docker
   local advertise_address
   advertise_address="$(detect_advertise_address)"
-  write_environment
+  write_environment "$advertise_address"
   ensure_swarm "$advertise_address"
   deploy_stack
   wait_for_stack

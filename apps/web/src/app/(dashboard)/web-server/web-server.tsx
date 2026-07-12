@@ -79,6 +79,7 @@ export default function WebServerDashboard({
   const [enableHttp3, setEnableHttp3] = useState(true);
   const [globalCaddyfile, setGlobalCaddyfile] = useState("");
   const [caddySnippets, setCaddySnippets] = useState("");
+  const [editingSettings, setEditingSettings] = useState(false);
 
   // Dialogue States
   const [serverLogsOpen, setServerLogsOpen] = useState(false);
@@ -147,7 +148,7 @@ export default function WebServerDashboard({
 
   // Sync state with fetched settings
   useEffect(() => {
-    if (info?.settings) {
+    if (info?.settings && !editingSettings) {
       setEmail(info.settings.letsEncryptEmail || "");
       setHttpPort(info.settings.httpPort);
       setHttpsPort(info.settings.httpsPort);
@@ -175,13 +176,14 @@ export default function WebServerDashboard({
         setPortMappings([]);
       }
     }
-  }, [info]);
+  }, [info, editingSettings]);
 
   // Mutations
   const updateSettingsMutation = useMutation({
     ...trpc.webServer.updateSettings.mutationOptions(),
     onSuccess: () => {
       toast.success("Web Server settings updated successfully");
+      setEditingSettings(false);
       refetchInfo();
       refetchCaddyLogs();
     },
@@ -853,7 +855,10 @@ export default function WebServerDashboard({
 
             {/* General Configurations & Custom Caddyfile */}
             <div className="space-y-6 lg:col-span-2">
-              <form onSubmit={handleSaveSettings}>
+              <form
+                onSubmit={handleSaveSettings}
+                onFocusCapture={() => setEditingSettings(true)}
+              >
                 <Card className="border border-border/40 bg-card/20 shadow-sm">
                   <CardHeader>
                     <CardTitle className="font-semibold text-lg">

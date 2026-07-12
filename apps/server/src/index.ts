@@ -23,6 +23,7 @@ import {
   DeploymentWorker,
   getDockerInstance,
   NotificationDeliveryWorker,
+  QueueDeploymentUseCase,
   reconcileQueuedJobs,
 } from "@upstand/usecases";
 import { initLogger, log } from "evlog";
@@ -203,6 +204,53 @@ app.get(
     };
   }),
 );
+
+// Public, tokenized deployment hook used by GitHub Actions and external CI.
+// The token contains only the resource id; authorization is completed by the
+// resource's persisted autoDeploy setting before anything is queued.
+app.post("/api/deploy/:token", async (c) => {
+  const token = c.req.param("token");
+  if (!token?.startsWith("rc-") || token.length <= 3) {
+    return c.json({ error: "Invalid deployment webhook" }, 404);
+  }
+  const resourceId = token.slice(3);
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const resource = await uow.resourceRepository.findById(resourceId);
+  if (!resource) return c.json({ error: "Resource not found" }, 404);
+
+  let autoDeploy = false;
+  try {
+    const credentials = JSON.parse(resource.credentials || "{}");
+    autoDeploy = credentials?.autoDeploy === true;
+  } catch {
+    autoDeploy = false;
+  }
+  if (!autoDeploy) {
+    return c.json({ error: "Automatic deployment is disabled" }, 403);
+  }
+
+  const payload = await c.req.json().catch(() => ({}));
+  const branch =
+    typeof payload?.ref === "string" ? payload.ref : payload?.branch;
+  const title = branch
+    ? `Webhook deployment (${String(branch).slice(0, 120)})`
+    : "Webhook deployment";
+  try {
+    const queued = await new QueueDeploymentUseCase(uow).execute({
+      resourceId,
+      title,
+    });
+    return c.json({ accepted: true, resourceId, status: queued.status }, 202);
+  } catch (error) {
+    log.error({
+      message: "Failed to queue deployment webhook",
+      resourceId,
+      err: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ error: "Unable to queue deployment" }, 500);
+  }
+});
 
 // This endpoint deliberately exposes only whether an owner exists. It lets the
 // web app provide a deterministic first-run flow without leaking user details.
