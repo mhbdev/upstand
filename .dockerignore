@@ -10,6 +10,7 @@
 **/.astro
 **/.turbo
 .turbo
+**/.source
 
 **/.wrangler
 **/.alchemy

@@ -22,11 +22,10 @@ COPY packages/domain/package.json ./packages/domain/
 COPY packages/usecases/package.json ./packages/usecases/
 
 # Install all dependencies without running postinstall scripts (which require source files)
-RUN bun install --ignore-scripts --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --ignore-scripts --frozen-lockfile
 
 # Copy codebase
 COPY apps/server ./apps/server
-COPY apps/fumadocs ./apps/fumadocs
 COPY packages/db ./packages/db
 COPY packages/env ./packages/env
 COPY packages/api ./packages/api
@@ -37,9 +36,6 @@ COPY packages/redis ./packages/redis
 COPY packages/repositories ./packages/repositories
 COPY packages/domain ./packages/domain
 COPY packages/usecases ./packages/usecases
-
-# Run postinstall scripts now that source code is copied
-RUN cd apps/fumadocs && bun run postinstall
 
 # Compile the Hono application
 RUN cd apps/server && bun run build
@@ -109,7 +105,7 @@ COPY apps/fumadocs ./apps/fumadocs
 # Install production dependencies with their platform-specific install steps.
 # This is required by ssh2's optional native CPU-feature module used for remote
 # server provisioning; the lockfile remains frozen for reproducibility.
-RUN bun install --production --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production --frozen-lockfile
 
 # Copy the built output from builder stage
 COPY --from=builder /app/apps/server/dist ./apps/server/dist

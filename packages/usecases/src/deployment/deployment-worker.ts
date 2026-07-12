@@ -1,23 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createToken } from "@circulo-ai/di";
 import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
 import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
 import { getInstallationToken } from "../git-provider/github-client";
-import type { PublishNotificationUseCase } from "../notification/publish-notification.usecase";
 import type { DockerService } from "../resource/docker.service";
 import { getDockerInstance } from "../resource/docker-client";
+import {
+  CaddyServiceToken,
+  DockerServiceToken,
+  PublishNotificationUseCaseToken,
+} from "../tokens";
 import type { CaddyService } from "../web-server/caddy.service";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 import { ResourceLock } from "./resource-lock";
-
-export const DockerServiceToken = createToken<DockerService>("DockerService");
-export const CaddyServiceToken = createToken<CaddyService>("CaddyService");
-export const PublishNotificationUseCaseToken =
-  createToken<PublishNotificationUseCase>("PublishNotificationUseCase");
 
 export class DeploymentWorker {
   private worker: Worker | null = null;

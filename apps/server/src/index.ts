@@ -2,24 +2,24 @@ import type { ServiceScope } from "@circulo-ai/di";
 import { validateUIMessages } from "ai";
 import { trpcServer } from "@hono/trpc-server";
 import { createContext } from "@upstand/api/context";
+import { serviceProvider } from "@upstand/api/di";
 import {
   BackupSchedulerToken,
   CreateGitProviderUseCaseToken,
-  GetWebServerSettingsUseCaseToken,
   GetUpdateStatusUseCaseToken,
+  GetWebServerSettingsUseCaseToken,
   TriggerUpdateUseCaseToken,
-  serviceProvider,
-} from "@upstand/api/di";
+} from "@upstand/usecases/tokens";
 import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
 import { db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
 import {
-  AIRepositoryToken,
   isJsonObject,
   type IUnitOfWork,
   UnitOfWorkToken,
 } from "@upstand/domain";
+import { AIRepositoryToken } from "@upstand/repositories";
 import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { env } from "@upstand/env/server";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";

@@ -18,13 +18,13 @@ import { z } from "zod";
 import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import type { ServiceScope, TokenLike } from "@circulo-ai/di";
 import {
-  AIRepositoryToken,
   type IAIRepository,
   toJsonValue,
   UnitOfWorkToken,
   type IUnitOfWork,
   type JsonValue,
 } from "@upstand/domain";
+import { AIRepositoryToken } from "@upstand/repositories";
 import {
   ControlResourceUseCaseToken,
   CreateEnvironmentUseCaseToken,

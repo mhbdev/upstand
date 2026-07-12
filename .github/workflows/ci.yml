@@ -25,9 +25,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -35,9 +35,29 @@ jobs:
           cache: true
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Check types
+      - name: Restore Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ hashFiles('bun.lock', 'turbo.json') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ hashFiles('bun.lock', 'turbo.json') }}-
+            ${{ runner.os }}-turbo-
+      - name: Check affected types
+        if: github.event_name == 'pull_request'
+        run: bunx turbo run check-types --filter="...[origin/${{ github.base_ref }}]"
+      - name: Check all types
+        if: github.event_name != 'pull_request'
         run: bun run check-types
-      - name: Run tests
-        run: bun test packages
-      - name: Build applications
+      - name: Test affected packages
+        if: github.event_name == 'pull_request'
+        run: bunx turbo run test --filter="...[origin/${{ github.base_ref }}]"
+      - name: Test all packages
+        if: github.event_name != 'pull_request'
+        run: bun run test
+      - name: Build affected applications
+        if: github.event_name == 'pull_request'
+        run: bunx turbo run build --filter="...[origin/${{ github.base_ref }}]"
+      - name: Build all applications
+        if: github.event_name != 'pull_request'
         run: bun run build

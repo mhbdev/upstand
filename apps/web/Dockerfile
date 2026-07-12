@@ -3,8 +3,33 @@ COPY --from=oven/bun:1.3.14 /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 ENV SKIP_ENV_VALIDATION=1
 
-COPY . .
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile
+COPY package.json bun.lock tsconfig.json ./
+COPY apps/web/package.json ./apps/web/
+COPY apps/server/package.json ./apps/server/
+COPY apps/fumadocs/package.json ./apps/fumadocs/
+COPY packages/db/package.json ./packages/db/
+COPY packages/env/package.json ./packages/env/
+COPY packages/api/package.json ./packages/api/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/config/package.json ./packages/config/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/redis/package.json ./packages/redis/
+COPY packages/repositories/package.json ./packages/repositories/
+COPY packages/domain/package.json ./packages/domain/
+COPY packages/usecases/package.json ./packages/usecases/
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --ignore-scripts --frozen-lockfile
+
+COPY apps/web ./apps/web
+COPY packages/db ./packages/db
+COPY packages/env ./packages/env
+COPY packages/api ./packages/api
+COPY packages/auth ./packages/auth
+COPY packages/config ./packages/config
+COPY packages/ui ./packages/ui
+COPY packages/redis ./packages/redis
+COPY packages/repositories ./packages/repositories
+COPY packages/domain ./packages/domain
+COPY packages/usecases ./packages/usecases
 
 ARG NEXT_PUBLIC_SERVER_URL
 ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}

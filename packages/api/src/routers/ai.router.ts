@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { encryptSecret } from "@upstand/domain/crypto/secret-box";
-import { AI_PROVIDERS, AIRepositoryToken } from "@upstand/domain";
+import { AI_PROVIDERS } from "@upstand/domain";
+import { AIRepositoryToken } from "@upstand/repositories";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
 import { protectedProcedure, router } from "../index";

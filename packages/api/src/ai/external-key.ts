@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ServiceScope } from "@circulo-ai/di";
-import { AIRepositoryToken } from "@upstand/domain";
+import { AIRepositoryToken } from "@upstand/repositories";
 
 export async function authenticateExternalKey(
   value: string,

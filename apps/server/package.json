@@ -23,6 +23,7 @@
     "@upstand/db": "workspace:*",
     "@upstand/domain": "workspace:*",
     "@upstand/env": "workspace:*",
+    "@upstand/repositories": "workspace:*",
     "@upstand/redis": "workspace:*",
     "@upstand/usecases": "workspace:*",
     "ai": "^7.0.22",
