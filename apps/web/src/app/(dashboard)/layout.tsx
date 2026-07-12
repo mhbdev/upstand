@@ -1,14 +1,18 @@
 "use client";
 
 import {
-  Activity01Icon,
+  AnalyticsUpIcon,
+  Certificate01Icon,
   CloudIcon,
-  Database01Icon,
+  CloudServerIcon,
+  ContainerIcon,
   Folder01Icon,
+  GitBranchIcon,
   Key01Icon,
   Layers01Icon,
+  Notification01Icon,
+  Rocket01Icon,
   ServerStack01Icon,
-  SourceCodeIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -47,15 +51,15 @@ import { trpc } from "@/utils/trpc";
 
 const NAV_ITEMS = [
   { title: "Projects", href: "/projects", icon: Folder01Icon },
-  { title: "Deployments", href: "/deployments", icon: Activity01Icon },
-  { title: "Notifications", href: "/notifications", icon: Activity01Icon },
-  { title: "Monitoring", href: "/monitoring", icon: Activity01Icon },
+  { title: "Deployments", href: "/deployments", icon: Rocket01Icon },
+  { title: "Notifications", href: "/notifications", icon: Notification01Icon },
+  { title: "Monitoring", href: "/monitoring", icon: AnalyticsUpIcon },
   { title: "SSH Keys", href: "/ssh-keys", icon: Key01Icon },
-  { title: "Git Providers", href: "/git-providers", icon: SourceCodeIcon },
+  { title: "Git Providers", href: "/git-providers", icon: GitBranchIcon },
   { title: "S3 Storage", href: "/s3-destinations", icon: CloudIcon },
-  { title: "Docker Registry", href: "/docker-registry", icon: Database01Icon },
-  { title: "Remote Servers", href: "/remote-servers", icon: ServerStack01Icon },
-  { title: "Web Server", href: "/web-server", icon: ServerStack01Icon },
+  { title: "Docker Registry", href: "/docker-registry", icon: ContainerIcon },
+  { title: "Remote Servers", href: "/remote-servers", icon: CloudServerIcon },
+  { title: "Web Server", href: "/web-server", icon: Certificate01Icon },
   { title: "Docker Swarm", href: "/docker-swarm", icon: Layers01Icon },
 ];
 

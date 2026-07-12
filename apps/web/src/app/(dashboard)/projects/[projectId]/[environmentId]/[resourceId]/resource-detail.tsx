@@ -1072,7 +1072,7 @@ services:
 
       {/* Tabs */}
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="flex flex-wrap gap-1 border border-border/40 bg-card/45 p-1">
+        <TabsList className="flex max-w-full flex-nowrap gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
           <TabsTrigger value="general" className="gap-2">
             <Settings className="size-4" /> General
           </TabsTrigger>
