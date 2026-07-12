@@ -6,6 +6,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.7 - 2026-07-12
+
+### Fixed
+
+- Removed a duplicate `advanced_config` migration statement that prevented fresh stable image installs from starting PostgreSQL migrations.
+
 ## 0.1.5 - 2026-07-12
 
 ### Fixed

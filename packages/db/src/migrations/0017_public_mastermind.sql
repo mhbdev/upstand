@@ -74,7 +74,6 @@ CREATE TABLE "external_api_key" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "resource" ADD COLUMN "advanced_config" text DEFAULT '{}' NOT NULL;--> statement-breakpoint
 ALTER TABLE "ai_approval" ADD CONSTRAINT "ai_approval_run_id_ai_run_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."ai_run"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ai_approval" ADD CONSTRAINT "ai_approval_conversation_id_ai_conversation_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."ai_conversation"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ai_approval" ADD CONSTRAINT "ai_approval_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
