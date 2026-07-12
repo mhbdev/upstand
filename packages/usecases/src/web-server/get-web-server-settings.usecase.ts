@@ -51,9 +51,7 @@ export class GetWebServerSettingsUseCase {
       }
     }
 
-    const resources = await this.uow.resourceRepository.findMany();
     await this.caddyService.initializeCaddy(settings);
-    await this.caddyService.syncResourceConfigs(resources, settings);
     const status = await this.caddyService.getStatus();
     return { settings, status };
   }
