@@ -15,6 +15,7 @@ const databaseResource: Resource = {
   provider: "postgres",
   dbType: "postgres",
   buildConfig: "{}",
+  advancedConfig: "{}",
   envVars: "{}",
   domains: "[]",
   deployments: "[]",

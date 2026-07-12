@@ -12,6 +12,8 @@ concurrency:
 jobs:
   verify-and-publish:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SERVER_URL: https://api.example.invalid
     permissions:
       contents: read
       packages: write
@@ -49,7 +51,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/${{ steps.image.outputs.repository }}-web:canary
           build-args: |
-            NEXT_PUBLIC_SERVER_URL=http://localhost:3000
+            NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: docker/build-push-action@v5

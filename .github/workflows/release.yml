@@ -9,6 +9,10 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      # Next.js validates this public build-time variable even though CI does
+      # not connect to a live API. Production installers provide the real URL.
+      NEXT_PUBLIC_SERVER_URL: https://api.example.invalid
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -87,7 +91,7 @@ jobs:
             ghcr.io/${{ steps.meta.outputs.repo }}-web:latest
             ghcr.io/${{ steps.meta.outputs.repo }}-web:${{ steps.meta.outputs.tag }}
           build-args: |
-            NEXT_PUBLIC_SERVER_URL=http://localhost:3000
+            NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
