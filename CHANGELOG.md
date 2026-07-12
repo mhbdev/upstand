@@ -12,6 +12,17 @@ Changes after the latest tag are collected here until the next release.
 
 - Removed a duplicate `advanced_config` migration statement that prevented fresh stable image installs from starting PostgreSQL migrations.
 
+## 0.1.8 - 2026-07-12
+
+### Added
+
+- Hardened deployment and token boundaries across the UpGal integration and background deployment workers.
+- Published stable GHCR images for the dashboard, API, and documentation services.
+
+### Changed
+
+- Stable self-hosted installations now use immutable release image digests with automatic updates disabled by default for manual verification.
+
 ## 0.1.5 - 2026-07-12
 
 ### Fixed
