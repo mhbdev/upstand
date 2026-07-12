@@ -4,6 +4,10 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+Changes after the latest tag are collected here until the next release.
+
+## 0.1.0 - 2026-07-12
+
 ### Added
 
 - Production contributor, security, support, and release guidance.
