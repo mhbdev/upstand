@@ -51,6 +51,8 @@ export const DeployResourceUseCaseToken =
   createToken<UseCases.DeployResourceUseCase>("DeployResourceUseCase");
 export const ControlResourceUseCaseToken =
   createToken<UseCases.ControlResourceUseCase>("ControlResourceUseCase");
+export const ControlContainerUseCaseToken =
+  createToken<UseCases.ControlContainerUseCase>("ControlContainerUseCase");
 export const GetResourceContainersUseCaseToken =
   createToken<UseCases.GetResourceContainersUseCase>(
     "GetResourceContainersUseCase",

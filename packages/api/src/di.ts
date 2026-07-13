@@ -35,6 +35,7 @@ import {
   BackupScheduler,
   CaddyService,
   CaddyServiceToken,
+  ControlContainerUseCase,
   ControlResourceUseCase,
   CreateAuditLogUseCase,
   CreateBackupScheduleUseCase,
@@ -122,6 +123,7 @@ import {
 import { GenerateSshKeyUseCase } from "@upstand/usecases/ssh-key/generate-ssh-key.usecase";
 import {
   BackupSchedulerToken,
+  ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
   CreateAuditLogUseCaseToken,
   CreateBackupScheduleUseCaseToken,
@@ -370,6 +372,14 @@ services.addTransient(
   ControlResourceUseCaseToken,
   (c) =>
     new ControlResourceUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(DockerServiceToken),
+    ),
+);
+services.addTransient(
+  ControlContainerUseCaseToken,
+  (c) =>
+    new ControlContainerUseCase(
       c.resolve(UnitOfWorkToken),
       c.resolve(DockerServiceToken),
     ),

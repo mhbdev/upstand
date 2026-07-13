@@ -31,6 +31,13 @@ export const CreateResourceInputSchema = z.object({
 
 export type CreateResourceInput = z.infer<typeof CreateResourceInputSchema>;
 
+function dockerServiceKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "-");
+}
+
 export class CreateResourceUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
@@ -50,6 +57,16 @@ export class CreateResourceUseCase {
       );
       if (!environment) {
         throw new ValidationError("Environment not found");
+      }
+
+      const serviceKey = dockerServiceKey(input.appName);
+      const duplicate = (await tx.resourceRepository.findMany()).find(
+        (resource) => dockerServiceKey(resource.appName ?? "") === serviceKey,
+      );
+      if (duplicate) {
+        throw new ValidationError(
+          `Docker service name '${input.appName}' is already used by resource '${duplicate.name}'. Choose a unique service name across the Swarm cluster.`,
+        );
       }
 
       // Prefill provider and initial metadata

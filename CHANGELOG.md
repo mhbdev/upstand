@@ -6,6 +6,26 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.29 - 2026-07-13
+
+### Added
+
+- Restore validated container-level start, stop, restart, and kill actions in the resource Containers tab.
+- Add unique Docker service-name validation across all resources to prevent Swarm collisions between projects and environments.
+
+### Changed
+
+- Make non-isolated Compose services join the managed shared ingress overlay while preserving user-defined networks.
+- Keep isolated resources on deterministic per-resource overlays and detach stale Caddy attachments after routes are removed or isolation changes.
+- Preserve operator-owned external Compose volumes during isolated deployment volume prefixing.
+- Document the shared and isolated network model, Compose project versus Stack routing, and container control limitations.
+
+### Fixed
+
+- Use standalone Compose service DNS names for Caddy routes and Swarm-prefixed names only for Stack deployments.
+- Remove standalone Compose projects with their actual Compose containers instead of incorrectly issuing `docker stack rm`.
+- Prevent resource deletion from leaving managed isolated networks attached indefinitely.
+
 ## 0.1.28 - 2026-07-13
 
 ### Added

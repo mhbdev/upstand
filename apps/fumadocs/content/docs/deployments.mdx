@@ -11,9 +11,11 @@ Upstand queues every deployment, locks each resource to prevent overlapping buil
 
 For a private generic Git repository, attach an SSH key to the resource. The private key is decrypted only for the build and the temporary key file is removed after the job.
 
-## Compose stacks
+## Compose projects and stacks
 
-Compose resources deploy through `docker stack deploy`. Service names are prefixed by the stack name. When adding a domain route, select the exact service that should receive traffic; Upstand cannot infer it for a multi-service Compose file.
+Compose resources can use either `docker compose up --detach` or `docker stack deploy`. Standalone Compose routes resolve the Compose service DNS name directly; Swarm stack routes resolve the `<stack>_<service>` name. When adding a domain route, select the exact service that should receive traffic; Upstand cannot infer it for a multi-service Compose file.
+
+Upstand always ensures the managed ingress overlay exists. Non-isolated Compose services are attached to the shared `upstand-network`; isolated resources use a dedicated resource network and Caddy is attached to that network for active routes. Existing user-defined Compose networks and volume definitions remain available.
 
 ## Databases
 
@@ -32,3 +34,4 @@ For automatic HTTPS, DNS must point to the manager and ports 80/443 must reach C
 - Check service state with `docker service ps <service>`.
 - Check resource logs in the dashboard or with `docker service logs <service>`.
 - If a service starts but is unreachable, verify its target port and domain mapping before rebuilding.
+- If a container-level kill or restart reports that the replica is on another node, use the resource-level restart or run the operation from the Docker node hosting that replica; Swarm task containers are not addressable through another node’s Docker socket.

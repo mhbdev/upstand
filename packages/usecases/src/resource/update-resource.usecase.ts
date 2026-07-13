@@ -38,6 +38,13 @@ export const UpdateResourceInputSchema = z.object({
 
 export type UpdateResourceInput = z.infer<typeof UpdateResourceInputSchema>;
 
+function dockerServiceKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "-");
+}
+
 export class UpdateResourceUseCase {
   constructor(
     private readonly uow: IUnitOfWork,
@@ -53,7 +60,20 @@ export class UpdateResourceUseCase {
     const patch: Partial<Resource> = {};
     if (input.name !== undefined) patch.name = input.name;
     if (input.status !== undefined) patch.status = input.status;
-    if (input.appName !== undefined) patch.appName = input.appName;
+    if (input.appName !== undefined) {
+      const serviceKey = dockerServiceKey(input.appName);
+      const duplicate = (await this.uow.resourceRepository.findMany()).find(
+        (candidate) =>
+          candidate.id !== resource.id &&
+          dockerServiceKey(candidate.appName ?? "") === serviceKey,
+      );
+      if (duplicate) {
+        throw new ValidationError(
+          `Docker service name '${input.appName}' is already used by resource '${duplicate.name}'. Choose a unique service name across the Swarm cluster.`,
+        );
+      }
+      patch.appName = input.appName;
+    }
     if (input.description !== undefined) patch.description = input.description;
     if (input.provider !== undefined) patch.provider = input.provider;
     if (input.dbType !== undefined || input.dockerImage !== undefined) {
@@ -138,7 +158,8 @@ export class UpdateResourceUseCase {
     const routingChanged =
       input.domains !== undefined ||
       input.appName !== undefined ||
-      input.name !== undefined;
+      input.name !== undefined ||
+      input.advancedConfig !== undefined;
     const candidate = { ...resource, ...patch } as Resource;
     const existingResources = routingChanged
       ? await this.uow.resourceRepository.findMany()

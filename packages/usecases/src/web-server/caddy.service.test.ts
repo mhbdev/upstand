@@ -148,6 +148,24 @@ describe("Caddy domain configuration", () => {
     expect(caddyfile).toContain("reverse_proxy storefront_web:3000");
   });
 
+  test("uses the Compose service DNS name for standalone Compose routes", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "compose-2",
+        name: "Storefront",
+        type: "compose",
+        composeType: "compose",
+        appName: "storefront",
+        domains: JSON.stringify([
+          { host: "shop.example.com", port: 3000, serviceName: "web" },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).toContain("reverse_proxy web:3000");
+    expect(caddyfile).not.toContain("reverse_proxy storefront_web:3000");
+  });
+
   test("does not mix HTTP-only and HTTPS routes on one hostname", () => {
     expect(() =>
       generateCaddyfileContent({}, [

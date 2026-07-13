@@ -116,6 +116,17 @@ export function useResourceDetail({
     },
   });
 
+  const controlContainerMutation = useMutation({
+    ...trpc.resource.controlContainer.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Container command dispatched successfully");
+      void resourceQuery.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to control container");
+    },
+  });
+
   const deleteResourceMutation = useMutation({
     ...trpc.resource.delete.mutationOptions(),
     onSuccess: () => {
@@ -144,6 +155,8 @@ export function useResourceDetail({
     isDeployingResource: deployResourceMutation.isPending,
     controlResource: controlResourceMutation.mutate,
     isControllingResource: controlResourceMutation.isPending,
+    controlContainer: controlContainerMutation.mutate,
+    isControllingContainer: controlContainerMutation.isPending,
     deleteResource: deleteResourceMutation.mutate,
     isDeletingResource: deleteResourceMutation.isPending,
   };

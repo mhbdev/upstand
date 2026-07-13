@@ -101,6 +101,8 @@ export default function ResourceDetail({
     isDeployingResource,
     controlResource,
     isControllingResource,
+    controlContainer,
+    isControllingContainer,
     deleteResource,
     isDeletingResource,
   } = useResourceDetail({
@@ -279,7 +281,8 @@ export default function ResourceDetail({
             resource={resource}
             liveContainers={liveContainers}
             containerLogsData={containerLogsData}
-            controlResource={controlResource}
+            controlContainer={controlContainer}
+            isControllingContainer={isControllingContainer}
             setContainerModalOpen={setContainerModalOpen}
             setSelectedContainerId={setSelectedContainerId}
           />

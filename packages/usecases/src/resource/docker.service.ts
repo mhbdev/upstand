@@ -17,6 +17,7 @@ import yaml from "yaml";
 import {
   ensureResourceOverlayNetwork,
   ensureUpstandOverlayNetwork,
+  getResourceOverlayNetworkName,
   isManager,
   isSwarmActive,
 } from "../swarm/swarm.helpers";
@@ -214,6 +215,114 @@ function applyComposeResourceConfig(
         retries: config.healthcheck.retries,
         start_period: `${config.healthcheck.startPeriodSeconds}s`,
       };
+    }
+  }
+
+  return yaml.stringify(parsed);
+}
+
+function applyComposeIngressNetwork(
+  rawCompose: string,
+  networkName: string,
+  prefixVolumes: boolean,
+  stackName: string,
+): string {
+  const parsed = yaml.parse(rawCompose) as {
+    services?: Record<string, Record<string, unknown>>;
+    networks?: Record<string, unknown>;
+    volumes?: unknown;
+  };
+  if (!parsed?.services || typeof parsed.services !== "object") {
+    throw new Error("Compose file must define services");
+  }
+
+  const ingressNetwork = "upstand_ingress";
+  parsed.networks = {
+    ...(isUnknownRecord(parsed.networks) ? parsed.networks : {}),
+    [ingressNetwork]: {
+      name: networkName,
+      external: true,
+    },
+  };
+
+  for (const service of Object.values(parsed.services)) {
+    // Docker Compose forbids networks alongside network_mode. Preserve an
+    // explicit host/none/container mode and let routing validation surface
+    // that it cannot be reached through the shared ingress network.
+    if (service.network_mode) continue;
+
+    const networks = service.networks;
+    if (!networks) {
+      service.networks = [ingressNetwork];
+    } else if (Array.isArray(networks)) {
+      if (!networks.includes(ingressNetwork)) networks.push(ingressNetwork);
+    } else if (isUnknownRecord(networks)) {
+      service.networks = { ...networks, [ingressNetwork]: {} };
+    } else {
+      service.networks = [ingressNetwork];
+    }
+  }
+
+  if (prefixVolumes) {
+    if (stackName.length === 0) {
+      throw new Error("An isolated Compose deployment needs a valid name");
+    }
+
+    const volumePrefix = `${stackName}_`;
+    if (parsed.volumes && typeof parsed.volumes === "object") {
+      const volumes = parsed.volumes as Record<string, unknown>;
+      const isNamedVolume = (source: unknown): source is string =>
+        typeof source === "string" &&
+        source.length > 0 &&
+        !source.startsWith(".") &&
+        !source.startsWith("/") &&
+        !source.startsWith("~") &&
+        !source.includes("/");
+      const volumeNames = new Map<string, string>();
+      const externalVolumeNames = new Set<string>();
+      const renameVolume = (source: unknown) => {
+        if (!isNamedVolume(source)) return source;
+        if (externalVolumeNames.has(source)) return source;
+        const renamed = volumeNames.get(source) || `${volumePrefix}${source}`;
+        volumeNames.set(source, renamed);
+        return renamed;
+      };
+      const renamedVolumes: Record<string, unknown> = {};
+      for (const [name, definition] of Object.entries(volumes)) {
+        if (
+          isUnknownRecord(definition) &&
+          (definition.external === true || isUnknownRecord(definition.external))
+        ) {
+          externalVolumeNames.add(name);
+          renamedVolumes[name] = definition;
+          continue;
+        }
+        const renamed = renameVolume(name) as string;
+        if (isUnknownRecord(definition)) {
+          const nextDefinition = { ...definition };
+          if (typeof nextDefinition.name === "string") {
+            nextDefinition.name = renameVolume(nextDefinition.name);
+          }
+          renamedVolumes[renamed] = nextDefinition;
+        } else {
+          renamedVolumes[renamed] = definition;
+        }
+      }
+      parsed.volumes = renamedVolumes;
+
+      for (const service of Object.values(parsed.services)) {
+        if (!Array.isArray(service.volumes)) continue;
+        service.volumes = service.volumes.map((volume) => {
+          if (typeof volume === "string") {
+            const [source, ...rest] = volume.split(":");
+            return [renameVolume(source), ...rest].join(":");
+          }
+          if (isUnknownRecord(volume) && typeof volume.source === "string") {
+            return { ...volume, source: renameVolume(volume.source) };
+          }
+          return volume;
+        });
+      }
     }
   }
 
@@ -1378,111 +1487,18 @@ export class DockerService {
       resource,
       advancedConfig,
     );
-    if (
-      !advancedConfig.isolatedDeployment &&
-      !composeContent.includes("networks:")
-    ) {
-      composeContent += `\n\nnetworks:\n  default:\n    name: ${this.networkName}\n    external: true\n`;
-    }
-
-    if (advancedConfig.isolatedDeployment) {
-      try {
-        const parsed = yaml.parse(composeContent) as {
-          services?: Record<string, Record<string, unknown>>;
-          networks?: Record<string, unknown>;
-          volumes?: unknown;
-        };
-        if (!parsed?.services || typeof parsed.services !== "object") {
-          throw new Error(
-            "Compose file must define services for isolated deployment",
-          );
-        }
-
-        const ingressNetwork = "upstand_ingress";
-        parsed.networks = {
-          ...(parsed.networks || {}),
-          [ingressNetwork]: {
-            name: deploymentNetwork.name,
-            external: true,
-          },
-        };
-
-        for (const service of Object.values(parsed.services)) {
-          const networks = service.networks;
-          if (!networks) {
-            service.networks = [ingressNetwork];
-          } else if (Array.isArray(networks)) {
-            if (!networks.includes(ingressNetwork))
-              networks.push(ingressNetwork);
-          } else if (typeof networks === "object") {
-            service.networks = { ...networks, [ingressNetwork]: {} };
-          } else {
-            service.networks = [ingressNetwork];
-          }
-        }
-
-        if (advancedConfig.isolatedDeploymentsVolume) {
-          const volumePrefix = `${stackName}_`;
-          const isNamedVolume = (source: unknown): source is string =>
-            typeof source === "string" &&
-            source.length > 0 &&
-            !source.startsWith(".") &&
-            !source.startsWith("/") &&
-            !source.startsWith("~") &&
-            !source.includes("/");
-          const volumeNames = new Map<string, string>();
-          const renameVolume = (source: unknown) => {
-            if (!isNamedVolume(source)) return source;
-            const renamed =
-              volumeNames.get(source) || `${volumePrefix}${source}`;
-            volumeNames.set(source, renamed);
-            return renamed;
-          };
-
-          if (parsed.volumes && typeof parsed.volumes === "object") {
-            const volumes = parsed.volumes as Record<string, unknown>;
-            const renamedVolumes: Record<string, unknown> = {};
-            for (const [name, definition] of Object.entries(volumes)) {
-              const renamed = renameVolume(name) as string;
-              if (definition && typeof definition === "object") {
-                const nextDefinition = {
-                  ...(definition as Record<string, unknown>),
-                };
-                if (typeof nextDefinition.name === "string") {
-                  nextDefinition.name = renameVolume(nextDefinition.name);
-                }
-                renamedVolumes[renamed] = nextDefinition;
-              } else {
-                renamedVolumes[renamed] = definition;
-              }
-            }
-            parsed.volumes = renamedVolumes;
-          }
-
-          for (const service of Object.values(parsed.services)) {
-            if (!Array.isArray(service.volumes)) continue;
-            service.volumes = service.volumes.map((volume) => {
-              if (typeof volume === "string") {
-                const [source, ...rest] = volume.split(":");
-                const renamed = renameVolume(source);
-                return rest.length ? [renamed, ...rest].join(":") : renamed;
-              }
-              if (volume && typeof volume === "object") {
-                const nextVolume = { ...(volume as Record<string, unknown>) };
-                nextVolume.source = renameVolume(nextVolume.source);
-                return nextVolume;
-              }
-              return volume;
-            });
-          }
-        }
-
-        composeContent = yaml.stringify(parsed);
-      } catch (error) {
-        throw new Error(
-          `Unable to prepare isolated Compose deployment: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+    try {
+      composeContent = applyComposeIngressNetwork(
+        composeContent,
+        deploymentNetwork.name,
+        advancedConfig.isolatedDeployment &&
+          advancedConfig.isolatedDeploymentsVolume,
+        stackName,
+      );
+    } catch (error) {
+      throw new Error(
+        `Unable to prepare Compose networking: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Inject placement constraints if provided
@@ -1662,6 +1678,43 @@ export class DockerService {
     }
   }
 
+  async controlContainer(
+    resource: Resource,
+    containerId: string,
+    cmd: "start" | "stop" | "restart" | "kill",
+  ): Promise<void> {
+    const containers = await this.getContainers(resource);
+    const target = containers.find(
+      (container) =>
+        typeof container.id === "string" &&
+        (container.id === containerId ||
+          container.id.startsWith(containerId) ||
+          containerId.startsWith(container.id)),
+    );
+    if (!target) {
+      throw new ConflictError(
+        "The selected container is no longer part of this resource. Refresh the container list and try again.",
+      );
+    }
+
+    const container = this.docker.getContainer(target.id);
+    try {
+      await container.inspect();
+    } catch (error: any) {
+      if (error.statusCode === 404) {
+        throw new ConflictError(
+          "This replica is running on another Swarm node. Manage it from the node that hosts the container or use the resource restart action.",
+        );
+      }
+      throw error;
+    }
+
+    if (cmd === "start") await container.start();
+    if (cmd === "stop") await container.stop();
+    if (cmd === "restart") await container.restart();
+    if (cmd === "kill") await container.kill({ signal: "SIGKILL" });
+  }
+
   async getContainers(resource: Resource): Promise<any[]> {
     const nameFilter = this.sanitizeName(resource.appName || resource.name);
 
@@ -1730,7 +1783,9 @@ export class DockerService {
                   (p: any) => `${p.PublishedPort}:${p.TargetPort}`,
                 ).join(", ") || "N/A";
               containersList.push({
-                id: task.ID.substring(0, 12),
+                id: (
+                  task.Status?.ContainerStatus?.ContainerID || task.ID
+                ).substring(0, 64),
                 name: `${serviceName}.${task.Slot || 1}`,
                 status: task.Status?.State || "unknown",
                 ports,
@@ -1784,7 +1839,9 @@ export class DockerService {
               (p: any) => `${p.PublishedPort}:${p.TargetPort}`,
             ).join(", ") || "N/A";
           return {
-            id: task.ID.substring(0, 12),
+            id: (
+              task.Status?.ContainerStatus?.ContainerID || task.ID
+            ).substring(0, 64),
             name: `${serviceName}.${task.Slot || 1}`,
             status: task.Status?.State || "unknown",
             ports,
@@ -1814,10 +1871,17 @@ export class DockerService {
             label: [`com.docker.compose.project=${resourceName}`],
           }),
         });
-        return containers
-          .map((container: any) => container.Names?.[0]?.replace(/^\//, ""))
-          .filter((name): name is string => Boolean(name))
-          .sort();
+        return [
+          ...new Set(
+            containers
+              .map(
+                (container: any) =>
+                  container.Labels?.["com.docker.compose.service"] ||
+                  container.Names?.[0]?.replace(/^\//, ""),
+              )
+              .filter((name): name is string => Boolean(name)),
+          ),
+        ].sort();
       }
 
       const services = await this.docker.listServices(
@@ -2194,14 +2258,31 @@ export class DockerService {
 
     if (resource.type === "compose") {
       try {
-        await this.runCommandAsync(
-          "docker",
-          ["stack", "rm", serviceName],
-          () => {},
-        );
+        if (resource.composeType === "compose") {
+          const containers = await this.docker.listContainers({
+            all: true,
+            filters: JSON.stringify({
+              label: [`com.docker.compose.project=${serviceName}`],
+            }),
+          });
+          await Promise.all(
+            containers.map((container) =>
+              this.docker
+                .getContainer(container.Id)
+                .remove({ force: true })
+                .catch(() => undefined),
+            ),
+          );
+        } else {
+          await this.runCommandAsync(
+            "docker",
+            ["stack", "rm", serviceName],
+            () => {},
+          );
+        }
       } catch (err: any) {
         log.error({
-          message: `Failed to remove compose stack ${serviceName}`,
+          message: `Failed to remove Compose resource ${serviceName}`,
           err: err.message,
         });
       }
@@ -2225,6 +2306,7 @@ export class DockerService {
           });
         }
       }
+      await this.removeResourceNetwork(resource);
       return;
     }
 
@@ -2250,6 +2332,38 @@ export class DockerService {
           message: `Failed to remove volume for resource ${resource.id}`,
           err: err.message,
         });
+      }
+    }
+
+    await this.removeResourceNetwork(resource);
+  }
+
+  private async removeResourceNetwork(resource: Resource): Promise<void> {
+    const advancedConfig = parseResourceAdvancedConfig(resource.advancedConfig);
+    if (!advancedConfig.isolatedDeployment) return;
+
+    const network = this.docker.getNetwork(
+      getResourceOverlayNetworkName(resource.id),
+    );
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        await network.remove();
+        log.info({
+          message: `Removed isolated network for resource '${resource.id}'.`,
+          network: getResourceOverlayNetworkName(resource.id),
+        });
+        return;
+      } catch (error: any) {
+        if (error.statusCode === 404) return;
+        if (error.statusCode !== 409 || attempt === 9) {
+          log.warn({
+            message: `Isolated network for resource '${resource.id}' could not be removed yet.`,
+            network: getResourceOverlayNetworkName(resource.id),
+            err: error.message || error,
+          });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
   }

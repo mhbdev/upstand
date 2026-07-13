@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import {
+  ControlContainerInputSchema,
   ControlResourceInputSchema,
   CreateResourceInputSchema,
   DeleteResourceInputSchema,
@@ -14,6 +15,7 @@ import {
 } from "@upstand/usecases";
 import { log } from "evlog";
 import {
+  ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
   CreateResourceUseCaseToken,
   DeleteResourceUseCaseToken,
@@ -358,6 +360,54 @@ export const resourceRouter = router({
       const controlUseCase = ctx.scope.resolve(ControlResourceUseCaseToken);
       try {
         return await controlUseCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  controlContainer: twoFactorVerifiedProcedure
+    .input(ControlContainerInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const resourceUseCase = ctx.scope.resolve(GetResourceUseCaseToken);
+      const resource = await resourceUseCase.execute({ id: input.resourceId });
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+
+      const environmentUseCase = ctx.scope.resolve(GetEnvironmentUseCaseToken);
+      const environment = await environmentUseCase.execute({
+        id: resource.environmentId,
+      });
+      if (!environment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Environment not found",
+        });
+      }
+
+      const projectUseCase = ctx.scope.resolve(GetProjectUseCaseToken);
+      const project = await projectUseCase.execute({
+        id: environment.projectId,
+      });
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:update",
+      );
+
+      const useCase = ctx.scope.resolve(ControlContainerUseCaseToken);
+      try {
+        return await useCase.execute(input);
       } catch (error) {
         handleUseCaseError(error);
       }

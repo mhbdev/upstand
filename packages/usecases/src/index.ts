@@ -73,6 +73,7 @@ export * from "./project/create-project.usecase";
 export * from "./project/delete-project.usecase";
 export * from "./project/get-project.usecase";
 export * from "./project/get-projects.usecase";
+export * from "./resource/control-container.usecase";
 export * from "./resource/control-resource.usecase";
 // Resources
 export * from "./resource/create-resource.usecase";

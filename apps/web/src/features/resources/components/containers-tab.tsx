@@ -24,6 +24,7 @@ import {
 } from "@upstand/ui/components/dropdown-menu";
 import { cn } from "@upstand/ui/lib/utils";
 import {
+  CircleX,
   Code,
   FileText,
   HardDrive,
@@ -49,7 +50,8 @@ interface ContainersTabProps {
   resource: any;
   liveContainers: any;
   containerLogsData: any;
-  controlResource: any;
+  controlContainer: any;
+  isControllingContainer: boolean;
   setContainerModalOpen: (open: boolean) => void;
   setSelectedContainerId: (id: string | null) => void;
 }
@@ -80,11 +82,41 @@ const parseContainerItems = (
   }
 };
 
+function resourceIngressNetwork(resource: any): {
+  name: string;
+  scope: string;
+} {
+  let isolated = false;
+  try {
+    const config = JSON.parse(resource.advancedConfig || "{}");
+    isolated = config.isolatedDeployment === true;
+  } catch {
+    // Legacy resources use the shared network by default.
+  }
+
+  if (!isolated) {
+    return {
+      name: "upstand-network",
+      scope: "Shared across non-isolated resources, projects, and environments",
+    };
+  }
+
+  const suffix = String(resource.id)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-");
+  return {
+    name: `upstand-resource-${suffix}`.slice(0, 63),
+    scope:
+      "Dedicated to this resource; Caddy is attached only while it has routes",
+  };
+}
+
 export function ContainersTab({
   resource,
   liveContainers,
   containerLogsData,
-  controlResource,
+  controlContainer,
+  isControllingContainer,
   setContainerModalOpen,
   setSelectedContainerId,
 }: ContainersTabProps) {
@@ -104,16 +136,21 @@ export function ContainersTab({
   }, [resource, liveContainers]);
 
   const dispatchContainerCommand = (
-    _containerId: string,
-    command: "start" | "stop" | "restart",
+    containerId: string,
+    command: "start" | "stop" | "restart" | "kill",
   ) => {
     toast.info(`Sending ${command} command to container...`);
-    controlResource({ id: resource.id, command });
+    controlContainer({
+      resourceId: resource.id,
+      containerId,
+      command,
+    });
   };
 
   const containerLogs = containerLogsData
     ? containerLogsData.trim().split("\n")
     : [];
+  const ingressNetwork = resourceIngressNetwork(resource);
 
   const handleOpenModal = (
     container: ContainerItem,
@@ -235,6 +272,15 @@ export function ContainersTab({
                               <Square className="mr-2 size-4 text-destructive" />{" "}
                               Stop
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={isControllingContainer}
+                              className="text-destructive focus:text-destructive"
+                              onClick={() =>
+                                dispatchContainerCommand(con.id, "kill")
+                              }
+                            >
+                              <CircleX className="mr-2 size-4" /> Kill
+                            </DropdownMenuItem>
                             <hr className="my-1 border-border/20" />
                             <DropdownMenuItem
                               onClick={() => handleOpenModal(con, "logs")}
@@ -332,19 +378,22 @@ export function ContainersTab({
           {containerModalType === "networks" && (
             <div className="space-y-3 bg-muted/10 p-4 text-foreground text-sm">
               <div className="flex justify-between border-border/10 border-b pb-1.5">
-                <span className="text-muted-foreground">Network Name</span>
+                <span className="text-muted-foreground">Ingress network</span>
                 <span className="font-mono font-semibold">
-                  upstand-overlay-net
+                  {ingressNetwork.name}
                 </span>
               </div>
               <div className="flex justify-between border-border/10 border-b pb-1.5">
-                <span className="text-muted-foreground">Gateway IP</span>
-                <span className="font-mono font-semibold">10.0.4.1</span>
+                <span className="text-muted-foreground">Sharing scope</span>
+                <span className="max-w-[14rem] text-right font-semibold text-xs">
+                  {ingressNetwork.scope}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Allocated IP</span>
-                <span className="font-mono font-semibold">10.0.4.15</span>
-              </div>
+              <p className="text-muted-foreground text-xs">
+                User-defined Compose networks are preserved. Upstand adds this
+                ingress network so Caddy and routed services share a stable DNS
+                path.
+              </p>
             </div>
           )}
 
@@ -354,11 +403,9 @@ export function ContainersTab({
                 <span className="font-semibold text-muted-foreground text-xs">
                   VOLUME MOUNT
                 </span>
-                <span className="break-all font-mono font-semibold text-xs">
-                  /var/lib/docker/volumes/{resource.appName}_data/_data
-                </span>
                 <span className="font-medium text-primary text-xs">
-                  Mapped to /data inside container
+                  Runtime mount details come from the deployed Docker definition
+                  and are not guessed by the dashboard.
                 </span>
               </div>
               <div className="flex justify-between">

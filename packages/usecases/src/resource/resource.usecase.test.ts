@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { IUnitOfWork } from "@upstand/domain";
+import { ControlContainerUseCase } from "./control-container.usecase";
 import { ControlResourceUseCase } from "./control-resource.usecase";
 import { CreateResourceUseCase } from "./create-resource.usecase";
 import { DeleteResourceUseCase } from "./delete-resource.usecase";
@@ -136,6 +137,7 @@ const mockDockerService = {
   deployAppGit: async () => {},
   deployComposeStack: async () => {},
   controlService: async () => {},
+  controlContainer: async () => {},
   getContainers: async () => [
     {
       id: "task-1",
@@ -308,6 +310,35 @@ describe("Resource Usecases", () => {
       command: "start",
     });
     expect(started.status).toBe("running");
+  });
+
+  test("controls only the selected container, including kill", async () => {
+    const uow = new MockUnitOfWork();
+    const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
+    const controlContainerUseCase = new ControlContainerUseCase(
+      uow as IUnitOfWork,
+      mockDockerService,
+    );
+
+    uow.environmentRepository.store.push({
+      id: "env-1",
+      name: "production",
+      resourceCount: 0,
+    });
+    const resource = await createUseCase.execute({
+      environmentId: "env-1",
+      name: "selected-container",
+      type: "application",
+      appName: "selected-container",
+    });
+
+    const result = await controlContainerUseCase.execute({
+      resourceId: resource.id,
+      containerId: "task-1",
+      command: "kill",
+    });
+
+    expect(result.id).toBe(resource.id);
   });
 
   test("normalizes a domain before Caddy receives the complete resource set", async () => {

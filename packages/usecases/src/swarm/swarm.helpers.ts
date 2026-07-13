@@ -217,16 +217,40 @@ async function ensureManagedOverlayNetwork(
     }
   }
 
-  const created = (await docker.createNetwork({
-    Name: name,
-    Driver: "overlay",
-    Attachable: true,
-    CheckDuplicate: true,
-    Labels: {
-      "com.upstand.managed": "true",
-      "com.upstand.purpose": purpose,
-    },
-  })) as DockerNetworkCreateResult;
+  let created: DockerNetworkCreateResult;
+  try {
+    created = (await docker.createNetwork({
+      Name: name,
+      Driver: "overlay",
+      Attachable: true,
+      CheckDuplicate: true,
+      Labels: {
+        "com.upstand.managed": "true",
+        "com.upstand.purpose": purpose,
+      },
+    })) as DockerNetworkCreateResult;
+  } catch (error: unknown) {
+    // Multiple deployment workers can converge on the same network at once.
+    // Docker may report the loser as a conflict even though the desired
+    // network is now available; inspect it again before failing the deploy.
+    const statusCode =
+      typeof error === "object" && error !== null && "statusCode" in error
+        ? error.statusCode
+        : undefined;
+    if (statusCode !== 409) throw error;
+
+    const racedNetwork = (await network.inspect()) as DockerOverlayNetwork;
+    if (
+      racedNetwork.Driver !== "overlay" ||
+      racedNetwork.Scope !== "swarm" ||
+      racedNetwork.Attachable !== true
+    ) {
+      throw new ConflictError(
+        `Network '${name}' exists but is not an attachable Swarm overlay network.`,
+      );
+    }
+    return { id: racedNetwork.Id, created: false };
+  }
 
   return {
     id: created.id || created.Id || UPSTAND_SWARM_NETWORK,

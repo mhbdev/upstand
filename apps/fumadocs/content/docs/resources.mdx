@@ -9,7 +9,7 @@ Upstand groups deployable workloads into three resource types:
 
 - **Applications** build from GitHub, GitLab, Bitbucket, Gitea, or a generic Git URL. Docker registry images are also supported.
 - **Databases** deploy PostgreSQL, MySQL, MariaDB, MongoDB, and Redis with persistent named volumes and generated connection metadata.
-- **Compose stacks** deploy a raw or repository-provided Compose file as a Docker Swarm stack. Routes must identify the target service.
+- **Compose resources** deploy a raw or repository-provided Compose file as either a standalone Docker Compose project or a Docker Swarm stack. Routes must identify the target service.
 
 Every resource belongs to a project and environment and exposes the same operational tabs: General, Environment, Advanced, Domains, Deployments, Containers, Backups, Logs, and Monitoring. Some tabs are intentionally more useful for a specific resource type; for example, build configuration is application-only and database credentials are shown only to authorized users.
 
@@ -46,11 +46,18 @@ The UI provides structured controls and a validated JSON editor for the complete
 
 Environment variables are managed as key/value pairs. Values are masked by default in the dashboard and are injected into the service at deployment time. Database credentials are encrypted at rest with Upstand’s Secret Box wrapper; never copy database passwords into public image tags or Compose files.
 
+## Network model
+
+Non-isolated applications, databases, and Compose services share the attachable `upstand-network` overlay across projects and environments. This gives Caddy and routed services stable Docker DNS while preserving normal service-to-service connectivity. Compose files may define additional networks; Upstand preserves them and adds a managed ingress network to services that do not use an incompatible `network_mode`.
+
+When **Isolated deployment** is enabled, the resource receives a dedicated `upstand-resource-<resource-id>` overlay. Caddy is attached to that network only while the resource has active routes, and named volumes can be prefixed to prevent collisions between identical Compose projects. Removing a resource removes its managed isolated network after Docker releases its endpoints.
+
+Compose volumes explicitly marked `external` are never renamed or prefixed; they remain operator-owned shared storage.
+
 ## Operational tabs
 
 - **Deployments** shows queued, running, successful, and failed runs with their logs.
-- **Containers** lists live Swarm tasks and exposes logs/configuration/network/mount views where available.
+- **Containers** lists live Docker containers or Swarm task containers and exposes start, stop, restart, and kill controls when the selected container is reachable from the current Docker node, plus logs/configuration/network/mount views where available.
 - **Backups** schedules and restores resource volume backups to configured S3 destinations.
 - **Logs** is a searchable, filterable, pausable live log reviewer.
 - **Monitoring** retains live CPU, memory, and network samples from the Docker runtime.
-

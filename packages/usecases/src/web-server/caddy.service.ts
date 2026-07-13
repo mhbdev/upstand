@@ -37,7 +37,7 @@ export type CaddySettings = {
 
 type CaddyResource = Pick<
   Resource,
-  "id" | "name" | "type" | "appName" | "domains"
+  "id" | "name" | "type" | "appName" | "domains" | "composeType"
 > & { advancedConfig?: Resource["advancedConfig"] };
 
 type CaddyRoute = DomainMapping & {
@@ -254,7 +254,9 @@ function getRoutes(resources: CaddyResource[]): CaddyRoute[] {
         mapping.serviceName ||
         sanitizeServiceName(resource.appName || resource.name);
       const upstreamServiceName =
-        resource.type === "compose" && mapping.serviceName
+        resource.type === "compose" &&
+        resource.composeType !== "compose" &&
+        mapping.serviceName
           ? `${sanitizeServiceName(resource.appName || resource.name)}_${sanitizeServiceName(mapping.serviceName)}`
           : serviceName;
       routes.push({
@@ -416,15 +418,16 @@ export class CaddyService {
 
   private async reconcileResourceNetworks(
     resources: CaddyResource[],
-  ): Promise<void> {
+  ): Promise<Set<string>> {
     const routes = getRoutes(resources);
-    if (routes.length === 0) return;
+    if (routes.length === 0) return new Set();
 
     const sharedNetwork = await ensureUpstandOverlayNetwork(docker);
     const resourcesById = new Map(
       resources.map((resource) => [resource.id, resource]),
     );
     const networksByResource = new Map<string, { id: string; name: string }>();
+    const desiredNetworkNames = new Set<string>();
 
     for (const route of routes) {
       const resource = resourcesById.get(route.resourceId);
@@ -439,6 +442,7 @@ export class CaddyService {
           ? await ensureResourceOverlayNetwork(docker, resource.id)
           : { id: sharedNetwork.id, name: this.networkName };
         networksByResource.set(resource.id, network);
+        desiredNetworkNames.add(network.name);
 
         try {
           await docker.getNetwork(network.name).connect({
@@ -500,6 +504,38 @@ export class CaddyService {
         UpdateConfig: serviceSpec.UpdateConfig,
         RollbackConfig: serviceSpec.RollbackConfig,
       });
+    }
+
+    return desiredNetworkNames;
+  }
+
+  private async detachStaleResourceNetworks(
+    desiredNetworkNames: Set<string>,
+  ): Promise<void> {
+    const managedNetworks = await docker.listNetworks({
+      filters: JSON.stringify({
+        label: ["com.upstand.purpose=resource-isolation"],
+      }),
+    });
+
+    for (const network of managedNetworks) {
+      if (!network.Name || desiredNetworkNames.has(network.Name)) continue;
+      try {
+        await docker.getNetwork(network.Id).disconnect({
+          Container: CADDY_CONTAINER_NAME,
+          Force: true,
+        });
+        log.info({
+          message: `Detached Caddy from stale resource network '${network.Name}'.`,
+        });
+      } catch (error: any) {
+        if (error.statusCode !== 404 && error.statusCode !== 409) {
+          log.warn({
+            message: `Unable to detach Caddy from stale resource network '${network.Name}'.`,
+            err: error.message || error,
+          });
+        }
+      }
     }
   }
 
@@ -712,7 +748,7 @@ export class CaddyService {
     let changed = false;
 
     await this.initializeCaddy(settings);
-    await this.reconcileResourceNetworks(resources);
+    const desiredNetworkNames = await this.reconcileResourceNetworks(resources);
     await this.serializeConfiguration(async () => {
       const container = await this.findContainer();
       if (!container) throw new Error("Caddy container is not available");
@@ -791,6 +827,7 @@ export class CaddyService {
         throw error;
       }
     });
+    await this.detachStaleResourceNetworks(desiredNetworkNames);
 
     log.info({
       message: "Caddy configuration synchronized successfully.",
