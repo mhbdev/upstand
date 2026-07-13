@@ -12,7 +12,7 @@ import {
   Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -76,6 +76,7 @@ export default function WebServerDashboard({
 }: {
   session: typeof authClient.$Infer.Session;
 }) {
+  const queryClient = useQueryClient();
   // Database Web Server settings
   const [email, setEmail] = useState("");
   const [httpPort, setHttpPort] = useState(80);
@@ -349,6 +350,32 @@ export default function WebServerDashboard({
     },
   });
 
+  const checkUpdatesMutation = useMutation({
+    ...trpc.webServer.checkForUpdates.mutationOptions(),
+    onSuccess: (result) => {
+      queryClient.setQueryData(trpc.webServer.getUpdateData.queryKey(), result);
+      if (result.updateAvailable && !result.canUpdate) {
+        toast.info(
+          `Upstand ${result.latestVersion} is available, but this source installation must be updated with the installer.`,
+        );
+      } else if (result.channel === "source") {
+        toast.info(
+          "This source installation is updated by rerunning the installer.",
+        );
+      } else if (result.updateAvailable) {
+        toast.success(`A new version is available: ${result.latestVersion}!`, {
+          description:
+            "You can click 'Update Now' next to the version below to update.",
+        });
+      } else {
+        toast.success(`Upstand is up to date (${result.currentVersion})`, {
+          description: "No new updates found.",
+        });
+      }
+    },
+    onError: (err) => toast.error(err.message || "Failed to check for updates"),
+  });
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettingsMutation.mutate({
@@ -381,24 +408,7 @@ export default function WebServerDashboard({
 
   const handleCheckUpdates = async () => {
     toast.info("Checking for Upstand updates...");
-    const res = await refetchUpdates();
-    if (res.data?.channel === "source") {
-      toast.info(
-        "This source installation is updated by rerunning the installer.",
-      );
-    } else if (res.data?.updateAvailable) {
-      toast.success(`A new version is available: ${res.data.latestVersion}!`, {
-        description:
-          "You can click 'Update Now' next to the version below to update.",
-      });
-    } else {
-      toast.success(
-        `Upstand is up to date (${res.data?.currentVersion || "unknown"})`,
-        {
-          description: "No new updates found.",
-        },
-      );
-    }
+    await checkUpdatesMutation.mutateAsync();
   };
 
   const handleToggleDailyCleanup = (checked: boolean) => {
@@ -684,8 +694,14 @@ export default function WebServerDashboard({
                   variant="outline"
                   className="w-full justify-center border-border/60 font-semibold"
                   onClick={handleCheckUpdates}
+                  disabled={checkUpdatesMutation.isPending}
                 >
-                  Check for updates
+                  {checkUpdatesMutation.isPending && (
+                    <Spinner data-icon="inline-start" />
+                  )}
+                  {checkUpdatesMutation.isPending
+                    ? "Checking…"
+                    : "Check for updates"}
                 </Button>
               </div>
 

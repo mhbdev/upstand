@@ -53,6 +53,18 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { Textarea } from "@upstand/ui/components/textarea";
+import {
+  Bell,
+  CircleDot,
+  Link2,
+  Mail,
+  MessageCircle,
+  MessageSquare,
+  Radio,
+  Send,
+  Users,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
@@ -79,14 +91,14 @@ type ConfigurationField = {
 
 type ProviderDefinition = {
   label: string;
-  icon: string;
+  icon: LucideIcon;
   fields: ConfigurationField[];
 };
 
 const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   slack: {
     label: "Slack",
-    icon: "💬",
+    icon: MessageCircle,
     fields: [
       {
         key: "webhookUrl",
@@ -103,7 +115,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   telegram: {
     label: "Telegram",
-    icon: "✈️",
+    icon: Send,
     fields: [
       {
         key: "botToken",
@@ -122,7 +134,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   discord: {
     label: "Discord",
-    icon: "🎮",
+    icon: MessageSquare,
     fields: [
       {
         key: "webhookUrl",
@@ -134,7 +146,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   lark: {
     label: "Lark",
-    icon: "🕊️",
+    icon: CircleDot,
     fields: [
       {
         key: "webhookUrl",
@@ -146,7 +158,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   teams: {
     label: "Microsoft Teams",
-    icon: "👥",
+    icon: Users,
     fields: [
       {
         key: "webhookUrl",
@@ -158,7 +170,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   email: {
     label: "SMTP Email",
-    icon: "✉️",
+    icon: Mail,
     fields: [
       {
         key: "smtpHost",
@@ -204,7 +216,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   resend: {
     label: "Resend",
-    icon: "📨",
+    icon: Send,
     fields: [
       {
         key: "apiKey",
@@ -230,7 +242,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   gotify: {
     label: "Gotify",
-    icon: "🔔",
+    icon: Bell,
     fields: [
       {
         key: "serverUrl",
@@ -256,7 +268,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   ntfy: {
     label: "ntfy",
-    icon: "📣",
+    icon: Radio,
     fields: [
       {
         key: "serverUrl",
@@ -287,7 +299,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   mattermost: {
     label: "Mattermost",
-    icon: "🟣",
+    icon: CircleDot,
     fields: [
       { key: "webhookUrl", label: "Incoming webhook URL", required: true },
       { key: "channel", label: "Channel override", placeholder: "deployments" },
@@ -296,7 +308,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   pushover: {
     label: "Pushover",
-    icon: "🔘",
+    icon: Bell,
     fields: [
       {
         key: "userKey",
@@ -335,7 +347,7 @@ const PROVIDERS: Record<NotificationProviderType, ProviderDefinition> = {
   },
   custom: {
     label: "Custom webhook",
-    icon: "🔗",
+    icon: Link2,
     fields: [
       {
         key: "endpoint",
@@ -671,7 +683,9 @@ export default function NotificationsPage() {
       {channels.length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyMedia variant="icon">🔔</EmptyMedia>
+            <EmptyMedia variant="icon">
+              <Bell aria-hidden="true" />
+            </EmptyMedia>
             <EmptyTitle>No notification channels</EmptyTitle>
             <EmptyDescription>
               Add Slack, email, webhooks, or any supported provider to receive
@@ -691,11 +705,13 @@ export default function NotificationsPage() {
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span
-                      aria-hidden
-                      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-lg"
-                    >
-                      {PROVIDERS[channel.provider].icon}
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+                      {(() => {
+                        const ProviderIcon = PROVIDERS[channel.provider].icon;
+                        return (
+                          <ProviderIcon aria-hidden="true" className="size-4" />
+                        );
+                      })()}
                     </span>
                     <div className="min-w-0">
                       <CardTitle className="truncate">{channel.name}</CardTitle>
@@ -755,7 +771,7 @@ export default function NotificationsPage() {
         open={dialogOpen}
         onOpenChange={(open) => (open ? setDialogOpen(true) : closeDialog())}
       >
-        <DialogContent className="max-h-[90svh] max-w-3xl overflow-y-auto">
+        <DialogContent className="h-[min(92svh,860px)] w-[calc(100vw-1rem)] max-w-[min(96vw,900px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Edit notification" : "Add notification"}
@@ -788,7 +804,8 @@ export default function NotificationsPage() {
                     <SelectGroup>
                       {providerOptions.map(([value, item]) => (
                         <SelectItem key={value} value={value}>
-                          {item.icon} {item.label}
+                          <item.icon aria-hidden="true" className="size-4" />
+                          {item.label}
                         </SelectItem>
                       ))}
                     </SelectGroup>

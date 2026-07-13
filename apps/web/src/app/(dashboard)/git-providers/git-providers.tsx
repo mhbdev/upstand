@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { CardContent } from "@upstand/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -329,39 +330,41 @@ export default function GitProviders({
             return (
               <Card
                 key={provider.id}
-                className="border border-border/40 bg-card/30 transition-all duration-300 hover:border-primary/45"
+                className="border border-border/40 bg-card/30 transition-colors hover:border-primary/45"
               >
-                <CardHeader className="flex flex-row items-start justify-between pb-3">
-                  <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2 font-bold text-base">
-                      {provider.name}
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] capitalize"
-                      >
-                        {provider.provider}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription className="text-muted-foreground text-xs">
-                      {provider.provider === "github" &&
-                        `App ID: ${config.githubAppId || "N/A"}`}
-                      {provider.provider === "gitlab" &&
-                        `Instance: ${config.gitlabUrl}`}
-                      {provider.provider === "gitea" &&
-                        `Instance: ${config.giteaUrl}`}
-                      {provider.provider === "bitbucket" &&
-                        `Username: ${config.bitbucketUsername}`}
-                    </CardDescription>
-                    <p className="pt-1 font-semibold text-[10px] text-muted-foreground/70 uppercase tracking-wider">
-                      Created: {new Date(provider.createdAt).toLocaleString()}
-                    </p>
+                <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 font-semibold text-primary uppercase">
+                      {provider.provider.slice(0, 2)}
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <CardTitle className="flex flex-wrap items-center gap-2 font-bold text-base">
+                        <span className="truncate">{provider.name}</span>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] capitalize"
+                        >
+                          {provider.provider}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription className="truncate text-muted-foreground text-xs">
+                        {provider.provider === "github" &&
+                          `App ID: ${config.githubAppId || "N/A"}`}
+                        {provider.provider === "gitlab" &&
+                          `Instance: ${config.gitlabUrl}`}
+                        {provider.provider === "gitea" &&
+                          `Instance: ${config.giteaUrl}`}
+                        {provider.provider === "bitbucket" &&
+                          `Username: ${config.bitbucketUsername}`}
+                      </CardDescription>
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     {!isInstalled ? (
                       provider.provider === "github" ? (
                         <a
                           href={`${config.githubAppName}/installations/new?state=gh_setup:${provider.id}`}
-                          className="flex items-center gap-1 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-600 transition-all hover:bg-yellow-500/20"
+                          className="flex items-center gap-1 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-600 transition-colors hover:bg-yellow-500/20"
                         >
                           <HugeiconsIcon
                             icon={Alert02Icon}
@@ -378,7 +381,7 @@ export default function GitProviders({
                           )}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-1 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-600 transition-all hover:bg-yellow-500/20"
+                          className="flex items-center gap-1 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-600 transition-colors hover:bg-yellow-500/20"
                         >
                           <HugeiconsIcon
                             icon={Alert02Icon}
@@ -428,6 +431,16 @@ export default function GitProviders({
                     </Button>
                   </div>
                 </CardHeader>
+                <CardContent className="flex items-center justify-between gap-3 border-border/40 border-t pt-3 text-muted-foreground text-xs">
+                  <span>
+                    Added {new Date(provider.createdAt).toLocaleDateString()}
+                  </span>
+                  <span>
+                    {isInstalled
+                      ? "Repository access enabled"
+                      : "Setup required"}
+                  </span>
+                </CardContent>
               </Card>
             );
           })}
@@ -461,7 +474,7 @@ export default function GitProviders({
 
       {/* Add Provider Dialog */}
       <Dialog open={addProviderOpen} onOpenChange={setAddProviderOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[92svh] w-[calc(100vw-1rem)] max-w-[min(96vw,720px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Git Provider</DialogTitle>
             <DialogDescription>

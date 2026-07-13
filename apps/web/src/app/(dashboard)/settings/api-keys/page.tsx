@@ -15,9 +15,12 @@ import { Checkbox } from "@upstand/ui/components/checkbox";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@upstand/ui/components/native-select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { Copy, KeyRound, ShieldCheck, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -162,20 +165,31 @@ export default function ApiKeysPage() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="key-preset">Permission preset</Label>
-            <NativeSelect
-              id="key-preset"
+            <Select
               value={preset}
               disabled={advanced}
-              onChange={(event) =>
-                setPreset(event.target.value as ApiKeyPreset)
-              }
+              onValueChange={(value) => {
+                if (value) setPreset(value as ApiKeyPreset);
+              }}
             >
-              {PRESETS.map((item) => (
-                <NativeSelectOption key={item.value} value={item.value}>
-                  {item.label} — {item.description}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+              <SelectTrigger
+                id="key-preset"
+                className="w-full"
+                aria-label="Permission preset"
+              >
+                <SelectValue placeholder="Select a permission preset" />
+              </SelectTrigger>
+              <SelectContent>
+                {PRESETS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              {PRESETS.find((item) => item.value === preset)?.description}
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox

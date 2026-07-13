@@ -6,6 +6,25 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.18 - 2026-07-13
+
+### Added
+
+- Added provider-wide AI model catalog discovery for OpenAI, Anthropic, Google, OpenRouter, and OpenAI-compatible gateways, while preserving custom model IDs.
+- Added a force-refresh update check shared by Web Server and Settings so newly published tags are detected immediately instead of waiting for the server cache.
+- Added responsive, larger terminal and notification configuration dialogs, accessible provider icons, and Git provider access-management links.
+
+### Changed
+
+- Moved UpGal configuration into Settings as **UpGal Settings** and removed the duplicate dashboard navigation entry.
+- Replaced settings/API-key/remote-server native selects with the repository's based-ui Select component.
+- Resource forms now protect unsaved edits from live polling and use a horizontally scrollable, keyboard-accessible provider tab list.
+
+### Fixed
+
+- Update checks now fall back to GitHub tags when a repository has no formal Release object (including the current v0.1.17 tag), compare semantic versions correctly, and report source-install updates without incorrectly enabling an in-place update.
+- UpGal chat requests now target the configured API origin in self-hosted deployments.
+
 ## 0.1.17 - 2026-07-13
 
 ### Added

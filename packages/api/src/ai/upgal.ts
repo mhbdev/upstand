@@ -498,52 +498,78 @@ function decryptProviderApiKey(
   });
 }
 
-export async function listOpenRouterModels(
+const MODEL_CATALOG_BASE_URLS: Record<AIProvider, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta",
+  openrouter: "https://openrouter.ai/api/v1",
+  gateway: "https://ai-gateway.vercel.sh/v1",
+};
+
+export async function listProviderModels(
   organizationId: string,
   scope: ServiceScope,
-  input: { apiKey?: string; baseUrl?: string },
+  input: { provider: AIProvider; apiKey?: string; baseUrl?: string },
 ) {
   const repository = resolve(scope, AIRepositoryToken);
   const config = await repository.findProviderConfig(organizationId);
   const apiKey = input.apiKey?.trim() || decryptProviderApiKey(config);
-  if (!apiKey) throw new Error("Enter an OpenRouter API key first.");
+  if (!apiKey) throw new Error(`Enter a ${input.provider} API key first.`);
 
   const endpoint = new URL(
     "models",
-    (input.baseUrl?.trim() || "https://openrouter.ai/api/v1").replace(
-      /\/$/,
-      "",
-    ) + "/",
+    `${(input.baseUrl?.trim() || MODEL_CATALOG_BASE_URLS[input.provider]).replace(/\/$/, "")}/`,
   );
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (input.provider === "google") {
+    endpoint.searchParams.set("key", apiKey);
+  } else if (input.provider === "anthropic") {
+    headers["x-api-key"] = apiKey;
+    headers["anthropic-version"] = "2023-06-01";
+  } else {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  if (input.provider === "openrouter" || input.provider === "gateway") {
+    headers["HTTP-Referer"] = "https://upstand.dev";
+    headers["X-Title"] = "Upstand";
+  }
   const response = await fetch(endpoint, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      Accept: "application/json",
-      "HTTP-Referer": "https://upstand.dev",
-      "X-Title": "Upstand",
-    },
+    cache: "no-store",
+    headers,
   });
   if (!response.ok) {
     const message = (await response.text()).slice(0, 500);
     throw new Error(
-      `OpenRouter model request failed (${response.status}): ${message}`,
+      `${input.provider} model request failed (${response.status}): ${message}`,
     );
   }
   const payload = (await response.json()) as {
-    data?: Array<{ id?: string; name?: string; context_length?: number }>;
+    data?: Array<{
+      id?: string;
+      name?: string;
+      display_name?: string;
+      context_length?: number;
+    }>;
+    models?: Array<{
+      name?: string;
+      displayName?: string;
+      inputTokenLimit?: number;
+    }>;
   };
-  return (payload.data ?? [])
-    .filter(
-      (
-        model,
-      ): model is { id: string; name?: string; context_length?: number } =>
-        Boolean(model.id),
-    )
-    .map((model) => ({
-      id: model.id,
-      name: model.name || model.id,
-      contextLength: model.context_length,
-    }))
+  const models =
+    input.provider === "google"
+      ? (payload.models ?? []).map((model) => ({
+          id: model.name?.replace(/^models\//, "") || "",
+          name: model.displayName || model.name || "",
+          contextLength: model.inputTokenLimit,
+        }))
+      : (payload.data ?? []).map((model) => ({
+          id: model.id || "",
+          name: model.name || model.id || "",
+          contextLength: model.context_length,
+        }));
+  return models
+    .filter((model) => Boolean(model.id))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

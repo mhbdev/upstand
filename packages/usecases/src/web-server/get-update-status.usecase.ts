@@ -17,10 +17,30 @@ let cachedStatus: {
   key: string;
 } | null = null;
 
+const VERSION_PATTERN = /^(?:v)?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/i;
+
+function compareVersions(left: string, right: string): number {
+  const parse = (value: string) => {
+    const match = value.trim().match(VERSION_PATTERN);
+    return match ? match.slice(1, 4).map(Number) : null;
+  };
+  const a = parse(left);
+  const b = parse(right);
+  if (!a || !b) return 0;
+  for (let index = 0; index < 3; index += 1) {
+    const leftPart = a[index] ?? 0;
+    const rightPart = b[index] ?? 0;
+    if (leftPart !== rightPart) return leftPart > rightPart ? 1 : -1;
+  }
+  return 0;
+}
+
 export class GetUpdateStatusUseCase {
   constructor() {}
 
-  async execute(): Promise<UpdateStatusResult> {
+  async execute(options?: {
+    forceRefresh?: boolean;
+  }): Promise<UpdateStatusResult> {
     let currentVersion = process.env.UPSTAND_VERSION;
     if (!currentVersion) {
       try {
@@ -42,17 +62,6 @@ export class GetUpdateStatusUseCase {
         ? "source"
         : "stable";
     const checkedAt = new Date().toISOString();
-    if (channel === "source") {
-      return {
-        currentVersion,
-        latestVersion: currentVersion,
-        updateAvailable: false,
-        channel,
-        canUpdate: false,
-        checkedAt,
-      };
-    }
-
     const repo = process.env.GITHUB_REPOSITORY || "mhbdev/upstand";
 
     const now = Date.now();
@@ -60,7 +69,8 @@ export class GetUpdateStatusUseCase {
     if (
       cachedStatus &&
       cachedStatus.expiresAt > now &&
-      cachedStatus.key === cacheKey
+      cachedStatus.key === cacheKey &&
+      !options?.forceRefresh
     ) {
       return cachedStatus.result;
     }
@@ -71,6 +81,7 @@ export class GetUpdateStatusUseCase {
           ? `https://api.github.com/repos/${repo}/releases?per_page=30`
           : `https://api.github.com/repos/${repo}/releases/latest`;
       const response = await fetch(endpoint, {
+        cache: "no-store",
         headers: {
           Accept: "application/vnd.github+json",
           "User-Agent": "Upstand",
@@ -86,7 +97,7 @@ export class GetUpdateStatusUseCase {
           latestVersion: currentVersion,
           updateAvailable: false,
           channel,
-          canUpdate: true,
+          canUpdate: channel !== "source",
           checkedAt,
         };
       }
@@ -99,6 +110,7 @@ export class GetUpdateStatusUseCase {
         const tagsResponse = await fetch(
           `https://api.github.com/repos/${repo}/tags?per_page=30`,
           {
+            cache: "no-store",
             headers: {
               Accept: "application/vnd.github+json",
               "User-Agent": "Upstand",
@@ -119,16 +131,15 @@ export class GetUpdateStatusUseCase {
             ? ((data as Array<{ name?: string }>)[0]?.name ?? currentVersion)
             : ((data as { tag_name?: string }).tag_name ?? currentVersion);
 
-      const cleanTag = (tag: string) => tag.replace(/^v/, "").trim();
       const updateAvailable =
-        cleanTag(latestVersion) !== cleanTag(currentVersion);
+        compareVersions(latestVersion, currentVersion) > 0;
 
       const result: UpdateStatusResult = {
         currentVersion,
         latestVersion,
         updateAvailable,
         channel,
-        canUpdate: true,
+        canUpdate: channel !== "source",
         checkedAt,
       };
 
@@ -149,7 +160,7 @@ export class GetUpdateStatusUseCase {
         latestVersion: currentVersion,
         updateAvailable: false,
         channel,
-        canUpdate: true,
+        canUpdate: channel !== "source",
         checkedAt,
       };
     }

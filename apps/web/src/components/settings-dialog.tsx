@@ -12,6 +12,7 @@ import {
 } from "@better-auth-ui/react";
 import {
   InformationCircleIcon,
+  AiBrain01Icon,
   Menu01Icon,
   MoreHorizontalCircle01Icon,
   Settings01Icon,
@@ -75,12 +76,13 @@ import {
   SidebarProvider,
 } from "@upstand/ui/components/sidebar";
 import { Spinner } from "@upstand/ui/components/spinner";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@upstand/ui/lib/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/utils/trpc";
 import { authClient } from "@/lib/auth-client";
+import { UpGalSettingsPanel } from "@/app/(dashboard)/settings/ai/page";
 
 /* ─────────────────────────────────────────────────────────────
    Root Dialog
@@ -117,6 +119,7 @@ export function SettingsDialog() {
         ]
       : []),
     { name: "security", label: "Security & 2FA", icon: Shield01Icon },
+    { name: "upgal", label: "UpGal Settings", icon: AiBrain01Icon },
     { name: "app", label: "About", icon: MoreHorizontalCircle01Icon },
   ];
 
@@ -207,6 +210,7 @@ export function SettingsDialog() {
                 {activeTab === "members" && <MembersPanel />}
                 {activeTab === "organization" && <OrganizationPanel />}
                 {activeTab === "security" && <SecurityPanel />}
+                {activeTab === "upgal" && <UpGalSettingsPanel />}
                 {activeTab === "app" && <AppInfoPanel />}
               </div>
             </main>
@@ -1000,8 +1004,16 @@ function SecurityPanel() {
    ───────────────────────────────────────────────────────────── */
 
 function AppInfoPanel() {
+  const queryClient = useQueryClient();
   const { data, isFetching, refetch } = useQuery({
     ...trpc.webServer.getUpdateData.queryOptions(),
+  });
+  const checkUpdates = useMutation({
+    ...trpc.webServer.checkForUpdates.mutationOptions(),
+    onSuccess: (result) => {
+      queryClient.setQueryData(trpc.webServer.getUpdateData.queryKey(), result);
+    },
+    onError: (error) => toast.error(error.message),
   });
   const update = useMutation({
     ...trpc.webServer.triggerUpdate.mutationOptions(),
@@ -1013,16 +1025,20 @@ function AppInfoPanel() {
   });
 
   const handleCheck = async () => {
-    const result = await refetch();
-    if (result.data?.updateAvailable) {
-      toast.info(`Upstand ${result.data.latestVersion} is available.`);
-    } else if (result.data?.channel === "source") {
+    const result = await checkUpdates.mutateAsync();
+    if (result.updateAvailable) {
+      toast.info(`Upstand ${result.latestVersion} is available.`);
+    } else if (result.channel === "source" && !result.updateAvailable) {
       toast.info(
         "This source installation is updated by rerunning the installer.",
       );
+    } else if (result.channel === "source") {
+      toast.info(
+        `Upstand ${result.latestVersion} is available. Re-run the installer to update this source installation.`,
+      );
     } else {
       toast.success(
-        `Upstand is up to date (${result.data?.currentVersion ?? "unknown"}).`,
+        `Upstand is up to date (${result.currentVersion ?? "unknown"}).`,
       );
     }
   };
@@ -1053,11 +1069,13 @@ function AppInfoPanel() {
           <Button
             size="sm"
             variant="outline"
-            disabled={isFetching}
+            disabled={isFetching || checkUpdates.isPending}
             onClick={handleCheck}
           >
-            {isFetching && <Spinner data-icon="inline-start" />}
-            Check for Updates
+            {(isFetching || checkUpdates.isPending) && (
+              <Spinner data-icon="inline-start" />
+            )}
+            {checkUpdates.isPending ? "Checking…" : "Check for Updates"}
           </Button>
           {data?.updateAvailable && data.canUpdate ? (
             <Button

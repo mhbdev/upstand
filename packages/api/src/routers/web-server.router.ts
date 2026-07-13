@@ -575,6 +575,15 @@ export const webServerRouter = router({
     }
   }),
 
+  checkForUpdates: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
+    const useCase = ctx.scope.resolve(GetUpdateStatusUseCaseToken);
+    try {
+      return await useCase.execute({ forceRefresh: true });
+    } catch (error) {
+      handleUseCaseError(error);
+    }
+  }),
+
   triggerUpdate: twoFactorVerifiedProcedure
     .input(TriggerUpdateInputSchema)
     .mutation(async ({ ctx, input }) => {

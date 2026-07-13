@@ -25,7 +25,13 @@ import {
 } from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
-import { NativeSelect } from "@upstand/ui/components/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
@@ -301,31 +307,37 @@ export default function RemoteServersPage() {
 
             <div className="space-y-2">
               <Label htmlFor="serverType">Server Type</Label>
-              <NativeSelect
-                id="serverType"
+              <Select
                 value={serverType}
-                onChange={(e) => setServerType(e.target.value)}
+                onValueChange={(value) => value && setServerType(value)}
               >
-                <option value="deploy">Deploy Server</option>
-                <option value="database">DB Server</option>
-              </NativeSelect>
+                <SelectTrigger id="serverType" className="w-full">
+                  <SelectValue placeholder="Select server type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deploy">Deploy Server</SelectItem>
+                  <SelectItem value="database">DB Server</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="sshKeyId">Select an SSH Key</Label>
-              <NativeSelect
-                id="sshKeyId"
+              <Select
                 value={sshKeyId}
-                onChange={(e) => setSshKeyId(e.target.value)}
-                required
+                onValueChange={(value) => setSshKeyId(value ?? "")}
               >
-                <option value="">-- Choose Key --</option>
-                {sshKeys?.map((key) => (
-                  <option key={key.id} value={key.id}>
-                    {key.name} ({key.algorithm})
-                  </option>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="sshKeyId" className="w-full">
+                  <SelectValue placeholder="Choose an SSH key" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sshKeys?.map((key) => (
+                    <SelectItem key={key.id} value={key.id}>
+                      {key.name} ({key.algorithm})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

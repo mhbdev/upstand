@@ -380,6 +380,8 @@ export default function ResourceDetail({
   const router = useRouter();
 
   const [metrics, setMetrics] = useState<MetricPoint[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const hydratedResourceId = useRef<string | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteVolumes, setDeleteVolumes] = useState(false);
@@ -595,6 +597,15 @@ services:
   // Sync state variables from DB
   useEffect(() => {
     if (resource) {
+      // Polling keeps runtime status, deployments, and containers current, but
+      // must never overwrite a form that the operator is editing. A successful
+      // save clears the dirty flag and allows the next response to hydrate the
+      // local draft again.
+      if (isDirty && hydratedResourceId.current === resource.id) {
+        if (liveContainers) setContainerList(liveContainers);
+        return;
+      }
+      hydratedResourceId.current = resource.id;
       setNameInput(resource.name);
       setBuildConfig(parseApplicationBuildConfig(resource.buildConfig));
       try {
@@ -651,7 +662,7 @@ services:
         }
       }
     }
-  }, [resource, liveContainers]);
+  }, [resource, liveContainers, isDirty]);
 
   // Automatically select the first provider of the chosen type when switching tabs
   useEffect(() => {
@@ -707,6 +718,7 @@ services:
   const updateResourceMutation = useMutation({
     ...trpc.resource.update.mutationOptions(),
     onSuccess: () => {
+      setIsDirty(false);
       refetchResource();
     },
     onError: (err) => toast.error(err.message || "Failed to update resource"),
@@ -978,7 +990,11 @@ services:
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <div
+      className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8"
+      onInput={() => setIsDirty(true)}
+      onChange={() => setIsDirty(true)}
+    >
       {/* Breadcrumbs */}
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
@@ -1083,37 +1099,47 @@ services:
             )}
           </div>
         </div>
+        {isDirty ? (
+          <p
+            className="text-amber-600 text-xs"
+            role="status"
+            aria-live="polite"
+          >
+            Unsaved changes are protected from live refreshes. Save the relevant
+            section before leaving this page.
+          </p>
+        ) : null}
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="flex max-w-full flex-nowrap gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
-          <TabsTrigger value="general" className="gap-2">
+        <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
+          <TabsTrigger value="general" className="shrink-0 gap-2">
             <Settings className="size-4" /> General
           </TabsTrigger>
-          <TabsTrigger value="environment" className="gap-2">
+          <TabsTrigger value="environment" className="shrink-0 gap-2">
             <Code className="size-4" /> Environment
           </TabsTrigger>
-          <TabsTrigger value="advanced" className="gap-2">
+          <TabsTrigger value="advanced" className="shrink-0 gap-2">
             <Settings className="size-4" /> Advanced
           </TabsTrigger>
-          <TabsTrigger value="domains" className="gap-2">
+          <TabsTrigger value="domains" className="shrink-0 gap-2">
             <Globe className="size-4" /> Domains
           </TabsTrigger>
-          <TabsTrigger value="deployments" className="gap-2">
+          <TabsTrigger value="deployments" className="shrink-0 gap-2">
             <RefreshCw className="size-4" /> Deployments
           </TabsTrigger>
-          <TabsTrigger value="containers" className="gap-2">
+          <TabsTrigger value="containers" className="shrink-0 gap-2">
             <HugeiconsIcon icon={ServerStack01Icon} className="size-4" />{" "}
             Containers
           </TabsTrigger>
-          <TabsTrigger value="backups" className="gap-2">
+          <TabsTrigger value="backups" className="shrink-0 gap-2">
             <HardDrive className="size-4" /> Backups
           </TabsTrigger>
-          <TabsTrigger value="logs" className="gap-2">
+          <TabsTrigger value="logs" className="shrink-0 gap-2">
             <Terminal className="size-4" /> Logs
           </TabsTrigger>
-          <TabsTrigger value="monitoring" className="gap-2">
+          <TabsTrigger value="monitoring" className="shrink-0 gap-2">
             <Activity className="size-4" /> Monitoring
           </TabsTrigger>
         </TabsList>
@@ -1562,7 +1588,11 @@ services:
                   </CardHeader>
                   <CardContent className="space-y-6 border-border/20 border-t pt-4">
                     {/* Provider Tabs */}
-                    <div className="flex flex-wrap gap-1 border border-border/30 bg-muted/40 p-1">
+                    <div
+                      aria-label="Source provider"
+                      className="flex max-w-full gap-1 overflow-x-auto border border-border/30 bg-muted/40 p-1 [scrollbar-width:thin]"
+                      role="tablist"
+                    >
                       {[
                         { id: "github", label: "GitHub", icon: Globe },
                         { id: "gitlab", label: "GitLab", icon: Globe },
@@ -1576,12 +1606,14 @@ services:
                         return (
                           <button
                             key={prov.id}
+                            aria-selected={active}
+                            role="tab"
                             type="button"
                             onClick={() =>
                               setProviderType(prov.id as ResourceProvider)
                             }
                             className={cn(
-                              "flex cursor-pointer items-center gap-2 border-none px-3 py-1.5 font-semibold text-xs transition-all duration-200",
+                              "flex shrink-0 cursor-pointer items-center gap-2 border-none px-3 py-1.5 font-semibold text-xs transition-colors",
                               active
                                 ? "bg-background text-foreground shadow-sm"
                                 : "text-muted-foreground hover:bg-background/20 hover:text-foreground",

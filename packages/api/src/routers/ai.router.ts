@@ -7,7 +7,7 @@ import { ensureOrganizationAccess } from "../access-control";
 import {
   getConversationForUser,
   listConversations,
-  listOpenRouterModels,
+  listProviderModels,
   testUpGalProvider,
 } from "../ai/upgal";
 import { protectedProcedure, router } from "../index";
@@ -111,12 +111,8 @@ export const aiRouter = router({
         input.organizationId,
         ["owner", "admin"],
       );
-      if (input.provider !== "openrouter") {
-        throw new Error(
-          "Dynamic model discovery is currently available for OpenRouter only.",
-        );
-      }
-      return listOpenRouterModels(input.organizationId, ctx.scope, {
+      return listProviderModels(input.organizationId, ctx.scope, {
+        provider: input.provider,
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
       });

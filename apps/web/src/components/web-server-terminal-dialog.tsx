@@ -140,7 +140,7 @@ export function WebServerTerminalDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl gap-0 overflow-hidden border-border/60 bg-background p-0">
+      <DialogContent className="h-[min(92svh,820px)] w-[calc(100vw-1rem)] max-w-[min(96vw,1120px)] gap-0 overflow-hidden border-border/60 bg-background p-0">
         <DialogHeader className="border-border/60 border-b bg-muted/20 px-6 py-5">
           <DialogTitle className="flex items-center gap-2">
             <HugeiconsIcon
@@ -152,7 +152,10 @@ export function WebServerTerminalDialog({
           <DialogDescription className="flex flex-wrap items-center gap-2">
             SSH uses the selected encrypted key. The private key never leaves
             the server.
-            <span className="rounded-full border px-2 py-0.5 font-medium text-[11px]">
+            <span
+              aria-live="polite"
+              className="rounded-full border px-2 py-0.5 font-medium text-[11px]"
+            >
               {connected
                 ? "Connected"
                 : connecting
@@ -161,7 +164,7 @@ export function WebServerTerminalDialog({
             </span>
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3 border-border/60 border-b bg-background p-4 md:grid-cols-[minmax(0,1fr)_9rem_6rem_auto_auto]">
+        <div className="grid gap-3 border-border/60 border-b bg-background p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_6rem_auto_auto]">
           <Select
             items={keys.map((key) => ({
               value: key.id,
@@ -195,24 +198,34 @@ export function WebServerTerminalDialog({
             aria-label="SSH port"
             placeholder="Port"
           />
-          <Button onClick={connect} disabled={connecting || connected}>
+          <Button
+            className="w-full"
+            onClick={connect}
+            disabled={connecting || connected}
+          >
             {connecting ? "Connecting…" : "Connect"}
           </Button>
-          <Button variant="outline" onClick={disconnect} disabled={!connected}>
+          <Button
+            className="w-full"
+            variant="outline"
+            onClick={disconnect}
+            disabled={!connected}
+          >
             Disconnect
           </Button>
         </div>
-        <div className="bg-[#0b0f0d] p-4">
+        <div className="min-h-0 flex-1 overflow-hidden bg-[#0b0f0d] p-3 sm:p-4">
           <pre
             ref={outputRef}
-            className="h-[min(56vh,520px)] overflow-auto rounded-md border border-emerald-500/20 bg-black p-4 font-mono text-[13px] leading-6 text-emerald-300 shadow-inner"
+            aria-live="polite"
+            className="h-full min-h-52 overflow-auto rounded-md border border-emerald-500/20 bg-black p-3 font-mono text-[12px] leading-6 text-emerald-300 shadow-inner sm:p-4 sm:text-[13px]"
           >
             {output}
           </pre>
         </div>
         <form
           onSubmit={send}
-          className="flex gap-2 border-border/60 border-t bg-muted/10 p-4"
+          className="flex flex-col gap-2 border-border/60 border-t bg-muted/10 p-3 sm:flex-row sm:p-4"
         >
           <Label className="sr-only" htmlFor="terminal-command">
             Command

@@ -28,10 +28,10 @@ sequenceDiagram
 
 ## Configure a provider
 
-Organization owners and administrators configure UpGal from **Settings → AI**.
+Organization owners and administrators configure UpGal from **Settings → UpGal Settings**.
 
 1. Choose OpenAI, Anthropic, Google, OpenRouter, or the OpenAI-compatible AI Gateway.
-2. Enter the model identifier supported by that provider. For OpenRouter, use **Load models** to fetch the current catalog; custom model IDs are also accepted.
+2. Click **Load models** to fetch the current catalog for the selected provider, then choose a model or enter any custom model ID. Catalog requests use the provider's native models endpoint; custom base URLs are supported for compatible gateways.
 3. Enter the API key and, when required, a custom base URL.
 4. Save the settings and use **Test connection** to verify the configuration. The test uses the values currently in the form, so you can validate a new key before saving it.
 
@@ -55,7 +55,7 @@ The agent is bounded to twelve loop steps per request. It uses the same request-
 
 ## MCP access
 
-UpGal exposes a reusable JSON-RPC MCP endpoint at `/api/mcp`. Create an external key from **Settings → AI**, choose only the tool scopes required by the integration, and keep the returned secret in a password manager. The secret is shown once; the database stores only its SHA-256 hash.
+UpGal exposes a reusable JSON-RPC MCP endpoint at `/api/mcp`. Create an external key from **Settings → API Keys**, choose only the tool scopes required by the integration, and keep the returned secret in a password manager. The secret is shown once; the database stores only its SHA-256 hash.
 
 Use `*` for all tools or individual scopes such as `tool:list_projects`. Keys can expire and can be revoked without changing other organization settings. Every request is checked for expiry, revocation, scope, and organization ownership.
 

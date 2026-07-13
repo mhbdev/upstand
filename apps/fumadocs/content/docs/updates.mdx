@@ -23,7 +23,7 @@ The in-dashboard update button is intended for published release images. Source-
 
 Automatic updates are opt-in. Add `UPSTAND_AUTO_UPDATE=true` to `/etc/upstand/.env` and rerun the installer. The server checks GitHub every 30 minutes, applies only a published release matching the installed channel, and uses Docker Swarm's rolling update and rollback policy. Source installations are never updated automatically. Leave the variable unset (or set it to `false`) when you want approval through the dashboard only.
 
-Both **Web Server → Check for updates** and **Settings → Check for Updates** read the same status. They show the installed version, channel, release availability, and whether that installation can be updated.
+Both **Web Server → Check for updates** and **Settings → Check for Updates** read the same status. They show the installed version, channel, release availability, and whether that installation can be updated. Clicking either button performs a force refresh against GitHub; it does not wait for the normal background status cache. Repositories without a formal GitHub Release are supported through their published semantic tags.
 
 ## Rollback
 
