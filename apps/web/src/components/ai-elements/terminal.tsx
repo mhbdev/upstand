@@ -38,7 +38,7 @@ export const TerminalHeader = ({
   <div
     className={cn(
       "flex items-center justify-between border-zinc-800 border-b px-4 py-2",
-      className
+      className,
     )}
     {...props}
   >
@@ -135,7 +135,7 @@ export const TerminalCopyButton = ({
     () => () => {
       window.clearTimeout(timeoutRef.current);
     },
-    []
+    [],
   );
 
   const Icon = isCopied ? CheckIcon : CopyIcon;
@@ -143,8 +143,8 @@ export const TerminalCopyButton = ({
   return (
     <Button
       className={cn(
-        "size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
-        className
+        "size-7 shrink-0 text-muted-foreground hover:bg-muted hover:text-foreground",
+        className,
       )}
       onClick={copyToClipboard}
       size="icon"
@@ -172,8 +172,8 @@ export const TerminalClearButton = ({
   return (
     <Button
       className={cn(
-        "size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
-        className
+        "size-7 shrink-0 text-muted-foreground hover:bg-muted hover:text-foreground",
+        className,
       )}
       onClick={onClear}
       size="icon"
@@ -205,7 +205,7 @@ export const TerminalContent = ({
     <div
       className={cn(
         "max-h-96 overflow-auto p-4 font-mono text-sm leading-relaxed",
-        className
+        className,
       )}
       ref={containerRef}
       {...props}
@@ -240,15 +240,15 @@ export const Terminal = ({
 }: TerminalProps) => {
   const contextValue = useMemo(
     () => ({ autoScroll, isStreaming, onClear, output }),
-    [autoScroll, isStreaming, onClear, output]
+    [autoScroll, isStreaming, onClear, output],
   );
 
   return (
     <TerminalContext.Provider value={contextValue}>
       <div
         className={cn(
-          "flex flex-col overflow-hidden rounded-lg border bg-zinc-950 text-zinc-100",
-          className
+          "flex flex-col overflow-hidden rounded-lg border bg-muted/20 text-foreground",
+          className,
         )}
         {...props}
       >

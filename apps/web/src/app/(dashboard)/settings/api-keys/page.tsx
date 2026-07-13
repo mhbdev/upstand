@@ -24,9 +24,12 @@ import {
 import { Copy, KeyRound, ShieldCheck, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 const PRESETS: Array<{
   value: ApiKeyPreset;

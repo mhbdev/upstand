@@ -35,10 +35,13 @@ import {
 import {
   Bot,
   Check,
+  CircleAlert,
   History,
   Loader2,
   MessageCircle,
   Plus,
+  ShieldAlert,
+  ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
@@ -79,24 +82,64 @@ const conversationDateFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
-function displayChatError(error: Error): string {
-  if (error.message === "An error occurred.") {
-    return "UpGal could not complete this response. Completed tool results remain available above; retry to continue.";
+const toolTitles: Record<string, string> = {
+  create_environment: "Create environment",
+  create_project: "Create project",
+  control_resource: "Change resource state",
+  delete_project: "Delete project",
+  delete_resource: "Delete resource",
+  deploy_resource: "Deploy resource",
+};
+
+function displayChatError(error: Error): {
+  message: string;
+  detail?: string;
+} {
+  if (
+    error.message === "An error occurred." ||
+    error.message.toLowerCase().includes("stream")
+  ) {
+    return {
+      message: "The response ended before UpGal finished.",
+      detail:
+        "Completed tool results are still available above. Retry to continue from the latest conversation state.",
+    };
   }
-  return error.message;
+  return { message: error.message || "UpGal could not complete this request." };
+}
+
+function toolTitle(name: string) {
+  return toolTitles[name] ?? name.replaceAll("_", " ");
+}
+
+function approvalDescription(name: string, input: unknown): string {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return `${toolTitle(name)} will change your Upstand organization.`;
+  }
+  const values = Object.entries(input)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .map(
+      ([key, value]) =>
+        `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
+    )
+    .join(" · ");
+  return values
+    ? `${toolTitle(name)} will run with ${values}.`
+    : `${toolTitle(name)} will change your Upstand organization.`;
 }
 
 function Part({
   part,
   approve,
+  approvalPendingId,
 }: {
   part: UpGalUIMessage["parts"][number];
   approve: (id: string, approved: boolean) => void;
+  approvalPendingId?: string;
 }) {
   if (isTextUIPart(part)) return <MessageResponse>{part.text}</MessageResponse>;
   if (isToolUIPart(part)) {
-    const toolName =
-      part.type === "dynamic-tool" ? getToolName(part) : getToolName(part);
+    const toolName = getToolName(part);
     const approval = part.approval;
     const hasInput =
       part.input !== undefined &&
@@ -119,33 +162,75 @@ function Part({
         )}
         <ToolContent>
           {hasInput ? <ToolInput input={part.input} /> : null}
-          {approval && part.state === "approval-requested" ? (
-            <div
-              className="flex items-center gap-2 border-t p-3"
+          {approval &&
+          part.state === "approval-requested" &&
+          !approval.isAutomatic ? (
+            <Alert
+              className="border-primary/30 bg-primary/5"
               role="status"
               aria-live="polite"
             >
-              <span className="mr-auto text-muted-foreground text-xs">
-                UpGal is waiting for your approval.
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => approve(approval.id, false)}
-              >
-                <X data-icon="inline-start" />
-                Reject
-              </Button>
-              <Button size="sm" onClick={() => approve(approval.id, true)}>
-                <Check data-icon="inline-start" />
-                Approve
-              </Button>
+              <ShieldAlert aria-hidden="true" />
+              <AlertTitle>Approval required</AlertTitle>
+              <AlertDescription>
+                <p>{approvalDescription(toolName, part.input)}</p>
+                <p className="mt-1 text-xs">
+                  Review the parameters above before allowing this operation.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    disabled={approvalPendingId === approval.id}
+                    onClick={() => approve(approval.id, false)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <X data-icon="inline-start" />
+                    Reject
+                  </Button>
+                  <Button
+                    disabled={approvalPendingId === approval.id}
+                    onClick={() => approve(approval.id, true)}
+                    size="sm"
+                  >
+                    {approvalPendingId === approval.id ? (
+                      <Loader2
+                        aria-hidden="true"
+                        className="animate-spin"
+                        data-icon="inline-start"
+                      />
+                    ) : (
+                      <Check data-icon="inline-start" />
+                    )}
+                    Approve
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {approval &&
+          part.state === "approval-requested" &&
+          approval.isAutomatic ? (
+            <div className="flex items-center gap-2 rounded-md border border-muted bg-muted/30 p-3 text-muted-foreground text-xs">
+              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+              Applying the approval decision…
             </div>
           ) : null}
           {part.state === "output-available" ? (
-            <UpGalToolOutput name={toolName} output={part.output} />
+            <UpGalToolOutput
+              input={part.input}
+              name={toolName}
+              output={part.output}
+            />
           ) : part.state === "output-error" ? (
             <ToolOutput output={undefined} errorText={part.errorText} />
+          ) : part.state === "output-denied" ? (
+            <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/30 p-3 text-muted-foreground text-xs">
+              <ShieldCheck aria-hidden="true" className="mt-0.5 size-4" />
+              <span>
+                {approval?.reason ||
+                  "This operation was not approved and was not run."}
+              </span>
+            </div>
           ) : null}
         </ToolContent>
       </Tool>
@@ -159,12 +244,15 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string>();
   const [loadError, setLoadError] = useState<string>();
+  const [approvalPendingId, setApprovalPendingId] = useState<string>();
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     title: string;
   }>();
   const queryClient = useQueryClient();
   const loadedConversationId = useRef<{ value?: string }>({});
+  const loadRequestId = useRef(0);
+  const previousOrganizationId = useRef(organizationId);
   const manualNewConversation = useRef(false);
   const createConversation = useMutation(
     trpc.ai.createConversation.mutationOptions(),
@@ -214,6 +302,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
   const loadConversation = useCallback(
     async (id: string) => {
       if (!organizationId || loadedConversationId.current.value === id) return;
+      const requestId = ++loadRequestId.current;
       try {
         setLoadError(undefined);
         const result = await queryClient.fetchQuery(
@@ -223,9 +312,11 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
           }),
         );
         if (!result) {
+          if (requestId !== loadRequestId.current) return;
           setLoadError("This conversation is no longer available.");
           return;
         }
+        if (requestId !== loadRequestId.current) return;
         setConversationId(id);
         manualNewConversation.current = false;
         loadedConversationId.current.value = id;
@@ -238,6 +329,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
         );
         setHistoryOpen(false);
       } catch (error) {
+        if (requestId !== loadRequestId.current) return;
         setLoadError(
           error instanceof Error
             ? error.message
@@ -247,6 +339,20 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
     },
     [chat, organizationId, queryClient],
   );
+
+  useEffect(() => {
+    if (previousOrganizationId.current !== organizationId) {
+      previousOrganizationId.current = organizationId;
+      loadRequestId.current += 1;
+      setConversationId(undefined);
+      loadedConversationId.current.value = undefined;
+      manualNewConversation.current = false;
+      chat.setMessages([]);
+      setLoadError(undefined);
+      setApprovalPendingId(undefined);
+      chat.clearError();
+    }
+  }, [chat, organizationId]);
 
   useEffect(() => {
     if (
@@ -277,12 +383,30 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
   }
 
   function newConversation() {
+    loadRequestId.current += 1;
     setConversationId(undefined);
     loadedConversationId.current.value = undefined;
     manualNewConversation.current = true;
     chat.setMessages([]);
     setLoadError(undefined);
+    chat.clearError();
+    setApprovalPendingId(undefined);
     setHistoryOpen(false);
+  }
+
+  function respondToApproval(id: string, approved: boolean) {
+    setApprovalPendingId(id);
+    void (async () => {
+      try {
+        await chat.addToolApprovalResponse({
+          id,
+          approved,
+          options: { body: { organizationId, conversationId } },
+        });
+      } finally {
+        setApprovalPendingId(undefined);
+      }
+    })();
   }
 
   return (
@@ -417,15 +541,8 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
                       <Part
                         key={`${message.id}-${index}`}
                         part={part}
-                        approve={(id, approved) =>
-                          void chat.addToolApprovalResponse({
-                            id,
-                            approved,
-                            options: {
-                              body: { organizationId, conversationId },
-                            },
-                          })
-                        }
+                        approve={respondToApproval}
+                        approvalPendingId={approvalPendingId}
                       />
                     ))}
                   </MessageContent>
@@ -445,17 +562,33 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
               ) : null}
               {chat.error ? (
                 <Alert variant="destructive">
-                  <AlertTitle>UpGal could not finish that request</AlertTitle>
+                  <CircleAlert aria-hidden="true" />
+                  <AlertTitle>UpGal response interrupted</AlertTitle>
                   <AlertDescription>
-                    <span>{displayChatError(chat.error)}</span>
-                    <Button
-                      className="mt-2"
-                      onClick={() => void chat.regenerate()}
-                      size="sm"
-                      variant="outline"
-                    >
-                      Retry response
-                    </Button>
+                    <div className="space-y-1">
+                      <p>{displayChatError(chat.error).message}</p>
+                      {displayChatError(chat.error).detail ? (
+                        <p className="text-xs">
+                          {displayChatError(chat.error).detail}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => void chat.regenerate()}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Retry response
+                      </Button>
+                      <Button
+                        onClick={() => chat.clearError()}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        Dismiss
+                      </Button>
+                    </div>
                   </AlertDescription>
                 </Alert>
               ) : null}

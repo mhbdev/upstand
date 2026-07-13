@@ -1,0 +1,384 @@
+"use client";
+
+import { Button } from "@upstand/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@upstand/ui/components/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@upstand/ui/components/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@upstand/ui/components/dropdown-menu";
+import { cn } from "@upstand/ui/lib/utils";
+import {
+  Code,
+  FileText,
+  HardDrive,
+  Network,
+  Play,
+  RotateCw,
+  Settings,
+  Square,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { ShowDockerLogs } from "@/components/shared/docker-logs";
+
+type ContainerItem = {
+  id: string;
+  name: string;
+  status: string;
+  ports: string;
+  node: string;
+};
+
+interface ContainersTabProps {
+  resource: any;
+  liveContainers: any;
+  containerLogsData: any;
+  controlResource: any;
+  setContainerModalOpen: (open: boolean) => void;
+  setSelectedContainerId: (id: string | null) => void;
+}
+
+const parseContainerItems = (
+  value: string | null | undefined,
+): ContainerItem[] => {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (typeof item !== "object" || item === null) return [];
+      const id = typeof item.id === "string" ? item.id : undefined;
+      if (!id) return [];
+      return [
+        {
+          id,
+          name: typeof item.name === "string" ? item.name : "container",
+          status: typeof item.status === "string" ? item.status : "unknown",
+          ports: typeof item.ports === "string" ? item.ports : "",
+          node: typeof item.node === "string" ? item.node : "",
+        },
+      ];
+    });
+  } catch {
+    return [];
+  }
+};
+
+export function ContainersTab({
+  resource,
+  liveContainers,
+  containerLogsData,
+  controlResource,
+  setContainerModalOpen,
+  setSelectedContainerId,
+}: ContainersTabProps) {
+  const [containerList, setContainerList] = useState<ContainerItem[]>([]);
+  const [selectedContainer, setSelectedContainer] =
+    useState<ContainerItem | null>(null);
+  const [containerModalType, setContainerModalType] = useState<
+    "logs" | "config" | "networks" | "mounts" | null
+  >(null);
+
+  useEffect(() => {
+    if (liveContainers) {
+      setContainerList(liveContainers);
+    } else if (resource) {
+      setContainerList(parseContainerItems(resource.containers));
+    }
+  }, [resource, liveContainers]);
+
+  const dispatchContainerCommand = (
+    _containerId: string,
+    cmd: "start" | "stop" | "restart" | "kill",
+  ) => {
+    const command = cmd === "kill" ? "stop" : cmd;
+    toast.info(`Sending ${command} command to container...`);
+    controlResource({ id: resource.id, command });
+  };
+
+  const containerLogs = containerLogsData
+    ? containerLogsData.trim().split("\n")
+    : [];
+
+  const handleOpenModal = (
+    container: ContainerItem,
+    type: "logs" | "config" | "networks" | "mounts",
+  ) => {
+    setSelectedContainer(container);
+    setContainerModalType(type);
+    setSelectedContainerId(container.id);
+    setContainerModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setContainerModalType(null);
+    setContainerModalOpen(false);
+    setSelectedContainerId(null);
+  };
+
+  const getEnvMap = () => {
+    try {
+      const parsed = JSON.parse(resource.envVars || "{}");
+      return parsed;
+    } catch {
+      return {};
+    }
+  };
+
+  return (
+    <>
+      <Card className="border border-border/40 bg-card/20">
+        <CardHeader>
+          <CardTitle className="font-semibold text-lg">
+            Active Swarm Replicas
+          </CardTitle>
+          <CardDescription className="text-muted-foreground text-sm">
+            Containers matching Swarm service replica specification.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="border-border/20 border-t pt-4">
+          {containerList.length > 0 ? (
+            <div className="overflow-hidden border border-border/20 bg-card/10">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-border/20 border-b bg-muted/10 text-muted-foreground text-xs uppercase">
+                    <th className="p-3">Replica Name</th>
+                    <th className="p-3">Docker Container ID</th>
+                    <th className="p-3">State</th>
+                    <th className="p-3">Ports</th>
+                    <th className="p-3">Created</th>
+                    <th className="p-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {containerList.map((con) => (
+                    <tr
+                      key={con.id}
+                      className="border-border/10 border-b hover:bg-muted/5"
+                    >
+                      <td className="p-3 font-semibold text-foreground">
+                        {con.name}
+                      </td>
+                      <td className="p-3 font-mono text-muted-foreground text-xs">
+                        {con.id}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "size-2 rounded-full",
+                              con.status === "running"
+                                ? "animate-pulse bg-emerald-500"
+                                : "bg-muted-foreground/50",
+                            )}
+                          />
+                          <span className="font-semibold text-foreground text-xs uppercase">
+                            {con.status}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-3 font-mono text-xs text-zinc-300">
+                        {con.ports}
+                      </td>
+                      <td className="p-3 text-muted-foreground text-xs">
+                        {con.node}
+                      </td>
+                      <td className="p-3 text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="flex h-8 w-8 cursor-pointer items-center justify-center border-none bg-transparent p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground">
+                            <Settings className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-48 border border-border/45 bg-card shadow-xl"
+                          >
+                            <DropdownMenuItem
+                              onClick={() =>
+                                dispatchContainerCommand(con.id, "restart")
+                              }
+                            >
+                              <RotateCw className="mr-2 size-4" /> Restart
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                dispatchContainerCommand(con.id, "start")
+                              }
+                            >
+                              <Play className="mr-2 size-4" /> Start
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                dispatchContainerCommand(con.id, "stop")
+                              }
+                            >
+                              <Square className="mr-2 size-4 text-destructive" />{" "}
+                              Stop
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                dispatchContainerCommand(con.id, "kill")
+                              }
+                            >
+                              <Trash2 className="mr-2 size-4 text-destructive" />{" "}
+                              Kill
+                            </DropdownMenuItem>
+                            <hr className="my-1 border-border/20" />
+                            <DropdownMenuItem
+                              onClick={() => handleOpenModal(con, "logs")}
+                            >
+                              <FileText className="mr-2 size-4" /> View Logs
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenModal(con, "config")}
+                            >
+                              <Code className="mr-2 size-4" /> View Config
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenModal(con, "networks")}
+                            >
+                              <Network className="mr-2 size-4" /> View Networks
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenModal(con, "mounts")}
+                            >
+                              <HardDrive className="mr-2 size-4" /> View Mounts
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              No containers.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Container detail dialogs */}
+      <Dialog
+        open={containerModalType !== null}
+        onOpenChange={(v) => !v && handleCloseModal()}
+      >
+        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[36rem]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-bold text-foreground text-lg">
+              {containerModalType === "logs" && (
+                <FileText className="size-5 text-primary" />
+              )}
+              {containerModalType === "config" && (
+                <Code className="size-5 text-amber-500" />
+              )}
+              {containerModalType === "networks" && (
+                <Network className="size-5 text-emerald-500" />
+              )}
+              {containerModalType === "mounts" && (
+                <HardDrive className="size-5 text-violet-500" />
+              )}
+              <span className="capitalize">{containerModalType}</span>:{" "}
+              {selectedContainer?.name}
+            </DialogTitle>
+            <DialogDescription className="font-normal text-muted-foreground text-xs">
+              Swarm replica ID: {selectedContainer?.id}
+            </DialogDescription>
+          </DialogHeader>
+
+          {containerModalType === "logs" && (
+            <ShowDockerLogs
+              containerId={selectedContainer?.id || ""}
+              logs={containerLogs}
+            />
+          )}
+
+          {containerModalType === "config" && (
+            <pre className="max-h-80 select-text overflow-auto rounded-md border border-border/40 bg-muted/20 p-4 font-mono text-xs">
+              {JSON.stringify(
+                {
+                  Image: resource.dockerImage || "app:latest",
+                  Service: resource.appName,
+                  Labels: {
+                    "swarm.service.name": resource.appName,
+                    "upstand.resource.id": resource.id,
+                  },
+                  RestartPolicy: {
+                    Name: "on-failure",
+                    MaximumRetryCount: 3,
+                  },
+                  Environment: getEnvMap(),
+                },
+                null,
+                2,
+              )}
+            </pre>
+          )}
+
+          {containerModalType === "networks" && (
+            <div className="space-y-3 bg-muted/10 p-4 text-foreground text-sm">
+              <div className="flex justify-between border-border/10 border-b pb-1.5">
+                <span className="text-muted-foreground">Network Name</span>
+                <span className="font-mono font-semibold">
+                  upstand-overlay-net
+                </span>
+              </div>
+              <div className="flex justify-between border-border/10 border-b pb-1.5">
+                <span className="text-muted-foreground">Gateway IP</span>
+                <span className="font-mono font-semibold">10.0.4.1</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Allocated IP</span>
+                <span className="font-mono font-semibold">10.0.4.15</span>
+              </div>
+            </div>
+          )}
+
+          {containerModalType === "mounts" && (
+            <div className="space-y-3 bg-muted/10 p-4 text-foreground text-sm">
+              <div className="flex flex-col gap-1 border-border/10 border-b pb-2">
+                <span className="font-semibold text-muted-foreground text-xs">
+                  VOLUME MOUNT
+                </span>
+                <span className="break-all font-mono font-semibold text-xs">
+                  /var/lib/docker/volumes/{resource.appName}_data/_data
+                </span>
+                <span className="font-medium text-primary text-xs">
+                  Mapped to /data inside container
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Driver</span>
+                <span className="font-mono font-semibold text-xs">
+                  local (overlayfs)
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button onClick={handleCloseModal}>Close View</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

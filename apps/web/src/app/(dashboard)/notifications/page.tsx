@@ -53,6 +53,7 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { Textarea } from "@upstand/ui/components/textarea";
+import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   CircleDot,
@@ -64,12 +65,14 @@ import {
   Send,
   Users,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 type NotificationChannelDto = Omit<
   NotificationChannelView,
@@ -778,7 +781,10 @@ export default function NotificationsPage() {
               operational events it should receive.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-6 py-5">
+          <form
+            onSubmit={submit}
+            className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-6 py-5"
+          >
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="notification-provider">

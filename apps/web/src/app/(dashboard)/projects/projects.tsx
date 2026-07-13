@@ -35,9 +35,9 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

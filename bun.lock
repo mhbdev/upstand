@@ -220,8 +220,10 @@
       "dependencies": {
         "@better-auth/api-key": "catalog:",
         "@upstand/db": "workspace:*",
+        "@upstand/domain": "workspace:*",
         "@upstand/env": "workspace:*",
         "@upstand/redis": "workspace:*",
+        "@upstand/usecases": "workspace:*",
         "better-auth": "catalog:",
         "dotenv": "catalog:",
         "drizzle-orm": "catalog:",

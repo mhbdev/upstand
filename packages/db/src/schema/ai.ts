@@ -1,5 +1,5 @@
-import { relations } from "drizzle-orm";
 import type { AIProvider, JsonObject, JsonValue } from "@upstand/domain";
+import { relations } from "drizzle-orm";
 import {
   index,
   integer,

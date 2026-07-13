@@ -1,10 +1,7 @@
 "use client";
 
 import { Button } from "@upstand/ui/components/button";
-import {
-  ScrollArea,
-  ScrollBar,
-} from "@upstand/ui/components/scroll-area";
+import { ScrollArea, ScrollBar } from "@upstand/ui/components/scroll-area";
 import { cn } from "@upstand/ui/lib/utils";
 import type { ComponentProps } from "react";
 import { useCallback } from "react";

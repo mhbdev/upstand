@@ -158,7 +158,7 @@ export class DrizzleAIRepository implements IAIRepository {
       .select()
       .from(aiMessage)
       .where(eq(aiMessage.conversationId, conversationId))
-      .orderBy(aiMessage.createdAt);
+      .orderBy(aiMessage.createdAt, aiMessage.id);
   }
 
   async saveMessages(

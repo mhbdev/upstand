@@ -19,12 +19,13 @@ export interface QueueReconciliationResult {
 export async function reconcileQueuedJobs(
   uow: IUnitOfWork,
 ): Promise<QueueReconciliationResult> {
-  const [backups, deployments, queuedNotifications, processingNotifications] = await Promise.all([
-    uow.backupRunRepository.findByStatus("queued", 500),
-    uow.deploymentRepository.findByStatus("queued", 500),
-    uow.notificationDeliveryRepository.findByStatus("queued", 500),
-    uow.notificationDeliveryRepository.findByStatus("processing", 500),
-  ]);
+  const [backups, deployments, queuedNotifications, processingNotifications] =
+    await Promise.all([
+      uow.backupRunRepository.findByStatus("queued", 500),
+      uow.deploymentRepository.findByStatus("queued", 500),
+      uow.notificationDeliveryRepository.findByStatus("queued", 500),
+      uow.notificationDeliveryRepository.findByStatus("processing", 500),
+    ]);
   const notifications = [
     ...queuedNotifications,
     ...processingNotifications.filter(

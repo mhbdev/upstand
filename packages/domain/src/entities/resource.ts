@@ -89,6 +89,35 @@ export const ResourceAdvancedConfigSchema = z.object({
       windowSeconds: z.number().int().min(0).max(86400).optional(),
     })
     .default({ condition: "any" }),
+  replicas: z.number().int().min(0).max(1000).optional(),
+  stopGracePeriodSeconds: z.number().int().min(0).max(86400).optional(),
+  workingDir: z.string().trim().max(4096).optional(),
+  user: z.string().trim().max(256).optional(),
+  hostname: z.string().trim().max(253).optional(),
+  dns: z.array(z.string().trim().min(1).max(253)).max(16).default([]),
+  dnsSearch: z.array(z.string().trim().min(1).max(253)).max(16).default([]),
+  extraHosts: z.array(z.string().trim().min(1).max(512)).max(64).default([]),
+  sysctls: z.record(z.string(), z.string()).default({}),
+  capAdd: z.array(z.string().trim().min(1).max(128)).max(64).default([]),
+  capDrop: z.array(z.string().trim().min(1).max(128)).max(64).default([]),
+  updateConfig: z
+    .object({
+      parallelism: z.number().int().min(0).max(1000).optional(),
+      delaySeconds: z.number().int().min(0).max(86400).optional(),
+      monitorSeconds: z.number().int().min(0).max(86400).optional(),
+      failureAction: z.enum(["continue", "pause", "rollback"]).optional(),
+      order: z.enum(["stop-first", "start-first"]).optional(),
+    })
+    .default({}),
+  rollbackConfig: z
+    .object({
+      parallelism: z.number().int().min(0).max(1000).optional(),
+      delaySeconds: z.number().int().min(0).max(86400).optional(),
+      monitorSeconds: z.number().int().min(0).max(86400).optional(),
+      failureAction: z.enum(["continue", "pause"]).optional(),
+      order: z.enum(["stop-first", "start-first"]).optional(),
+    })
+    .default({}),
   healthcheck: ResourceHealthcheckSchema.nullable().default(null),
   init: z.boolean().default(false),
   readOnlyRootFilesystem: z.boolean().default(false),

@@ -2,6 +2,7 @@
 
 import { TerminalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
 import {
   Dialog,
@@ -20,11 +21,10 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import { trpc } from "@/utils/trpc";
 import { getServerUrl } from "@/lib/server-url";
+import { trpc } from "@/utils/trpc";
 
 function apiUrl(path: string) {
   return new URL(path, getServerUrl()).toString();
@@ -218,7 +218,7 @@ export function WebServerTerminalDialog({
           <pre
             ref={outputRef}
             aria-live="polite"
-            className="h-full min-h-52 overflow-auto rounded-md border border-emerald-500/20 bg-black p-3 font-mono text-[12px] leading-6 text-emerald-300 shadow-inner sm:p-4 sm:text-[13px]"
+            className="h-full min-h-52 overflow-auto rounded-md border border-border/40 bg-muted/30 p-3 font-mono text-[12px] text-foreground leading-6 shadow-inner sm:p-4 sm:text-[13px]"
           >
             {output}
           </pre>

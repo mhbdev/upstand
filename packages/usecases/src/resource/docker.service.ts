@@ -79,6 +79,7 @@ export class DockerService {
     taskTemplate: Record<string, unknown>,
     endpointSpec: Record<string, unknown>,
     baseConstraints: string[] = [],
+    serviceSpec?: Record<string, unknown>,
   ): void {
     const config = parseResourceAdvancedConfig(resource.advancedConfig);
     if (config.command.length) containerSpec.Command = config.command;
@@ -129,7 +130,21 @@ export class DockerService {
     containerSpec.Init = config.init;
     containerSpec.ReadOnly = config.readOnlyRootFilesystem;
     containerSpec.TTY = config.tty;
-    containerSpec.Privileges = config.privileged ? {} : undefined;
+    containerSpec.Privileged = config.privileged;
+    if (config.stopGracePeriodSeconds !== undefined) {
+      containerSpec.StopGracePeriod =
+        config.stopGracePeriodSeconds * 1_000_000_000;
+    }
+    if (config.workingDir) containerSpec.Dir = config.workingDir;
+    if (config.user) containerSpec.User = config.user;
+    if (config.hostname) containerSpec.Hostname = config.hostname;
+    if (config.dns.length) containerSpec.DNS = config.dns;
+    if (config.dnsSearch.length) containerSpec.DNSSearch = config.dnsSearch;
+    if (config.extraHosts.length) containerSpec.Hosts = config.extraHosts;
+    if (Object.keys(config.sysctls).length)
+      containerSpec.Sysctls = config.sysctls;
+    if (config.capAdd.length) containerSpec.CapAdd = config.capAdd;
+    if (config.capDrop.length) containerSpec.CapDrop = config.capDrop;
 
     const resources = config.resources;
     if (resources.cpuLimit || resources.memoryLimitMb) {
@@ -176,6 +191,47 @@ export class DockerService {
         ...(taskTemplate.Placement as Record<string, unknown> | undefined),
         Constraints: [...new Set(constraints)],
       };
+    }
+    if (config.replicas !== undefined) {
+      (serviceSpec ?? taskTemplate).Mode = {
+        Replicated: { Replicas: config.replicas },
+      };
+    }
+    const toDuration = (seconds?: number) =>
+      seconds === undefined ? undefined : seconds * 1_000_000_000;
+    const serviceConfig = (serviceSpec ?? taskTemplate) as Record<
+      string,
+      unknown
+    >;
+    const update = config.updateConfig;
+    if (Object.keys(update).length) {
+      const updateConfig = {
+        ...update,
+        ...(toDuration(update.delaySeconds) !== undefined
+          ? { Delay: toDuration(update.delaySeconds) }
+          : {}),
+        ...(toDuration(update.monitorSeconds) !== undefined
+          ? { Monitor: toDuration(update.monitorSeconds) }
+          : {}),
+      } as Record<string, unknown>;
+      delete updateConfig.delaySeconds;
+      delete updateConfig.monitorSeconds;
+      serviceConfig.UpdateConfig = updateConfig;
+    }
+    const rollback = config.rollbackConfig;
+    if (Object.keys(rollback).length) {
+      const rollbackConfig = {
+        ...rollback,
+        ...(toDuration(rollback.delaySeconds) !== undefined
+          ? { Delay: toDuration(rollback.delaySeconds) }
+          : {}),
+        ...(toDuration(rollback.monitorSeconds) !== undefined
+          ? { Monitor: toDuration(rollback.monitorSeconds) }
+          : {}),
+      } as Record<string, unknown>;
+      delete rollbackConfig.delaySeconds;
+      delete rollbackConfig.monitorSeconds;
+      serviceConfig.RollbackConfig = rollbackConfig;
     }
     if (config.ports.length) {
       endpointSpec.Ports = [
@@ -372,6 +428,7 @@ export class DockerService {
       spec.TaskTemplate as Record<string, unknown>,
       spec.EndpointSpec as Record<string, unknown>,
       constraints,
+      spec as Record<string, unknown>,
     );
 
     await this.upsertService(serviceName, spec);
@@ -440,6 +497,7 @@ export class DockerService {
       spec.TaskTemplate as Record<string, unknown>,
       endpointSpec as Record<string, unknown>,
       constraints,
+      spec as Record<string, unknown>,
     );
 
     await this.upsertService(serviceName, spec);
@@ -562,6 +620,7 @@ export class DockerService {
         spec.TaskTemplate as Record<string, unknown>,
         endpointSpec as Record<string, unknown>,
         constraints,
+        spec as Record<string, unknown>,
       );
 
       await this.upsertService(serviceName, spec);

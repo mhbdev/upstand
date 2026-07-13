@@ -50,6 +50,8 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import { SelfUpdateDialog } from "@/components/self-update-dialog";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import {
@@ -57,8 +59,6 @@ import {
   validateKeyValuePairs,
 } from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
-import { SelfUpdateDialog } from "@/components/self-update-dialog";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -759,7 +759,7 @@ export default function WebServerDashboard({
                       </Button>
                     )}
                     {updateData?.channel && (
-                      <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <span className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase tracking-wide">
                         {updateData.channel}
                       </span>
                     )}
@@ -1058,7 +1058,7 @@ export default function WebServerDashboard({
                       Domains are managed from each resource&apos;s Domains tab.
                     </p>
                   </div>
-                  <div className="sm:col-span-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-muted-foreground text-xs">
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-muted-foreground text-xs sm:col-span-3">
                     DNS for each hostname must resolve to this server and TCP
                     ports 80 and 443 must be reachable. Use the Caddyfile editor
                     below for advanced ACME settings such as a staging CA or

@@ -27,9 +27,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 type MetricPoint = {
   time: string;
@@ -155,7 +158,12 @@ export default function MonitoringPage() {
       <DashboardPageHeader
         title="Server Monitoring"
         icon={<Activity className="size-6 text-primary" />}
-        description={<>Live Docker Engine telemetry for {stats.serverName}. History begins when this page opens and refreshes every five seconds.</>}
+        description={
+          <>
+            Live Docker Engine telemetry for {stats.serverName}. History begins
+            when this page opens and refreshes every five seconds.
+          </>
+        }
         actions={<Badge variant="outline">Docker {stats.dockerVersion}</Badge>}
       />
 
