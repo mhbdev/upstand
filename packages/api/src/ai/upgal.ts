@@ -44,6 +44,7 @@ import {
   type ToolExecutionOptions,
   ToolLoopAgent,
   type UIMessage,
+  safeValidateUIMessages,
 } from "ai";
 import { log } from "evlog";
 import { z } from "zod";
@@ -1331,15 +1332,57 @@ export async function createUpGalResponse(
   });
 }
 
+const messagePersistenceChains = new Map<string, Promise<void>>();
+
+/**
+ * Serialize snapshots for a conversation. A step checkpoint and the terminal
+ * callback can be emitted close together; without a per-conversation queue a
+ * slower earlier write can overwrite a newer, more complete snapshot.
+ */
+export async function persistUpGalMessages(
+  conversationId: string,
+  messages: ReadonlyArray<UpGalUIMessage>,
+  ai: IAIRepository,
+): Promise<void> {
+  const previous =
+    messagePersistenceChains.get(conversationId) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(() => saveIncomingMessagesNow(conversationId, messages, ai));
+  messagePersistenceChains.set(conversationId, current);
+
+  try {
+    await current;
+  } finally {
+    if (messagePersistenceChains.get(conversationId) === current) {
+      messagePersistenceChains.delete(conversationId);
+    }
+  }
+}
+
 export async function saveIncomingMessages(
   conversationId: string,
   messages: ReadonlyArray<UpGalUIMessage>,
   ai: IAIRepository,
 ) {
-  // The UI sends the complete conversation on every turn. Assign a stable
-  // monotonic timestamp within that snapshot so messages created in the same
-  // millisecond cannot be reordered by the database when they are reloaded.
-  const savedAt = Date.now();
+  return persistUpGalMessages(conversationId, messages, ai);
+}
+
+async function saveIncomingMessagesNow(
+  conversationId: string,
+  messages: ReadonlyArray<UpGalUIMessage>,
+  ai: IAIRepository,
+) {
+  const existingMessages = await ai.listMessages(conversationId);
+  const existingCreatedAt = new Map(
+    existingMessages.map((message) => [message.id, message.createdAt]),
+  );
+  const latestCreatedAt = existingMessages.reduce(
+    (latest, message) => Math.max(latest, message.createdAt.getTime()),
+    0,
+  );
+  let nextCreatedAt = Math.max(Date.now(), latestCreatedAt + 1);
+
   await ai.saveMessages(
     conversationId,
     messages.map((message, index) => ({
@@ -1347,7 +1390,11 @@ export async function saveIncomingMessages(
       conversationId,
       role: message.role,
       parts: message.parts.map(toJsonValue),
-      createdAt: new Date(savedAt + index),
+      // Message timestamps are immutable once a message ID is persisted. New
+      // messages receive an increasing timestamp; replayed history keeps its
+      // original position regardless of how often useChat resends it.
+      createdAt:
+        existingCreatedAt.get(message.id) ?? new Date(nextCreatedAt + index),
     })),
   );
   const firstUserText = messages
@@ -1359,6 +1406,116 @@ export async function saveIncomingMessages(
       firstUserText.trim().replace(/\s+/g, " "),
     );
   }
+}
+
+function lastPlainUserMessage(messages: unknown): UpGalUIMessage | null {
+  if (!Array.isArray(messages)) return null;
+
+  for (const candidate of [...messages].reverse()) {
+    if (
+      !candidate ||
+      typeof candidate !== "object" ||
+      (candidate as { role?: unknown }).role !== "user"
+    ) {
+      continue;
+    }
+
+    const record = candidate as { id?: unknown; parts?: unknown };
+    const textParts = Array.isArray(record.parts)
+      ? record.parts.filter((part): part is { type: "text"; text: string } =>
+          Boolean(
+            part &&
+              typeof part === "object" &&
+              (part as { type?: unknown }).type === "text" &&
+              typeof (part as { text?: unknown }).text === "string",
+          ),
+        )
+      : [];
+
+    if (textParts.length === 0) continue;
+    return {
+      id: typeof record.id === "string" ? record.id : randomUUID(),
+      role: "user",
+      parts: textParts,
+    } as UpGalUIMessage;
+  }
+
+  return null;
+}
+
+/**
+ * Validate the complete useChat history, but recover a turn when an old or
+ * partially streamed tool part is no longer accepted by the current SDK.
+ * The agent still receives only SDK-valid messages; malformed historical parts
+ * are discarded with a structured warning instead of turning the whole turn
+ * into an opaque 400 response.
+ */
+export async function validateAndRecoverUpGalMessages(
+  messages: unknown,
+  tools: ReturnType<typeof createUpGalTools>,
+): Promise<UpGalUIMessage[]> {
+  const validated = await safeValidateUIMessages<UpGalUIMessage>({
+    messages,
+    tools,
+  });
+  if (validated.success) return validated.data;
+
+  const generic = await safeValidateUIMessages<UpGalUIMessage>({ messages });
+  if (!generic.success) {
+    const fallback = lastPlainUserMessage(messages);
+    if (fallback) {
+      log.warn({
+        message: "Recovered UpGal turn from malformed UI message history",
+        originalMessageCount: Array.isArray(messages) ? messages.length : 0,
+        recoveredMessageCount: 1,
+        err: validated.error.message,
+      });
+      return [fallback];
+    }
+    throw validated.error;
+  }
+
+  const recoveredMessages: UpGalUIMessage[] = [];
+  for (const message of generic.data) {
+    const validParts: UpGalUIMessage["parts"] = [];
+    for (const part of message.parts) {
+      const partResult = await safeValidateUIMessages<UpGalUIMessage>({
+        messages: [{ ...message, parts: [part] }],
+        tools,
+      });
+      if (partResult.success) validParts.push(part);
+    }
+    if (validParts.length > 0) {
+      recoveredMessages.push({ ...message, parts: validParts });
+    }
+  }
+
+  const recovered = await safeValidateUIMessages<UpGalUIMessage>({
+    messages: recoveredMessages,
+    tools,
+  });
+  if (recovered.success) {
+    log.warn({
+      message: "Recovered UpGal UI message history by dropping invalid parts",
+      originalMessageCount: generic.data.length,
+      recoveredMessageCount: recovered.data.length,
+      err: validated.error.message,
+    });
+    return recovered.data;
+  }
+
+  const fallback = lastPlainUserMessage(messages);
+  if (fallback) {
+    log.warn({
+      message: "Recovered UpGal turn from invalid tool message history",
+      originalMessageCount: Array.isArray(messages) ? messages.length : 0,
+      recoveredMessageCount: 1,
+      err: recovered.error.message,
+    });
+    return [fallback];
+  }
+
+  throw recovered.error;
 }
 
 export async function getConversationForUser(

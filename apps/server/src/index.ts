@@ -9,6 +9,7 @@ import {
   getConversationForUser,
   isUpGalToolName,
   saveIncomingMessages,
+  validateAndRecoverUpGalMessages,
   UPGAL_TOOL_METADATA,
   type UpGalUIMessage,
 } from "@upstand/api/ai/upgal";
@@ -46,7 +47,6 @@ import {
   GetWebServerSettingsUseCaseToken,
   TriggerUpdateUseCaseToken,
 } from "@upstand/usecases/tokens";
-import { validateUIMessages } from "ai";
 import { count } from "drizzle-orm";
 import { initLogger, log } from "evlog";
 import {
@@ -327,12 +327,22 @@ app.post("/api/ai/chat", async (c) => {
   const tools = createUpGalTools(context);
   let messages: UpGalUIMessage[];
   try {
-    messages = await validateUIMessages<UpGalUIMessage>({
-      messages: body.messages,
-      tools,
+    messages = await validateAndRecoverUpGalMessages(body.messages, tools);
+  } catch (error) {
+    log.warn({
+      message: "Rejected UpGal request with unrecoverable UI message history",
+      organizationId: body.organizationId,
+      conversationId,
+      messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
+      err: error instanceof Error ? error.message : String(error),
     });
-  } catch {
-    return c.json({ error: "Invalid UpGal messages" }, 400);
+    return c.json(
+      {
+        error:
+          "UpGal could not read this conversation history. Start a new message to continue.",
+      },
+      400,
+    );
   }
   await saveIncomingMessages(
     conversationId,

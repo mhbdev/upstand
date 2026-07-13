@@ -6,6 +6,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.27 - 2026-07-13
+
+### Fixed
+
+- Recover UpGal turns when stale or partially streamed UI tool parts fail current AI SDK validation, with structured diagnostics instead of a silent history loss.
+- Serialize per-conversation UpGal persistence checkpoints so an older asynchronous snapshot cannot overwrite a newer assistant/tool result.
+- Preserve immutable message creation timestamps when `useChat` resends full conversation history and add a deterministic database ordering tie-breaker.
+
 ## 0.1.26 - 2026-07-13
 
 ### Changed

@@ -180,7 +180,6 @@ export class DrizzleAIRepository implements IAIRepository {
           set: {
             role: message.role,
             parts: message.parts as JsonValue[],
-            createdAt: message.createdAt,
           },
         });
     }

@@ -70,6 +70,7 @@ export const aiMessage = pgTable(
     index("ai_message_conversation_idx").on(
       table.conversationId,
       table.createdAt,
+      table.id,
     ),
   ],
 );
