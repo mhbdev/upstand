@@ -407,6 +407,12 @@ const resourceOutputSchema = z
   .object({
     id: z.string().describe("Stable resource ID."),
     environmentId: z.string().describe("Parent environment ID."),
+    projectId: z
+      .string()
+      .optional()
+      .describe(
+        "Parent project ID, when the resource was listed in an environment.",
+      ),
     name: z.string().describe("Human-readable resource name."),
     type: z
       .string()
@@ -657,7 +663,6 @@ function mutationTool<TInput, TOutput>(
     inputSchema,
     outputSchema,
     contextSchema: toolContextSchema,
-    needsApproval: true,
     execute: async (
       input: TInput,
       _options: ToolExecutionOptions<UpGalToolContext>,
@@ -709,8 +714,14 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
       "Read deployable resources in an environment. The environmentId must come from a prior environment result or the user.",
       environmentIdSchema,
       async ({ environmentId }) => {
-        await assertEnvironment(context, environmentId);
-        return run(GetResourcesUseCaseToken).execute({ environmentId });
+        const environment = await assertEnvironment(context, environmentId);
+        const resources = await run(GetResourcesUseCaseToken).execute({
+          environmentId,
+        });
+        return resources.map((resource) => ({
+          ...resource,
+          projectId: environment.projectId,
+        }));
       },
       resourcesOutputSchema,
     ),
@@ -855,6 +866,12 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
 
 export function isUpGalToolName(value: string): value is UpGalToolName {
   return UPGAL_TOOL_METADATA.some(([name]) => name === value);
+}
+
+export function upGalToolNeedsApproval(value: string): boolean {
+  return UPGAL_TOOL_METADATA.some(
+    ([name, , needsApproval]) => name === value && needsApproval,
+  );
 }
 
 export async function executeUpGalReadTool(
@@ -1200,8 +1217,10 @@ export async function createUpGalResponse(
     id: "upgal",
     model: provider.model,
     temperature: 0.5,
-    instructions: `You are UpGal, Upstand's operations assistant. Be precise, transparent, and concise. You may inspect organization resources automatically. Every mutation requires user approval. Never invent IDs or claim an action completed until the tool returns success. After every tool call, continue with a concise plain-language answer; never leave the user with only a tool result card. If a list is empty, say that explicitly. Use IDs from tool results for follow-up calls and do not guess them. The active organization is ${context.organizationId}.`,
+    instructions: `You are UpGal, Upstand's operations assistant. Be precise, transparent, and concise. You may inspect organization resources automatically. Every mutation requires user approval through the tool approval protocol. For a mutation, call the mutation tool with the exact confirmed target and parameters; do not ask for confirmation in prose, do not simulate an approval request in text, and do not claim an action completed until the tool returns success. The client renders the approval controls after the tool call. If a mutation is denied, acknowledge the denial and do not retry it unless the user explicitly asks again. After every tool call, continue with a concise plain-language answer; never leave the user with only a tool result card. If a list is empty, say that explicitly. Use IDs from tool results for follow-up calls and do not guess them. The active organization is ${context.organizationId}.`,
     tools: createUpGalTools(context),
+    toolApproval: ({ toolCall }) =>
+      upGalToolNeedsApproval(toolCall.toolName) ? "user-approval" : undefined,
     toolsContext: {
       get_account_status: { organizationId: context.organizationId },
       list_projects: { organizationId: context.organizationId },
@@ -1240,6 +1259,10 @@ export async function createUpGalResponse(
   const response = await createAgentUIStreamResponse({
     agent,
     uiMessages,
+    // Passing the original messages lets the UI stream treat an approval
+    // response as a continuation of the pending assistant message. Without
+    // it, every approved tool call is persisted as a second assistant turn.
+    originalMessages: uiMessages,
     abortSignal: request.signal,
     // Persist the complete assistant message, including tool calls and tool
     // results. Without this callback only the incoming user messages are
@@ -1279,14 +1302,18 @@ export async function saveIncomingMessages(
   messages: ReadonlyArray<UpGalUIMessage>,
   ai: IAIRepository,
 ) {
+  // The UI sends the complete conversation on every turn. Assign a stable
+  // monotonic timestamp within that snapshot so messages created in the same
+  // millisecond cannot be reordered by the database when they are reloaded.
+  const savedAt = Date.now();
   await ai.saveMessages(
     conversationId,
-    messages.map((message) => ({
+    messages.map((message, index) => ({
       id: message.id,
       conversationId,
       role: message.role,
       parts: message.parts.map(toJsonValue),
-      createdAt: new Date(),
+      createdAt: new Date(savedAt + index),
     })),
   );
   const firstUserText = messages
