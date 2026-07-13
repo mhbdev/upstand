@@ -63,6 +63,17 @@ export class TriggerUpdateUseCase {
           }
 
           const newImage = `${baseImage}:${version}`;
+          const currentEnv = (inspect.Spec.TaskTemplate.ContainerSpec.Env ??
+            []) as string[];
+          const nextEnv = currentEnv.some((entry) =>
+            entry.startsWith("UPSTAND_VERSION="),
+          )
+            ? currentEnv.map((entry) =>
+                entry.startsWith("UPSTAND_VERSION=")
+                  ? `UPSTAND_VERSION=${version}`
+                  : entry,
+              )
+            : [...currentEnv, `UPSTAND_VERSION=${version}`];
           log.info({
             message: `Updating Swarm service '${name}' to use image '${newImage}'...`,
           });
@@ -75,6 +86,7 @@ export class TriggerUpdateUseCase {
               ContainerSpec: {
                 ...inspect.Spec.TaskTemplate.ContainerSpec,
                 Image: newImage,
+                Env: nextEnv,
               },
               ForceUpdate: (inspect.Spec.TaskTemplate.ForceUpdate || 0) + 1,
             },

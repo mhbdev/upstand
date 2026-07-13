@@ -6,6 +6,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.19 - 2026-07-13
+
+### Fixed
+
+- Dashboard self-updates now persist the new `UPSTAND_VERSION` in the Swarm service environment, so About and subsequent update checks report the image that is actually running instead of the pre-update version.
+
 ## 0.1.18 - 2026-07-13
 
 ### Added
