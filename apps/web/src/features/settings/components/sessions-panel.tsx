@@ -66,7 +66,6 @@ export function SessionsPanel() {
           </p>
         ) : (
           <div className="flex flex-col divide-y">
-            {/* biome-ignore lint/suspicious/noExplicitAny: sessions typed as any from better-auth-ui */}
             {sessions.map((s: any) => {
               const ip =
                 !s.ipAddress ||

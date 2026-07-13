@@ -522,7 +522,7 @@ export const webServerRouter = router({
   checkGpuStatus: twoFactorVerifiedProcedure.query(async () => {
     try {
       return await checkGpuStatus();
-    } catch (err: any) {
+    } catch (_err: any) {
       return {
         driverInstalled: false,
         driverVersion: undefined,

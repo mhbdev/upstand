@@ -1,9 +1,11 @@
 import {
   ApplicationBuildConfigSchema,
   type IUnitOfWork,
+  isSupportedDatabaseImage,
   parseDomainMappings,
   parseResourceAdvancedConfig,
   type Resource,
+  ResourceComposeTypeSchema,
   serializeApplicationBuildConfig,
   serializeDomainMappings,
   serializeResourceAdvancedConfig,
@@ -21,6 +23,9 @@ export const UpdateResourceInputSchema = z.object({
   appName: z.string().optional(),
   description: z.string().optional(),
   provider: z.string().optional(),
+  dbType: z.string().optional(),
+  dockerImage: z.string().optional(),
+  composeType: ResourceComposeTypeSchema.optional(),
   credentials: z.string().optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
   advancedConfig: z.string().optional(),
@@ -51,6 +56,33 @@ export class UpdateResourceUseCase {
     if (input.appName !== undefined) patch.appName = input.appName;
     if (input.description !== undefined) patch.description = input.description;
     if (input.provider !== undefined) patch.provider = input.provider;
+    if (input.dbType !== undefined || input.dockerImage !== undefined) {
+      if (resource.type !== "database") {
+        throw new ValidationError(
+          "Database engine and image can only be changed on database resources",
+        );
+      }
+
+      const dbType = input.dbType ?? resource.dbType ?? undefined;
+      const dockerImage =
+        input.dockerImage ?? resource.dockerImage ?? undefined;
+      if (!isSupportedDatabaseImage(dbType, dockerImage)) {
+        throw new ValidationError(
+          "Select a supported database image version for the selected database engine",
+        );
+      }
+      if (input.dbType !== undefined) patch.dbType = input.dbType;
+      if (input.dockerImage !== undefined)
+        patch.dockerImage = input.dockerImage;
+    }
+    if (input.composeType !== undefined) {
+      if (resource.type !== "compose") {
+        throw new ValidationError(
+          "Compose deployment mode can only be changed on Compose resources",
+        );
+      }
+      patch.composeType = input.composeType;
+    }
     if (input.credentials !== undefined) {
       let credentials = input.credentials;
       if (resource.type === "database" && input.credentials) {

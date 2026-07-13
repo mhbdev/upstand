@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { IAIRepository, AIMessageRecord } from "@upstand/domain";
+import type { AIMessageRecord, IAIRepository } from "@upstand/domain";
 import { saveIncomingMessages, validateAndRecoverUpGalMessages } from "./upgal";
 
 function textMessage(id: string, role: "user" | "assistant", text: string) {

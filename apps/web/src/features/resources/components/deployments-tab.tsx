@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -23,6 +24,7 @@ import { Eye, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getServerUrl } from "@/lib/server-url";
+import { trpc } from "@/utils/trpc";
 
 type DeploymentItem = {
   id: string;
@@ -86,6 +88,28 @@ export function DeploymentsTab({
   }, [resource]);
 
   const isBuilding = deployList.some((d) => d.status === "running");
+  const queuedDeployment = deployList.find((deployment) =>
+    ["queued", "waiting"].includes(deployment.status),
+  );
+  const cancelDeploymentMutation = useMutation({
+    ...trpc.deployment.cancelDeploymentJob.mutationOptions(),
+    onSuccess: () => {
+      if (!queuedDeployment) return;
+      setDeployList((current) =>
+        current.map((deployment) =>
+          deployment.id === queuedDeployment.id
+            ? {
+                ...deployment,
+                status: "failed",
+                logs: `${deployment.logs}\nDeployment cancelled by user.\n`,
+              }
+            : deployment,
+        ),
+      );
+      toast.success("Queued deployment cancelled");
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const triggerDeployment = () => {
     toast.info("Building and deploying resource...");
@@ -171,18 +195,20 @@ export function DeploymentsTab({
               <Trash2 className="size-4" /> Clear Deployments
             </Button>
             <Button
-              onClick={() => toast.success("Kill Build signal dispatched")}
+              onClick={() => {
+                if (!queuedDeployment) return;
+                cancelDeploymentMutation.mutate({
+                  serverId: resource.serverId ?? "local",
+                  jobId: queuedDeployment.id,
+                });
+              }}
               variant="outline"
               className="gap-2 border-border/40"
+              disabled={!queuedDeployment || cancelDeploymentMutation.isPending}
             >
-              Kill Build
-            </Button>
-            <Button
-              onClick={() => toast.success("Current deployment cancelled")}
-              variant="outline"
-              className="gap-2 border-border/40"
-            >
-              Cancel Deployment
+              {cancelDeploymentMutation.isPending
+                ? "Cancelling..."
+                : "Cancel Queued Deployment"}
             </Button>
           </div>
         </CardContent>

@@ -20,6 +20,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
@@ -32,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -51,6 +53,7 @@ export default function RemoteServersPage() {
   const [port, setPort] = useState(22);
   const [username, setUsername] = useState("root");
   const [enableDockerCleanup, setEnableDockerCleanup] = useState(false);
+  const [setupServerId, setSetupServerId] = useState<string | null>(null);
 
   const { data: servers, refetch } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
@@ -88,12 +91,11 @@ export default function RemoteServersPage() {
 
   const setupMutation = useMutation({
     ...trpc.server.setup.mutationOptions(),
-    onSuccess: (res) => {
-      toast.success(res.message);
+    onSuccess: () => {
       refetch();
     },
-    onError: (err) => {
-      toast.error(err.message || "Failed to start setup");
+    onError: () => {
+      toast.error("Remote server setup needs attention");
     },
   });
 
@@ -134,7 +136,16 @@ export default function RemoteServersPage() {
   };
 
   const handleSetup = (id: string) => {
+    setupMutation.reset();
+    setSetupServerId(id);
     setupMutation.mutate({ id });
+  };
+
+  const setupServer = servers?.find((server) => server.id === setupServerId);
+  const closeSetupDialog = () => {
+    if (setupMutation.isPending) return;
+    setSetupServerId(null);
+    setupMutation.reset();
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -411,6 +422,102 @@ export default function RemoteServersPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(setupServer)}
+        onOpenChange={(open) => {
+          if (!open) closeSetupDialog();
+        }}
+      >
+        <DialogContent
+          className="max-w-lg"
+          showCloseButton={!setupMutation.isPending}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {setupMutation.isSuccess
+                ? "Server ready"
+                : setupMutation.isError
+                  ? "Setup needs attention"
+                  : `Setting up ${setupServer?.name ?? "server"}`}
+            </DialogTitle>
+            <DialogDescription>
+              Upstand installs and verifies Docker, then safely reconciles this
+              host with the active Swarm cluster.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-4">
+              {setupMutation.isPending ? (
+                <Spinner className="size-5 shrink-0 text-primary" />
+              ) : setupMutation.isSuccess ? (
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-500 text-xs">
+                  ✓
+                </span>
+              ) : (
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-destructive/15 font-bold text-destructive text-xs">
+                  !
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="font-medium text-sm">
+                  {setupServer?.name ?? "Remote server"}
+                </p>
+                <p className="break-all text-muted-foreground text-xs">
+                  {setupServer?.ipAddress}:{setupServer?.port}
+                </p>
+              </div>
+            </div>
+
+            {setupMutation.isPending && (
+              <p className="text-muted-foreground text-sm">
+                Waiting for Docker to confirm the node joined. This can take a
+                few seconds when the daemon completes the join asynchronously.
+              </p>
+            )}
+
+            {setupMutation.isSuccess && (
+              <p className="text-emerald-600 text-sm dark:text-emerald-400">
+                {setupMutation.data.message}
+              </p>
+            )}
+
+            {setupMutation.isError && (
+              <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
+                <p className="font-medium text-destructive">
+                  {setupMutation.error.message}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  For safety, Upstand does not automatically leave an existing
+                  Swarm. Resolve the stated network or cluster issue on the
+                  server, then retry setup.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeSetupDialog}
+              disabled={setupMutation.isPending}
+            >
+              Close
+            </Button>
+            {setupMutation.isError && setupServerId && (
+              <Button
+                type="button"
+                onClick={() => handleSetup(setupServerId)}
+                disabled={setupMutation.isPending}
+              >
+                Retry setup
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardPage>

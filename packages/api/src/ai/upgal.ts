@@ -39,12 +39,12 @@ import {
   type FlexibleSchema,
   generateText,
   type InferUITools,
+  safeValidateUIMessages,
   stepCountIs,
   type Tool,
   type ToolExecutionOptions,
   ToolLoopAgent,
   type UIMessage,
-  safeValidateUIMessages,
 } from "ai";
 import { log } from "evlog";
 import { z } from "zod";
@@ -454,9 +454,6 @@ const resourceOutputSchema = z
 const resourcesOutputSchema = z
   .array(resourceOutputSchema)
   .describe("Resource records.");
-const nullableResourceOutputSchema = resourceOutputSchema
-  .nullable()
-  .describe("The updated resource, or null if it no longer exists.");
 
 const serverOutputSchema = z
   .object({
@@ -841,7 +838,7 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
         await assertResource(context, input.id);
         return run(ControlResourceUseCaseToken).execute(input);
       },
-      nullableResourceOutputSchema,
+      resourceOutputSchema,
     ),
     delete_resource: mutationTool(
       "Permanently delete a resource and its deployment configuration. This cannot be undone and requires approval.",
@@ -1381,7 +1378,7 @@ async function saveIncomingMessagesNow(
     (latest, message) => Math.max(latest, message.createdAt.getTime()),
     0,
   );
-  let nextCreatedAt = Math.max(Date.now(), latestCreatedAt + 1);
+  const nextCreatedAt = Math.max(Date.now(), latestCreatedAt + 1);
 
   await ai.saveMessages(
     conversationId,

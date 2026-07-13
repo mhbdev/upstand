@@ -26,11 +26,13 @@
       "!**/.svelte-kit",
       "!**/wrangler.jsonc",
       "!**/.source",
+      "!**/.agents",
       "!**/convex/_generated"
     ]
   },
   "formatter": {
     "enabled": true,
+    "lineEnding": "auto",
     "indentStyle": "space",
     "indentWidth": 2
   },
@@ -58,6 +60,9 @@
             "functions": ["clsx", "cva", "cn"]
           }
         }
+      },
+      "suspicious": {
+        "noExplicitAny": "off"
       },
       "style": {
         "noParameterAssign": "error",

@@ -38,7 +38,7 @@ import {
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   DashboardPage,
@@ -139,7 +139,10 @@ export default function GitProviders({
     },
   });
 
-  const randomString = () => Math.random().toString(36).slice(2, 8);
+  const randomString = useCallback(
+    () => Math.random().toString(36).slice(2, 8),
+    [],
+  );
 
   const resetForms = () => {
     setName("");
@@ -188,7 +191,7 @@ export default function GitProviders({
 
     const manifestJSON = JSON.stringify(manifestData, null, 2);
     setManifest(manifestJSON);
-  }, [orgId, session?.user?.id]);
+  }, [orgId, session?.user?.id, randomString]);
 
   const handleCreateNonGithub = (e: React.FormEvent) => {
     e.preventDefault();

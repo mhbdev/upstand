@@ -39,7 +39,6 @@ import {
   CheckCircle,
   Clock,
   Copy,
-  Play,
   RefreshCw,
   Search,
   Server,
@@ -192,7 +191,7 @@ export default function DeploymentsPage() {
       dep.resourceName.toLowerCase().includes(query) ||
       dep.title.toLowerCase().includes(query) ||
       dep.status.toLowerCase().includes(query) ||
-      (dep.serverName && dep.serverName.toLowerCase().includes(query))
+      dep.serverName?.toLowerCase().includes(query)
     );
   });
 
@@ -524,7 +523,7 @@ export default function DeploymentsPage() {
                                 setConcurrencyInputs({
                                   ...concurrencyInputs,
                                   [server.id]:
-                                    Number.parseInt(e.target.value) || 1,
+                                    Number.parseInt(e.target.value, 10) || 1,
                                 });
                               }}
                               className="h-9 w-24"

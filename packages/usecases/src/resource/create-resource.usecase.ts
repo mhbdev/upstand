@@ -6,6 +6,7 @@ import {
   type IUnitOfWork,
   isSupportedDatabaseImage,
   type Resource,
+  ResourceComposeTypeSchema,
   serializeApplicationBuildConfig,
   serializeResourceAdvancedConfig,
   ValidationError,
@@ -21,7 +22,7 @@ export const CreateResourceInputSchema = z.object({
   appName: z.string().min(1, "App Name is required"),
   description: z.string().optional(),
   dbType: z.string().optional(),
-  composeType: z.string().optional(),
+  composeType: ResourceComposeTypeSchema.optional(),
   dockerImage: z.string().optional(),
   credentials: z.string().optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
@@ -55,6 +56,8 @@ export class CreateResourceUseCase {
       let provider = "github";
       if (input.type === "database") {
         provider = input.dockerImage || input.dbType || "docker-registry";
+      } else if (input.type === "application" && input.dockerImage) {
+        provider = "docker-registry";
       } else if (input.type === "compose") {
         provider = "raw";
       }
@@ -85,7 +88,8 @@ export class CreateResourceUseCase {
         appName: input.appName,
         description: input.description ?? null,
         dbType: input.dbType ?? null,
-        composeType: input.composeType ?? null,
+        composeType:
+          input.type === "compose" ? (input.composeType ?? "stack") : null,
         dockerImage: input.dockerImage ?? null,
         credentials,
         buildConfig: serializeApplicationBuildConfig(

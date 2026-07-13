@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
+import {
+  type IUnitOfWork,
+  type Resource,
+  UnitOfWorkToken,
+} from "@upstand/domain";
 import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
@@ -518,11 +522,24 @@ export class DeploymentWorker {
         );
         appendLog("Database Swarm service deployed successfully!\n");
       } else if (resource.type === "compose") {
-        appendLog("Preparing Docker Compose Stack deployment...\n");
+        appendLog(
+          resource.composeType === "compose"
+            ? "Preparing Docker Compose deployment...\n"
+            : "Preparing Docker Compose Stack deployment...\n",
+        );
         let composeFile = "";
-        if (resource.credentials) {
-          const config = JSON.parse(resource.credentials);
-          composeFile = config.composeFile || "";
+        const credentials = parseResourceCredentials(resource.credentials);
+        if (resource.provider === "raw") {
+          composeFile = credentials.composeFile || "";
+        } else {
+          const source = await resolveGitSource(resource, uow, appendLog);
+          tempSshKeyPath = source.sshKeyPath || null;
+          composeFile = await dockerService.readComposeFileFromGit(
+            resource,
+            source.cloneUrl,
+            appendLog,
+            source.sshKeyPath,
+          );
         }
         if (!composeFile) {
           throw new Error("No compose file content found in configuration");
@@ -533,7 +550,11 @@ export class DeploymentWorker {
           appendLog,
           constraints,
         );
-        appendLog("Compose Stack stack deployed successfully!\n");
+        appendLog(
+          resource.composeType === "compose"
+            ? "Docker Compose project deployed successfully!\n"
+            : "Compose Stack deployed successfully!\n",
+        );
       } else if (resource.type === "application") {
         if (resource.provider === "docker-registry") {
           await dockerService.deployAppImage(
@@ -632,7 +653,7 @@ export class DeploymentWorker {
               const buildDir = path.join(process.cwd(), ".builds");
               fs.mkdirSync(buildDir, { recursive: true });
               tempSshKeyPath = path.join(buildDir, `ssh-key-${resource.id}`);
-              fs.writeFileSync(tempSshKeyPath, privateKey.trim() + "\n", {
+              fs.writeFileSync(tempSshKeyPath, `${privateKey.trim()}\n`, {
                 mode: 0o600,
               });
             }
@@ -664,7 +685,7 @@ export class DeploymentWorker {
         return await tx.resourceRepository.findById(resourceId);
       });
 
-      if (updatedResource && updatedResource.domains) {
+      if (updatedResource?.domains) {
         const [resources, settings] = await uow.transaction(async (tx) => [
           await tx.resourceRepository.findMany(),
           await tx.webServerSettingsRepository.findGlobal(),
@@ -720,4 +741,91 @@ export class DeploymentWorker {
       });
     }
   }
+}
+
+function parseResourceCredentials(
+  value: string | null | undefined,
+): Record<string, any> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function resolveGitSource(
+  resource: Resource,
+  uow: IUnitOfWork,
+  appendLog: (log: string) => void,
+): Promise<{ cloneUrl: string; sshKeyPath?: string }> {
+  const credentials = parseResourceCredentials(resource.credentials);
+  let cloneUrl = "";
+  let sshKeyPath: string | undefined;
+
+  if (["github", "gitlab", "bitbucket", "gitea"].includes(resource.provider)) {
+    const gitProviderId = credentials.githubAccount;
+    if (!gitProviderId) {
+      throw new Error(
+        "Git Provider not associated. Please configure repository connection.",
+      );
+    }
+
+    const gitProvider = await uow.transaction((tx) =>
+      tx.gitProviderRepository.findById(gitProviderId),
+    );
+    if (!gitProvider) throw new Error("Associated Git Provider not found");
+    const config = JSON.parse(gitProvider.config);
+
+    if (resource.provider === "github") {
+      appendLog("Retrieving GitHub App installation access token...\n");
+      const token = await getInstallationToken(
+        String(config.githubAppId),
+        config.githubPrivateKey,
+        config.githubInstallationId,
+      );
+      cloneUrl = `https://x-access-token:${token}@github.com/${credentials.repository}.git`;
+    } else if (resource.provider === "gitlab") {
+      appendLog("Connecting to GitLab using OAuth access token...\n");
+      const gitlabHost = (config.gitlabUrl || "https://gitlab.com").replace(
+        /https?:\/\//,
+        "",
+      );
+      cloneUrl = `https://oauth2:${config.accessToken}@${gitlabHost}/${credentials.repository}.git`;
+    } else if (resource.provider === "gitea") {
+      appendLog("Connecting to Gitea using OAuth access token...\n");
+      const giteaHost = (config.giteaUrl || "").replace(/https?:\/\//, "");
+      cloneUrl = `https://oauth2:${config.accessToken}@${giteaHost}/${credentials.repository}.git`;
+    } else {
+      appendLog("Connecting to Bitbucket using app password...\n");
+      cloneUrl = `https://${config.bitbucketUsername}:${config.appPassword}@bitbucket.org/${credentials.repository}.git`;
+    }
+  } else if (resource.provider === "git") {
+    cloneUrl = credentials.repositoryUrl || "";
+    if (!cloneUrl) throw new Error("Repository URL is empty in configuration");
+
+    if (credentials.sshKeyId) {
+      const sshKey = await uow.transaction((tx) =>
+        tx.sshKeyRepository.findById(credentials.sshKeyId),
+      );
+      if (!sshKey) throw new Error("Configured SSH key not found in workspace");
+      const privateKey = decryptSecret({
+        ciphertext: sshKey.privateKeyCiphertext,
+        iv: sshKey.privateKeyIv,
+        authTag: sshKey.privateKeyAuthTag,
+        keyVersion: sshKey.privateKeyVersion,
+      });
+      const buildDir = path.join(process.cwd(), ".builds");
+      fs.mkdirSync(buildDir, { recursive: true });
+      sshKeyPath = path.join(buildDir, `ssh-key-${resource.id}`);
+      fs.writeFileSync(sshKeyPath, `${privateKey.trim()}\n`, { mode: 0o600 });
+    }
+  } else {
+    throw new Error(
+      `Unsupported Compose deployment provider: ${resource.provider}`,
+    );
+  }
+
+  return { cloneUrl, sshKeyPath };
 }

@@ -25,6 +25,9 @@ export const DATABASE_IMAGE_OPTIONS = {
 
 export type DatabaseType = keyof typeof DATABASE_IMAGE_OPTIONS;
 
+export const ResourceComposeTypeSchema = z.enum(["compose", "stack"]);
+export type ResourceComposeType = z.infer<typeof ResourceComposeTypeSchema>;
+
 export function isSupportedDatabaseImage(
   databaseType: string | undefined,
   image: string | null | undefined,
@@ -58,6 +61,12 @@ const ResourceHealthcheckSchema = z.object({
 });
 
 export const ResourceAdvancedConfigSchema = z.object({
+  serviceName: z
+    .string()
+    .trim()
+    .max(253)
+    .optional()
+    .describe("Compose service to receive resource-level overrides."),
   isolatedDeployment: z
     .boolean()
     .default(false)

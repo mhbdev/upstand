@@ -1,9 +1,6 @@
 "use client";
 
 import {
-  Alert02Icon,
-  ArrowRight01Icon,
-  CheckmarkCircle02Icon,
   CloudIcon,
   Database01Icon,
   Delete02Icon,
@@ -16,7 +13,6 @@ import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -39,7 +35,7 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
@@ -86,9 +82,7 @@ export const S3_PROVIDERS: Array<{
   { key: "Other", name: "Any other S3 compatible provider" },
 ];
 
-export default function S3Destinations({
-  session,
-}: {
+export default function S3Destinations(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
   const { data: activeOrg } = authClient.useActiveOrganization();

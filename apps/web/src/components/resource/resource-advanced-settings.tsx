@@ -157,24 +157,47 @@ export function ResourceAdvancedSettings({
               />
             </Field>
             {resourceType === "compose" && (
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor="advanced-isolated-volumes">
-                    Isolate Compose volumes
+              <>
+                <Field>
+                  <FieldLabel htmlFor="advanced-compose-service">
+                    Compose service target
                   </FieldLabel>
                   <FieldDescription>
-                    Prefix named volumes for this Compose deployment to avoid
-                    collisions between isolated instances.
+                    Apply the resource-level command, ports, volumes, and limits
+                    to this service. Leave empty to apply them to every service
+                    in the Compose project.
                   </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id="advanced-isolated-volumes"
-                  checked={config.isolatedDeploymentsVolume}
-                  onCheckedChange={(value) =>
-                    updateConfig("isolatedDeploymentsVolume", value)
-                  }
-                />
-              </Field>
+                  <Input
+                    id="advanced-compose-service"
+                    value={config.serviceName ?? ""}
+                    onChange={(event) =>
+                      updateConfig(
+                        "serviceName",
+                        event.target.value || undefined,
+                      )
+                    }
+                    placeholder="web"
+                  />
+                </Field>
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel htmlFor="advanced-isolated-volumes">
+                      Isolate Compose volumes
+                    </FieldLabel>
+                    <FieldDescription>
+                      Prefix named volumes for this Compose deployment to avoid
+                      collisions between isolated instances.
+                    </FieldDescription>
+                  </FieldContent>
+                  <Switch
+                    id="advanced-isolated-volumes"
+                    checked={config.isolatedDeploymentsVolume}
+                    onCheckedChange={(value) =>
+                      updateConfig("isolatedDeploymentsVolume", value)
+                    }
+                  />
+                </Field>
+              </>
             )}
           </FieldGroup>
 

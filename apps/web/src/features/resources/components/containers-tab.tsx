@@ -32,7 +32,6 @@ import {
   RotateCw,
   Settings,
   Square,
-  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -106,9 +105,8 @@ export function ContainersTab({
 
   const dispatchContainerCommand = (
     _containerId: string,
-    cmd: "start" | "stop" | "restart" | "kill",
+    command: "start" | "stop" | "restart",
   ) => {
-    const command = cmd === "kill" ? "stop" : cmd;
     toast.info(`Sending ${command} command to container...`);
     controlResource({ id: resource.id, command });
   };
@@ -147,10 +145,16 @@ export function ContainersTab({
       <Card className="border border-border/40 bg-card/20">
         <CardHeader>
           <CardTitle className="font-semibold text-lg">
-            Active Swarm Replicas
+            {resource.type === "compose"
+              ? resource.composeType === "compose"
+                ? "Docker Compose Containers"
+                : "Swarm Stack Replicas"
+              : "Active Swarm Replicas"}
           </CardTitle>
           <CardDescription className="text-muted-foreground text-sm">
-            Containers matching Swarm service replica specification.
+            {resource.type === "compose" && resource.composeType === "compose"
+              ? "Containers belonging to this Docker Compose project."
+              : "Containers matching the deployed resource service specification."}
           </CardDescription>
         </CardHeader>
         <CardContent className="border-border/20 border-t pt-4">
@@ -230,14 +234,6 @@ export function ContainersTab({
                             >
                               <Square className="mr-2 size-4 text-destructive" />{" "}
                               Stop
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                dispatchContainerCommand(con.id, "kill")
-                              }
-                            >
-                              <Trash2 className="mr-2 size-4 text-destructive" />{" "}
-                              Kill
                             </DropdownMenuItem>
                             <hr className="my-1 border-border/20" />
                             <DropdownMenuItem

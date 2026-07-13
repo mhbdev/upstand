@@ -151,6 +151,7 @@ export const QueueItemImage = ({
   className,
   ...props
 }: QueueItemImageProps) => (
+  // biome-ignore lint/performance/noImgElement: Queue attachments may be blob URLs and are intentionally not optimized.
   <img
     alt=""
     className={cn("h-8 w-8 rounded border object-cover", className)}

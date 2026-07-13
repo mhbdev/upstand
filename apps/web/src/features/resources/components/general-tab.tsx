@@ -1,8 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { ApplicationBuildConfig } from "@upstand/domain";
-import { Badge } from "@upstand/ui/components/badge";
+import {
+  type ApplicationBuildConfig,
+  ApplicationBuildConfigSchema,
+  DATABASE_IMAGE_OPTIONS,
+  type DatabaseType,
+  type ResourceComposeType,
+} from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -73,12 +78,15 @@ interface GeneralTabProps {
 }
 
 export type ResourceProvider =
+  | "docker"
   | "github"
   | "gitlab"
   | "bitbucket"
   | "gitea"
   | "git"
   | "raw";
+
+type DatabaseCredentials = Record<string, string>;
 
 const parseApplicationBuildConfig = (
   value: string | null | undefined,
@@ -108,6 +116,16 @@ const parseResourceCredentials = (value: string | null | undefined): any => {
     return JSON.parse(value);
   } catch {
     return null;
+  }
+};
+
+const parseDeployments = (value: string | null | undefined): any[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
 };
 
@@ -152,6 +170,8 @@ export function GeneralTab({
 
   // General Rename State
   const [nameInput, setNameInput] = useState("");
+  const [appNameInput, setAppNameInput] = useState("");
+  const [descriptionInput, setDescriptionInput] = useState("");
 
   // Build Configuration State
   const [buildConfig, setBuildConfig] = useState<ApplicationBuildConfig>(() =>
@@ -181,21 +201,45 @@ export function GeneralTab({
   const [gitSubmodules, setGitSubmodules] = useState(false);
 
   const [rawComposeFile, setRawComposeFile] = useState("");
+  const [dockerImage, setDockerImage] = useState("");
+  const [databaseType, setDatabaseType] = useState<DatabaseType>("postgres");
+  const [databaseCredentials, setDatabaseCredentials] =
+    useState<DatabaseCredentials>({});
+  const [composeType, setComposeType] = useState<ResourceComposeType>("stack");
 
   const isRunning = resource.status === "running";
-  const isBuilding = resource.deployments
-    ? JSON.parse(resource.deployments || "[]").some(
-        (d: any) => d.status === "running",
-      )
-    : false;
+  const isBuilding = parseDeployments(resource.deployments).some(
+    (deployment) => deployment.status === "running",
+  );
 
   // Hydrate states when resource changes
   useEffect(() => {
     if (resource) {
       setNameInput(resource.name);
+      setAppNameInput(resource.appName ?? "");
+      setDescriptionInput(resource.description ?? "");
       setBuildConfig(parseApplicationBuildConfig(resource.buildConfig));
       if (resource.provider) {
-        setProviderType(resource.provider);
+        setProviderType(
+          resource.provider === "docker-registry"
+            ? "docker"
+            : resource.provider,
+        );
+      }
+      if (resource.dbType && resource.dbType in DATABASE_IMAGE_OPTIONS) {
+        setDatabaseType(resource.dbType as DatabaseType);
+      }
+      setDockerImage(
+        resource.dockerImage ??
+          (resource.dbType && resource.dbType in DATABASE_IMAGE_OPTIONS
+            ? DATABASE_IMAGE_OPTIONS[resource.dbType as DatabaseType][0]
+            : ""),
+      );
+      if (
+        resource.composeType === "compose" ||
+        resource.composeType === "stack"
+      ) {
+        setComposeType(resource.composeType);
       }
       const config = parseResourceCredentials(resource.credentials);
       if (config) {
@@ -223,6 +267,9 @@ export function GeneralTab({
           setGitSubmodules(config.enableSubmodules ?? false);
         } else if (config.provider === "raw") {
           setRawComposeFile(config.composeFile ?? "");
+        }
+        if (resource.type === "database") {
+          setDatabaseCredentials(config);
         }
       }
     }
@@ -310,7 +357,7 @@ export function GeneralTab({
         setGithubAccount("");
       }
     }
-  }, [providerType, gitProviders]);
+  }, [providerType, gitProviders, githubAccount]);
 
   // Reset repository when account changes
   useEffect(() => {
@@ -320,7 +367,7 @@ export function GeneralTab({
         setGithubRepo(gitRepos[0].fullName);
       }
     }
-  }, [githubAccount, gitRepos]);
+  }, [githubAccount, gitRepos, githubRepo]);
 
   // Reset branch when repository changes
   useEffect(() => {
@@ -330,11 +377,17 @@ export function GeneralTab({
         setGithubBranch(gitBranches[0]);
       }
     }
-  }, [githubRepo, gitBranches]);
+  }, [githubRepo, gitBranches, githubBranch]);
 
   const handleSaveProvider = () => {
     let config: any = { provider: providerType, autoDeploy };
-    if (["github", "gitlab", "bitbucket", "gitea"].includes(providerType)) {
+    let provider: string = providerType;
+    if (providerType === "docker") {
+      provider = "docker-registry";
+      config = { provider, autoDeploy, dockerImage };
+    } else if (
+      ["github", "gitlab", "bitbucket", "gitea"].includes(providerType)
+    ) {
       config = {
         ...config,
         githubAccount,
@@ -365,7 +418,8 @@ export function GeneralTab({
     updateResource(
       {
         id: resource.id,
-        provider: providerType,
+        provider,
+        ...(providerType === "docker" ? { dockerImage } : {}),
         credentials: JSON.stringify(config),
       },
       {
@@ -373,6 +427,52 @@ export function GeneralTab({
           toast.success("Provider configuration saved successfully");
         },
       },
+    );
+  };
+
+  const updateDatabaseCredential = (key: string, value: string) => {
+    setDatabaseCredentials((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleSaveDatabase = () => {
+    const userRequired = databaseType !== "redis";
+    const databaseRequired =
+      databaseType !== "redis" && databaseType !== "mongodb";
+    const rootPasswordRequired =
+      databaseType === "mysql" || databaseType === "mariadb";
+
+    if (userRequired && !databaseCredentials.dbUser?.trim()) {
+      toast.error("Database user is required");
+      return;
+    }
+    if (!databaseCredentials.dbPassword?.trim()) {
+      toast.error("Database password is required");
+      return;
+    }
+    if (databaseRequired && !databaseCredentials.dbName?.trim()) {
+      toast.error("Database name is required");
+      return;
+    }
+    if (rootPasswordRequired && !databaseCredentials.dbRootPassword?.trim()) {
+      toast.error("Root password is required");
+      return;
+    }
+
+    updateResource(
+      {
+        id: resource.id,
+        dbType: databaseType,
+        dockerImage,
+        credentials: JSON.stringify(databaseCredentials),
+      },
+      { onSuccess: () => toast.success("Database configuration saved") },
+    );
+  };
+
+  const handleSaveCompose = () => {
+    updateResource(
+      { id: resource.id, composeType },
+      { onSuccess: () => toast.success("Compose deployment mode saved") },
     );
   };
 
@@ -384,9 +484,14 @@ export function GeneralTab({
 
   const handleRename = (e: React.FormEvent) => {
     e.preventDefault();
-    if (nameInput.trim()) {
+    if (nameInput.trim() && appNameInput.trim()) {
       updateResource(
-        { id: resource.id, name: nameInput.trim() },
+        {
+          id: resource.id,
+          name: nameInput.trim(),
+          appName: appNameInput.trim(),
+          description: descriptionInput.trim(),
+        },
         {
           onSuccess: () => toast.success("Resource name saved"),
         },
@@ -395,8 +500,8 @@ export function GeneralTab({
   };
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
-      <div className="space-y-6 md:col-span-2">
+    <div className="grid min-w-0 gap-6 md:grid-cols-3">
+      <div className="min-w-0 space-y-6 md:col-span-2">
         {/* Deploy settings */}
         <Card className="border border-border/40 bg-card/20">
           <CardHeader>
@@ -482,6 +587,199 @@ export function GeneralTab({
             </div>
           </CardContent>
         </Card>
+
+        {resource.type === "database" && (
+          <Card className="border border-border/40 bg-card/20">
+            <CardHeader>
+              <CardTitle className="font-semibold text-lg">
+                Database Configuration
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Manage the engine, image version, and credentials used when the
+                database Swarm service is deployed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5 border-border/20 border-t pt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="database-engine">Database engine</Label>
+                  <Select
+                    value={databaseType}
+                    onValueChange={(value) => {
+                      const nextType = value as DatabaseType;
+                      setDatabaseType(nextType);
+                      setDockerImage(DATABASE_IMAGE_OPTIONS[nextType][0]);
+                    }}
+                  >
+                    <SelectTrigger
+                      id="database-engine"
+                      className="bg-background"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="postgres">PostgreSQL</SelectItem>
+                        <SelectItem value="mysql">MySQL</SelectItem>
+                        <SelectItem value="mariadb">MariaDB</SelectItem>
+                        <SelectItem value="mongodb">MongoDB</SelectItem>
+                        <SelectItem value="redis">Redis</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="database-image">Image version</Label>
+                  <Select
+                    value={dockerImage}
+                    onValueChange={(value) => {
+                      if (value) setDockerImage(value);
+                    }}
+                  >
+                    <SelectTrigger
+                      id="database-image"
+                      className="bg-background"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {DATABASE_IMAGE_OPTIONS[databaseType].map((image) => (
+                          <SelectItem key={image} value={image}>
+                            {image}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {databaseType !== "redis" && (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="database-user">
+                      {databaseType === "mongodb"
+                        ? "Root username"
+                        : "Database user"}
+                    </Label>
+                    <Input
+                      id="database-user"
+                      value={databaseCredentials.dbUser ?? ""}
+                      onChange={(event) =>
+                        updateDatabaseCredential("dbUser", event.target.value)
+                      }
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="database-password">Password</Label>
+                  <Input
+                    id="database-password"
+                    type="password"
+                    value={databaseCredentials.dbPassword ?? ""}
+                    onChange={(event) =>
+                      updateDatabaseCredential("dbPassword", event.target.value)
+                    }
+                    autoComplete="new-password"
+                  />
+                </div>
+                {(databaseType === "mysql" || databaseType === "mariadb") && (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="database-root-password">
+                      Root password
+                    </Label>
+                    <Input
+                      id="database-root-password"
+                      type="password"
+                      value={databaseCredentials.dbRootPassword ?? ""}
+                      onChange={(event) =>
+                        updateDatabaseCredential(
+                          "dbRootPassword",
+                          event.target.value,
+                        )
+                      }
+                      autoComplete="new-password"
+                    />
+                  </div>
+                )}
+                {databaseType !== "redis" && databaseType !== "mongodb" && (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="database-name">Database name</Label>
+                    <Input
+                      id="database-name"
+                      value={databaseCredentials.dbName ?? ""}
+                      onChange={(event) =>
+                        updateDatabaseCredential("dbName", event.target.value)
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end border-border/20 border-t pt-4">
+                <Button
+                  onClick={handleSaveDatabase}
+                  disabled={isUpdatingResource}
+                >
+                  Save Database Configuration
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {resource.type === "compose" && (
+          <Card className="border border-border/40 bg-card/20">
+            <CardHeader>
+              <CardTitle className="font-semibold text-lg">
+                Compose Deployment Mode
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Choose standard Docker Compose for a single host or Docker Stack
+                for Swarm-managed deployments.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 border-border/20 border-t pt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="compose-deployment-mode">
+                    Deployment mode
+                  </Label>
+                  <Select
+                    value={composeType}
+                    onValueChange={(value) =>
+                      setComposeType(value as ResourceComposeType)
+                    }
+                  >
+                    <SelectTrigger
+                      id="compose-deployment-mode"
+                      className="bg-background"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="compose">Docker Compose</SelectItem>
+                      <SelectItem value="stack">Docker Swarm Stack</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="rounded-md border border-border/50 bg-muted/20 p-3 text-muted-foreground text-sm">
+                  {composeType === "stack"
+                    ? "Uses the Swarm scheduler and supports multi-node placement."
+                    : "Runs with Docker Compose on the selected host and does not create Swarm services."}
+                </div>
+              </div>
+              <div className="flex justify-end border-border/20 border-t pt-4">
+                <Button
+                  onClick={handleSaveCompose}
+                  disabled={isUpdatingResource}
+                >
+                  Save Deployment Mode
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {resource.type === "application" && (
           <Card className="border border-border/40 bg-card/20">
@@ -791,9 +1089,21 @@ export function GeneralTab({
               <div className="flex justify-end border-border/20 border-t pt-4">
                 <Button
                   type="button"
-                  onClick={() =>
-                    updateResource({ id: resource.id, buildConfig })
-                  }
+                  onClick={() => {
+                    const parsed =
+                      ApplicationBuildConfigSchema.safeParse(buildConfig);
+                    if (!parsed.success) {
+                      toast.error(
+                        parsed.error.issues[0]?.message ??
+                          "Invalid build configuration",
+                      );
+                      return;
+                    }
+                    updateResource({
+                      id: resource.id,
+                      buildConfig: parsed.data,
+                    });
+                  }}
                   disabled={isUpdatingResource}
                 >
                   Save Build Configuration
@@ -824,6 +1134,9 @@ export function GeneralTab({
                 role="tablist"
               >
                 {[
+                  ...(resource.type === "application"
+                    ? [{ id: "docker", label: "Docker", icon: Code }]
+                    : []),
                   { id: "github", label: "GitHub", icon: Globe },
                   { id: "gitlab", label: "GitLab", icon: Globe },
                   { id: "bitbucket", label: "Bitbucket", icon: Globe },
@@ -855,6 +1168,21 @@ export function GeneralTab({
                   );
                 })}
               </div>
+
+              {providerType === "docker" && resource.type === "application" && (
+                <div className="flex flex-col gap-2 pt-2">
+                  <Label htmlFor="application-image">Docker image</Label>
+                  <Input
+                    id="application-image"
+                    value={dockerImage}
+                    onChange={(event) => setDockerImage(event.target.value)}
+                    placeholder="ghcr.io/example/app:latest"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    The image is pulled and deployed as a Swarm service.
+                  </p>
+                </div>
+              )}
 
               {/* GitHub/GitLab/Bitbucket/Gitea Form */}
               {["github", "gitlab", "bitbucket", "gitea"].includes(
@@ -1277,7 +1605,10 @@ export function GeneralTab({
               <div className="flex justify-end border-border/20 border-t pt-2">
                 <Button
                   onClick={handleSaveProvider}
-                  disabled={isUpdatingResource}
+                  disabled={
+                    isUpdatingResource ||
+                    (providerType === "docker" && !dockerImage.trim())
+                  }
                   className="font-medium"
                 >
                   {isUpdatingResource ? "Saving..." : "Save"}
@@ -1308,9 +1639,37 @@ export function GeneralTab({
                   className="border-border/40 bg-card/30"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="res-service-name-set">
+                  Docker service name
+                </Label>
+                <Input
+                  id="res-service-name-set"
+                  value={appNameInput}
+                  onChange={(e) => setAppNameInput(e.target.value)}
+                  className="border-border/40 bg-card/30"
+                />
+                <p className="text-muted-foreground text-xs">
+                  This stable service or stack name is used by deployment and
+                  routing.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="res-description-set">Description</Label>
+                <Input
+                  id="res-description-set"
+                  value={descriptionInput}
+                  onChange={(e) => setDescriptionInput(e.target.value)}
+                  className="border-border/40 bg-card/30"
+                />
+              </div>
               <Button
                 type="submit"
-                disabled={isUpdatingResource || !nameInput.trim()}
+                disabled={
+                  isUpdatingResource ||
+                  !nameInput.trim() ||
+                  !appNameInput.trim()
+                }
               >
                 {isUpdatingResource ? "Saving..." : "Save Changes"}
               </Button>
@@ -1352,7 +1711,7 @@ export function GeneralTab({
       </div>
 
       {/* Right Column: details info */}
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <Card className="border border-border/40 bg-card/20">
           <CardHeader>
             <CardTitle className="font-semibold text-base">
@@ -1368,6 +1727,20 @@ export function GeneralTab({
                 value: resource.status,
                 className: "capitalize font-semibold text-primary",
               },
+              ...(resource.type === "database"
+                ? [
+                    { label: "Database", value: resource.dbType ?? "—" },
+                    { label: "Image", value: resource.dockerImage ?? "—" },
+                  ]
+                : []),
+              ...(resource.type === "compose"
+                ? [
+                    {
+                      label: "Deployment mode",
+                      value: resource.composeType ?? "stack",
+                    },
+                  ]
+                : []),
             ].map(({ label, value, className }) => (
               <div key={label} className="flex justify-between py-2.5">
                 <span className="text-muted-foreground">{label}</span>

@@ -309,7 +309,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [filteredLogs, autoScroll]);
+  }, [autoScroll]);
 
   const handleScroll = () => {
     if (!scrollRef.current) return;

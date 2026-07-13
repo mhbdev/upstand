@@ -121,6 +121,7 @@ export function SecurityPanel() {
                 Authenticator, Authy, or 1Password):
               </p>
               <div className="flex justify-center">
+                {/* biome-ignore lint/performance/noImgElement: QR code is served by an external generator and must remain a direct image URL. */}
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(totpURI)}`}
                   alt="2FA QR Code"

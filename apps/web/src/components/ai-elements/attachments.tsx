@@ -91,6 +91,7 @@ const renderAttachmentImage = (
   isGrid: boolean,
 ) =>
   isGrid ? (
+    // biome-ignore lint/performance/noImgElement: Attachments can be blob or data URLs that must remain unoptimized.
     <img
       alt={filename || "Image"}
       className="size-full object-cover"
@@ -99,6 +100,7 @@ const renderAttachmentImage = (
       width={96}
     />
   ) : (
+    // biome-ignore lint/performance/noImgElement: Attachments can be blob or data URLs that must remain unoptimized.
     <img
       alt={filename || "Image"}
       className="size-full rounded object-cover"

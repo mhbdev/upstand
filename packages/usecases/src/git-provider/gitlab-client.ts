@@ -68,7 +68,7 @@ export async function getGitlabRepositories(
     page++;
 
     const total = response.headers.get("x-total");
-    if (total && allProjects.length >= Number.parseInt(total)) {
+    if (total && allProjects.length >= Number.parseInt(total, 10)) {
       break;
     }
   }
@@ -129,7 +129,7 @@ export async function getGitlabBranches(
     page++;
 
     const total = response.headers.get("x-total");
-    if (total && allBranches.length >= Number.parseInt(total)) {
+    if (total && allBranches.length >= Number.parseInt(total, 10)) {
       break;
     }
   }

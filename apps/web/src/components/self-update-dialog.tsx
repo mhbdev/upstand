@@ -111,7 +111,7 @@ export function SelfUpdateDialog({ open, version }: SelfUpdateDialogProps) {
       clearInterval(interval);
       if (reloadTimer.current.timer) clearTimeout(reloadTimer.current.timer);
     };
-  }, [open, version]);
+  }, [open, version, check.mutateAsync]);
 
   return (
     <Dialog open={open} onOpenChange={() => undefined}>

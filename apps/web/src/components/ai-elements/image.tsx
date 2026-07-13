@@ -12,6 +12,7 @@ export const Image = ({
   mediaType,
   ...props
 }: ImageProps) => (
+  // biome-ignore lint/performance/noImgElement: Generated images use data URLs and cannot be optimized by Next Image.
   <img
     {...props}
     alt={props.alt}

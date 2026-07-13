@@ -6,7 +6,6 @@ import {
   ComputerIcon,
   DatabaseIcon,
   Delete02Icon,
-  Folder01Icon,
   PlusSignIcon,
   ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
@@ -53,10 +52,9 @@ import {
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
-import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -197,7 +195,7 @@ function CreateAppDialog({
   const handleNameChange = (val: string) => {
     setName(val);
     const prefix = projectName
-      ? projectName.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-"
+      ? `${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-`
       : "";
     const suffix = val.toLowerCase().replace(/[^a-z0-9]/g, "-");
     setAppName(prefix + suffix);
@@ -379,13 +377,13 @@ function CreateDbDialog({
   const handleNameChange = (val: string) => {
     setName(val);
     const prefix = projectName
-      ? projectName.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-"
+      ? `${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-`
       : "";
     const suffix = val.toLowerCase().replace(/[^a-z0-9]/g, "-");
     setAppName(prefix + suffix);
   };
 
-  const handleDbTypeChange = (val: DatabaseType | null) => {
+  const handleDbTypeChange = useCallback((val: DatabaseType | null) => {
     if (!val) return;
     setDbType(val);
     setDockerImage(DATABASE_IMAGE_OPTIONS[val][0]);
@@ -405,7 +403,7 @@ function CreateDbDialog({
       setDbName("upstand_db");
     }
     setFormErrors({});
-  };
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -414,7 +412,7 @@ function CreateDbDialog({
       setDescription("");
       handleDbTypeChange("postgres");
     }
-  }, [open]);
+  }, [open, handleDbTypeChange]);
 
   const mutation = useMutation({
     ...trpc.resource.create.mutationOptions(),
@@ -790,7 +788,7 @@ function CreateComposeDialog({
   const handleNameChange = (val: string) => {
     setName(val);
     const prefix = projectName
-      ? projectName.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-"
+      ? `${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-`
       : "";
     const suffix = val.toLowerCase().replace(/[^a-z0-9]/g, "-");
     setAppName(prefix + suffix);
@@ -1013,7 +1011,6 @@ function DeleteResourceDialog({
 export default function EnvironmentDetail({
   projectId,
   environmentId,
-  session,
 }: {
   projectId: string;
   environmentId: string;
@@ -1070,7 +1067,7 @@ export default function EnvironmentDetail({
 
   if (!env || !project) {
     return (
-      <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 text-center">
+      <div className="mx-auto w-full min-w-0 max-w-7xl space-y-4 overflow-x-hidden px-4 py-8 text-center">
         <p className="text-muted-foreground">Environment not found.</p>
         <Link href={`/projects/${projectId}` as any}>
           <Button variant="outline">Back to Project</Button>
@@ -1088,7 +1085,7 @@ export default function EnvironmentDetail({
   const isDefaultEnv = env.isDefault || env.isProtected;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 overflow-x-hidden px-4 py-8 md:px-8">
       {/* Breadcrumbs / Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
@@ -1117,12 +1114,12 @@ export default function EnvironmentDetail({
               Deploy and manage apps, databases, and microservices.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search resources…"
-              className="w-full border-border/40 bg-card/30 sm:w-64"
+              className="w-full min-w-0 border-border/40 bg-card/30 sm:w-64"
             />
             <DropdownMenu>
               <DropdownMenuTrigger className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 border-none bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90">
@@ -1161,8 +1158,8 @@ export default function EnvironmentDetail({
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="resources" className="space-y-6">
-        <TabsList className="border border-border/40 bg-card/45 p-1">
+      <Tabs defaultValue="resources" className="min-w-0 space-y-6">
+        <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>

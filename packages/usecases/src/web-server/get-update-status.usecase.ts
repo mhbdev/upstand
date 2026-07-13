@@ -36,8 +36,6 @@ function compareVersions(left: string, right: string): number {
 }
 
 export class GetUpdateStatusUseCase {
-  constructor() {}
-
   async execute(options?: {
     forceRefresh?: boolean;
   }): Promise<UpdateStatusResult> {

@@ -51,7 +51,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import z from "zod";
 import { SearchableSelect } from "@/components/shared/searchable-select";
 import { useBackupSettings } from "../hooks/use-backup-settings";

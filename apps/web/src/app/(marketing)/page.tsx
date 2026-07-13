@@ -78,7 +78,7 @@ export default function Home() {
                 variant="outline"
                 render={
                   <a
-                    href="https://github.com/upstand-dev/upstand"
+                    href="https://github.com/mhbdev/upstand"
                     target="_blank"
                     rel="noreferrer"
                   />
@@ -233,7 +233,7 @@ export default function Home() {
             </a>
             <a
               className="hover:text-foreground"
-              href="https://github.com/upstand-dev/upstand"
+              href="https://github.com/mhbdev/upstand"
               target="_blank"
               rel="noreferrer"
             >

@@ -9,6 +9,7 @@ import {
   parseApplicationBuildConfig,
   parseResourceAdvancedConfig,
   type Resource,
+  type ResourceAdvancedConfig,
 } from "@upstand/domain";
 import type Docker from "dockerode";
 import { log } from "evlog";
@@ -68,6 +69,156 @@ const sumDockerUsage = (value: unknown): number =>
         0,
       )
     : 0;
+
+function composeMap(value: unknown): Record<string, string> {
+  if (isUnknownRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(
+          ([, item]) => typeof item === "string" || typeof item === "number",
+        )
+        .map(([key, item]) => [key, String(item)]),
+    );
+  }
+  if (Array.isArray(value)) {
+    return Object.fromEntries(
+      value.flatMap((item) => {
+        if (typeof item !== "string") return [];
+        const separator = item.indexOf("=");
+        return separator === -1
+          ? [[item, ""]]
+          : [[item.slice(0, separator), item.slice(separator + 1)]];
+      }),
+    );
+  }
+  return {};
+}
+
+function applyComposeResourceConfig(
+  rawCompose: string,
+  resource: Resource,
+  config: ResourceAdvancedConfig,
+): string {
+  const parsed = yaml.parse(rawCompose) as {
+    services?: Record<string, Record<string, unknown>>;
+  };
+  if (!parsed?.services || typeof parsed.services !== "object")
+    return rawCompose;
+  const services = parsed.services;
+
+  const resourceEnvironment = (() => {
+    try {
+      const value = JSON.parse(resource.envVars || "{}");
+      return isUnknownRecord(value) ? composeMap(value) : {};
+    } catch {
+      return {};
+    }
+  })();
+  const serviceNames = config.serviceName
+    ? [config.serviceName]
+    : Object.keys(parsed.services);
+  const missingService = serviceNames.find((name) => !services[name]);
+  if (missingService) {
+    throw new Error(`Compose service '${missingService}' was not found`);
+  }
+
+  for (const serviceName of serviceNames) {
+    const service = services[serviceName];
+    if (!service) {
+      throw new Error(`Compose service '${serviceName}' was not found`);
+    }
+    const environment = {
+      ...composeMap(service.environment),
+      ...resourceEnvironment,
+      ...config.environment,
+    };
+    if (Object.keys(environment).length) service.environment = environment;
+
+    const labels = { ...composeMap(service.labels), ...config.labels };
+    if (Object.keys(labels).length) service.labels = labels;
+
+    if (config.command.length) service.entrypoint = config.command;
+    if (config.args.length) service.command = config.args;
+    if (config.workingDir) service.working_dir = config.workingDir;
+    if (config.user) service.user = config.user;
+    if (config.hostname) service.hostname = config.hostname;
+    if (config.dns.length) service.dns = config.dns;
+    if (config.dnsSearch.length) service.dns_search = config.dnsSearch;
+    if (config.extraHosts.length) service.extra_hosts = config.extraHosts;
+    if (config.capAdd.length) service.cap_add = config.capAdd;
+    if (config.capDrop.length) service.cap_drop = config.capDrop;
+    if (config.init) service.init = true;
+    if (config.readOnlyRootFilesystem) service.read_only = true;
+    if (config.privileged) service.privileged = true;
+    if (config.tty) service.tty = true;
+    if (config.stopGracePeriodSeconds !== undefined) {
+      service.stop_grace_period = `${config.stopGracePeriodSeconds}s`;
+    }
+
+    if (config.ports.length) {
+      const currentPorts = Array.isArray(service.ports) ? service.ports : [];
+      const additionalPorts = config.ports.map(
+        (port) =>
+          `${port.publishedPort}:${port.targetPort}${port.protocol === "udp" ? "/udp" : ""}`,
+      );
+      service.ports = [...new Set([...currentPorts, ...additionalPorts])];
+    }
+    if (config.volumes.length) {
+      const currentVolumes = Array.isArray(service.volumes)
+        ? service.volumes
+        : [];
+      const additionalVolumes = config.volumes.map(
+        (volume) =>
+          `${volume.source}:${volume.target}${volume.readOnly ? ":ro" : ""}`,
+      );
+      service.volumes = [...new Set([...currentVolumes, ...additionalVolumes])];
+    }
+
+    const deploy = isUnknownRecord(service.deploy) ? service.deploy : {};
+    if (config.replicas !== undefined) deploy.replicas = config.replicas;
+    if (config.placementConstraints.length) {
+      deploy.placement = {
+        ...(isUnknownRecord(deploy.placement) ? deploy.placement : {}),
+        constraints: config.placementConstraints,
+      };
+    }
+    if (config.resources.cpuLimit || config.resources.memoryLimitMb) {
+      const existingResources = isUnknownRecord(deploy.resources)
+        ? deploy.resources
+        : {};
+      deploy.resources = {
+        ...existingResources,
+        limits: {
+          ...(isUnknownRecord(existingResources.limits)
+            ? existingResources.limits
+            : {}),
+          ...(config.resources.cpuLimit
+            ? { cpus: String(config.resources.cpuLimit) }
+            : {}),
+          ...(config.resources.memoryLimitMb
+            ? { memory: `${config.resources.memoryLimitMb}M` }
+            : {}),
+        },
+      };
+    }
+    if (Object.keys(deploy).length) service.deploy = deploy;
+    if (config.restartPolicy.condition !== "any") {
+      service.restart =
+        config.restartPolicy.condition === "on-failure" ? "on-failure" : "no";
+    }
+    if (config.healthcheck) {
+      service.healthcheck = {
+        test: config.healthcheck.command,
+        interval: `${config.healthcheck.intervalSeconds}s`,
+        timeout: `${config.healthcheck.timeoutSeconds}s`,
+        retries: config.healthcheck.retries,
+        start_period: `${config.healthcheck.startPeriodSeconds}s`,
+      };
+    }
+  }
+
+  return yaml.stringify(parsed);
+}
 
 export class DockerService {
   private readonly docker = getDockerInstance();
@@ -657,6 +808,86 @@ export class DockerService {
     }
   }
 
+  async readComposeFileFromGit(
+    resource: Resource,
+    cloneUrl: string,
+    onLog: (log: string) => void,
+    sshKeyPath?: string,
+  ): Promise<string> {
+    const buildDir = path.join(process.cwd(), ".builds");
+    const clonePath = path.join(buildDir, `${resource.id}-compose`);
+    fs.rmSync(clonePath, { recursive: true, force: true });
+    fs.mkdirSync(buildDir, { recursive: true });
+
+    let branch = "main";
+    let composePath = "docker-compose.yml";
+    let submodules = false;
+    try {
+      const config: unknown = JSON.parse(resource.credentials || "{}");
+      if (isUnknownRecord(config)) {
+        if (typeof config.branch === "string" && config.branch.trim()) {
+          branch = config.branch.trim();
+        }
+        if (
+          typeof config.composePath === "string" &&
+          config.composePath.trim()
+        ) {
+          composePath = config.composePath.trim();
+        }
+        submodules = config.enableSubmodules === true;
+      }
+    } catch {
+      // Defaults are safe when optional source metadata is malformed.
+    }
+
+    const sshEnvironment = sshKeyPath
+      ? {
+          ...process.env,
+          GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=accept-new`,
+        }
+      : undefined;
+    try {
+      onLog(`Cloning branch ${branch} into ${clonePath}...\n`);
+      await this.runCommandAsync(
+        "git",
+        [
+          "clone",
+          "--depth",
+          "1",
+          "--branch",
+          branch,
+          "--single-branch",
+          cloneUrl,
+          clonePath,
+        ],
+        onLog,
+        sshEnvironment,
+      );
+      if (submodules) {
+        await this.runCommandAsync(
+          "git",
+          ["-C", clonePath, "submodule", "update", "--init", "--recursive"],
+          onLog,
+          sshEnvironment,
+        );
+      }
+
+      const resolvedComposePath = path.resolve(clonePath, composePath);
+      const cloneRoot = `${path.resolve(clonePath)}${path.sep}`;
+      if (!resolvedComposePath.startsWith(cloneRoot)) {
+        throw new Error(
+          "Compose path must stay inside the checked-out repository",
+        );
+      }
+      if (!fs.existsSync(resolvedComposePath)) {
+        throw new Error(`Compose file not found at '${composePath}'`);
+      }
+      return fs.readFileSync(resolvedComposePath, "utf8");
+    } finally {
+      fs.rmSync(clonePath, { recursive: true, force: true });
+    }
+  }
+
   private async buildApplicationImage(
     clonePath: string,
     imageName: string,
@@ -1142,7 +1373,11 @@ export class DockerService {
     const composePath = path.join(composeDir, "docker-compose.yml");
 
     const advancedConfig = parseResourceAdvancedConfig(resource.advancedConfig);
-    let composeContent = rawCompose;
+    let composeContent = applyComposeResourceConfig(
+      rawCompose,
+      resource,
+      advancedConfig,
+    );
     if (
       !advancedConfig.isolatedDeployment &&
       !composeContent.includes("networks:")
@@ -1285,12 +1520,25 @@ export class DockerService {
 
     fs.writeFileSync(composePath, composeContent, "utf8");
 
-    onLog(`Deploying Docker Swarm stack '${stackName}'...\n`);
-    await this.runCommandAsync(
-      "docker",
-      ["stack", "deploy", "-c", composePath, stackName],
-      onLog,
+    const composeCommand =
+      resource.composeType === "compose"
+        ? [
+            "compose",
+            "--project-name",
+            stackName,
+            "--file",
+            composePath,
+            "up",
+            "--detach",
+            "--remove-orphans",
+          ]
+        : ["stack", "deploy", "--compose-file", composePath, stackName];
+    onLog(
+      resource.composeType === "compose"
+        ? `Deploying Docker Compose project '${stackName}'...\n`
+        : `Deploying Docker Swarm stack '${stackName}'...\n`,
     );
+    await this.runCommandAsync("docker", composeCommand, onLog);
 
     // Clean up
     fs.rmSync(composeDir, { recursive: true, force: true });
@@ -1303,13 +1551,27 @@ export class DockerService {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
 
     if (resource.type === "compose") {
-      // Compose stacks are stacks, not single services. To stop, we remove the stack. To start, we redeploy.
+      // Compose resources are either Docker Compose projects or Swarm stacks.
       if (cmd === "stop") {
-        await this.runCommandAsync(
-          "docker",
-          ["stack", "rm", serviceName],
-          () => {},
-        );
+        if (resource.composeType === "compose") {
+          const containers = await this.docker.listContainers({
+            all: true,
+            filters: JSON.stringify({
+              label: [`com.docker.compose.project=${serviceName}`],
+            }),
+          });
+          await Promise.all(
+            containers.map((container: any) =>
+              this.docker.getContainer(container.Id).remove({ force: true }),
+            ),
+          );
+        } else {
+          await this.runCommandAsync(
+            "docker",
+            ["stack", "rm", serviceName],
+            () => {},
+          );
+        }
       } else if (cmd === "start" || cmd === "restart") {
         let composeFile = "";
         try {
@@ -1404,6 +1666,35 @@ export class DockerService {
     const nameFilter = this.sanitizeName(resource.appName || resource.name);
 
     if (resource.type === "compose") {
+      if (resource.composeType === "compose") {
+        try {
+          const containers = await this.docker.listContainers({
+            all: true,
+            filters: JSON.stringify({
+              label: [`com.docker.compose.project=${nameFilter}`],
+            }),
+          });
+          return containers.map((container: any) => ({
+            id: container.Id.substring(0, 12),
+            name: (container.Names?.[0] || container.Id).replace(/^\//, ""),
+            status: container.State || "unknown",
+            ports:
+              container.Ports?.map((port: any) =>
+                port.PublicPort
+                  ? `${port.PublicPort}:${port.PrivatePort}`
+                  : `${port.PrivatePort}`,
+              ).join(", ") || "N/A",
+            node: "local",
+          }));
+        } catch (err: any) {
+          log.error({
+            message: "Error getting Docker Compose containers",
+            err: err.message,
+          });
+          return [];
+        }
+      }
+
       // Find all services in the stack
       try {
         const services = await this.docker.listServices({
@@ -1516,6 +1807,19 @@ export class DockerService {
   async getRoutingServices(resource: Resource): Promise<string[]> {
     const resourceName = this.sanitizeName(resource.appName || resource.name);
     try {
+      if (resource.type === "compose" && resource.composeType === "compose") {
+        const containers = await this.docker.listContainers({
+          all: true,
+          filters: JSON.stringify({
+            label: [`com.docker.compose.project=${resourceName}`],
+          }),
+        });
+        return containers
+          .map((container: any) => container.Names?.[0]?.replace(/^\//, ""))
+          .filter((name): name is string => Boolean(name))
+          .sort();
+      }
+
       const services = await this.docker.listServices(
         resource.type === "compose"
           ? {
@@ -1558,7 +1862,7 @@ export class DockerService {
           .getTask(containerId)
           .inspect()
           .catch(() => null);
-        if (task && task.Status?.ContainerStatus?.ContainerID) {
+        if (task?.Status?.ContainerStatus?.ContainerID) {
           const container = this.docker.getContainer(
             task.Status.ContainerStatus.ContainerID,
           );
@@ -1614,7 +1918,7 @@ export class DockerService {
       } catch (err: any) {
         if (
           err.statusCode === 404 ||
-          (err.message && err.message.includes("no such service"))
+          err.message?.includes("no such service")
         ) {
           return `No logs found. The Swarm service '${serviceName}' has not been deployed yet, is starting up, or is stopped.`;
         }

@@ -175,7 +175,7 @@ export default function DashboardLayout({
           </SidebarFooter>
         </Sidebar>
 
-        <SidebarInset className="flex flex-1 flex-col overflow-hidden">
+        <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
@@ -201,7 +201,9 @@ export default function DashboardLayout({
             <ModeToggle />
           </header>
 
-          <div className="flex-1 overflow-y-auto">{children}</div>
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+            {children}
+          </div>
         </SidebarInset>
       </div>
       <CreateOrganizationDialog

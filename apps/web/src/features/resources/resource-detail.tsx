@@ -142,7 +142,7 @@ export default function ResourceDetail({
   const Icon = TYPE_ICONS[resource.type] || ComputerIcon;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 overflow-x-hidden px-4 py-8 md:px-8">
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -187,7 +187,7 @@ export default function ResourceDetail({
       <Tabs
         defaultValue="general"
         onValueChange={setActiveTab}
-        className="space-y-6"
+        className="min-w-0 space-y-6"
       >
         <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
           <TabsTrigger value="general" className="shrink-0 gap-2">
@@ -199,9 +199,11 @@ export default function ResourceDetail({
           <TabsTrigger value="advanced" className="shrink-0 gap-2">
             <Settings className="size-4" /> Advanced
           </TabsTrigger>
-          <TabsTrigger value="domains" className="shrink-0 gap-2">
-            <Globe className="size-4" /> Domains
-          </TabsTrigger>
+          {resource.type !== "database" && (
+            <TabsTrigger value="domains" className="shrink-0 gap-2">
+              <Globe className="size-4" /> Domains
+            </TabsTrigger>
+          )}
           <TabsTrigger value="deployments" className="shrink-0 gap-2">
             <RefreshCw className="size-4" /> Deployments
           </TabsTrigger>
@@ -220,7 +222,7 @@ export default function ResourceDetail({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="outline-none">
+        <TabsContent value="general" className="min-w-0 outline-none">
           <GeneralTab
             resource={resource}
             sshKeys={sshKeys}
@@ -236,7 +238,7 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="environment" className="outline-none">
+        <TabsContent value="environment" className="min-w-0 outline-none">
           <EnvironmentTab
             resource={resource}
             updateResource={updateResource}
@@ -244,7 +246,7 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="advanced" className="outline-none">
+        <TabsContent value="advanced" className="min-w-0 outline-none">
           <ResourceAdvancedSettings
             resourceId={resourceId}
             resourceType={resource.type}
@@ -252,16 +254,18 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="domains" className="outline-none">
-          <DomainsTab
-            resource={resource}
-            updateResource={updateResource}
-            isUpdatingResource={isUpdatingResource}
-            routingTargets={routingTargets}
-          />
-        </TabsContent>
+        {resource.type !== "database" && (
+          <TabsContent value="domains" className="min-w-0 outline-none">
+            <DomainsTab
+              resource={resource}
+              updateResource={updateResource}
+              isUpdatingResource={isUpdatingResource}
+              routingTargets={routingTargets}
+            />
+          </TabsContent>
+        )}
 
-        <TabsContent value="deployments" className="outline-none">
+        <TabsContent value="deployments" className="min-w-0 outline-none">
           <DeploymentsTab
             resource={resource}
             updateResource={updateResource}
@@ -270,7 +274,7 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="containers" className="outline-none">
+        <TabsContent value="containers" className="min-w-0 outline-none">
           <ContainersTab
             resource={resource}
             liveContainers={liveContainers}
@@ -281,7 +285,7 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="backups" className="outline-none">
+        <TabsContent value="backups" className="min-w-0 outline-none">
           {project?.organizationId && (
             <BackupPanel
               resource={resource}
@@ -290,7 +294,7 @@ export default function ResourceDetail({
           )}
         </TabsContent>
 
-        <TabsContent value="logs" className="outline-none">
+        <TabsContent value="logs" className="min-w-0 outline-none">
           <Card className="border border-border/40 bg-card/20">
             <CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -346,7 +350,7 @@ export default function ResourceDetail({
           </Card>
         </TabsContent>
 
-        <TabsContent value="monitoring" className="outline-none">
+        <TabsContent value="monitoring" className="min-w-0 outline-none">
           <MonitoringTab statsData={statsData} />
         </TabsContent>
       </Tabs>

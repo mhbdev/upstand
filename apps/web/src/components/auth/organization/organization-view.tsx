@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@upstand/ui/components/badge";
 import { cn } from "@upstand/ui/lib/utils";
 import type { Organization } from "better-auth/client";
 import type { ComponentProps } from "react";

@@ -3,14 +3,12 @@
 import { useListOrganizationMembers } from "@better-auth-ui/react";
 import {
   Alert02Icon,
-  ArrowRight01Icon,
   Building04Icon,
   CheckmarkCircle02Icon,
   Delete02Icon,
   Folder01Icon,
   PlusSignIcon,
   ServerStack01Icon,
-  Settings01Icon,
   UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
@@ -426,7 +424,7 @@ export default function Dashboard({
     name: string;
   } | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [renaming, setRenaming] = useState(false);
+  const [_renaming, setRenaming] = useState(false);
 
   const {
     data: projects,
@@ -437,7 +435,7 @@ export default function Dashboard({
     enabled: !!activeOrg?.id,
   });
 
-  const handleRenameOrg = async (e: React.FormEvent) => {
+  const _handleRenameOrg = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!renameValue.trim() || !activeOrg) return;
     setRenaming(true);

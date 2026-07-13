@@ -525,7 +525,13 @@ export function useHotKey() {
 }
 
 export function useAISearchContext() {
-  return use(Context)!;
+  const context = use(Context);
+  if (!context) {
+    throw new Error(
+      "useAISearchContext must be used within an AISearchProvider",
+    );
+  }
+  return context;
 }
 
 function useChatContext() {

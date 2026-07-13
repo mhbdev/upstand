@@ -783,7 +783,7 @@ export default function NotificationsPage() {
           </DialogHeader>
           <form
             onSubmit={submit}
-            className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-6 py-5"
+            className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto overscroll-contain px-6 pt-5 pb-0"
           >
             <FieldGroup>
               <Field>

@@ -29,11 +29,7 @@ export class GetS3DestinationsUseCase {
         const parsedAccessKey = JSON.parse(
           dest.accessKeyId,
         ) as EncryptedPayload;
-        if (
-          parsedAccessKey &&
-          parsedAccessKey.ciphertext &&
-          parsedAccessKey.iv
-        ) {
+        if (parsedAccessKey?.ciphertext && parsedAccessKey.iv) {
           accessKeyId = decryptSecret(parsedAccessKey);
         }
       } catch {}
@@ -42,7 +38,7 @@ export class GetS3DestinationsUseCase {
         const parsedSecret = JSON.parse(
           dest.secretAccessKey,
         ) as EncryptedPayload;
-        if (parsedSecret && parsedSecret.ciphertext && parsedSecret.iv) {
+        if (parsedSecret?.ciphertext && parsedSecret.iv) {
           secretAccessKey = decryptSecret(parsedSecret);
         }
       } catch {}

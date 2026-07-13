@@ -48,9 +48,7 @@ interface RevealedKey {
   privateKey: string;
 }
 
-export default function SSHKeys({
-  session,
-}: {
+export default function SSHKeys(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
   const { data: activeOrg } = authClient.useActiveOrganization();

@@ -11,8 +11,6 @@ export type TestDockerRegistryConnectionInput = z.infer<
 >;
 
 export class TestDockerRegistryConnectionUseCase {
-  constructor() {}
-
   async execute(
     input: TestDockerRegistryConnectionInput,
   ): Promise<{ success: boolean; message: string }> {

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Alert02Icon,
   ArrowRight01Icon,
   Certificate01Icon,
   CheckmarkCircle02Icon,
@@ -9,7 +8,6 @@ import {
   Delete02Icon,
   PlusSignIcon,
   ServerStack01Icon,
-  Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -73,9 +71,7 @@ interface EnvVar {
   value: string;
 }
 
-export default function WebServerDashboard({
-  session,
-}: {
+export default function WebServerDashboard(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
   const queryClient = useQueryClient();
@@ -104,7 +100,7 @@ export default function WebServerDashboard({
   const [caddyLogsTail, setCaddyLogsTail] = useState(100);
   const [serverLogsTail, setServerLogsTail] = useState(100);
   const [caddyLogsCopied, setCaddyLogsCopied] = useState(false);
-  const [serverLogsCopied, setServerLogsCopied] = useState(false);
+  const [_serverLogsCopied, setServerLogsCopied] = useState(false);
   const [autoRefreshCaddyLogs, setAutoRefreshCaddyLogs] = useState(true);
   const [autoRefreshServerLogs, setAutoRefreshServerLogs] = useState(true);
 
@@ -140,11 +136,7 @@ export default function WebServerDashboard({
   });
 
   // 4. Fetch GPU Status
-  const {
-    data: gpuStatus,
-    isPending: loadingGpu,
-    refetch: refetchGpu,
-  } = useQuery({
+  const { data: gpuStatus, isPending: loadingGpu } = useQuery({
     ...trpc.webServer.checkGpuStatus.queryOptions(),
     enabled: gpuModalOpen,
   });
@@ -475,7 +467,7 @@ export default function WebServerDashboard({
   };
 
   const isSaving = updateSettingsMutation.isPending;
-  const isOperating = reloadMutation.isPending;
+  const _isOperating = reloadMutation.isPending;
 
   return (
     <DashboardPage>

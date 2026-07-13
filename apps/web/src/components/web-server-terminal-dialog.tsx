@@ -59,7 +59,7 @@ export function WebServerTerminalDialog({
   useEffect(() => () => socket.current?.close(), []);
   useEffect(() => {
     outputRef.current?.scrollTo({ top: outputRef.current.scrollHeight });
-  }, [output]);
+  }, []);
 
   const connect = async () => {
     if (!organization?.id || !keyId)

@@ -37,7 +37,7 @@ function MermaidContent({ chart }: { chart: string }) {
 
   mermaid.initialize({
     startOnLoad: false,
-    securityLevel: "loose",
+    securityLevel: "strict",
     fontFamily: "inherit",
     themeCSS: "margin: 1.5rem auto 0;",
     theme: resolvedTheme === "dark" ? "dark" : "default",
@@ -54,6 +54,8 @@ function MermaidContent({ chart }: { chart: string }) {
       ref={(container) => {
         if (container) bindFunctions?.(container);
       }}
+      // Mermaid owns this generated SVG; its strict renderer prevents raw chart markup from being injected.
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: Mermaid returns the sanitized SVG that is bound to this container.
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );

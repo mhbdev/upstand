@@ -11,7 +11,7 @@ export function DashboardPage({
   return (
     <main
       className={cn(
-        "mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 md:px-8",
+        "mx-auto flex min-h-full w-full min-w-0 max-w-7xl flex-col gap-8 overflow-x-hidden px-4 py-8 md:px-8",
         className,
       )}
     >

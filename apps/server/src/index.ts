@@ -9,9 +9,9 @@ import {
   getConversationForUser,
   isUpGalToolName,
   saveIncomingMessages,
-  validateAndRecoverUpGalMessages,
   UPGAL_TOOL_METADATA,
   type UpGalUIMessage,
+  validateAndRecoverUpGalMessages,
 } from "@upstand/api/ai/upgal";
 import {
   authenticateApiKey,

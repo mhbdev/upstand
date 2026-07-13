@@ -6,6 +6,27 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.28 - 2026-07-13
+
+### Added
+
+- Add type-aware resource configuration for applications, databases, Docker Compose projects, and Docker Swarm stacks.
+- Add Compose service targeting and apply advanced runtime, networking, health-check, resource, and deployment settings to Compose definitions.
+
+### Changed
+
+- Improve resource tabs with type-aware domains, containers, deployments, backups, and General tab controls.
+- Make repository-backed Compose start and restart actions use the deployment queue so source checkout and server selection are handled consistently.
+- Improve remote server setup handling for asynchronous and already-active Swarm joins with clearer progress and recovery errors.
+- Improve Docker image application configuration and database engine, image, and credential editing.
+- Remove remaining Biome diagnostics and normalize formatting across the workspace.
+
+### Fixed
+
+- Prevent Compose deployments from treating Docker Compose projects as Swarm stacks, and preserve Compose service routing and container discovery.
+- Fix deployment controls that previously displayed non-functional build/kill actions.
+- Recover the test server update path after Docker disk exhaustion took PostgreSQL offline; the server is now running and healthy on `v0.1.27`.
+
 ## 0.1.27 - 2026-07-13
 
 ### Fixed

@@ -5,10 +5,7 @@ import {
   ArrowRight01Icon,
   ComputerIcon,
   Delete02Icon,
-  Folder01Icon,
-  Home01Icon,
   PlusSignIcon,
-  Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -38,12 +35,11 @@ import {
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
-import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { authClient } from "@/lib/auth-client";
+import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
 // ─── Environment Card ──────────────────────────────────────────────────────────
@@ -322,13 +318,11 @@ function DeleteEnvDialog({
 
 export default function ProjectDetail({
   projectId,
-  session,
 }: {
   projectId: string;
   session: typeof authClient.$Infer.Session;
 }) {
   const router = useRouter();
-  const { data: activeOrg } = authClient.useActiveOrganization();
   const [createEnvOpen, setCreateEnvOpen] = useState(false);
   const [deleteEnvOpen, setDeleteEnvOpen] = useState(false);
   const [selectedEnv, setSelectedEnv] = useState<{
@@ -371,7 +365,7 @@ export default function ProjectDetail({
 
   if (!project) {
     return (
-      <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 text-center">
+      <div className="mx-auto w-full min-w-0 max-w-7xl space-y-4 overflow-x-hidden px-4 py-8 text-center">
         <p className="text-muted-foreground">Project not found.</p>
         <Link href={"/projects" as any}>
           <Button variant="outline">Back to Projects</Button>
@@ -384,7 +378,7 @@ export default function ProjectDetail({
     environments?.some((env: any) => env.resourceCount > 0) ?? false;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 overflow-x-hidden px-4 py-8 md:px-8">
       {/* Breadcrumbs / Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
@@ -419,8 +413,8 @@ export default function ProjectDetail({
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="environments" className="space-y-6">
-        <TabsList className="border border-border/40 bg-card/45 p-1">
+      <Tabs defaultValue="environments" className="min-w-0 space-y-6">
+        <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
           <TabsTrigger value="environments">Environments</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>

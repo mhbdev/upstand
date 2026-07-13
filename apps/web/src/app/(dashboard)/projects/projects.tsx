@@ -1,24 +1,15 @@
 "use client";
 
-import { useListOrganizationMembers } from "@better-auth-ui/react";
 import {
   Alert02Icon,
-  ArrowRight01Icon,
-  Building04Icon,
   Delete02Icon,
   Folder01Icon,
   PlusSignIcon,
-  ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@upstand/ui/components/card";
+import { Card } from "@upstand/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +22,6 @@ import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { cn } from "@upstand/ui/lib/utils";
-import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -41,7 +31,7 @@ import { trpc } from "@/utils/trpc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function parseIsPersonal(metadata: string | null | undefined): boolean {
+function _parseIsPersonal(metadata: string | null | undefined): boolean {
   if (!metadata) return false;
   try {
     return JSON.parse(metadata).isPersonal === true;
@@ -57,7 +47,7 @@ const ACCENT_MAP = {
   amber: "bg-amber-500/10 text-amber-500",
 } as const;
 
-function StatCard({
+function _StatCard({
   label,
   value,
   icon,
@@ -275,7 +265,7 @@ function DeleteProjectDialog({
   onDeleted: () => void;
 }) {
   const [envsWithResources, setEnvsWithResources] = useState<any[]>([]);
-  const [checking, setChecking] = useState(false);
+  const [_checking, _setChecking] = useState(false);
 
   const { data: envs } = useQuery({
     ...trpc.environment.list.queryOptions({ projectId: project?.id ?? "" }),
@@ -399,19 +389,10 @@ function DeleteProjectDialog({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function Projects({
-  session,
-}: {
+export default function Projects(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
-  const { data: activeOrg, isPending: loadingActiveOrg } =
-    authClient.useActiveOrganization();
-  const { data: orgs, isPending: loadingOrgs } =
-    authClient.useListOrganizations();
-  const { data: members, isPending: loadingMembers } =
-    useListOrganizationMembers(authClient, {
-      query: { organizationId: activeOrg?.id ?? "" },
-    });
+  const { data: activeOrg } = authClient.useActiveOrganization();
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
@@ -438,7 +419,7 @@ export default function Projects({
     ) ?? [];
 
   // Calculate totals
-  const totalProjects = projects?.length ?? 0;
+  const _totalProjects = projects?.length ?? 0;
 
   return (
     <DashboardPage>
@@ -451,12 +432,12 @@ export default function Projects({
             {activeOrg?.name || "your organization"}.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search projects…"
-            className="w-full border-border/40 bg-card/30 sm:w-64"
+            className="w-full min-w-0 border-border/40 bg-card/30 sm:w-64"
           />
           <Button
             onClick={() => setCreateProjectOpen(true)}
