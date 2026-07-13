@@ -1,4 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
+import { spawn } from "node:child_process";
+import * as path from "node:path";
+import * as fs from "node:fs";
 import type { ServiceScope } from "@circulo-ai/di";
 import { trpcServer } from "@hono/trpc-server";
 import { ensureOrganizationAccess } from "@upstand/api/access-control";
@@ -21,7 +24,7 @@ import { createContext } from "@upstand/api/context";
 import { serviceProvider } from "@upstand/api/di";
 import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
-import { db } from "@upstand/db";
+import { db, monitoringSettings } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
 import {
   type IUnitOfWork,
@@ -34,6 +37,7 @@ import { closeRedis, pingRedis, redis } from "@upstand/redis";
 import { AIRepositoryToken } from "@upstand/repositories";
 import {
   BackupRunWorker,
+  CaddyService,
   DeploymentWorker,
   getDockerInstance,
   NotificationDeliveryWorker,
@@ -42,12 +46,13 @@ import {
 } from "@upstand/usecases";
 import {
   BackupSchedulerToken,
+  GeneralSchedulerToken,
   CreateGitProviderUseCaseToken,
   GetUpdateStatusUseCaseToken,
   GetWebServerSettingsUseCaseToken,
   TriggerUpdateUseCaseToken,
 } from "@upstand/usecases/tokens";
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { initLogger, log } from "evlog";
 import {
   type BetterAuthInstance,
@@ -90,6 +95,7 @@ const notificationWorker = new NotificationDeliveryWorker(
 );
 const backupWorker = new BackupRunWorker(() => serviceProvider);
 const backupScheduler = serviceProvider.resolve(BackupSchedulerToken);
+const generalScheduler = serviceProvider.resolve(GeneralSchedulerToken);
 let deploymentWorkerRefresh: Promise<void> | null = null;
 let workerRefreshInterval: ReturnType<typeof setInterval> | null = null;
 let queueReconcileInterval: ReturnType<typeof setInterval> | null = null;
@@ -232,6 +238,86 @@ app.get(
   }),
 );
 
+// Webhook for receiving threshold alerts from Go Monitoring Agent.
+app.post("/api/monitoring/alerts", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as {
+    json?: {
+      serverType?: string;
+      type?: "CPU" | "Memory";
+      value?: number;
+      threshold?: number;
+      message?: string;
+      timestamp?: string;
+      token?: string;
+    };
+  } | null;
+
+  if (!body?.json?.token) {
+    return c.json({ error: "Invalid payload: token is required" }, 400);
+  }
+
+  const { token, type, value, threshold, message } = body.json;
+
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+
+  const settings = await db.query.monitoringSettings.findFirst({
+    where: eq(monitoringSettings.token, token),
+  });
+
+  if (!settings) {
+    return c.json({ error: "Unauthorized: Invalid metrics token" }, 401);
+  }
+
+  const serverRecord = await uow.serverRepository.findById(settings.serverId);
+  if (!serverRecord) {
+    return c.json({ error: "Associated server not found" }, 404);
+  }
+
+  log.warn({
+    message: `Server alert received: ${type} usage exceeded threshold`,
+    serverId: settings.serverId,
+    type,
+    value,
+    threshold,
+  });
+
+  const publisher = scope.resolve(
+    Symbol.for("PublishNotificationUseCase"),
+  ) as {
+    execute: (input: {
+      event: "server_threshold_alert";
+      organizationId: string;
+      idempotencyKey: string;
+      title: string;
+      message: string;
+      metadata: Record<string, unknown>;
+    }) => Promise<number>;
+  };
+
+  await publisher.execute({
+    event: "server_threshold_alert",
+    organizationId: serverRecord.organizationId,
+    idempotencyKey: `alert:${settings.serverId}:${type}:${new Date().toISOString().slice(0, 13)}`,
+    title: `[Alert] Server ${serverRecord.name} - High ${type} Usage`,
+    message: message || `The ${type} usage on server '${serverRecord.name}' is currently ${value}%, exceeding the set threshold of ${threshold}%.`,
+    metadata: {
+      serverId: settings.serverId,
+      serverName: serverRecord.name,
+      alertType: type,
+      value,
+      threshold,
+    },
+  }).catch((err) => {
+    log.error({
+      message: "Failed to publish server threshold alert notification",
+      err: err instanceof Error ? err.message : String(err),
+    });
+  });
+
+  return c.json({ status: "acknowledged" });
+});
+
 // Public, tokenized deployment hook used by GitHub Actions and external CI.
 // The token contains only the resource id; authorization is completed by the
 // resource's persisted autoDeploy setting before anything is queued.
@@ -277,6 +363,244 @@ app.post("/api/deploy/:token", async (c) => {
     });
     return c.json({ error: "Unable to queue deployment" }, 500);
   }
+});
+
+app.post("/api/resources/:resourceId/upload", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "Authentication required" }, 401);
+
+  const resourceId = c.req.param("resourceId");
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+
+  const resourceRecord = await uow.resourceRepository.findById(resourceId);
+  if (!resourceRecord) return c.json({ error: "Resource not found" }, 404);
+
+  const environment = await uow.environmentRepository.findById(resourceRecord.environmentId);
+  if (!environment) return c.json({ error: "Environment not found" }, 404);
+
+  const project = await uow.projectRepository.findById(environment.projectId);
+  if (!project) return c.json({ error: "Project not found" }, 404);
+
+  await ensureOrganizationAccess(session.user.id, project.organizationId);
+
+  const body = await c.req.parseBody();
+  const file = body.file;
+  if (!file || typeof file === "string") {
+    return c.json({ error: "Upload payload ('file') is required" }, 400);
+  }
+
+  const tempDir = path.join(process.cwd(), ".builds", "temp");
+  fs.mkdirSync(tempDir, { recursive: true });
+  const archivePath = path.join(tempDir, `upload-${resourceId}-${Date.now()}.zip`);
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  fs.writeFileSync(archivePath, buffer);
+
+  const dropsDir = path.join(process.cwd(), ".builds", "drops", resourceId);
+  if (fs.existsSync(dropsDir)) {
+    fs.rmSync(dropsDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(dropsDir, { recursive: true });
+
+  const { exec } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execAsync = promisify(exec);
+
+  try {
+    await execAsync(`tar -xf "${archivePath}" -C "${dropsDir}"`);
+  } catch (err: any) {
+    try {
+      fs.unlinkSync(archivePath);
+    } catch {}
+    return c.json({ error: `Extraction failed: ${err.message}` }, 500);
+  }
+
+  try {
+    fs.unlinkSync(archivePath);
+  } catch {}
+
+  await uow.transaction(async (tx) => {
+    await tx.resourceRepository.updateById(resourceId, {
+      provider: "drop",
+    });
+  });
+
+  try {
+    const queued = await new QueueDeploymentUseCase(uow).execute({
+      resourceId,
+      title: "ZIP upload deployment",
+    });
+    return c.json({ accepted: true, resourceId, status: queued.status }, 202);
+  } catch (error: any) {
+    return c.json({ error: `Failed to trigger deployment queue: ${error.message}` }, 500);
+  }
+});
+
+app.post("/api/webhooks/github/:providerId", async (c) => {
+  const providerId = c.req.param("providerId");
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+
+  const provider = await uow.gitProviderRepository.findById(providerId);
+  if (!provider) return c.json({ error: "Git provider not found" }, 404);
+
+  const config = JSON.parse(provider.config);
+  const webhookSecret = config.githubWebhookSecret;
+
+  const bodyText = await c.req.text();
+  const signature = c.req.header("x-hub-signature-256");
+
+  if (webhookSecret && signature) {
+    const hmac = createHmac("sha256", webhookSecret);
+    const digest = `sha256=${hmac.update(bodyText).digest("hex")}`;
+    const trusted = Buffer.from(digest, "ascii");
+    const received = Buffer.from(signature, "ascii");
+    if (
+      trusted.length !== received.length ||
+      !timingSafeEqual(trusted, received)
+    ) {
+      return c.json({ error: "Invalid signature" }, 401);
+    }
+  }
+
+  const event = c.req.header("x-github-event");
+  if (event !== "pull_request") {
+    return c.json({ message: "Ignored event" }, 200);
+  }
+
+  const payload = JSON.parse(bodyText);
+  const action = payload.action;
+  const prNumber = payload.number;
+  const branchName = payload.pull_request?.head?.ref;
+  const repoFullName = payload.repository?.full_name;
+
+  if (!branchName || !repoFullName || !prNumber) {
+    return c.json({ error: "Invalid pull request payload" }, 400);
+  }
+
+  const allResources = await uow.resourceRepository.findMany();
+  const matchedResources = allResources.filter((r) => {
+    if (r.provider !== "github") return false;
+    try {
+      const creds = JSON.parse(r.credentials || "{}");
+      return creds.repository === repoFullName && creds.enablePrPreviews === true;
+    } catch {
+      return false;
+    }
+  });
+
+  for (const resource of matchedResources) {
+    if (action === "opened" || action === "synchronize") {
+      let preview = await uow.previewDeploymentRepository.findByPullRequestId(resource.id, prNumber);
+      let appName = preview?.appName;
+      let domain = preview?.domain;
+
+      if (!preview) {
+        const hash = randomBytes(3).toString("hex");
+        appName = `pr-${prNumber}-${resource.name}-${hash}`
+          .toLowerCase()
+          .replace(/[^a-z0-9-_]/g, "-");
+
+        const settings = await uow.webServerSettingsRepository.findGlobal();
+        domain = `${appName}.sslip.io`;
+
+        preview = await uow.previewDeploymentRepository.create({
+          resourceId: resource.id,
+          pullRequestId: prNumber,
+          branchName,
+          appName,
+          status: "idle",
+          domain,
+        });
+      } else {
+        await uow.previewDeploymentRepository.updateById(preview.id, {
+          status: "idle",
+          branchName,
+        });
+      }
+
+      await new QueueDeploymentUseCase(uow).execute({
+        resourceId: resource.id,
+        title: `PR #${prNumber} preview deployment (${action})`,
+        previewDeploymentId: preview.id,
+      });
+
+    } else if (action === "closed") {
+      const preview = await uow.previewDeploymentRepository.findByPullRequestId(resource.id, prNumber);
+      if (preview) {
+        log.info({ message: `Cleaning up preview deployment ${preview.appName} on PR close...` });
+
+        try {
+          const docker = getDockerInstance();
+          const service = docker.getService(preview.appName);
+          await service.remove();
+        } catch (err: any) {
+          log.error({ message: `Failed to remove Swarm service for preview ${preview.appName}`, err: err.message });
+        }
+
+        await uow.previewDeploymentRepository.deleteById(preview.id);
+
+        try {
+          const [resources, settings, allPreviews] = await Promise.all([
+            uow.resourceRepository.findMany(),
+            uow.webServerSettingsRepository.findGlobal(),
+            uow.previewDeploymentRepository.findMany(),
+          ]);
+          const docker = getDockerInstance();
+          const caddyService = new CaddyService(docker);
+
+          const routingResources = resources.filter(
+            (candidate) =>
+              !candidate.serverId ||
+              candidate.serverId === "local" ||
+              candidate.serverId === "manager",
+          );
+
+          const activePreviews = allPreviews.filter((p) => p.status === "success");
+          const routingPreviews: any[] = [];
+          for (const prev of activePreviews) {
+            const parent = resources.find((r) => r.id === prev.resourceId);
+            if (parent) {
+              const parentDomains = JSON.parse(parent.domains || "[]");
+              const parentPort = parentDomains[0]?.port || 80;
+              const parentHttps = parentDomains[0]?.https ?? false;
+              const parentCert = parentDomains[0]?.certificateType ?? "none";
+              const parentMiddlewares = parentDomains[0]?.middlewares ?? [];
+
+              routingPreviews.push({
+                id: prev.id,
+                name: prev.appName,
+                type: "application",
+                appName: prev.appName,
+                domains: JSON.stringify([
+                  {
+                    host: prev.domain,
+                    path: "/",
+                    port: parentPort,
+                    https: parentHttps,
+                    certificateType: parentCert,
+                    middlewares: parentMiddlewares,
+                  }
+                ]),
+                composeType: parent.composeType,
+                advancedConfig: parent.advancedConfig,
+              });
+            }
+          }
+
+          await caddyService.syncResourceConfigs(
+            [...routingResources, ...routingPreviews],
+            settings || {},
+          );
+        } catch (err: any) {
+          log.error({ message: `Failed to sync Caddy on preview cleanup`, err: err.message });
+        }
+      }
+    }
+  }
+
+  return c.json({ accepted: true }, 200);
 });
 
 // This endpoint deliberately exposes only whether an owner exists. It lets the
@@ -858,12 +1182,140 @@ async function reconcileQueues(): Promise<void> {
   }
 }
 
+async function initializeMonitoring() {
+  const monitoringPath = process.env.NODE_ENV === "production"
+    ? "/app/apps/monitoring"
+    : path.join(process.cwd(), "apps", "monitoring");
+
+  if (!fs.existsSync(monitoringPath)) {
+    log.error({ message: `Monitoring path not found: ${monitoringPath}` });
+    return;
+  }
+
+  try {
+    const docker = getDockerInstance();
+    await new Promise<void>((resolve, reject) => {
+      log.info({ message: "Building Upstand Monitoring Agent Docker image..." });
+      const tarProcess = spawn("tar", ["-cf", "-", "-C", monitoringPath, "."]);
+      
+      docker.buildImage(tarProcess.stdout, { t: "upstand-monitoring-agent:latest" }, (err, stream) => {
+        if (err) return reject(err);
+        if (!stream) return reject(new Error("No build stream returned"));
+        docker.modem.followProgress(stream, (err, output) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      tarProcess.on("error", reject);
+    });
+    log.info({ message: "Upstand Monitoring Agent Docker image built successfully! ✅" });
+
+    const containerName = "upstand-monitoring-agent";
+    const scope = serviceProvider.createScope();
+    let token = "";
+    try {
+      const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      let settings = await uow.transaction(async (tx) => {
+        let localSettings = await tx.db.query.monitoringSettings.findFirst({
+          where: eq(monitoringSettings.serverId, "local"),
+        });
+        if (!localSettings) {
+          const generatedToken = randomBytes(24).toString("hex");
+          const [inserted] = await tx.db.insert(monitoringSettings).values({
+            serverId: "local",
+            token: generatedToken,
+            cpuThreshold: 90,
+            memoryThreshold: 90,
+          }).returning();
+          localSettings = inserted;
+        }
+        return localSettings;
+      });
+      token = settings.token;
+    } finally {
+      await scope.dispose();
+    }
+
+    const metricsConfig = {
+      server: {
+        refreshRate: 25,
+        port: 3001,
+        serverType: "Dokploy",
+        token: token,
+        urlCallback: `http://localhost:${process.env.PORT || 3000}/api/monitoring/alerts`,
+        retentionDays: 7,
+        cronJob: "0 0 * * *",
+        thresholds: {
+          cpu: 90,
+          memory: 90
+        }
+      },
+      containers: {
+        refreshRate: 25,
+        services: {
+          include: [],
+          exclude: []
+        }
+      }
+    };
+
+    const containerOpts = {
+      name: containerName,
+      Env: [
+        `METRICS_CONFIG=${JSON.stringify(metricsConfig)}`,
+        `DB_PATH=/data/monitoring.db`
+      ],
+      Image: "upstand-monitoring-agent:latest",
+      HostConfig: {
+        RestartPolicy: { Name: "always" },
+        PortBindings: {
+          "3001/tcp": [{ HostPort: "3001" }],
+        },
+        Binds: [
+          "/var/run/docker.sock:/var/run/docker.sock:ro",
+          "/proc:/host/proc:ro",
+          "/sys:/host/sys:ro",
+          "/etc/os-release:/etc/os-release:ro",
+          "upstand-monitoring-data:/data",
+        ],
+      },
+      ExposedPorts: {
+        "3001/tcp": {},
+      },
+    };
+
+    const container = docker.getContainer(containerName);
+    try {
+      await container.inspect();
+      await container.remove({ force: true });
+    } catch {}
+
+    await docker.createContainer(containerOpts);
+    const newContainer = docker.getContainer(containerName);
+    await newContainer.start();
+    log.info({ message: "Local Monitoring Agent container started on port 3001! 📈" });
+  } catch (error) {
+    log.error({
+      message: "Failed to initialize local monitoring agent",
+      err: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 await refreshDeploymentWorkers();
 await notificationWorker.start();
 await backupWorker.start();
 await backupScheduler.start();
+await generalScheduler.start();
 await reconcileQueues();
 log.info({ message: "Background job workers and schedulers started" });
+
+initializeMonitoring().catch((err) => {
+  log.error({
+    message: "Monitoring initialization error",
+    err: err instanceof Error ? err.message : String(err),
+  });
+});
 
 // Opt-in release-channel updates. Source installs and canary builds are never
 // updated silently; operators can still use the explicit UI action for those.
@@ -1008,6 +1460,7 @@ async function shutdown(signal: string): Promise<void> {
     notificationWorker.stop(),
     backupWorker.stop(),
     backupScheduler.stop(),
+    generalScheduler.stop(),
   ]);
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<"timeout">((resolve) => {

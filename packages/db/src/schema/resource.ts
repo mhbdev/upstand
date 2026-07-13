@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { environment } from "./environment";
+import { server } from "./server";
 
 export const resource = pgTable("resource", {
   id: text("id").primaryKey(),
@@ -28,6 +29,12 @@ export const resource = pgTable("resource", {
   deployments: text("deployments").default("[]").notNull(),
   containers: text("containers").default("[]").notNull(),
   serverId: text("server_id"),
+  buildServerId: text("build_server_id").references(() => server.id, { onDelete: "set null" }),
+  isPreviewDeploymentsActive: boolean("is_preview_deployments_active").default(false).notNull(),
+  previewLimit: integer("preview_limit").default(3).notNull(),
+  previewWildcard: text("preview_wildcard"),
+  previewHttps: boolean("preview_https").default(false).notNull(),
+  previewPort: integer("preview_port").default(3000).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -39,5 +46,9 @@ export const resourceRelations = relations(resource, ({ one }) => ({
   environment: one(environment, {
     fields: [resource.environmentId],
     references: [environment.id],
+  }),
+  buildServer: one(server, {
+    fields: [resource.buildServerId],
+    references: [server.id],
   }),
 }));

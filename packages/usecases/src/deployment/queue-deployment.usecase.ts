@@ -12,12 +12,13 @@ import { getDeploymentQueueName } from "./deployment-queue-name";
 export interface QueueDeploymentInput {
   resourceId: string;
   title?: string;
+  previewDeploymentId?: string;
 }
 
 export interface DeploymentQueue {
   add(
     name: string,
-    data: { resourceId: string; deploymentId: string },
+    data: { resourceId: string; deploymentId: string; previewDeploymentId?: string },
     options: {
       jobId: string;
       attempts: number;
@@ -155,6 +156,7 @@ export class QueueDeploymentUseCase {
         {
           resourceId: queued.updatedResource.id,
           deploymentId: queued.deploymentId,
+          previewDeploymentId: input.previewDeploymentId,
         },
         {
           jobId: queued.deploymentId,

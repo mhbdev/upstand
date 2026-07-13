@@ -20,6 +20,7 @@ import {
   DrizzleUnitOfWork,
   DrizzleUserRepository,
   DrizzleWebServerSettingsRepository,
+  DrizzleMonitoringSettingsRepository,
   EnvironmentRepositoryToken,
   GitProviderRepositoryToken,
   NotificationChannelRepositoryToken,
@@ -30,9 +31,11 @@ import {
   SshKeyRepositoryToken,
   UserRepositoryToken,
   WebServerSettingsRepositoryToken,
+  MonitoringSettingsRepositoryToken,
 } from "@upstand/repositories";
 import {
   BackupScheduler,
+  GeneralScheduler,
   CaddyService,
   CaddyServiceToken,
   ControlContainerUseCase,
@@ -107,6 +110,7 @@ import {
   RestoreBackupRunUseCase,
   RotateSwarmJoinTokenUseCase,
   SetupServerUseCase,
+  GetServerHistoricalMetricsUseCase,
   TestDockerRegistryConnectionUseCase,
   TestNotificationChannelUseCase,
   TestS3DestinationConnectionUseCase,
@@ -123,6 +127,7 @@ import {
 import { GenerateSshKeyUseCase } from "@upstand/usecases/ssh-key/generate-ssh-key.usecase";
 import {
   BackupSchedulerToken,
+  GeneralSchedulerToken,
   ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
   CreateAuditLogUseCaseToken,
@@ -194,6 +199,7 @@ import {
   RestoreBackupRunUseCaseToken,
   RotateSwarmJoinTokenUseCaseToken,
   SetupServerUseCaseToken,
+  GetServerHistoricalMetricsUseCaseToken,
   TestDockerRegistryConnectionUseCaseToken,
   TestNotificationChannelUseCaseToken,
   TestS3DestinationConnectionUseCaseToken,
@@ -279,6 +285,10 @@ services.addScoped(
 services.addScoped(
   NotificationDeliveryRepositoryToken,
   (c) => new DrizzleNotificationDeliveryRepository(c.resolve(DbToken)),
+);
+services.addScoped(
+  MonitoringSettingsRepositoryToken,
+  (c) => new DrizzleMonitoringSettingsRepository(c.resolve(DbToken)),
 );
 
 // 3. Unit of Work (scoped per request)
@@ -501,6 +511,10 @@ services.addSingleton(
   BackupSchedulerToken,
   () => new BackupScheduler(() => serviceProvider),
 );
+services.addSingleton(
+  GeneralSchedulerToken,
+  (c) => new GeneralScheduler(() => serviceProvider, c.resolve(DockerServiceToken)),
+);
 services.addTransient(
   CreateBackupScheduleUseCaseToken,
   (c) => new CreateBackupScheduleUseCase(c.resolve(UnitOfWorkToken)),
@@ -650,6 +664,10 @@ services.addTransient(
 services.addTransient(
   SetupServerUseCaseToken,
   (c) => new SetupServerUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  GetServerHistoricalMetricsUseCaseToken,
+  (c) => new GetServerHistoricalMetricsUseCase(c.resolve(UnitOfWorkToken)),
 );
 
 // Swarm Containers registration

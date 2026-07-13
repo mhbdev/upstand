@@ -5,6 +5,10 @@ import { Client } from "ssh2";
 import { z } from "zod";
 import { createRemoteDocker } from "../resource/docker-client";
 import { CaddyService } from "../web-server/caddy.service";
+import { randomBytes } from "node:crypto";
+import * as path from "node:path";
+import * as fs from "node:fs";
+
 
 interface CommandResult {
   code: number | null;
@@ -177,6 +181,9 @@ export class SetupServerUseCase {
       // Traefik instance. Resource routing is synchronized during deployment.
       await new CaddyService(remoteDocker).initializeCaddy();
 
+      // Setup the Go monitoring agent container on the remote server
+      await this.setupMonitoringAgent(conn, server, privileged, executeCommand);
+
       log.info({
         message: `[Server Setup] Server ${server.name} set up successfully.`,
       });
@@ -201,6 +208,116 @@ export class SetupServerUseCase {
     } finally {
       conn.end();
     }
+  }
+
+  private async setupMonitoringAgent(
+    conn: Client,
+    server: Server,
+    privileged: (cmd: string) => Promise<string>,
+    executeCommand: (cmd: string) => Promise<string>,
+  ): Promise<void> {
+    log.info({
+      message: `[Monitoring Setup] Provisioning Monitoring Agent on ${server.ipAddress}...`,
+    });
+
+    let settings = await this.uow.monitoringSettingsRepository.findByServerId(server.id);
+    if (!settings) {
+      const generatedToken = randomBytes(24).toString("hex");
+      settings = await this.uow.monitoringSettingsRepository.upsert({
+        serverId: server.id,
+        token: generatedToken,
+        cpuThreshold: 90,
+        memoryThreshold: 90,
+      });
+    }
+
+    const token = settings.token;
+
+    const monitoringPath = process.env.NODE_ENV === "production"
+      ? "/app/apps/monitoring"
+      : path.join(process.cwd(), "apps", "monitoring");
+
+    if (!fs.existsSync(monitoringPath)) {
+      throw new Error(`Monitoring agent source path not found: ${monitoringPath}`);
+    }
+
+    const tarFileName = `monitoring-${server.id}-${Date.now()}.tar.gz`;
+    const localTarPath = path.join(process.cwd(), ".builds", tarFileName);
+    fs.mkdirSync(path.dirname(localTarPath), { recursive: true });
+
+    const { exec } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execAsync = promisify(exec);
+
+    log.info({ message: `[Monitoring Setup] Creating tarball at ${localTarPath}` });
+    await execAsync(`tar -czf "${localTarPath}" -C "${monitoringPath}" .`);
+
+    const remoteTarPath = `/tmp/${tarFileName}`;
+    const remoteSrcPath = `/tmp/monitoring-src-${server.id}`;
+
+    log.info({ message: `[Monitoring Setup] Uploading tarball to ${server.ipAddress}:${remoteTarPath}` });
+    await new Promise<void>((resolve, reject) => {
+      conn.sftp((err, sftp) => {
+        if (err) return reject(err);
+        sftp.fastPut(localTarPath, remoteTarPath, {}, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    });
+
+    fs.unlinkSync(localTarPath);
+
+    log.info({ message: `[Monitoring Setup] Extracting and building Docker image on remote server...` });
+    await privileged(`mkdir -p ${remoteSrcPath} && tar -xzf ${remoteTarPath} -C ${remoteSrcPath}`);
+    await privileged(`docker build -t upstand-monitoring-agent ${remoteSrcPath}`);
+
+    const containerName = "upstand-monitoring-agent";
+    const globalSettings = await this.uow.webServerSettingsRepository.findGlobal();
+    const controlPlaneIp = globalSettings?.serverIp || "localhost";
+
+    const metricsConfig = {
+      server: {
+        refreshRate: 25,
+        port: 3001,
+        serverType: "Remote",
+        token: token,
+        urlCallback: `http://${controlPlaneIp}:${process.env.PORT || 3000}/api/monitoring/alerts`,
+        retentionDays: 7,
+        cronJob: "0 0 * * *",
+        thresholds: {
+          cpu: settings.cpuThreshold,
+          memory: settings.memoryThreshold
+        }
+      },
+      containers: {
+        refreshRate: 25,
+        services: {
+          include: [],
+          exclude: []
+        }
+      }
+    };
+
+    log.info({ message: `[Monitoring Setup] Starting upstand-monitoring-agent container on ${server.ipAddress}...` });
+    await privileged(`docker rm -f ${containerName} 2>/dev/null || true`);
+    await privileged(
+      `docker run -d ` +
+      `--name ${containerName} ` +
+      `--restart always ` +
+      `-p 3001:3001 ` +
+      `-e DB_PATH=/data/monitoring.db ` +
+      `-e METRICS_CONFIG=${shellQuote(JSON.stringify(metricsConfig))} ` +
+      `-v /var/run/docker.sock:/var/run/docker.sock:ro ` +
+      `-v /proc:/host/proc:ro ` +
+      `-v /sys:/host/sys:ro ` +
+      `-v /etc/os-release:/etc/os-release:ro ` +
+      `-v upstand-monitoring-data:/data ` +
+      `upstand-monitoring-agent`
+    );
+
+    await privileged(`rm -rf ${remoteTarPath} ${remoteSrcPath}`);
+    log.info({ message: `[Monitoring Setup] Monitoring Agent configured successfully on ${server.ipAddress}! ✅` });
   }
 }
 

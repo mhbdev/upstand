@@ -262,6 +262,7 @@ export const ResourceSchema = z.object({
   deployments: z.string(),
   containers: z.string(),
   serverId: z.string().nullable().optional(),
+  buildServerId: z.string().nullable().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -288,4 +289,5 @@ export interface CreateResourceDTO {
   deployments?: string;
   containers?: string;
   serverId?: string | null;
+  buildServerId?: string | null;
 }

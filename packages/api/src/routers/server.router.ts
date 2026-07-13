@@ -6,6 +6,7 @@ import {
   GetServerRuntimeStatsInputSchema,
   GetServersInputSchema,
   SetupServerInputSchema,
+  GetServerHistoricalMetricsInputSchema,
 } from "@upstand/usecases";
 import {
   CreateServerUseCaseToken,
@@ -13,6 +14,7 @@ import {
   GetServerRuntimeStatsUseCaseToken,
   GetServersUseCaseToken,
   SetupServerUseCaseToken,
+  GetServerHistoricalMetricsUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
@@ -125,6 +127,25 @@ export const serverRouter = router({
             cause: error,
           });
         }
+        handleUseCaseError(error);
+      }
+    }),
+
+  historicalMetrics: twoFactorVerifiedProcedure
+    .input(GetServerHistoricalMetricsInputSchema)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+
+      const useCase = ctx.scope.resolve(
+        GetServerHistoricalMetricsUseCaseToken,
+      );
+      try {
+        return await useCase.execute(input);
+      } catch (error) {
         handleUseCaseError(error);
       }
     }),

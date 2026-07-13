@@ -523,8 +523,9 @@ export class DockerService {
       .replace(/[^a-z0-9-_]/g, "-");
   }
 
-  async initializeSwarm(): Promise<void> {
-    const info = await this.docker.info();
+  async initializeSwarm(targetDocker?: Docker): Promise<void> {
+    const docker = targetDocker || this.docker;
+    const info = await docker.info();
     if (!isSwarmActive(info)) {
       throw new ConflictError(
         "Docker Swarm is inactive. Initialize it from the Docker Swarm dashboard with a routable advertise address before deploying resources.",
@@ -537,30 +538,35 @@ export class DockerService {
     }
   }
 
-  async ensureNetwork(): Promise<string> {
-    await this.initializeSwarm();
-    const network = await ensureUpstandOverlayNetwork(this.docker);
+  async ensureNetwork(targetDocker?: Docker): Promise<string> {
+    await this.initializeSwarm(targetDocker);
+    const docker = targetDocker || this.docker;
+    const network = await ensureUpstandOverlayNetwork(docker);
     return network.id;
   }
 
-  private async ensureDeploymentNetwork(resource: Resource): Promise<{
+  private async ensureDeploymentNetwork(
+    resource: Resource,
+    targetDocker?: Docker,
+  ): Promise<{
     id: string;
     name: string;
     isolated: boolean;
   }> {
+    const docker = targetDocker || this.docker;
     const isolated = parseResourceAdvancedConfig(
       resource.advancedConfig,
     ).isolatedDeployment;
     if (isolated) {
       const network = await ensureResourceOverlayNetwork(
-        this.docker,
+        docker,
         resource.id,
       );
       return { ...network, isolated: true };
     }
 
     return {
-      id: await this.ensureNetwork(),
+      id: await this.ensureNetwork(targetDocker),
       name: this.networkName,
       isolated: false,
     };
@@ -805,65 +811,72 @@ export class DockerService {
     onLog: (log: string) => void,
     sshKeyPath?: string,
     constraints?: string[],
+    registryInfo?: {
+      url: string;
+      username?: string;
+      password?: string;
+      imageTag: string;
+    },
+    destinationDocker?: Docker,
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     const imageName = `upstand-app-${resource.id}:latest`;
-    const networkId = (await this.ensureDeploymentNetwork(resource)).id;
+    const buildImageName = registryInfo ? registryInfo.imageTag : imageName;
+    const networkId = (await this.ensureDeploymentNetwork(resource, destinationDocker)).id;
 
     const buildDir = path.join(process.cwd(), ".builds");
     const clonePath = path.join(buildDir, resource.id);
 
-    if (fs.existsSync(clonePath)) {
-      onLog("Cleaning up old build directory...\n");
-      fs.rmSync(clonePath, { recursive: true, force: true });
-    }
-    fs.mkdirSync(clonePath, { recursive: true });
-
-    let branch = "main";
-    let submodules = false;
-    try {
-      if (resource.credentials) {
-        const config: unknown = JSON.parse(resource.credentials);
-        if (isUnknownRecord(config)) {
-          const configuredBranch = config.branch;
-          branch =
-            typeof configuredBranch === "string" && configuredBranch.trim()
-              ? configuredBranch.trim()
-              : branch;
-          submodules = config.enableSubmodules === true;
-        }
+    if (resource.provider === "drop") {
+      const dropsDir = path.join(process.cwd(), ".builds", "drops", resource.id);
+      if (!fs.existsSync(dropsDir)) {
+        throw new Error("ZIP drop folder not found. Please upload the ZIP file first.");
       }
-    } catch {
-      // Credentials are optional for direct Git providers; defaults remain safe.
-    }
+      if (fs.existsSync(clonePath)) {
+        onLog("Cleaning up old workspace directory...\n");
+        fs.rmSync(clonePath, { recursive: true, force: true });
+      }
+      fs.mkdirSync(clonePath, { recursive: true });
+      onLog("Copying files from uploaded ZIP payload...\n");
+      fs.cpSync(dropsDir, clonePath, { recursive: true });
+    } else {
+      if (fs.existsSync(clonePath)) {
+        onLog("Cleaning up old build directory...\n");
+        fs.rmSync(clonePath, { recursive: true, force: true });
+      }
+      fs.mkdirSync(clonePath, { recursive: true });
 
-    onLog(`Cloning branch ${branch} into ${clonePath}...\n`);
-    await this.runCommandAsync(
-      "git",
-      [
-        "clone",
-        "--depth",
-        "1",
-        "--branch",
-        branch,
-        "--single-branch",
-        cloneUrl,
-        clonePath,
-      ],
-      onLog,
-      sshKeyPath
-        ? {
-            ...process.env,
-            GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=accept-new`,
+      let branch = "main";
+      let submodules = false;
+      try {
+        if (resource.credentials) {
+          const config: unknown = JSON.parse(resource.credentials);
+          if (isUnknownRecord(config)) {
+            const configuredBranch = config.branch;
+            branch =
+              typeof configuredBranch === "string" && configuredBranch.trim()
+                ? configuredBranch.trim()
+                : branch;
+            submodules = config.enableSubmodules === true;
           }
-        : undefined,
-    );
+        }
+      } catch {
+        // Credentials are optional for direct Git providers; defaults remain safe.
+      }
 
-    if (submodules) {
-      onLog("Initializing submodules...\n");
+      onLog(`Cloning branch ${branch} into ${clonePath}...\n`);
       await this.runCommandAsync(
         "git",
-        ["-C", clonePath, "submodule", "update", "--init", "--recursive"],
+        [
+          "clone",
+          "--depth",
+          "1",
+          "--branch",
+          branch,
+          "--single-branch",
+          cloneUrl,
+          clonePath,
+        ],
         onLog,
         sshKeyPath
           ? {
@@ -872,17 +885,56 @@ export class DockerService {
             }
           : undefined,
       );
+
+      if (submodules) {
+        onLog("Initializing submodules...\n");
+        await this.runCommandAsync(
+          "git",
+          ["-C", clonePath, "submodule", "update", "--init", "--recursive"],
+          onLog,
+          sshKeyPath
+            ? {
+                ...process.env,
+                GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=accept-new`,
+              }
+            : undefined,
+        );
+      }
     }
 
     try {
       const buildConfig = parseApplicationBuildConfig(resource.buildConfig);
       await this.buildApplicationImage(
         clonePath,
-        imageName,
+        buildImageName,
         buildConfig,
         envVars,
         onLog,
       );
+
+      if (registryInfo) {
+        if (registryInfo.username && registryInfo.password) {
+          onLog(`Logging into Docker registry: ${registryInfo.url}...\n`);
+          await this.runCommandAsync(
+            "docker",
+            [
+              "login",
+              "-u",
+              registryInfo.username,
+              "-p",
+              registryInfo.password,
+              registryInfo.url,
+            ],
+            onLog,
+          );
+        }
+        onLog(`Pushing image to registry: ${registryInfo.imageTag}...\n`);
+        await this.runCommandAsync(
+          "docker",
+          ["push", registryInfo.imageTag],
+          onLog,
+        );
+      }
 
       onLog("Deploying Swarm Service...\n");
       const envArray = Object.entries(envVars).map(
@@ -894,7 +946,7 @@ export class DockerService {
         Name: serviceName,
         TaskTemplate: {
           ContainerSpec: {
-            Image: imageName,
+            Image: buildImageName,
             Env: envArray,
             ...(runtimeCommand ? { Command: runtimeCommand } : {}),
           },
@@ -918,8 +970,16 @@ export class DockerService {
         spec as Record<string, unknown>,
       );
 
-      await this.upsertService(serviceName, spec);
-      await this.ensureServiceNetwork(serviceName, networkId);
+      const authConfig = registryInfo && registryInfo.username && registryInfo.password
+        ? {
+            username: registryInfo.username,
+            password: registryInfo.password,
+            serveraddress: registryInfo.url,
+          }
+        : undefined;
+
+      await this.upsertService(serviceName, spec, authConfig, destinationDocker);
+      await this.ensureServiceNetwork(serviceName, networkId, destinationDocker);
     } finally {
       onLog("Cleaning up build directory...\n");
       fs.rmSync(clonePath, { recursive: true, force: true });
@@ -2024,14 +2084,17 @@ export class DockerService {
   private async upsertService(
     serviceName: string,
     spec: Docker.CreateServiceOptions,
+    authconfig?: any,
+    targetDocker?: Docker,
   ): Promise<void> {
+    const docker = targetDocker || this.docker;
     try {
-      const service = this.docker.getService(serviceName);
+      const service = docker.getService(serviceName);
       const inspect = await service.inspect();
       log.info({
         message: `Updating existing Swarm service '${serviceName}'...`,
       });
-      await service.update({
+      await (service as any).update(authconfig, {
         version: inspect.Version.Index,
         Name: serviceName,
         TaskTemplate: spec.TaskTemplate,
@@ -2041,7 +2104,7 @@ export class DockerService {
     } catch (err: any) {
       if (err.statusCode === 404) {
         log.info({ message: `Creating new Swarm service '${serviceName}'...` });
-        await this.docker.createService(spec);
+        await (docker as any).createService(authconfig || {}, spec);
       } else {
         throw err;
       }
@@ -2057,8 +2120,10 @@ export class DockerService {
   private async ensureServiceNetwork(
     serviceName: string,
     networkId: string,
+    targetDocker?: Docker,
   ): Promise<void> {
-    const service = this.docker.getService(serviceName);
+    const docker = targetDocker || this.docker;
+    const service = docker.getService(serviceName);
     const inspect = await service.inspect();
     const networks = inspect.Spec?.Networks || [];
     if (
@@ -2379,5 +2444,40 @@ export class DockerService {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
+  }
+
+  async runCommandInResourceContainer(
+    resource: Resource,
+    command: string,
+    targetDocker?: Docker,
+  ): Promise<string> {
+    const docker = targetDocker || this.docker;
+    const containers = await this.getContainers(resource);
+    if (containers.length === 0) {
+      throw new Error(`No running containers found for resource '${resource.name}'`);
+    }
+
+    const containerId = containers[0].id;
+    const container = docker.getContainer(containerId);
+
+    const exec = await container.exec({
+      Cmd: ["sh", "-c", command],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+
+    const stream = await exec.start({ Detach: false });
+    return new Promise<string>((resolve, reject) => {
+      let output = "";
+      stream.on("data", (chunk) => {
+        output += chunk.toString("utf8");
+      });
+      stream.on("end", () => {
+        resolve(output);
+      });
+      stream.on("error", (err) => {
+        reject(err);
+      });
+    });
   }
 }

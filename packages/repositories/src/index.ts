@@ -19,3 +19,7 @@ export * from "./ssh-key/drizzle-ssh-key.repository";
 export * from "./tokens";
 export * from "./user/drizzle-user.repository";
 export * from "./web-server/drizzle-web-server-settings.repository";
+export * from "./monitoring/drizzle-monitoring-settings.repository";
+export * from "./preview-deployment/drizzle-preview-deployment.repository";
+export * from "./schedule/drizzle-schedule.repository";
+

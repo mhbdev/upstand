@@ -43,7 +43,7 @@ import {
 } from "@upstand/ui/components/select";
 import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
-import { Code, Globe, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import { Code, Globe, Play, RefreshCw, Square, Trash2, Upload } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -84,7 +84,8 @@ export type ResourceProvider =
   | "bitbucket"
   | "gitea"
   | "git"
-  | "raw";
+  | "raw"
+  | "drop";
 
 type DatabaseCredentials = Record<string, string>;
 
@@ -206,6 +207,33 @@ export function GeneralTab({
   const [databaseCredentials, setDatabaseCredentials] =
     useState<DatabaseCredentials>({});
   const [composeType, setComposeType] = useState<ResourceComposeType>("stack");
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleUploadDropFile = async (file: File) => {
+    setIsUploading(true);
+    const toastId = toast.loading("Uploading and extracting project archive...");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`/api/resources/${resource.id}/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Upload failed with status ${response.status}`);
+      }
+
+      toast.success("Archive uploaded and deployment triggered!", { id: toastId });
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`, { id: toastId });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const isRunning = resource.status === "running";
   const isBuilding = parseDeployments(resource.deployments).some(
@@ -1135,7 +1163,10 @@ export function GeneralTab({
               >
                 {[
                   ...(resource.type === "application"
-                    ? [{ id: "docker", label: "Docker", icon: Code }]
+                    ? [
+                        { id: "docker", label: "Docker", icon: Code },
+                        { id: "drop", label: "Drag & Drop", icon: Upload },
+                      ]
                     : []),
                   { id: "github", label: "GitHub", icon: Globe },
                   { id: "gitlab", label: "GitLab", icon: Globe },
@@ -1168,6 +1199,47 @@ export function GeneralTab({
                   );
                 })}
               </div>
+
+              {providerType === "drop" && (
+                <div className="flex flex-col gap-3 pt-2">
+                  <Label>Source Archive (ZIP or Tarball)</Label>
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) {
+                        await handleUploadDropFile(file);
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center border-2 border-dashed border-border/40 hover:border-primary/50 bg-muted/20 hover:bg-muted/30 cursor-pointer rounded-lg p-8 transition-colors text-center"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = ".zip,.tar,.gz,.tgz";
+                      input.onchange = async (e: any) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          await handleUploadDropFile(file);
+                        }
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Upload className="size-8 text-muted-foreground mb-2 animate-pulse" />
+                    <p className="font-medium text-sm text-foreground">
+                      Drag & drop your archive file here, or click to select
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Supports .zip, .tar.gz, .tgz (Max 50MB)
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {providerType === "docker" && resource.type === "application" && (
                 <div className="flex flex-col gap-2 pt-2">

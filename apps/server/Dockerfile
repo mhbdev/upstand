@@ -101,6 +101,7 @@ COPY packages/usecases/package.json ./packages/usecases/
 # available while Bun installs production dependencies, even though it is not
 # included in the final server command.
 COPY apps/fumadocs ./apps/fumadocs
+COPY apps/monitoring ./apps/monitoring
 
 # Install production dependencies with their platform-specific install steps.
 # This is required by ssh2's optional native CPU-feature module used for remote

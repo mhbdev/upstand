@@ -74,6 +74,15 @@ export default function MonitoringPage() {
     enabled: Boolean(activeOrganization?.id),
   });
 
+  const { data: historicalData } = useQuery({
+    ...trpc.server.historicalMetrics.queryOptions({
+      organizationId: activeOrganization?.id ?? "",
+      serverId: selectedServerId,
+      limit: "60",
+    }),
+    enabled: Boolean(activeOrganization?.id),
+  });
+
   const {
     data: stats,
     isPending,
@@ -88,27 +97,54 @@ export default function MonitoringPage() {
   });
 
   useEffect(() => {
-    setHistory([]);
-  }, [selectedServerId]);
+    if (!historicalData || !Array.isArray(historicalData)) {
+      setHistory([]);
+      return;
+    }
+    try {
+      const mapped = historicalData
+        .map((m: any) => {
+          const collectedAt = new Date(m.timestamp);
+          const memUsed = parseFloat(m.memUsed || "0");
+          const memTotal = parseFloat(m.memTotal || "0");
+          const memPercent = memTotal > 0 ? (memUsed / memTotal) * 100 : 0;
+          return {
+            time: collectedAt.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+            }),
+            cpu: parseFloat(m.cpu || "0"),
+            memoryPercent: Math.round(memPercent * 10) / 10,
+          };
+        })
+        .reverse();
+      setHistory(mapped);
+    } catch {
+      setHistory([]);
+    }
+  }, [historicalData]);
 
   useEffect(() => {
     if (!stats) return;
     const collectedAt = new Date(stats.collectedAt);
-    setHistory((previous) =>
-      [
-        ...previous,
-        {
-          time: collectedAt.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-          }),
-          cpu: stats.cpu,
-          memoryPercent: stats.memoryPercent,
-        },
-      ].slice(-60),
-    );
+    const newPoint = {
+      time: collectedAt.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }),
+      cpu: stats.cpu,
+      memoryPercent: stats.memoryPercent,
+    };
+    setHistory((previous) => {
+      if (previous.length > 0 && previous[previous.length - 1].time === newPoint.time) {
+        return previous;
+      }
+      return [...previous, newPoint].slice(-60);
+    });
   }, [stats]);
 
   if (organizationPending || isPending) {

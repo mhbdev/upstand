@@ -30,6 +30,7 @@ export const NotificationEventTypeSchema = z.enum([
   "cluster_node_updated",
   "cluster_node_removed",
   "cluster_token_rotated",
+  "server_threshold_alert",
 ]);
 
 export type NotificationEventType = z.infer<typeof NotificationEventTypeSchema>;

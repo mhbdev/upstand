@@ -113,6 +113,8 @@ export const TestS3DestinationConnectionUseCaseToken =
   );
 export const BackupSchedulerToken =
   createToken<UseCases.BackupScheduler>("BackupScheduler");
+export const GeneralSchedulerToken =
+  createToken<UseCases.GeneralScheduler>("GeneralScheduler");
 export const CreateBackupScheduleUseCaseToken =
   createToken<UseCases.CreateBackupScheduleUseCase>(
     "CreateBackupScheduleUseCase",
@@ -201,6 +203,10 @@ export const GetServersUseCaseToken =
   createToken<UseCases.GetServersUseCase>("GetServersUseCase");
 export const SetupServerUseCaseToken =
   createToken<UseCases.SetupServerUseCase>("SetupServerUseCase");
+export const GetServerHistoricalMetricsUseCaseToken =
+  createToken<UseCases.GetServerHistoricalMetricsUseCase>(
+    "GetServerHistoricalMetricsUseCase",
+  );
 export const GetSwarmContainersUseCaseToken =
   createToken<UseCases.GetSwarmContainersUseCase>("GetSwarmContainersUseCase");
 export const CreateNotificationChannelUseCaseToken =

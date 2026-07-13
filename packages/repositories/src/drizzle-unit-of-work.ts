@@ -17,6 +17,9 @@ import type { Executor } from "./shared/types";
 import { DrizzleSshKeyRepository } from "./ssh-key/drizzle-ssh-key.repository";
 import { DrizzleUserRepository } from "./user/drizzle-user.repository";
 import { DrizzleWebServerSettingsRepository } from "./web-server/drizzle-web-server-settings.repository";
+import { DrizzleMonitoringSettingsRepository } from "./monitoring/drizzle-monitoring-settings.repository";
+import { DrizzlePreviewDeploymentRepository } from "./preview-deployment/drizzle-preview-deployment.repository";
+import { DrizzleScheduleRepository } from "./schedule/drizzle-schedule.repository";
 
 export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly auditLogRepository: DrizzleAuditLogRepository;
@@ -36,6 +39,9 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly serverRepository: DrizzleServerRepository;
   public readonly notificationChannelRepository: DrizzleNotificationChannelRepository;
   public readonly notificationDeliveryRepository: DrizzleNotificationDeliveryRepository;
+  public readonly monitoringSettingsRepository: DrizzleMonitoringSettingsRepository;
+  public readonly previewDeploymentRepository: DrizzlePreviewDeploymentRepository;
+  public readonly scheduleRepository: DrizzleScheduleRepository;
 
   constructor(private readonly executor: Executor) {
     this.auditLogRepository = new DrizzleAuditLogRepository(this.executor);
@@ -70,6 +76,13 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
       new DrizzleNotificationChannelRepository(this.executor);
     this.notificationDeliveryRepository =
       new DrizzleNotificationDeliveryRepository(this.executor);
+    this.monitoringSettingsRepository = new DrizzleMonitoringSettingsRepository(
+      this.executor,
+    );
+    this.previewDeploymentRepository = new DrizzlePreviewDeploymentRepository(
+      this.executor,
+    );
+    this.scheduleRepository = new DrizzleScheduleRepository(this.executor);
   }
 
   async transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T> {

@@ -15,6 +15,9 @@ import type { IServerRepository } from "./server-repository.interface";
 import type { ISshKeyRepository } from "./ssh-key-repository.interface";
 import type { IUserRepository } from "./user-repository.interface";
 import type { IWebServerSettingsRepository } from "./web-server-settings-repository.interface";
+import type { IMonitoringSettingsRepository } from "./monitoring-settings-repository.interface";
+import type { IPreviewDeploymentRepository } from "./preview-deployment-repository.interface";
+import type { IScheduleRepository } from "./schedule-repository.interface";
 
 export interface IUnitOfWork {
   readonly auditLogRepository: IAuditLogRepository;
@@ -34,5 +37,8 @@ export interface IUnitOfWork {
   readonly serverRepository: IServerRepository;
   readonly notificationChannelRepository: INotificationChannelRepository;
   readonly notificationDeliveryRepository: INotificationDeliveryRepository;
+  readonly monitoringSettingsRepository: IMonitoringSettingsRepository;
+  readonly previewDeploymentRepository: IPreviewDeploymentRepository;
+  readonly scheduleRepository: IScheduleRepository;
   transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T>;
 }
