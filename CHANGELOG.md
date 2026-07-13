@@ -6,6 +6,26 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.25 - 2026-07-13
+
+### Added
+
+- Added actionable UpGal project, environment, and resource result cards with direct dashboard links.
+- Added explicit approval, denial, pending, and interrupted-response states to the UpGal chat UI.
+- Added complete resource advanced settings for runtime, networking, health checks, capabilities, and rolling updates.
+
+### Changed
+
+- Migrated UpGal mutation approval policy to AI SDK `toolApproval` with the native `useChat` approval continuation flow.
+- Improved conversation loading, organization switching, stale-load handling, and deterministic message ordering.
+- Improved resource and tool-result presentation with reusable, theme-aware components.
+
+### Fixed
+
+- Preserved original UI messages when streaming agent responses so approved tool calls continue the pending assistant message instead of creating duplicate turns.
+- Prevented same-millisecond persisted messages from changing order after a conversation reload.
+- Replaced forced dark surfaces in dialogs, terminals, charts, and resource views with semantic theme colors.
+
 ## 0.1.24 - 2026-07-13
 
 ### Added
