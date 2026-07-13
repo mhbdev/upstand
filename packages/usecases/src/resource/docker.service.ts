@@ -14,6 +14,7 @@ import type Docker from "dockerode";
 import { log } from "evlog";
 import yaml from "yaml";
 import {
+  ensureResourceOverlayNetwork,
   ensureUpstandOverlayNetwork,
   isManager,
   isSwarmActive,
@@ -273,6 +274,29 @@ export class DockerService {
     return network.id;
   }
 
+  private async ensureDeploymentNetwork(resource: Resource): Promise<{
+    id: string;
+    name: string;
+    isolated: boolean;
+  }> {
+    const isolated = parseResourceAdvancedConfig(
+      resource.advancedConfig,
+    ).isolatedDeployment;
+    if (isolated) {
+      const network = await ensureResourceOverlayNetwork(
+        this.docker,
+        resource.id,
+      );
+      return { ...network, isolated: true };
+    }
+
+    return {
+      id: await this.ensureNetwork(),
+      name: this.networkName,
+      isolated: false,
+    };
+  }
+
   async deployDatabase(
     resource: Resource,
     envVars: Record<string, string>,
@@ -280,7 +304,7 @@ export class DockerService {
     constraints?: string[],
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
-    const networkId = await this.ensureNetwork();
+    const networkId = (await this.ensureDeploymentNetwork(resource)).id;
 
     let image = "";
     let targetPath = "";
@@ -432,6 +456,7 @@ export class DockerService {
     );
 
     await this.upsertService(serviceName, spec);
+    await this.ensureServiceNetwork(serviceName, networkId);
   }
 
   async deployAppImage(
@@ -441,7 +466,7 @@ export class DockerService {
     constraints?: string[],
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
-    const networkId = await this.ensureNetwork();
+    const networkId = (await this.ensureDeploymentNetwork(resource)).id;
 
     if (!resource.dockerImage) {
       throw new Error("No Docker image specified for application resource");
@@ -501,6 +526,7 @@ export class DockerService {
     );
 
     await this.upsertService(serviceName, spec);
+    await this.ensureServiceNetwork(serviceName, networkId);
   }
 
   async deployAppGit(
@@ -513,7 +539,7 @@ export class DockerService {
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     const imageName = `upstand-app-${resource.id}:latest`;
-    const networkId = await this.ensureNetwork();
+    const networkId = (await this.ensureDeploymentNetwork(resource)).id;
 
     const buildDir = path.join(process.cwd(), ".builds");
     const clonePath = path.join(buildDir, resource.id);
@@ -624,6 +650,7 @@ export class DockerService {
       );
 
       await this.upsertService(serviceName, spec);
+      await this.ensureServiceNetwork(serviceName, networkId);
     } finally {
       onLog("Cleaning up build directory...\n");
       fs.rmSync(clonePath, { recursive: true, force: true });
@@ -1107,17 +1134,120 @@ export class DockerService {
     constraints?: string[],
   ): Promise<void> {
     const stackName = this.sanitizeName(resource.appName || resource.name);
-    await this.ensureNetwork();
+    const deploymentNetwork = await this.ensureDeploymentNetwork(resource);
 
     const buildDir = path.join(process.cwd(), ".builds");
     const composeDir = path.join(buildDir, resource.id);
     fs.mkdirSync(composeDir, { recursive: true });
     const composePath = path.join(composeDir, "docker-compose.yml");
 
-    // Inject default network to compose file
+    const advancedConfig = parseResourceAdvancedConfig(resource.advancedConfig);
     let composeContent = rawCompose;
-    if (!composeContent.includes("networks:")) {
+    if (
+      !advancedConfig.isolatedDeployment &&
+      !composeContent.includes("networks:")
+    ) {
       composeContent += `\n\nnetworks:\n  default:\n    name: ${this.networkName}\n    external: true\n`;
+    }
+
+    if (advancedConfig.isolatedDeployment) {
+      try {
+        const parsed = yaml.parse(composeContent) as {
+          services?: Record<string, Record<string, unknown>>;
+          networks?: Record<string, unknown>;
+          volumes?: unknown;
+        };
+        if (!parsed?.services || typeof parsed.services !== "object") {
+          throw new Error(
+            "Compose file must define services for isolated deployment",
+          );
+        }
+
+        const ingressNetwork = "upstand_ingress";
+        parsed.networks = {
+          ...(parsed.networks || {}),
+          [ingressNetwork]: {
+            name: deploymentNetwork.name,
+            external: true,
+          },
+        };
+
+        for (const service of Object.values(parsed.services)) {
+          const networks = service.networks;
+          if (!networks) {
+            service.networks = [ingressNetwork];
+          } else if (Array.isArray(networks)) {
+            if (!networks.includes(ingressNetwork))
+              networks.push(ingressNetwork);
+          } else if (typeof networks === "object") {
+            service.networks = { ...networks, [ingressNetwork]: {} };
+          } else {
+            service.networks = [ingressNetwork];
+          }
+        }
+
+        if (advancedConfig.isolatedDeploymentsVolume) {
+          const volumePrefix = `${stackName}_`;
+          const isNamedVolume = (source: unknown): source is string =>
+            typeof source === "string" &&
+            source.length > 0 &&
+            !source.startsWith(".") &&
+            !source.startsWith("/") &&
+            !source.startsWith("~") &&
+            !source.includes("/");
+          const volumeNames = new Map<string, string>();
+          const renameVolume = (source: unknown) => {
+            if (!isNamedVolume(source)) return source;
+            const renamed =
+              volumeNames.get(source) || `${volumePrefix}${source}`;
+            volumeNames.set(source, renamed);
+            return renamed;
+          };
+
+          if (parsed.volumes && typeof parsed.volumes === "object") {
+            const volumes = parsed.volumes as Record<string, unknown>;
+            const renamedVolumes: Record<string, unknown> = {};
+            for (const [name, definition] of Object.entries(volumes)) {
+              const renamed = renameVolume(name) as string;
+              if (definition && typeof definition === "object") {
+                const nextDefinition = {
+                  ...(definition as Record<string, unknown>),
+                };
+                if (typeof nextDefinition.name === "string") {
+                  nextDefinition.name = renameVolume(nextDefinition.name);
+                }
+                renamedVolumes[renamed] = nextDefinition;
+              } else {
+                renamedVolumes[renamed] = definition;
+              }
+            }
+            parsed.volumes = renamedVolumes;
+          }
+
+          for (const service of Object.values(parsed.services)) {
+            if (!Array.isArray(service.volumes)) continue;
+            service.volumes = service.volumes.map((volume) => {
+              if (typeof volume === "string") {
+                const [source, ...rest] = volume.split(":");
+                const renamed = renameVolume(source);
+                return rest.length ? [renamed, ...rest].join(":") : renamed;
+              }
+              if (volume && typeof volume === "object") {
+                const nextVolume = { ...(volume as Record<string, unknown>) };
+                nextVolume.source = renameVolume(nextVolume.source);
+                return nextVolume;
+              }
+              return volume;
+            });
+          }
+        }
+
+        composeContent = yaml.stringify(parsed);
+      } catch (error) {
+        throw new Error(
+          `Unable to prepare isolated Compose deployment: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     // Inject placement constraints if provided
@@ -1539,6 +1669,43 @@ export class DockerService {
         throw err;
       }
     }
+  }
+
+  /**
+   * Reconcile the network separately from the service spec update. Existing
+   * services may have been created before the shared overlay was introduced,
+   * and Docker does not retroactively attach those tasks when only the image
+   * or environment changes.
+   */
+  private async ensureServiceNetwork(
+    serviceName: string,
+    networkId: string,
+  ): Promise<void> {
+    const service = this.docker.getService(serviceName);
+    const inspect = await service.inspect();
+    const networks = inspect.Spec?.Networks || [];
+    if (
+      networks.some(
+        (network: { Target?: string }) => network.Target === networkId,
+      )
+    ) {
+      return;
+    }
+
+    log.warn({
+      message: `Attaching existing Swarm service '${serviceName}' to the Upstand overlay network.`,
+      networkId,
+    });
+    await service.update({
+      version: inspect.Version.Index,
+      Name: serviceName,
+      Mode: inspect.Spec.Mode,
+      TaskTemplate: inspect.Spec.TaskTemplate,
+      Networks: [...networks, { Target: networkId }],
+      EndpointSpec: inspect.Spec.EndpointSpec,
+      UpdateConfig: inspect.Spec.UpdateConfig,
+      RollbackConfig: inspect.Spec.RollbackConfig,
+    });
   }
 
   private runCommandAsync(

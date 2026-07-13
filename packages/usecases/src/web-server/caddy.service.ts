@@ -1,9 +1,14 @@
 import { Readable } from "node:stream";
 import type { DomainMapping, Resource } from "@upstand/domain";
-import { parseDomainMappings } from "@upstand/domain";
+import {
+  parseDomainMappings,
+  parseResourceAdvancedConfig,
+} from "@upstand/domain";
+import type Docker from "dockerode";
 import { log } from "evlog";
 import { getDockerInstance } from "../resource/docker-client";
 import {
+  ensureResourceOverlayNetwork,
   ensureUpstandOverlayNetwork,
   requireActiveManager,
 } from "../swarm/swarm.helpers";
@@ -33,7 +38,7 @@ export type CaddySettings = {
 type CaddyResource = Pick<
   Resource,
   "id" | "name" | "type" | "appName" | "domains"
->;
+> & { advancedConfig?: Resource["advancedConfig"] };
 
 type CaddyRoute = DomainMapping & {
   resourceId: string;
@@ -248,11 +253,15 @@ function getRoutes(resources: CaddyResource[]): CaddyRoute[] {
       const serviceName =
         mapping.serviceName ||
         sanitizeServiceName(resource.appName || resource.name);
+      const upstreamServiceName =
+        resource.type === "compose" && mapping.serviceName
+          ? `${sanitizeServiceName(resource.appName || resource.name)}_${sanitizeServiceName(mapping.serviceName)}`
+          : serviceName;
       routes.push({
         ...mapping,
         resourceId: resource.id,
         resourceName: resource.name,
-        upstream: `${serviceName}:${mapping.port}`,
+        upstream: `${upstreamServiceName}:${mapping.port}`,
       });
     }
   }
@@ -286,7 +295,13 @@ function routeBlock(route: CaddyRoute, index: number): string[] {
     lines.push(`\t\t\trewrite ${route.internalPath}{uri}`);
   }
 
-  lines.push(`\t\t\treverse_proxy ${route.upstream}`);
+  lines.push(`\t\t\treverse_proxy ${route.upstream} {`);
+  // Swarm tasks can briefly disappear during a rolling update. Retry the
+  // upstream while Docker's service DNS converges instead of returning an
+  // avoidable 502 to the browser.
+  lines.push("\t\t\tlb_try_duration 30s");
+  lines.push("\t\t\tlb_try_interval 250ms");
+  lines.push("\t\t}");
   lines.push("\t\t}");
   lines.push("\t}");
   return lines;
@@ -397,6 +412,95 @@ export class CaddyService {
   private async ensureNetwork(): Promise<void> {
     await this.initializeSwarm();
     await ensureUpstandOverlayNetwork(docker);
+  }
+
+  private async reconcileResourceNetworks(
+    resources: CaddyResource[],
+  ): Promise<void> {
+    const routes = getRoutes(resources);
+    if (routes.length === 0) return;
+
+    const sharedNetwork = await ensureUpstandOverlayNetwork(docker);
+    const resourcesById = new Map(
+      resources.map((resource) => [resource.id, resource]),
+    );
+    const networksByResource = new Map<string, { id: string; name: string }>();
+
+    for (const route of routes) {
+      const resource = resourcesById.get(route.resourceId);
+      if (!resource) continue;
+
+      let network = networksByResource.get(resource.id);
+      if (!network) {
+        const isolated = parseResourceAdvancedConfig(
+          resource.advancedConfig,
+        ).isolatedDeployment;
+        network = isolated
+          ? await ensureResourceOverlayNetwork(docker, resource.id)
+          : { id: sharedNetwork.id, name: this.networkName };
+        networksByResource.set(resource.id, network);
+
+        try {
+          await docker.getNetwork(network.name).connect({
+            Container: CADDY_CONTAINER_NAME,
+          });
+        } catch (error: unknown) {
+          const statusCode =
+            typeof error === "object" && error !== null && "statusCode" in error
+              ? error.statusCode
+              : undefined;
+          if (statusCode !== 403 && statusCode !== 409) throw error;
+        }
+      }
+
+      const serviceName = route.upstream.slice(
+        0,
+        route.upstream.lastIndexOf(":"),
+      );
+      const service = docker.getService(serviceName);
+      let inspect: Docker.Service;
+      try {
+        inspect = await service.inspect();
+      } catch (error: unknown) {
+        const statusCode =
+          typeof error === "object" && error !== null && "statusCode" in error
+            ? error.statusCode
+            : undefined;
+        if (statusCode === 404) {
+          log.warn({
+            message: `Caddy upstream service '${serviceName}' does not exist yet.`,
+          });
+          continue;
+        }
+        throw error;
+      }
+
+      const serviceSpec = inspect.Spec;
+      if (!serviceSpec) continue;
+      const networks = serviceSpec.Networks || [];
+      if (
+        networks.some(
+          (entry: { Target?: string }) => entry.Target === network.id,
+        )
+      ) {
+        continue;
+      }
+
+      log.warn({
+        message: `Repairing Caddy upstream service '${serviceName}' network attachment.`,
+        networkId: network.id,
+      });
+      await service.update({
+        version: inspect.Version?.Index,
+        Name: serviceName,
+        Mode: serviceSpec.Mode,
+        TaskTemplate: serviceSpec.TaskTemplate,
+        Networks: [...networks, { Target: network.id }],
+        EndpointSpec: serviceSpec.EndpointSpec,
+        UpdateConfig: serviceSpec.UpdateConfig,
+        RollbackConfig: serviceSpec.RollbackConfig,
+      });
+    }
   }
 
   private async ensureVolume(name: string): Promise<void> {
@@ -608,6 +712,7 @@ export class CaddyService {
     let changed = false;
 
     await this.initializeCaddy(settings);
+    await this.reconcileResourceNetworks(resources);
     await this.serializeConfiguration(async () => {
       const container = await this.findContainer();
       if (!container) throw new Error("Caddy container is not available");

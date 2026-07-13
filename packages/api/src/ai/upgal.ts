@@ -33,7 +33,9 @@ import type {
   GetServersUseCase,
 } from "@upstand/usecases";
 import {
-  createAgentUIStreamResponse,
+  createAgentUIStream,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   type FlexibleSchema,
   generateText,
   type InferUITools,
@@ -1256,7 +1258,7 @@ export async function createUpGalResponse(
     },
   });
 
-  const response = await createAgentUIStreamResponse({
+  const agentStream = await createAgentUIStream({
     agent,
     uiMessages,
     // Passing the original messages lets the UI stream treat an approval
@@ -1264,12 +1266,39 @@ export async function createUpGalResponse(
     // it, every approved tool call is persisted as a second assistant turn.
     originalMessages: uiMessages,
     abortSignal: request.signal,
+  });
+
+  // createAgentUIStreamResponse exposes the agent-level onStepEnd callback,
+  // but not the UI-message-level callback needed for persistence. Wrap its UI
+  // stream so we can checkpoint the actual assembled message after each
+  // completed step while retaining the SDK's approval and continuation logic.
+  const stream = createUIMessageStream<UpGalUIMessage>({
+    originalMessages: uiMessages,
+    execute: ({ writer }) => {
+      writer.merge(agentStream);
+    },
+    onStepEnd: async ({ messages }) => {
+      try {
+        await saveIncomingMessages(context.conversationId, messages, ai);
+      } catch (error) {
+        log.error({
+          message: "Failed to persist UpGal intermediate messages",
+          conversationId: context.conversationId,
+          runId,
+          messageCount: messages.length,
+          err: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
     // Persist the complete assistant message, including tool calls and tool
     // results. Without this callback only the incoming user messages are
     // stored, so a reloaded conversation loses the useful part of the run.
-    onEnd: async ({ messages }) => {
+    onEnd: async ({ messages, isAborted, finishReason }) => {
       try {
         await saveIncomingMessages(context.conversationId, messages, ai);
+        if (isAborted) {
+          await updateRunSafely({ status: "failed", finishedAt: new Date() });
+        }
       } catch (error) {
         // Persistence must not turn an otherwise successful model response
         // into a misleading stream error. The run is still observable in the
@@ -1278,6 +1307,9 @@ export async function createUpGalResponse(
           message: "Failed to persist UpGal response messages",
           conversationId: context.conversationId,
           runId,
+          messageCount: messages.length,
+          isAborted,
+          finishReason,
           err: error instanceof Error ? error.message : String(error),
         });
       }
@@ -1292,9 +1324,11 @@ export async function createUpGalResponse(
       });
       return upGalStreamErrorMessage(error);
     },
+  });
+  return createUIMessageStreamResponse({
+    stream,
     headers: { "X-UpGal-Run-Id": runId },
   });
-  return response;
 }
 
 export async function saveIncomingMessages(

@@ -1,6 +1,27 @@
 import type { IUnitOfWork, WebServerSettings } from "@upstand/domain";
 import type { CaddyService } from "./caddy.service";
 
+function addUpstreamRetry(snippets: string, upstream: string): string {
+  const legacy = `\treverse_proxy ${upstream}`;
+  const resilient = `${legacy} {
+\t\tlb_try_duration 30s
+\t\tlb_try_interval 250ms
+\t}`;
+
+  return snippets.replaceAll(
+    `${legacy}\n`,
+    snippets.includes(`${legacy} {`) ? `${legacy}\n` : `${resilient}\n`,
+  );
+}
+
+function ensureControlPlaneRetries(snippets: string): string {
+  return [
+    "upstand_web:3001",
+    "upstand_server:3000",
+    "upstand_fumadocs:4000",
+  ].reduce(addUpstreamRetry, snippets);
+}
+
 export class GetWebServerSettingsUseCase {
   constructor(
     private readonly uow: IUnitOfWork,
@@ -22,12 +43,23 @@ export class GetWebServerSettingsUseCase {
       ) {
         const docsRoute = `${docsHost} {
 \tencode zstd gzip
-\treverse_proxy upstand_fumadocs:4000`;
+\treverse_proxy upstand_fumadocs:4000 {
+\t\tlb_try_duration 30s
+\t\tlb_try_interval 250ms
+\t}`;
         settings =
           (await this.uow.webServerSettingsRepository.updateGlobal({
             caddySnippets: `${settings.caddySnippets.trim()}\n\n${docsRoute}\n}`,
           })) ?? settings;
       }
+    }
+
+    const resilientSnippets = ensureControlPlaneRetries(settings.caddySnippets);
+    if (resilientSnippets !== settings.caddySnippets) {
+      settings =
+        (await this.uow.webServerSettingsRepository.updateGlobal({
+          caddySnippets: resilientSnippets,
+        })) ?? settings;
     }
 
     if (!settings.serverIp) {
@@ -67,6 +99,10 @@ export class GetWebServerSettingsUseCase {
     }
 
     await this.caddyService.initializeCaddy(settings);
+    await this.caddyService.syncResourceConfigs(
+      await this.uow.resourceRepository.findMany(),
+      settings,
+    );
     const status = await this.caddyService.getStatus();
     return { settings, status };
   }
@@ -85,19 +121,28 @@ export class GetWebServerSettingsUseCase {
     // for a new installation; operator-authored snippets remain untouched.
     return `${dashboardHost} {
 \tencode zstd gzip
-\treverse_proxy upstand_web:3001
+\treverse_proxy upstand_web:3001 {
+\t\tlb_try_duration 30s
+\t\tlb_try_interval 250ms
+\t}
 }
 
 ${apiHost} {
 \tencode zstd gzip
-\treverse_proxy upstand_server:3000
+\treverse_proxy upstand_server:3000 {
+\t\tlb_try_duration 30s
+\t\tlb_try_interval 250ms
+\t}
 }${
       validHost(docsHost)
         ? `
 
 ${docsHost} {
 	encode zstd gzip
-	reverse_proxy upstand_fumadocs:4000
+	reverse_proxy upstand_fumadocs:4000 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
 }`
         : ""
     }`;

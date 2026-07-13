@@ -27,7 +27,22 @@ type MetricPoint = {
 };
 
 interface MonitoringTabProps {
-  statsData: any;
+  statsData?: {
+    collectedAt?: string;
+    cpu?: number | null;
+    ram?: number | null;
+    ramUsage?: number | null;
+    cpuPercent?: number | null;
+    memoryPercent?: number | null;
+    memoryUsageBytes?: number | null;
+    containerCount?: number | null;
+    networkRxBytes?: number | null;
+    networkTxBytes?: number | null;
+  } | null;
+}
+
+function finiteMetric(value: number | null | undefined, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 export function MonitoringTab({ statsData }: MonitoringTabProps) {
@@ -35,18 +50,23 @@ export function MonitoringTab({ statsData }: MonitoringTabProps) {
 
   useEffect(() => {
     if (!statsData) return;
-    const collectedAt = new Date(statsData.collectedAt);
+    const collectedAt = new Date(statsData.collectedAt ?? Date.now());
+    const cpu = finiteMetric(statsData.cpu ?? statsData.cpuPercent);
+    const ram = finiteMetric(statsData.ram ?? statsData.memoryPercent);
     const metric: MetricPoint = {
-      time: collectedAt.toLocaleTimeString([], {
+      time: (Number.isNaN(collectedAt.getTime())
+        ? new Date()
+        : collectedAt
+      ).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
       }),
-      cpu: Number(statsData.cpuPercent.toFixed(1)),
-      ram: Number(statsData.memoryPercent.toFixed(1)),
-      ramUsage: statsData.memoryUsageBytes,
-      networkRxBytes: statsData.networkRxBytes,
-      networkTxBytes: statsData.networkTxBytes,
+      cpu: Number(cpu.toFixed(1)),
+      ram: Number(ram.toFixed(1)),
+      ramUsage: finiteMetric(statsData.ramUsage ?? statsData.memoryUsageBytes),
+      networkRxBytes: finiteMetric(statsData.networkRxBytes),
+      networkTxBytes: finiteMetric(statsData.networkTxBytes),
     };
     setMetrics((current) => [...current.slice(-30), metric]);
   }, [statsData]);

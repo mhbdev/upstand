@@ -132,6 +132,22 @@ describe("Caddy domain configuration", () => {
     ).toThrow("needs an explicit service name");
   });
 
+  test("uses the Swarm stack service name for Compose routes", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "compose-1",
+        name: "Storefront",
+        type: "compose",
+        appName: "storefront",
+        domains: JSON.stringify([
+          { host: "shop.example.com", port: 3000, serviceName: "web" },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).toContain("reverse_proxy storefront_web:3000");
+  });
+
   test("does not mix HTTP-only and HTTPS routes on one hostname", () => {
     expect(() =>
       generateCaddyfileContent({}, [

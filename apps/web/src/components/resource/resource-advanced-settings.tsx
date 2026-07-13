@@ -137,6 +137,47 @@ export function ResourceAdvancedSettings({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6 border-t pt-5">
+          <FieldGroup className="grid gap-4 md:grid-cols-2">
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="advanced-isolated-deployment">
+                  Isolated deployment
+                </FieldLabel>
+                <FieldDescription>
+                  Attach this resource to a dedicated Swarm overlay network so
+                  it cannot resolve services from other resources.
+                </FieldDescription>
+              </FieldContent>
+              <Switch
+                id="advanced-isolated-deployment"
+                checked={config.isolatedDeployment}
+                onCheckedChange={(value) =>
+                  updateConfig("isolatedDeployment", value)
+                }
+              />
+            </Field>
+            {resourceType === "compose" && (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="advanced-isolated-volumes">
+                    Isolate Compose volumes
+                  </FieldLabel>
+                  <FieldDescription>
+                    Prefix named volumes for this Compose deployment to avoid
+                    collisions between isolated instances.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="advanced-isolated-volumes"
+                  checked={config.isolatedDeploymentsVolume}
+                  onCheckedChange={(value) =>
+                    updateConfig("isolatedDeploymentsVolume", value)
+                  }
+                />
+              </Field>
+            )}
+          </FieldGroup>
+
           <FieldGroup className="grid gap-5 lg:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="resource-command">

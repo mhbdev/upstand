@@ -5,6 +5,13 @@ import type Docker from "dockerode";
 export const UPSTAND_SWARM_NETWORK =
   process.env.DOCKER_NETWORK || "upstand-network";
 
+const RESOURCE_NETWORK_PREFIX = "upstand-resource-";
+
+export function getResourceOverlayNetworkName(resourceId: string): string {
+  const suffix = resourceId.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  return `${RESOURCE_NETWORK_PREFIX}${suffix}`.slice(0, 63);
+}
+
 export interface DockerSwarmInfo {
   Swarm?: {
     LocalNodeState?: string;
@@ -160,7 +167,32 @@ export async function requireActiveManager(
 export async function ensureUpstandOverlayNetwork(
   docker: Docker,
 ): Promise<{ id: string; created: boolean }> {
-  const network = docker.getNetwork(UPSTAND_SWARM_NETWORK);
+  return ensureManagedOverlayNetwork(
+    docker,
+    UPSTAND_SWARM_NETWORK,
+    "application-routing",
+  );
+}
+
+export async function ensureResourceOverlayNetwork(
+  docker: Docker,
+  resourceId: string,
+): Promise<{ id: string; name: string; created: boolean }> {
+  const name = getResourceOverlayNetworkName(resourceId);
+  const network = await ensureManagedOverlayNetwork(
+    docker,
+    name,
+    "resource-isolation",
+  );
+  return { ...network, name };
+}
+
+async function ensureManagedOverlayNetwork(
+  docker: Docker,
+  name: string,
+  purpose: string,
+): Promise<{ id: string; created: boolean }> {
+  const network = docker.getNetwork(name);
 
   try {
     const existing = (await network.inspect()) as DockerOverlayNetwork;
@@ -170,7 +202,7 @@ export async function ensureUpstandOverlayNetwork(
       existing.Attachable !== true
     ) {
       throw new ConflictError(
-        `Network '${UPSTAND_SWARM_NETWORK}' exists but is not an attachable Swarm overlay network. Rename or remove it before continuing.`,
+        `Network '${name}' exists but is not an attachable Swarm overlay network. Rename or remove it before continuing.`,
       );
     }
 
@@ -186,13 +218,13 @@ export async function ensureUpstandOverlayNetwork(
   }
 
   const created = (await docker.createNetwork({
-    Name: UPSTAND_SWARM_NETWORK,
+    Name: name,
     Driver: "overlay",
     Attachable: true,
     CheckDuplicate: true,
     Labels: {
       "com.upstand.managed": "true",
-      "com.upstand.purpose": "application-routing",
+      "com.upstand.purpose": purpose,
     },
   })) as DockerNetworkCreateResult;
 

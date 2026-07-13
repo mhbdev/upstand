@@ -304,6 +304,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
       if (!organizationId || loadedConversationId.current.value === id) return;
       const requestId = ++loadRequestId.current;
       try {
+        chat.stop();
         setLoadError(undefined);
         const result = await queryClient.fetchQuery(
           trpc.ai.getConversation.queryOptions({
@@ -384,6 +385,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
 
   function newConversation() {
     loadRequestId.current += 1;
+    chat.stop();
     setConversationId(undefined);
     loadedConversationId.current.value = undefined;
     manualNewConversation.current = true;
@@ -575,7 +577,11 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
-                        onClick={() => void chat.regenerate()}
+                        onClick={() =>
+                          void chat.regenerate({
+                            body: { organizationId, conversationId },
+                          })
+                        }
                         size="sm"
                         variant="outline"
                       >

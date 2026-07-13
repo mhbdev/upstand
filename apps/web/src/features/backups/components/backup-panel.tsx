@@ -50,7 +50,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { SearchableSelect } from "@/components/shared/searchable-select";
@@ -229,17 +229,6 @@ export function BackupPanel({
       },
     },
   });
-
-  // Watch kind in TanStack Form to determine dynamically shown fields
-  const kind = (form as any).useStore((state: any) => state.values.kind);
-  const destinationId = (form as any).useStore(
-    (state: any) => state.values.destinationId,
-  );
-  const prefix = (form as any).useStore((state: any) => state.values.prefix);
-
-  const selectedDestination = useMemo(() => {
-    return destinations.find((dest) => dest.id === destinationId);
-  }, [destinations, destinationId]);
 
   const openCreate = () => {
     setEditingSchedule(null);
@@ -539,12 +528,27 @@ export function BackupPanel({
                 </form.Field>
               </div>
 
-              {selectedDestination && (
-                <p className="rounded-md bg-muted px-3 py-2 text-muted-foreground text-xs">
-                  Writing to {selectedDestination.bucket}/
-                  {prefix || "resource-id/"} via {selectedDestination.name}.
-                </p>
-              )}
+              <form.Subscribe
+                selector={(state) => ({
+                  destinationId: state.values.destinationId,
+                  prefix: state.values.prefix,
+                })}
+              >
+                {({ destinationId, prefix }) => {
+                  const selectedDestination = destinations.find(
+                    (destination) => destination.id === destinationId,
+                  );
+
+                  if (!selectedDestination) return null;
+
+                  return (
+                    <p className="rounded-md bg-muted px-3 py-2 text-muted-foreground text-xs">
+                      Writing to {selectedDestination.bucket}/
+                      {prefix || "resource-id/"} via {selectedDestination.name}.
+                    </p>
+                  );
+                }}
+              </form.Subscribe>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <form.Field
@@ -628,179 +632,193 @@ export function BackupPanel({
                 )}
               </form.Field>
 
-              {kind === "database" ? (
-                <>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <form.Field name="databaseEngine">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel>Engine</FieldLabel>
-                          <Select
-                            value={field.state.value}
-                            onValueChange={(value) =>
-                              field.handleChange(value as DatabaseEngine)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="postgres">
-                                PostgreSQL
-                              </SelectItem>
-                              <SelectItem value="mysql">MySQL</SelectItem>
-                              <SelectItem value="mariadb">MariaDB</SelectItem>
-                              <SelectItem value="mongodb">MongoDB</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                      )}
-                    </form.Field>
+              <form.Subscribe selector={(state) => state.values.kind}>
+                {(kind) =>
+                  kind === "database" ? (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <form.Field name="databaseEngine">
+                          {(field) => (
+                            <Field>
+                              <FieldLabel>Engine</FieldLabel>
+                              <Select
+                                value={field.state.value}
+                                onValueChange={(value) =>
+                                  field.handleChange(value as DatabaseEngine)
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="postgres">
+                                    PostgreSQL
+                                  </SelectItem>
+                                  <SelectItem value="mysql">MySQL</SelectItem>
+                                  <SelectItem value="mariadb">
+                                    MariaDB
+                                  </SelectItem>
+                                  <SelectItem value="mongodb">
+                                    MongoDB
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </Field>
+                          )}
+                        </form.Field>
 
-                    <form.Field
-                      name="databaseName"
-                      validators={{
-                        onChange: z
-                          .string()
-                          .min(1, "Database name is required"),
-                      }}
-                    >
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>
-                            Database name
-                          </FieldLabel>
-                          <Input
-                            id={field.name}
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                          />
-                          <FieldError errors={field.state.meta.errors} />
-                        </Field>
-                      )}
-                    </form.Field>
+                        <form.Field
+                          name="databaseName"
+                          validators={{
+                            onChange: z
+                              .string()
+                              .min(1, "Database name is required"),
+                          }}
+                        >
+                          {(field) => (
+                            <Field>
+                              <FieldLabel htmlFor={field.name}>
+                                Database name
+                              </FieldLabel>
+                              <Input
+                                id={field.name}
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                              />
+                              <FieldError errors={field.state.meta.errors} />
+                            </Field>
+                          )}
+                        </form.Field>
 
-                    <form.Field name="serviceName">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>
-                            Compose service (optional)
-                          </FieldLabel>
-                          <Input
-                            id={field.name}
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            placeholder="postgres"
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-                  </div>
+                        <form.Field name="serviceName">
+                          {(field) => (
+                            <Field>
+                              <FieldLabel htmlFor={field.name}>
+                                Compose service (optional)
+                              </FieldLabel>
+                              <Input
+                                id={field.name}
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                placeholder="postgres"
+                              />
+                            </Field>
+                          )}
+                        </form.Field>
+                      </div>
 
-                  {resource.type === "compose" && (
-                    <div className="grid gap-4 rounded-lg border border-border/50 p-4 sm:grid-cols-2">
-                      <form.Field name="databaseUser">
+                      {resource.type === "compose" && (
+                        <div className="grid gap-4 rounded-lg border border-border/50 p-4 sm:grid-cols-2">
+                          <form.Field name="databaseUser">
+                            {(field) => (
+                              <Field>
+                                <FieldLabel htmlFor={field.name}>
+                                  Database user
+                                </FieldLabel>
+                                <Input
+                                  id={field.name}
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                />
+                              </Field>
+                            )}
+                          </form.Field>
+
+                          <form.Field name="databasePassword">
+                            {(field) => (
+                              <Field>
+                                <FieldLabel htmlFor={field.name}>
+                                  Database password
+                                </FieldLabel>
+                                <Input
+                                  id={field.name}
+                                  type="password"
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                />
+                              </Field>
+                            )}
+                          </form.Field>
+                          <p className="text-muted-foreground text-xs sm:col-span-2">
+                            Compose resources require source database
+                            credentials. Leave these blank when editing to
+                            preserve the saved encrypted credentials.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                        <form.Field
+                          name="volumeName"
+                          validators={{
+                            onChange: z
+                              .string()
+                              .min(1, "Choose a Docker volume"),
+                          }}
+                        >
+                          {(field) => (
+                            <Field>
+                              <FieldLabel>Docker volume</FieldLabel>
+                              <Select
+                                value={field.state.value}
+                                onValueChange={(value) =>
+                                  field.handleChange(value || "")
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Discover or select a volume" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {volumes.map((volume) => (
+                                    <SelectItem key={volume} value={volume}>
+                                      {volume}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FieldError errors={field.state.meta.errors} />
+                            </Field>
+                          )}
+                        </form.Field>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isVolumesFetching}
+                          onClick={() => void refetchVolumes()}
+                        >
+                          {isVolumesFetching ? <Spinner /> : "Discover volumes"}
+                        </Button>
+                      </div>
+                      <form.Field name="stopService">
                         {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor={field.name}>
-                              Database user
-                            </FieldLabel>
-                            <Input
-                              id={field.name}
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                            />
-                          </Field>
+                          <label className="flex items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-sm">
+                            <Switch
+                              checked={field.state.value}
+                              onCheckedChange={(val) => field.handleChange(val)}
+                            />{" "}
+                            Stop the service during archive and restore for a
+                            consistent volume snapshot.
+                          </label>
                         )}
                       </form.Field>
-
-                      <form.Field name="databasePassword">
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor={field.name}>
-                              Database password
-                            </FieldLabel>
-                            <Input
-                              id={field.name}
-                              type="password"
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                            />
-                          </Field>
-                        )}
-                      </form.Field>
-                      <p className="text-muted-foreground text-xs sm:col-span-2">
-                        Compose resources require source database credentials.
-                        Leave these blank when editing to preserve the saved
-                        encrypted credentials.
-                      </p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                    <form.Field
-                      name="volumeName"
-                      validators={{
-                        onChange: z.string().min(1, "Choose a Docker volume"),
-                      }}
-                    >
-                      {(field) => (
-                        <Field>
-                          <FieldLabel>Docker volume</FieldLabel>
-                          <Select
-                            value={field.state.value}
-                            onValueChange={(value) =>
-                              field.handleChange(value || "")
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Discover or select a volume" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {volumes.map((volume) => (
-                                <SelectItem key={volume} value={volume}>
-                                  {volume}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FieldError errors={field.state.meta.errors} />
-                        </Field>
-                      )}
-                    </form.Field>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isVolumesFetching}
-                      onClick={() => void refetchVolumes()}
-                    >
-                      {isVolumesFetching ? <Spinner /> : "Discover volumes"}
-                    </Button>
-                  </div>
-                  <form.Field name="stopService">
-                    {(field) => (
-                      <label className="flex items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-sm">
-                        <Switch
-                          checked={field.state.value}
-                          onCheckedChange={(val) => field.handleChange(val)}
-                        />{" "}
-                        Stop the service during archive and restore for a
-                        consistent volume snapshot.
-                      </label>
-                    )}
-                  </form.Field>
-                </>
-              )}
+                    </>
+                  )
+                }
+              </form.Subscribe>
             </FieldGroup>
 
             <DialogFooter className="mt-4">

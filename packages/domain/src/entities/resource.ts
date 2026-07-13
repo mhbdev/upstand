@@ -58,6 +58,14 @@ const ResourceHealthcheckSchema = z.object({
 });
 
 export const ResourceAdvancedConfigSchema = z.object({
+  isolatedDeployment: z
+    .boolean()
+    .default(false)
+    .describe("Use a dedicated Swarm overlay network for this resource."),
+  isolatedDeploymentsVolume: z
+    .boolean()
+    .default(false)
+    .describe("Prefix Compose named volumes when isolation is enabled."),
   command: z.array(z.string().trim().min(1)).max(64).default([]),
   args: z.array(z.string().max(4096)).max(128).default([]),
   ports: z.array(ResourcePortSchema).max(32).default([]),

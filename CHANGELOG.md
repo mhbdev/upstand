@@ -6,6 +6,24 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.26 - 2026-07-13
+
+### Changed
+
+- Checkpoint UpGal UI messages after each completed agent step and persist the final partial message when a stream is aborted.
+- Keep UpGal retries bound to their existing conversation and stop stale streams before loading or starting another conversation.
+- Reconcile deployed Swarm services and Caddy upstreams onto the shared `upstand-network` overlay.
+- Retry Caddy upstreams briefly during Swarm task and service-DNS convergence to avoid transient 502 responses.
+- Add Dokploy-style isolated deployments with dedicated attachable overlay networks, isolated Compose ingress, and optional named-volume prefixing.
+- Use the real Swarm service name for Compose domain routes and attach Caddy to each resource's routing network.
+- Make the resource Backups panel reactive with TanStack Form subscriptions and normalize resource monitoring metrics at the UI boundary.
+
+### Fixed
+
+- Prevent interrupted UpGal responses from leaving only the incoming user message in persistent conversation history.
+- Prevent legacy deployed resources without the shared overlay attachment from returning a permanent Caddy 502.
+- Prevent Backups and Monitoring tabs from crashing when form state or runtime metrics are unavailable.
+
 ## 0.1.25 - 2026-07-13
 
 ### Added
