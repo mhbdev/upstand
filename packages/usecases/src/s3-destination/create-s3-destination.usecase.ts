@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { IUnitOfWork, S3Destination } from "@upstand/domain";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 
 export const CreateS3DestinationInputSchema = z.object({

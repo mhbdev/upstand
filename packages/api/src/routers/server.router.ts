@@ -1,20 +1,20 @@
 import { TRPCError } from "@trpc/server";
-import { UnitOfWorkToken } from "@upstand/domain";
 import {
   CreateServerInputSchema,
   DeleteServerInputSchema,
+  GetServerHistoricalMetricsInputSchema,
   GetServerRuntimeStatsInputSchema,
   GetServersInputSchema,
   SetupServerInputSchema,
-  GetServerHistoricalMetricsInputSchema,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateServerUseCaseToken,
   DeleteServerUseCaseToken,
+  GetServerHistoricalMetricsUseCaseToken,
   GetServerRuntimeStatsUseCaseToken,
   GetServersUseCaseToken,
   SetupServerUseCaseToken,
-  GetServerHistoricalMetricsUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
@@ -140,9 +140,7 @@ export const serverRouter = router({
         "server:view",
       );
 
-      const useCase = ctx.scope.resolve(
-        GetServerHistoricalMetricsUseCaseToken,
-      );
+      const useCase = ctx.scope.resolve(GetServerHistoricalMetricsUseCaseToken);
       try {
         return await useCase.execute(input);
       } catch (error) {

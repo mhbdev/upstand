@@ -1,7 +1,12 @@
-import { randomUUID, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
-import * as path from "node:path";
+import {
+  createHmac,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import type { ServiceScope } from "@circulo-ai/di";
 import { trpcServer } from "@hono/trpc-server";
 import { ensureOrganizationAccess } from "@upstand/api/access-control";
@@ -26,13 +31,9 @@ import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
 import { db, monitoringSettings } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
-import {
-  type IUnitOfWork,
-  isJsonObject,
-  UnitOfWorkToken,
-} from "@upstand/domain";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
+import { type IUnitOfWork, isJsonObject } from "@upstand/domain";
 import { env } from "@upstand/env/server";
+import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";
 import { AIRepositoryToken } from "@upstand/repositories";
 import {
@@ -46,11 +47,12 @@ import {
 } from "@upstand/usecases";
 import {
   BackupSchedulerToken,
-  GeneralSchedulerToken,
   CreateGitProviderUseCaseToken,
+  GeneralSchedulerToken,
   GetUpdateStatusUseCaseToken,
   GetWebServerSettingsUseCaseToken,
   TriggerUpdateUseCaseToken,
+  UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
 import { count, eq } from "drizzle-orm";
 import { initLogger, log } from "evlog";
@@ -282,9 +284,7 @@ app.post("/api/monitoring/alerts", async (c) => {
     threshold,
   });
 
-  const publisher = scope.resolve(
-    Symbol.for("PublishNotificationUseCase"),
-  ) as {
+  const publisher = scope.resolve(Symbol.for("PublishNotificationUseCase")) as {
     execute: (input: {
       event: "server_threshold_alert";
       organizationId: string;
@@ -295,25 +295,29 @@ app.post("/api/monitoring/alerts", async (c) => {
     }) => Promise<number>;
   };
 
-  await publisher.execute({
-    event: "server_threshold_alert",
-    organizationId: serverRecord.organizationId,
-    idempotencyKey: `alert:${settings.serverId}:${type}:${new Date().toISOString().slice(0, 13)}`,
-    title: `[Alert] Server ${serverRecord.name} - High ${type} Usage`,
-    message: message || `The ${type} usage on server '${serverRecord.name}' is currently ${value}%, exceeding the set threshold of ${threshold}%.`,
-    metadata: {
-      serverId: settings.serverId,
-      serverName: serverRecord.name,
-      alertType: type,
-      value,
-      threshold,
-    },
-  }).catch((err) => {
-    log.error({
-      message: "Failed to publish server threshold alert notification",
-      err: err instanceof Error ? err.message : String(err),
+  await publisher
+    .execute({
+      event: "server_threshold_alert",
+      organizationId: serverRecord.organizationId,
+      idempotencyKey: `alert:${settings.serverId}:${type}:${new Date().toISOString().slice(0, 13)}`,
+      title: `[Alert] Server ${serverRecord.name} - High ${type} Usage`,
+      message:
+        message ||
+        `The ${type} usage on server '${serverRecord.name}' is currently ${value}%, exceeding the set threshold of ${threshold}%.`,
+      metadata: {
+        serverId: settings.serverId,
+        serverName: serverRecord.name,
+        alertType: type,
+        value,
+        threshold,
+      },
+    })
+    .catch((err) => {
+      log.error({
+        message: "Failed to publish server threshold alert notification",
+        err: err instanceof Error ? err.message : String(err),
+      });
     });
-  });
 
   return c.json({ status: "acknowledged" });
 });
@@ -376,7 +380,9 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
   const resourceRecord = await uow.resourceRepository.findById(resourceId);
   if (!resourceRecord) return c.json({ error: "Resource not found" }, 404);
 
-  const environment = await uow.environmentRepository.findById(resourceRecord.environmentId);
+  const environment = await uow.environmentRepository.findById(
+    resourceRecord.environmentId,
+  );
   if (!environment) return c.json({ error: "Environment not found" }, 404);
 
   const project = await uow.projectRepository.findById(environment.projectId);
@@ -392,7 +398,10 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
 
   const tempDir = path.join(process.cwd(), ".builds", "temp");
   fs.mkdirSync(tempDir, { recursive: true });
-  const archivePath = path.join(tempDir, `upload-${resourceId}-${Date.now()}.zip`);
+  const archivePath = path.join(
+    tempDir,
+    `upload-${resourceId}-${Date.now()}.zip`,
+  );
 
   const buffer = Buffer.from(await file.arrayBuffer());
   fs.writeFileSync(archivePath, buffer);
@@ -433,7 +442,10 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
     });
     return c.json({ accepted: true, resourceId, status: queued.status }, 202);
   } catch (error: any) {
-    return c.json({ error: `Failed to trigger deployment queue: ${error.message}` }, 500);
+    return c.json(
+      { error: `Failed to trigger deployment queue: ${error.message}` },
+      500,
+    );
   }
 });
 
@@ -484,7 +496,9 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
     if (r.provider !== "github") return false;
     try {
       const creds = JSON.parse(r.credentials || "{}");
-      return creds.repository === repoFullName && creds.enablePrPreviews === true;
+      return (
+        creds.repository === repoFullName && creds.enablePrPreviews === true
+      );
     } catch {
       return false;
     }
@@ -492,7 +506,10 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
 
   for (const resource of matchedResources) {
     if (action === "opened" || action === "synchronize") {
-      let preview = await uow.previewDeploymentRepository.findByPullRequestId(resource.id, prNumber);
+      let preview = await uow.previewDeploymentRepository.findByPullRequestId(
+        resource.id,
+        prNumber,
+      );
       let appName = preview?.appName;
       let domain = preview?.domain;
 
@@ -502,7 +519,6 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
           .toLowerCase()
           .replace(/[^a-z0-9-_]/g, "-");
 
-        const settings = await uow.webServerSettingsRepository.findGlobal();
         domain = `${appName}.sslip.io`;
 
         preview = await uow.previewDeploymentRepository.create({
@@ -525,18 +541,25 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
         title: `PR #${prNumber} preview deployment (${action})`,
         previewDeploymentId: preview.id,
       });
-
     } else if (action === "closed") {
-      const preview = await uow.previewDeploymentRepository.findByPullRequestId(resource.id, prNumber);
+      const preview = await uow.previewDeploymentRepository.findByPullRequestId(
+        resource.id,
+        prNumber,
+      );
       if (preview) {
-        log.info({ message: `Cleaning up preview deployment ${preview.appName} on PR close...` });
+        log.info({
+          message: `Cleaning up preview deployment ${preview.appName} on PR close...`,
+        });
 
         try {
           const docker = getDockerInstance();
           const service = docker.getService(preview.appName);
           await service.remove();
         } catch (err: any) {
-          log.error({ message: `Failed to remove Swarm service for preview ${preview.appName}`, err: err.message });
+          log.error({
+            message: `Failed to remove Swarm service for preview ${preview.appName}`,
+            err: err.message,
+          });
         }
 
         await uow.previewDeploymentRepository.deleteById(preview.id);
@@ -557,7 +580,9 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
               candidate.serverId === "manager",
           );
 
-          const activePreviews = allPreviews.filter((p) => p.status === "success");
+          const activePreviews = allPreviews.filter(
+            (p) => p.status === "success",
+          );
           const routingPreviews: any[] = [];
           for (const prev of activePreviews) {
             const parent = resources.find((r) => r.id === prev.resourceId);
@@ -581,7 +606,7 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
                     https: parentHttps,
                     certificateType: parentCert,
                     middlewares: parentMiddlewares,
-                  }
+                  },
                 ]),
                 composeType: parent.composeType,
                 advancedConfig: parent.advancedConfig,
@@ -594,7 +619,10 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
             settings || {},
           );
         } catch (err: any) {
-          log.error({ message: `Failed to sync Caddy on preview cleanup`, err: err.message });
+          log.error({
+            message: "Failed to sync Caddy on preview cleanup",
+            err: err.message,
+          });
         }
       }
     }
@@ -1183,9 +1211,10 @@ async function reconcileQueues(): Promise<void> {
 }
 
 async function initializeMonitoring() {
-  const monitoringPath = process.env.NODE_ENV === "production"
-    ? "/app/apps/monitoring"
-    : path.join(process.cwd(), "apps", "monitoring");
+  const monitoringPath =
+    process.env.NODE_ENV === "production"
+      ? "/app/apps/monitoring"
+      : path.join(process.cwd(), "apps", "monitoring");
 
   if (!fs.existsSync(monitoringPath)) {
     log.error({ message: `Monitoring path not found: ${monitoringPath}` });
@@ -1195,42 +1224,44 @@ async function initializeMonitoring() {
   try {
     const docker = getDockerInstance();
     await new Promise<void>((resolve, reject) => {
-      log.info({ message: "Building Upstand Monitoring Agent Docker image..." });
-      const tarProcess = spawn("tar", ["-cf", "-", "-C", monitoringPath, "."]);
-      
-      docker.buildImage(tarProcess.stdout, { t: "upstand-monitoring-agent:latest" }, (err, stream) => {
-        if (err) return reject(err);
-        if (!stream) return reject(new Error("No build stream returned"));
-        docker.modem.followProgress(stream, (err, output) => {
-          if (err) reject(err);
-          else resolve();
-        });
+      log.info({
+        message: "Building Upstand Monitoring Agent Docker image...",
       });
+      const tarProcess = spawn("tar", ["-cf", "-", "-C", monitoringPath, "."]);
+
+      docker.buildImage(
+        tarProcess.stdout,
+        { t: "upstand-monitoring-agent:latest" },
+        (err, stream) => {
+          if (err) return reject(err);
+          if (!stream) return reject(new Error("No build stream returned"));
+          docker.modem.followProgress(stream, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        },
+      );
       tarProcess.on("error", reject);
     });
-    log.info({ message: "Upstand Monitoring Agent Docker image built successfully! ✅" });
+    log.info({
+      message: "Upstand Monitoring Agent Docker image built successfully! ✅",
+    });
 
     const containerName = "upstand-monitoring-agent";
     const scope = serviceProvider.createScope();
     let token = "";
     try {
       const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-      let settings = await uow.transaction(async (tx) => {
-        let localSettings = await tx.db.query.monitoringSettings.findFirst({
-          where: eq(monitoringSettings.serverId, "local"),
+      let settings =
+        await uow.monitoringSettingsRepository.findByServerId("local");
+      if (!settings) {
+        settings = await uow.monitoringSettingsRepository.upsert({
+          serverId: "local",
+          token: randomBytes(24).toString("hex"),
+          cpuThreshold: 90,
+          memoryThreshold: 90,
         });
-        if (!localSettings) {
-          const generatedToken = randomBytes(24).toString("hex");
-          const [inserted] = await tx.db.insert(monitoringSettings).values({
-            serverId: "local",
-            token: generatedToken,
-            cpuThreshold: 90,
-            memoryThreshold: 90,
-          }).returning();
-          localSettings = inserted;
-        }
-        return localSettings;
-      });
+      }
       token = settings.token;
     } finally {
       await scope.dispose();
@@ -1247,23 +1278,23 @@ async function initializeMonitoring() {
         cronJob: "0 0 * * *",
         thresholds: {
           cpu: 90,
-          memory: 90
-        }
+          memory: 90,
+        },
       },
       containers: {
         refreshRate: 25,
         services: {
           include: [],
-          exclude: []
-        }
-      }
+          exclude: [],
+        },
+      },
     };
 
     const containerOpts = {
       name: containerName,
       Env: [
         `METRICS_CONFIG=${JSON.stringify(metricsConfig)}`,
-        `DB_PATH=/data/monitoring.db`
+        "DB_PATH=/data/monitoring.db",
       ],
       Image: "upstand-monitoring-agent:latest",
       HostConfig: {
@@ -1293,7 +1324,9 @@ async function initializeMonitoring() {
     await docker.createContainer(containerOpts);
     const newContainer = docker.getContainer(containerName);
     await newContainer.start();
-    log.info({ message: "Local Monitoring Agent container started on port 3001! 📈" });
+    log.info({
+      message: "Local Monitoring Agent container started on port 3001! 📈",
+    });
   } catch (error) {
     log.error({
       message: "Failed to initialize local monitoring agent",

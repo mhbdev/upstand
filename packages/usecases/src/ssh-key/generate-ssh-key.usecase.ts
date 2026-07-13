@@ -1,8 +1,8 @@
 // packages/usecases/src/ssh-key/generate-ssh-key.usecase.ts
 import { randomUUID } from "node:crypto";
 import type { IUnitOfWork } from "@upstand/domain";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
-import { generateEd25519KeyPair } from "@upstand/domain/ssh/keygen";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
+import { generateEd25519KeyPair } from "@upstand/platform/ssh/keygen";
 import { z } from "zod";
 
 // Generated path: we create the key pair for the user.

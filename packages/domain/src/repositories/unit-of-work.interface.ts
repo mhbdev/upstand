@@ -5,19 +5,19 @@ import type { IDeploymentRepository } from "./deployment-repository.interface";
 import type { IDockerRegistryRepository } from "./docker-registry-repository.interface";
 import type { IEnvironmentRepository } from "./environment-repository.interface";
 import type { IGitProviderRepository } from "./git-provider-repository.interface";
+import type { IMonitoringSettingsRepository } from "./monitoring-settings-repository.interface";
 import type { INotificationChannelRepository } from "./notification-channel-repository.interface";
 import type { INotificationDeliveryRepository } from "./notification-delivery-repository.interface";
+import type { IPreviewDeploymentRepository } from "./preview-deployment-repository.interface";
 import type { IProjectRepository } from "./project-repository.interface";
 import type { IResourceRepository } from "./resource-repository.interface";
 import type { IS3DestinationRepository } from "./s3-destination-repository.interface";
+import type { IScheduleRepository } from "./schedule-repository.interface";
 import type { IServerBuildSettingsRepository } from "./server-build-settings-repository.interface";
 import type { IServerRepository } from "./server-repository.interface";
 import type { ISshKeyRepository } from "./ssh-key-repository.interface";
 import type { IUserRepository } from "./user-repository.interface";
 import type { IWebServerSettingsRepository } from "./web-server-settings-repository.interface";
-import type { IMonitoringSettingsRepository } from "./monitoring-settings-repository.interface";
-import type { IPreviewDeploymentRepository } from "./preview-deployment-repository.interface";
-import type { IScheduleRepository } from "./schedule-repository.interface";
 
 export interface IUnitOfWork {
   readonly auditLogRepository: IAuditLogRepository;

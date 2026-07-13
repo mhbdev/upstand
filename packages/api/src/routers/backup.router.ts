@@ -1,6 +1,6 @@
 import type { ServiceScope } from "@circulo-ai/di";
 import { TRPCError } from "@trpc/server";
-import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
+import type { IUnitOfWork } from "@upstand/domain";
 import {
   CreateBackupScheduleInputSchema,
   DeleteBackupScheduleInputSchema,
@@ -11,6 +11,7 @@ import {
   TriggerBackupRunInputSchema,
   UpdateBackupScheduleInputSchema,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   BackupSchedulerToken,
   CreateBackupScheduleUseCaseToken,

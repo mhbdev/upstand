@@ -6,6 +6,7 @@ import type {
   IBackupScheduleRepository,
   IEnvironmentRepository,
   IGitProviderRepository,
+  IMonitoringSettingsRepository,
   INotificationChannelRepository,
   INotificationDeliveryRepository,
   IProjectRepository,
@@ -14,7 +15,6 @@ import type {
   ISshKeyRepository,
   IUserRepository,
   IWebServerSettingsRepository,
-  IMonitoringSettingsRepository,
 } from "@upstand/domain";
 
 export const DbToken = createToken<DatabaseExecutor>("DatabaseExecutor");
@@ -51,4 +51,3 @@ export const NotificationDeliveryRepositoryToken =
   );
 export const MonitoringSettingsRepositoryToken =
   createToken<IMonitoringSettingsRepository>("IMonitoringSettingsRepository");
-

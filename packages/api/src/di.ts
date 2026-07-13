@@ -1,6 +1,5 @@
 import { ServiceCollection } from "@circulo-ai/di";
 import { db } from "@upstand/db";
-import { UnitOfWorkToken } from "@upstand/domain";
 import {
   AIRepositoryToken,
   BackupRunRepositoryToken,
@@ -11,6 +10,7 @@ import {
   DrizzleBackupScheduleRepository,
   DrizzleEnvironmentRepository,
   DrizzleGitProviderRepository,
+  DrizzleMonitoringSettingsRepository,
   DrizzleNotificationChannelRepository,
   DrizzleNotificationDeliveryRepository,
   DrizzleProjectRepository,
@@ -20,9 +20,9 @@ import {
   DrizzleUnitOfWork,
   DrizzleUserRepository,
   DrizzleWebServerSettingsRepository,
-  DrizzleMonitoringSettingsRepository,
   EnvironmentRepositoryToken,
   GitProviderRepositoryToken,
+  MonitoringSettingsRepositoryToken,
   NotificationChannelRepositoryToken,
   NotificationDeliveryRepositoryToken,
   ProjectRepositoryToken,
@@ -31,11 +31,9 @@ import {
   SshKeyRepositoryToken,
   UserRepositoryToken,
   WebServerSettingsRepositoryToken,
-  MonitoringSettingsRepositoryToken,
 } from "@upstand/repositories";
 import {
   BackupScheduler,
-  GeneralScheduler,
   CaddyService,
   CaddyServiceToken,
   ControlContainerUseCase,
@@ -68,6 +66,7 @@ import {
   DockerService,
   DockerServiceToken,
   ExecuteBackupRunUseCase,
+  GeneralScheduler,
   GetAccountStatusUseCase,
   GetBackupRunsUseCase,
   GetBackupSchedulesUseCase,
@@ -88,6 +87,7 @@ import {
   GetResourcesUseCase,
   GetResourceUseCase,
   GetS3DestinationsUseCase,
+  GetServerHistoricalMetricsUseCase,
   GetServerRuntimeStatsUseCase,
   GetServersUseCase,
   GetSshKeysUseCase,
@@ -110,7 +110,6 @@ import {
   RestoreBackupRunUseCase,
   RotateSwarmJoinTokenUseCase,
   SetupServerUseCase,
-  GetServerHistoricalMetricsUseCase,
   TestDockerRegistryConnectionUseCase,
   TestNotificationChannelUseCase,
   TestS3DestinationConnectionUseCase,
@@ -127,7 +126,6 @@ import {
 import { GenerateSshKeyUseCase } from "@upstand/usecases/ssh-key/generate-ssh-key.usecase";
 import {
   BackupSchedulerToken,
-  GeneralSchedulerToken,
   ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
   CreateAuditLogUseCaseToken,
@@ -156,6 +154,7 @@ import {
   DeployResourceUseCaseToken,
   DockerReadOnlyServiceToken,
   ExecuteBackupRunUseCaseToken,
+  GeneralSchedulerToken,
   GenerateSshKeyUseCaseToken,
   GetAccountStatusUseCaseToken,
   GetBackupRunsUseCaseToken,
@@ -177,6 +176,7 @@ import {
   GetResourcesUseCaseToken,
   GetResourceUseCaseToken,
   GetS3DestinationsUseCaseToken,
+  GetServerHistoricalMetricsUseCaseToken,
   GetServerRuntimeStatsUseCaseToken,
   GetServersUseCaseToken,
   GetSshKeysUseCaseToken,
@@ -199,12 +199,12 @@ import {
   RestoreBackupRunUseCaseToken,
   RotateSwarmJoinTokenUseCaseToken,
   SetupServerUseCaseToken,
-  GetServerHistoricalMetricsUseCaseToken,
   TestDockerRegistryConnectionUseCaseToken,
   TestNotificationChannelUseCaseToken,
   TestS3DestinationConnectionUseCaseToken,
   TriggerBackupRunUseCaseToken,
   TriggerUpdateUseCaseToken,
+  UnitOfWorkToken,
   UpdateBackupScheduleUseCaseToken,
   UpdateConcurrencyUseCaseToken,
   UpdateNotificationChannelUseCaseToken,
@@ -214,9 +214,9 @@ import {
   UpdateWebServerSettingsUseCaseToken,
 } from "@upstand/usecases/tokens";
 
-export { UnitOfWorkToken } from "@upstand/domain";
 export * from "@upstand/repositories/tokens";
 export * from "@upstand/usecases/tokens";
+export { UnitOfWorkToken } from "@upstand/usecases/tokens";
 
 export const services = new ServiceCollection();
 
@@ -513,7 +513,8 @@ services.addSingleton(
 );
 services.addSingleton(
   GeneralSchedulerToken,
-  (c) => new GeneralScheduler(() => serviceProvider, c.resolve(DockerServiceToken)),
+  (c) =>
+    new GeneralScheduler(() => serviceProvider, c.resolve(DockerServiceToken)),
 );
 services.addTransient(
   CreateBackupScheduleUseCaseToken,

@@ -2,7 +2,7 @@ import type { IUnitOfWork, S3Destination } from "@upstand/domain";
 import {
   decryptSecret,
   type EncryptedPayload,
-} from "@upstand/domain/crypto/secret-box";
+} from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 
 export const GetS3DestinationsInputSchema = z.object({

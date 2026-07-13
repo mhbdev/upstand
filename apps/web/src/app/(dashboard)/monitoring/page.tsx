@@ -3,19 +3,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@upstand/ui/components/select";
-import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
 import {
   Activity,
@@ -105,8 +105,8 @@ export default function MonitoringPage() {
       const mapped = historicalData
         .map((m: any) => {
           const collectedAt = new Date(m.timestamp);
-          const memUsed = parseFloat(m.memUsed || "0");
-          const memTotal = parseFloat(m.memTotal || "0");
+          const memUsed = Number.parseFloat(m.memUsed || "0");
+          const memTotal = Number.parseFloat(m.memTotal || "0");
           const memPercent = memTotal > 0 ? (memUsed / memTotal) * 100 : 0;
           return {
             time: collectedAt.toLocaleTimeString([], {
@@ -115,7 +115,7 @@ export default function MonitoringPage() {
               second: "2-digit",
               hour12: false,
             }),
-            cpu: parseFloat(m.cpu || "0"),
+            cpu: Number.parseFloat(m.cpu || "0"),
             memoryPercent: Math.round(memPercent * 10) / 10,
           };
         })
@@ -140,7 +140,10 @@ export default function MonitoringPage() {
       memoryPercent: stats.memoryPercent,
     };
     setHistory((previous) => {
-      if (previous.length > 0 && previous[previous.length - 1].time === newPoint.time) {
+      if (
+        previous.length > 0 &&
+        previous[previous.length - 1].time === newPoint.time
+      ) {
         return previous;
       }
       return [...previous, newPoint].slice(-60);
@@ -195,7 +198,10 @@ export default function MonitoringPage() {
     {
       label: "Active containers",
       value: String(stats.activeContainers),
-      description: selectedServerId === "local" ? "Running on this manager" : "Running on this server",
+      description:
+        selectedServerId === "local"
+          ? "Running on this manager"
+          : "Running on this server",
       icon: Server,
     },
     {
@@ -227,7 +233,7 @@ export default function MonitoringPage() {
               value={selectedServerId}
               onValueChange={(val) => val && setSelectedServerId(val)}
             >
-              <SelectTrigger className="w-[180px] h-9">
+              <SelectTrigger className="h-9 w-[180px]">
                 <SelectValue placeholder="Local Server" />
               </SelectTrigger>
               <SelectContent>

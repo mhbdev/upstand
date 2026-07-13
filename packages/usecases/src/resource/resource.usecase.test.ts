@@ -121,6 +121,9 @@ class MockUnitOfWork implements IUnitOfWork {
   public readonly serverRepository = {} as any;
   public readonly notificationChannelRepository = {} as any;
   public readonly notificationDeliveryRepository = {} as any;
+  public readonly monitoringSettingsRepository = {} as any;
+  public readonly previewDeploymentRepository = {} as any;
+  public readonly scheduleRepository = {} as any;
 
   async transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T> {
     return work(this as any);

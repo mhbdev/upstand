@@ -1,11 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  type IUnitOfWork,
-  type Resource,
-  UnitOfWorkToken,
-} from "@upstand/domain";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
+import type { IUnitOfWork, Resource } from "@upstand/domain";
+import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
@@ -19,6 +15,7 @@ import {
   CaddyServiceToken,
   DockerServiceToken,
   PublishNotificationUseCaseToken,
+  UnitOfWorkToken,
 } from "../tokens";
 import { CaddyService } from "../web-server/caddy.service";
 import { getDeploymentQueueName } from "./deployment-queue-name";
@@ -364,8 +361,12 @@ export class DeploymentWorker {
 
             await tx.resourceRepository.updateById(resourceId, {
               deployments: JSON.stringify(depsList),
-              ...(!previewDeploymentId ? { status: status === "success" ? "running" : "stopped" } : {}),
-              ...(containers && !previewDeploymentId ? { containers: JSON.stringify(containers) } : {}),
+              ...(!previewDeploymentId
+                ? { status: status === "success" ? "running" : "stopped" }
+                : {}),
+              ...(containers && !previewDeploymentId
+                ? { containers: JSON.stringify(containers) }
+                : {}),
             });
           }
         }
@@ -417,12 +418,16 @@ export class DeploymentWorker {
 
       let previewDeploymentRecord: any = null;
       if (previewDeploymentId) {
-        previewDeploymentRecord = await uow.previewDeploymentRepository.findById(previewDeploymentId);
+        previewDeploymentRecord =
+          await uow.previewDeploymentRepository.findById(previewDeploymentId);
         if (previewDeploymentRecord) {
           await uow.transaction(async (tx) => {
-            await tx.previewDeploymentRepository.updateById(previewDeploymentId, {
-              status: "running",
-            });
+            await tx.previewDeploymentRepository.updateById(
+              previewDeploymentId,
+              {
+                status: "running",
+              },
+            );
           });
 
           // Override name, appName, and branch in credentials
@@ -437,8 +442,8 @@ export class DeploymentWorker {
 
       let buildDockerService = dockerService;
       buildCliCleanup = null;
-      let registryInfo: any = undefined;
-      let targetDestinationDocker: any = undefined;
+      let registryInfo: any;
+      let targetDestinationDocker: any;
 
       if (
         deployedResource.serverId &&
@@ -488,9 +493,10 @@ export class DeploymentWorker {
         if (!buildServer.sshKeyId) {
           throw new Error("Target build server has no SSH key configured");
         }
-        const sshKey = await uow.sshKeyRepository.findById(buildServer.sshKeyId);
-        if (!sshKey)
-          throw new Error("Target build server SSH key not found");
+        const sshKey = await uow.sshKeyRepository.findById(
+          buildServer.sshKeyId,
+        );
+        if (!sshKey) throw new Error("Target build server SSH key not found");
         const privateKey = decryptSecret({
           ciphertext: sshKey.privateKeyCiphertext,
           iv: sshKey.privateKeyIv,
@@ -506,18 +512,28 @@ export class DeploymentWorker {
         const remoteBuildDocker = createRemoteDocker(connection);
         const remoteBuildCli = createRemoteDockerCliEnvironment(connection);
         buildCliCleanup = remoteBuildCli.cleanup;
-        buildDockerService = new DockerService(remoteBuildDocker, remoteBuildCli.environment);
+        buildDockerService = new DockerService(
+          remoteBuildDocker,
+          remoteBuildCli.environment,
+        );
         appendLog(
           `Offloading build compilation tasks to separate build server '${buildServer.name}'.\n`,
         );
 
-        const envRecord = await uow.environmentRepository.findById(deployedResource.environmentId);
+        const envRecord = await uow.environmentRepository.findById(
+          deployedResource.environmentId,
+        );
         if (!envRecord) throw new Error("Environment not found");
-        const projectRecord = await uow.projectRepository.findById(envRecord.projectId);
+        const projectRecord = await uow.projectRepository.findById(
+          envRecord.projectId,
+        );
         if (!projectRecord) throw new Error("Project not found");
         const organizationId = projectRecord.organizationId;
 
-        const registries = await uow.dockerRegistryRepository.findByOrganizationId(organizationId);
+        const registries =
+          await uow.dockerRegistryRepository.findByOrganizationId(
+            organizationId,
+          );
         if (registries.length === 0) {
           throw new Error(
             "No Docker Registry configured. A shared Docker Registry must be configured under settings to support separate build servers.",
@@ -525,6 +541,9 @@ export class DeploymentWorker {
         }
 
         const registry = registries[0];
+        if (!registry) {
+          throw new Error("No Docker Registry configured.");
+        }
         let decryptedPassword = "";
         if (registry.password) {
           try {
@@ -535,9 +554,15 @@ export class DeploymentWorker {
           } catch {}
         }
 
-        const cleanUrl = (registry.registryUrl || "").replace(/https?:\/\//, "");
-        const serviceName = dockerService.sanitizeName(deployedResource.appName || deployedResource.name);
-        const imageTag = `${cleanUrl}/${registry.username}/${serviceName}:latest`.toLowerCase();
+        const cleanUrl = (registry.registryUrl || "").replace(
+          /https?:\/\//,
+          "",
+        );
+        const serviceName = dockerService.sanitizeName(
+          deployedResource.appName || deployedResource.name,
+        );
+        const imageTag =
+          `${cleanUrl}/${registry.username}/${serviceName}:latest`.toLowerCase();
 
         registryInfo = {
           url: cleanUrl,
@@ -778,11 +803,13 @@ export class DeploymentWorker {
       });
 
       if (updatedResource?.domains || previewDeploymentId) {
-        const [resources, settings, allPreviews] = await uow.transaction(async (tx) => [
-          await tx.resourceRepository.findMany(),
-          await tx.webServerSettingsRepository.findGlobal(),
-          await tx.previewDeploymentRepository.findMany(),
-        ]);
+        const [resources, settings, allPreviews] = await uow.transaction(
+          async (tx) => [
+            await tx.resourceRepository.findMany(),
+            await tx.webServerSettingsRepository.findGlobal(),
+            await tx.previewDeploymentRepository.findMany(),
+          ],
+        );
         const routingResources =
           deployedResource.serverId &&
           !["local", "manager"].includes(deployedResource.serverId)
@@ -797,10 +824,14 @@ export class DeploymentWorker {
               );
 
         // Fetch all active preview deployments
-        const activePreviews = allPreviews.filter((p) => p.status === "success" || p.id === previewDeploymentId);
+        const activePreviews = allPreviews.filter(
+          (p) => p.status === "success" || p.id === previewDeploymentId,
+        );
         const routingPreviews: any[] = [];
         for (const preview of activePreviews) {
-          const parentResource = resources.find((r) => r.id === preview.resourceId);
+          const parentResource = resources.find(
+            (r) => r.id === preview.resourceId,
+          );
           if (parentResource) {
             const matchesServer =
               deployedResource.serverId &&
@@ -825,7 +856,7 @@ export class DeploymentWorker {
                   https: parentHttps,
                   certificateType: parentCert,
                   middlewares: parentMiddlewares,
-                }
+                },
               ];
 
               routingPreviews.push({

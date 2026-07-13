@@ -4,10 +4,10 @@ import type { S3Destination } from "@upstand/domain";
 import {
   type BackupDatabaseEngine,
   type BackupSchedule,
-  decryptSecret,
   type Resource,
   ValidationError,
 } from "@upstand/domain";
+import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import {
   normalizeBackupPrefix,
   pipeProcesses,

@@ -1,6 +1,7 @@
-import { UnitOfWorkToken, ValidationError } from "@upstand/domain";
+import { ValidationError } from "@upstand/domain";
 import { redis } from "@upstand/redis";
 import { getDeploymentQueueName, getDockerInstance } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { Queue } from "bullmq";
 import { z } from "zod";
 import {

@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import {
   CreateNotificationChannelInputSchema,
-  UnitOfWorkToken,
   UpdateNotificationChannelInputSchema,
 } from "@upstand/domain";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { z } from "zod";
 import {
   CreateNotificationChannelUseCaseToken,

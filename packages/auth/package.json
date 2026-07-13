@@ -14,16 +14,14 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@better-auth/api-key": "catalog:",
     "@upstand/db": "workspace:*",
     "@upstand/domain": "workspace:*",
     "@upstand/env": "workspace:*",
     "@upstand/redis": "workspace:*",
     "@upstand/usecases": "workspace:*",
-    "@better-auth/api-key": "catalog:",
     "better-auth": "catalog:",
-    "drizzle-orm": "catalog:",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "@upstand/config": "workspace:*",

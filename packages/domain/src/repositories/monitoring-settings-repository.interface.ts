@@ -1,4 +1,7 @@
-import type { MonitoringSettings, UpsertMonitoringSettingsDTO } from "../entities/monitoring-settings";
+import type {
+  MonitoringSettings,
+  UpsertMonitoringSettingsDTO,
+} from "../entities/monitoring-settings";
 
 export interface IMonitoringSettingsRepository {
   findByServerId(serverId: string): Promise<MonitoringSettings | null>;

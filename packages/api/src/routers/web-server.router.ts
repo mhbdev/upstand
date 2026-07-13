@@ -1,11 +1,11 @@
 import type { IUnitOfWork } from "@upstand/domain";
-import { UnitOfWorkToken } from "@upstand/domain";
 import {
   getDockerInstance,
   PublishNotificationUseCaseToken,
   TriggerUpdateInputSchema,
   UpdateWebServerSettingsInputSchema,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 import { z } from "zod";
 import {

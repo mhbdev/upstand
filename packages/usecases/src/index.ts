@@ -95,6 +95,8 @@ export * from "./s3-destination/delete-s3-destination.usecase";
 export * from "./s3-destination/get-s3-destinations.usecase";
 export * from "./s3-destination/test-s3-destination-connection.usecase";
 export * from "./s3-destination/update-s3-destination.usecase";
+// Web Server
+export * from "./schedule/general-scheduler";
 export * from "./server/create-server.usecase";
 // Server
 export * from "./server/create-server.usecase";
@@ -103,11 +105,11 @@ export * from "./server/delete-server.usecase";
 // Servers
 export * from "./server/get-account-status.usecase";
 export * from "./server/get-docker-inventory.usecase";
+export * from "./server/get-server-historical-metrics.usecase";
 export * from "./server/get-server-runtime-stats.usecase";
 export * from "./server/get-servers.usecase";
 export * from "./server/get-servers.usecase";
 export * from "./server/setup-server.usecase";
-export * from "./server/get-server-historical-metrics.usecase";
 export * from "./ssh-key/create-ssh-key.usecase";
 export * from "./ssh-key/delete-ssh-key.usecase";
 export * from "./ssh-key/generate-ssh-key.usecase";
@@ -124,8 +126,6 @@ export * from "./swarm/rotate-swarm-join-token.usecase";
 export * from "./swarm/update-swarm-node.usecase";
 export * from "./tokens";
 export * from "./user/create-user.usecase";
-// Web Server
-export * from "./schedule/general-scheduler";
 export * from "./web-server/caddy.service";
 export * from "./web-server/get-update-status.usecase";
 export * from "./web-server/get-web-server-logs.usecase";

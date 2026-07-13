@@ -1,13 +1,14 @@
 import { relations } from "drizzle-orm";
-import { index, pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { resource } from "./resource";
 
 export const schedule = pgTable(
   "schedule",
   {
     id: text("id").primaryKey(),
-    resourceId: text("resource_id")
-      .references(() => resource.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id").references(() => resource.id, {
+      onDelete: "cascade",
+    }),
     name: text("name").notNull(),
     cronExpression: text("cron_expression").notNull(),
     command: text("command").notNull(),

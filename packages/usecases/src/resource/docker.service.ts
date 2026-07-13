@@ -331,13 +331,13 @@ function applyComposeIngressNetwork(
 
 export class DockerService {
   private readonly docker: Docker;
-  private readonly commandEnvironment: NodeJS.ProcessEnv;
+  private readonly commandEnvironment: Record<string, string | undefined>;
   private readonly networkName =
     process.env.DOCKER_NETWORK || "upstand-network";
 
   constructor(
     docker: Docker = getDockerInstance(),
-    commandEnvironment: NodeJS.ProcessEnv = {} as NodeJS.ProcessEnv,
+    commandEnvironment: Record<string, string | undefined> = {},
   ) {
     this.docker = docker;
     this.commandEnvironment = commandEnvironment;
@@ -558,10 +558,7 @@ export class DockerService {
       resource.advancedConfig,
     ).isolatedDeployment;
     if (isolated) {
-      const network = await ensureResourceOverlayNetwork(
-        docker,
-        resource.id,
-      );
+      const network = await ensureResourceOverlayNetwork(docker, resource.id);
       return { ...network, isolated: true };
     }
 
@@ -822,15 +819,24 @@ export class DockerService {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     const imageName = `upstand-app-${resource.id}:latest`;
     const buildImageName = registryInfo ? registryInfo.imageTag : imageName;
-    const networkId = (await this.ensureDeploymentNetwork(resource, destinationDocker)).id;
+    const networkId = (
+      await this.ensureDeploymentNetwork(resource, destinationDocker)
+    ).id;
 
     const buildDir = path.join(process.cwd(), ".builds");
     const clonePath = path.join(buildDir, resource.id);
 
     if (resource.provider === "drop") {
-      const dropsDir = path.join(process.cwd(), ".builds", "drops", resource.id);
+      const dropsDir = path.join(
+        process.cwd(),
+        ".builds",
+        "drops",
+        resource.id,
+      );
       if (!fs.existsSync(dropsDir)) {
-        throw new Error("ZIP drop folder not found. Please upload the ZIP file first.");
+        throw new Error(
+          "ZIP drop folder not found. Please upload the ZIP file first.",
+        );
       }
       if (fs.existsSync(clonePath)) {
         onLog("Cleaning up old workspace directory...\n");
@@ -970,16 +976,26 @@ export class DockerService {
         spec as Record<string, unknown>,
       );
 
-      const authConfig = registryInfo && registryInfo.username && registryInfo.password
-        ? {
-            username: registryInfo.username,
-            password: registryInfo.password,
-            serveraddress: registryInfo.url,
-          }
-        : undefined;
+      const authConfig =
+        registryInfo?.username && registryInfo.password
+          ? {
+              username: registryInfo.username,
+              password: registryInfo.password,
+              serveraddress: registryInfo.url,
+            }
+          : undefined;
 
-      await this.upsertService(serviceName, spec, authConfig, destinationDocker);
-      await this.ensureServiceNetwork(serviceName, networkId, destinationDocker);
+      await this.upsertService(
+        serviceName,
+        spec,
+        authConfig,
+        destinationDocker,
+      );
+      await this.ensureServiceNetwork(
+        serviceName,
+        networkId,
+        destinationDocker,
+      );
     } finally {
       onLog("Cleaning up build directory...\n");
       fs.rmSync(clonePath, { recursive: true, force: true });
@@ -2454,7 +2470,9 @@ export class DockerService {
     const docker = targetDocker || this.docker;
     const containers = await this.getContainers(resource);
     if (containers.length === 0) {
-      throw new Error(`No running containers found for resource '${resource.name}'`);
+      throw new Error(
+        `No running containers found for resource '${resource.name}'`,
+      );
     }
 
     const containerId = containers[0].id;

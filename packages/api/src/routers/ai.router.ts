@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AI_PROVIDERS } from "@upstand/domain";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { AIRepositoryToken } from "@upstand/repositories";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";

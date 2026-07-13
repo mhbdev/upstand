@@ -1,11 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { UnitOfWorkToken } from "@upstand/domain";
 import {
   CreateSshKeyInputSchema,
   DeleteSshKeyInputSchema,
   GenerateSshKeyInputSchema,
   GetSshKeysInputSchema,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateSshKeyUseCaseToken,
   DeleteSshKeyUseCaseToken,

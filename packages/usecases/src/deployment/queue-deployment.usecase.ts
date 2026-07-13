@@ -18,7 +18,11 @@ export interface QueueDeploymentInput {
 export interface DeploymentQueue {
   add(
     name: string,
-    data: { resourceId: string; deploymentId: string; previewDeploymentId?: string },
+    data: {
+      resourceId: string;
+      deploymentId: string;
+      previewDeploymentId?: string;
+    },
     options: {
       jobId: string;
       attempts: number;

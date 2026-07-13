@@ -154,7 +154,7 @@ export const resourceRouter = router({
           const payload = JSON.parse(resource.credentials);
           if (payload.ciphertext && payload.iv && payload.authTag) {
             const { decryptSecret } = await import(
-              "@upstand/domain/crypto/secret-box"
+              "@upstand/platform/crypto/secret-box"
             );
             const decrypted = decryptSecret(payload);
             return {

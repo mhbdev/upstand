@@ -11,11 +11,13 @@ import {
   serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
+import {
+  decryptSecret,
+  encryptSecret,
+} from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
 import { CaddyService } from "../web-server/caddy.service";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { createRemoteDocker } from "./docker-client";
 
 export const UpdateResourceInputSchema = z.object({
@@ -168,14 +170,13 @@ export class UpdateResourceUseCase {
       ? await this.uow.resourceRepository.findMany()
       : [];
     const serverId = resource.serverId;
-    const sameServerResources = serverId && !["local", "manager"].includes(serverId)
-      ? resources.filter((c) => c.serverId === serverId)
-      : resources.filter(
-          (c) =>
-            !c.serverId ||
-            c.serverId === "local" ||
-            c.serverId === "manager",
-        );
+    const sameServerResources =
+      serverId && !["local", "manager"].includes(serverId)
+        ? resources.filter((c) => c.serverId === serverId)
+        : resources.filter(
+            (c) =>
+              !c.serverId || c.serverId === "local" || c.serverId === "manager",
+          );
 
     const existingResources = routingChanged ? sameServerResources : [];
     const candidateResources = routingChanged
@@ -188,13 +189,19 @@ export class UpdateResourceUseCase {
       : null;
 
     let caddyService = this.caddyService;
-    if (routingChanged && serverId && !["local", "manager"].includes(serverId)) {
+    if (
+      routingChanged &&
+      serverId &&
+      !["local", "manager"].includes(serverId)
+    ) {
       const server = await this.uow.serverRepository.findById(serverId);
       if (server) {
         if (!server.sshKeyId) {
           throw new Error("Target deployment server has no SSH key configured");
         }
-        const sshKey = await this.uow.sshKeyRepository.findById(server.sshKeyId);
+        const sshKey = await this.uow.sshKeyRepository.findById(
+          server.sshKeyId,
+        );
         if (!sshKey) {
           throw new Error("Target deployment server SSH key not found");
         }

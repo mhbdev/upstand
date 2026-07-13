@@ -11,7 +11,7 @@ import {
   serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
 

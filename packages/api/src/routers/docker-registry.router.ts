@@ -1,11 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { UnitOfWorkToken } from "@upstand/domain";
 import {
   CreateDockerRegistryInputSchema,
   DeleteDockerRegistryInputSchema,
   GetDockerRegistriesInputSchema,
   TestDockerRegistryConnectionInputSchema,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateDockerRegistryUseCaseToken,
   DeleteDockerRegistryUseCaseToken,

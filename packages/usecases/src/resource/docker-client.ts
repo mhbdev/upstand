@@ -3,11 +3,11 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import Docker from "dockerode";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
-import { DockerService } from "./docker.service";
+import { decryptSecret } from "@upstand/platform/crypto/secret-box";
+import Docker from "dockerode";
 import { CaddyService } from "../web-server/caddy.service";
+import { DockerService } from "./docker.service";
 
 let proxyStarted = false;
 const PROXY_PORT = 23775;
@@ -52,7 +52,10 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
 
 export function createRemoteDockerCliEnvironment(
   connection: RemoteDockerConnection,
-): { environment: NodeJS.ProcessEnv; cleanup: () => void } {
+): {
+  environment: Record<string, string | undefined>;
+  cleanup: () => void;
+} {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "upstand-docker-"));
   const sshDirectory = path.join(home, ".ssh");
   const keyPath = path.join(sshDirectory, "id_deployment");
@@ -77,10 +80,9 @@ export function createRemoteDockerCliEnvironment(
 
   return {
     environment: {
-      ...process.env,
       DOCKER_HOST: "ssh://upstand-deployment",
       HOME: home,
-    } as NodeJS.ProcessEnv,
+    },
     cleanup: () => fs.rmSync(home, { recursive: true, force: true }),
   };
 }
@@ -100,12 +102,12 @@ export async function resolveDockerServiceForServer(
   }
 
   if (!server.sshKeyId) {
-    throw new Error(`Target deployment server has no SSH key configured`);
+    throw new Error("Target deployment server has no SSH key configured");
   }
 
   const sshKey = await uow.sshKeyRepository.findById(server.sshKeyId);
   if (!sshKey) {
-    throw new Error(`Target deployment server SSH key not found`);
+    throw new Error("Target deployment server SSH key not found");
   }
 
   const privateKey = decryptSecret({
@@ -157,12 +159,12 @@ export async function resolveServicesForResource(
   }
 
   if (!server.sshKeyId) {
-    throw new Error(`Target deployment server has no SSH key configured`);
+    throw new Error("Target deployment server has no SSH key configured");
   }
 
   const sshKey = await uow.sshKeyRepository.findById(server.sshKeyId);
   if (!sshKey) {
-    throw new Error(`Target deployment server SSH key not found`);
+    throw new Error("Target deployment server SSH key not found");
   }
 
   const privateKey = decryptSecret({

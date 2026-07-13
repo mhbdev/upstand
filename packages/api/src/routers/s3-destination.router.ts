@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { UnitOfWorkToken } from "@upstand/domain";
 import {
   CreateS3DestinationInputSchema,
   DeleteS3DestinationInputSchema,
@@ -7,6 +6,7 @@ import {
   TestS3DestinationConnectionInputSchema,
   UpdateS3DestinationInputSchema,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateS3DestinationUseCaseToken,
   DeleteS3DestinationUseCaseToken,

@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { UnitOfWorkToken } from "@upstand/domain";
 import {
   CreateGitProviderInputSchema,
   DeleteGitProviderInputSchema,
@@ -7,6 +6,7 @@ import {
   ListGitBranchesInputSchema,
   ListGitRepositoriesInputSchema,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateGitProviderUseCaseToken,
   DeleteGitProviderUseCaseToken,

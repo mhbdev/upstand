@@ -4,13 +4,13 @@ import {
   type SshKey,
   ValidationError,
 } from "@upstand/domain";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import {
   algorithmOf,
   assertKeyPairMatches,
   fingerprintOf,
   KeyPairMismatchError,
-} from "@upstand/domain/ssh/validate";
+} from "@upstand/platform/ssh/validate";
 import { z } from "zod";
 
 // Import path: user brings their own existing key pair.

@@ -46,7 +46,8 @@ export class ControlContainerUseCase {
         const updated = await tx.resourceRepository.updateById(resource.id, {
           containers: JSON.stringify(containers),
         });
-        if (!updated) throw new ValidationError("Resource could not be updated");
+        if (!updated)
+          throw new ValidationError("Resource could not be updated");
         return updated;
       } finally {
         cleanup();

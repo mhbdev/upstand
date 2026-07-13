@@ -43,7 +43,15 @@ import {
 } from "@upstand/ui/components/select";
 import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
-import { Code, Globe, Play, RefreshCw, Square, Trash2, Upload } from "lucide-react";
+import {
+  Code,
+  Globe,
+  Play,
+  RefreshCw,
+  Square,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -208,10 +216,13 @@ export function GeneralTab({
     useState<DatabaseCredentials>({});
   const [composeType, setComposeType] = useState<ResourceComposeType>("stack");
   const [isUploading, setIsUploading] = useState(false);
+  void isUploading;
 
   const handleUploadDropFile = async (file: File) => {
     setIsUploading(true);
-    const toastId = toast.loading("Uploading and extracting project archive...");
+    const toastId = toast.loading(
+      "Uploading and extracting project archive...",
+    );
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -223,10 +234,14 @@ export function GeneralTab({
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Upload failed with status ${response.status}`);
+        throw new Error(
+          errData.error || `Upload failed with status ${response.status}`,
+        );
       }
 
-      toast.success("Archive uploaded and deployment triggered!", { id: toastId });
+      toast.success("Archive uploaded and deployment triggered!", {
+        id: toastId,
+      });
       window.location.reload();
     } catch (err: any) {
       toast.error(`Upload failed: ${err.message}`, { id: toastId });
@@ -1216,7 +1231,7 @@ export function GeneralTab({
                         await handleUploadDropFile(file);
                       }
                     }}
-                    className="flex flex-col items-center justify-center border-2 border-dashed border-border/40 hover:border-primary/50 bg-muted/20 hover:bg-muted/30 cursor-pointer rounded-lg p-8 transition-colors text-center"
+                    className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-border/40 border-dashed bg-muted/20 p-8 text-center transition-colors hover:border-primary/50 hover:bg-muted/30"
                     onClick={() => {
                       const input = document.createElement("input");
                       input.type = "file";
@@ -1230,11 +1245,11 @@ export function GeneralTab({
                       input.click();
                     }}
                   >
-                    <Upload className="size-8 text-muted-foreground mb-2 animate-pulse" />
-                    <p className="font-medium text-sm text-foreground">
+                    <Upload className="mb-2 size-8 animate-pulse text-muted-foreground" />
+                    <p className="font-medium text-foreground text-sm">
                       Drag & drop your archive file here, or click to select
                     </p>
-                    <p className="text-muted-foreground text-xs mt-1">
+                    <p className="mt-1 text-muted-foreground text-xs">
                       Supports .zip, .tar.gz, .tgz (Max 50MB)
                     </p>
                   </div>

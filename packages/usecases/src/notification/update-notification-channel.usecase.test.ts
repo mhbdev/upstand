@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
-import {
-  encryptSecret,
-  type IUnitOfWork,
-  type NotificationChannel,
-  type NotificationConfiguration,
+import type {
+  IUnitOfWork,
+  NotificationChannel,
+  NotificationConfiguration,
 } from "@upstand/domain";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { UpdateNotificationChannelUseCase } from "./update-notification-channel.usecase";
 
 const TEST_KEY = Buffer.alloc(32, 7).toString("base64");

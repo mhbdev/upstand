@@ -1,8 +1,9 @@
-import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
+import type { IUnitOfWork } from "@upstand/domain";
 import { Cron } from "croner";
 import { log } from "evlog";
-import { DockerService } from "../resource/docker.service";
+import type { DockerService } from "../resource/docker.service";
 import { resolveDockerServiceForServer } from "../resource/docker-client";
+import { UnitOfWorkToken } from "../tokens";
 
 interface ScheduledJob {
   cron: Cron;
@@ -117,9 +118,11 @@ export class GeneralScheduler {
     try {
       const uow = scope.resolve<IUnitOfWork>(UnitOfWorkToken);
       const schedule = await uow.scheduleRepository.findById(scheduleId);
-      if (!schedule || !schedule.enabled || !schedule.resourceId) return;
+      if (!schedule?.enabled || !schedule.resourceId) return;
 
-      const resource = await uow.resourceRepository.findById(schedule.resourceId);
+      const resource = await uow.resourceRepository.findById(
+        schedule.resourceId,
+      );
       if (!resource) return;
 
       log.info({
@@ -134,7 +137,10 @@ export class GeneralScheduler {
       );
 
       try {
-        const output = await dockerService.runCommandInResourceContainer(resource, schedule.command);
+        const output = await dockerService.runCommandInResourceContainer(
+          resource,
+          schedule.command,
+        );
         log.info({
           message: `Custom scheduled command finished successfully inside resource ${resource.name}.`,
           output: output.slice(0, 1000),

@@ -1,10 +1,12 @@
 import {
-  decryptSecret,
-  encryptSecret,
   type NotificationChannel,
   type NotificationConfiguration,
   NotificationConfigurationSchema,
 } from "@upstand/domain";
+import {
+  decryptSecret,
+  encryptSecret,
+} from "@upstand/platform/crypto/secret-box";
 
 export function encryptNotificationConfiguration(
   configuration: NotificationConfiguration,

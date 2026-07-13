@@ -7,7 +7,7 @@ import {
   type Resource,
   ValidationError,
 } from "@upstand/domain";
-import { encryptSecret } from "@upstand/domain/crypto/secret-box";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { Cron } from "croner";
 
 const DATABASE_ENGINES: Record<string, BackupDatabaseEngine> = {

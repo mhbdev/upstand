@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import type { S3Destination } from "@upstand/domain";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
+import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 
 export interface BackupStorageDestination {
   bucket: string;

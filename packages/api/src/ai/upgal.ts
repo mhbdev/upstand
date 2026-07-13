@@ -11,9 +11,8 @@ import {
   type IUnitOfWork,
   type JsonValue,
   toJsonValue,
-  UnitOfWorkToken,
 } from "@upstand/domain";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
+import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { AIRepositoryToken } from "@upstand/repositories";
 import type {
   ControlResourceUseCase,
@@ -32,6 +31,7 @@ import type {
   GetResourcesUseCase,
   GetServersUseCase,
 } from "@upstand/usecases";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   createAgentUIStream,
   createUIMessageStream,

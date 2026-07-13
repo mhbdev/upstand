@@ -1,6 +1,7 @@
-import { type IUnitOfWork, UnitOfWorkToken } from "@upstand/domain";
+import type { IUnitOfWork } from "@upstand/domain";
 import { Cron } from "croner";
 import { log } from "evlog";
+import { UnitOfWorkToken } from "../tokens";
 import { TriggerBackupRunUseCase } from "./trigger-backup-run.usecase";
 
 interface ScheduledBackup {

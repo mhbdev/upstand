@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { index, pgTable, text, timestamp, integer } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { resource } from "./resource";
 
 export const previewDeployment = pgTable(
@@ -26,9 +26,12 @@ export const previewDeployment = pgTable(
   ],
 );
 
-export const previewDeploymentRelations = relations(previewDeployment, ({ one }) => ({
-  resource: one(resource, {
-    fields: [previewDeployment.resourceId],
-    references: [resource.id],
+export const previewDeploymentRelations = relations(
+  previewDeployment,
+  ({ one }) => ({
+    resource: one(resource, {
+      fields: [previewDeployment.resourceId],
+      references: [resource.id],
+    }),
   }),
-}));
+);

@@ -26,14 +26,17 @@ export class DeleteResourceUseCase {
     }
 
     const resources = await this.uow.resourceRepository.findMany();
-    const serverResources = resource.serverId && !["local", "manager"].includes(resource.serverId)
-      ? resources.filter((candidate) => candidate.serverId === resource.serverId)
-      : resources.filter(
-          (candidate) =>
-            !candidate.serverId ||
-            candidate.serverId === "local" ||
-            candidate.serverId === "manager",
-        );
+    const serverResources =
+      resource.serverId && !["local", "manager"].includes(resource.serverId)
+        ? resources.filter(
+            (candidate) => candidate.serverId === resource.serverId,
+          )
+        : resources.filter(
+            (candidate) =>
+              !candidate.serverId ||
+              candidate.serverId === "local" ||
+              candidate.serverId === "manager",
+          );
     const remainingResources = serverResources.filter(
       (item) => item.id !== resource.id,
     );
@@ -67,7 +70,10 @@ export class DeleteResourceUseCase {
         });
       } catch (error) {
         try {
-          await caddyService.syncResourceConfigs(serverResources, settings || {});
+          await caddyService.syncResourceConfigs(
+            serverResources,
+            settings || {},
+          );
         } catch (rollbackError) {
           log.error({
             message: "Failed to restore Caddy after resource deletion rollback",

@@ -1,5 +1,11 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { environment } from "./environment";
 import { server } from "./server";
 
@@ -29,8 +35,12 @@ export const resource = pgTable("resource", {
   deployments: text("deployments").default("[]").notNull(),
   containers: text("containers").default("[]").notNull(),
   serverId: text("server_id"),
-  buildServerId: text("build_server_id").references(() => server.id, { onDelete: "set null" }),
-  isPreviewDeploymentsActive: boolean("is_preview_deployments_active").default(false).notNull(),
+  buildServerId: text("build_server_id").references(() => server.id, {
+    onDelete: "set null",
+  }),
+  isPreviewDeploymentsActive: boolean("is_preview_deployments_active")
+    .default(false)
+    .notNull(),
   previewLimit: integer("preview_limit").default(3).notNull(),
   previewWildcard: text("preview_wildcard"),
   previewHttps: boolean("preview_https").default(false).notNull(),

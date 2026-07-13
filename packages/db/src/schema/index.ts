@@ -6,15 +6,14 @@ export * from "./deployment";
 export * from "./docker-registry";
 export * from "./environment";
 export * from "./git-provider";
+export * from "./monitoring-settings";
 export * from "./notification";
+export * from "./preview-deployment";
 export * from "./project";
 export * from "./resource";
 export * from "./s3-destination";
+export * from "./schedule";
 export * from "./server";
 export * from "./server-build-settings";
 export * from "./ssh-key";
 export * from "./web-server-settings";
-export * from "./preview-deployment";
-export * from "./schedule";
-export * from "./monitoring-settings";
-

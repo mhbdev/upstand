@@ -6,6 +6,25 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.30 - 2026-07-13
+
+### Added
+
+- Add an explicit architecture boundary check and document the dependency direction between domain, application, adapters, and composition roots.
+- Add Knip dead-code and dependency analysis to the root quality checks.
+- Add the `@upstand/platform` adapter package for encryption and SSH platform concerns.
+
+### Changed
+
+- Remove framework, DI, Node platform, encryption, and SSH implementation dependencies from the domain package.
+- Move composition tokens out of the domain and into the application/composition layer.
+- Remove unused source files and dependencies across the workspace.
+- Replace the unavailable package-manager scanner command with Bun audit and pin vulnerable transitive packages through workspace overrides.
+
+### Security
+
+- `bun audit` reports no known vulnerabilities.
+
 ## 0.1.29 - 2026-07-13
 
 ### Added

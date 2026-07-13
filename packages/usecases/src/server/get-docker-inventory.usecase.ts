@@ -1,5 +1,5 @@
 import type { IUnitOfWork } from "@upstand/domain";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
+import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 import type {
   DockerInspectionTarget,

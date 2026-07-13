@@ -1,4 +1,4 @@
-import { type IUnitOfWork } from "@upstand/domain";
+import type { IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
 import type {
   DockerService,
