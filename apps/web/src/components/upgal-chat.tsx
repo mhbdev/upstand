@@ -482,9 +482,6 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
                 onStop={() => chat.stop()}
               />
             </PromptInputFooter>
-            <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              UpGal will ask before making any changes.
-            </p>
           </PromptInput>
         </section>
       )}
