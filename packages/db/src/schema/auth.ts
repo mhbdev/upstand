@@ -20,6 +20,10 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
 });
 
@@ -38,6 +42,7 @@ export const session = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    impersonatedBy: text("impersonated_by"),
     activeOrganizationId: text("active_organization_id"),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
@@ -108,6 +113,7 @@ export const member = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     role: text("role").default("member").notNull(),
     createdAt: timestamp("created_at").notNull(),
+    permissions: text("permissions"),
   },
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
@@ -130,6 +136,8 @@ export const invitation = pgTable(
     inviterId: text("inviter_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    permissions: text("permissions"),
+    emailChannelId: text("email_channel_id"),
   },
   (table) => [
     index("invitation_organizationId_idx").on(table.organizationId),

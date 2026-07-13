@@ -60,6 +60,7 @@ export * from "./notification/create-notification-channel.usecase";
 export * from "./notification/delete-notification-channel.usecase";
 export * from "./notification/deliver-notification.usecase";
 export * from "./notification/get-notification-channels.usecase";
+export * from "./notification/notification-configuration";
 export * from "./notification/notification-delivery-worker";
 export * from "./notification/notification-transport";
 export * from "./notification/publish-notification.usecase";

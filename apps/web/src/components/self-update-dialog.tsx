@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  CheckmarkCircle02Icon,
+  CloudUploadIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Dialog,
@@ -9,11 +14,6 @@ import {
   DialogTitle,
 } from "@upstand/ui/components/dialog";
 import { Progress } from "@upstand/ui/components/progress";
-import {
-  CheckmarkCircle02Icon,
-  CloudUploadIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/utils/trpc";
 
@@ -26,12 +26,28 @@ function sameVersion(current: string, target: string) {
   return current.trim().replace(/^v/i, "") === target.trim().replace(/^v/i, "");
 }
 
+const POLL_TIMEOUT_MS = 8_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error("Update status request timed out")),
+        timeoutMs,
+      );
+    }),
+  ]);
+}
+
 export function SelfUpdateDialog({ open, version }: SelfUpdateDialogProps) {
   const [progress, setProgress] = useState(12);
   const [message, setMessage] = useState("Preparing a rolling update…");
   const [complete, setComplete] = useState(false);
   const checking = useRef(false);
   const completed = useRef(false);
+  const mounted = useRef(false);
+  const reloadStarted = useRef(false);
   const reloadTimer = useRef<{ timer?: ReturnType<typeof setTimeout> }>({});
   const check = useMutation(trpc.webServer.checkForUpdates.mutationOptions());
 
@@ -42,21 +58,36 @@ export function SelfUpdateDialog({ open, version }: SelfUpdateDialogProps) {
     setComplete(false);
     checking.current = false;
     completed.current = false;
+    mounted.current = true;
+    reloadStarted.current = false;
 
     const poll = async () => {
       if (checking.current || completed.current) return;
       checking.current = true;
       try {
-        const status = await check.mutateAsync();
+        // The API briefly disappears while Swarm replaces the web service. A
+        // request made just before that happens can otherwise stay pending
+        // forever and permanently lock the polling loop.
+        const status = await withTimeout(check.mutateAsync(), POLL_TIMEOUT_MS);
+        if (!mounted.current) return;
         if (sameVersion(status.currentVersion, version)) {
           setProgress(100);
           setMessage("Update complete. Reloading this page…");
           setComplete(true);
           completed.current = true;
-          reloadTimer.current.timer = setTimeout(
-            () => window.location.reload(),
-            1500,
-          );
+          if (!reloadStarted.current) {
+            reloadStarted.current = true;
+            reloadTimer.current.timer = setTimeout(() => {
+              window.location.reload();
+              // Some browsers keep the old document alive when a reload is
+              // requested during a failed connection recovery. Ensure the
+              // healthy page is loaded even in that case.
+              window.setTimeout(
+                () => window.location.assign(window.location.href),
+                2000,
+              );
+            }, 700);
+          }
         } else {
           setProgress((value) => Math.min(90, value + 12));
           setMessage(
@@ -76,6 +107,7 @@ export function SelfUpdateDialog({ open, version }: SelfUpdateDialogProps) {
     void poll();
     const interval = setInterval(() => void poll(), 4000);
     return () => {
+      mounted.current = false;
       clearInterval(interval);
       if (reloadTimer.current.timer) clearTimeout(reloadTimer.current.timer);
     };

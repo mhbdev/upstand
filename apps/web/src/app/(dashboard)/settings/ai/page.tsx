@@ -10,8 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Field, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -22,11 +22,20 @@ import {
 import { Bot, Loader2, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
-export function UpGalSettingsPanel() {
+type UpGalSettingsPanelProps = {
+  embedded?: boolean;
+};
+
+export function UpGalSettingsPanel({
+  embedded = false,
+}: UpGalSettingsPanelProps) {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const organizationId = activeOrg?.id || "";
   const settings = useQuery({
@@ -105,24 +114,23 @@ export function UpGalSettingsPanel() {
     setApiKey("");
   }
 
-  return (
-    <DashboardPage className="max-w-4xl gap-6">
-      <DashboardPageHeader
-        title="UpGal AI"
-        icon={<Bot className="size-6 text-primary" />}
-        description="Configure the model that powers your organization’s operations assistant."
-      />
+  const content = (
+    <>
       <Card>
         <CardHeader>
-          <CardTitle>Provider</CardTitle>
+          <CardTitle className="text-sm">AI provider</CardTitle>
           <CardDescription>
-            API keys are encrypted server-side and never sent back to the
-            browser.
+            Configure the model that powers UpGal. API keys are encrypted
+            server-side and never sent back to the browser.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-5 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="provider">Provider</Label>
+        <CardContent
+          className={
+            embedded ? "flex flex-col gap-4" : "grid gap-5 md:grid-cols-2"
+          }
+        >
+          <Field>
+            <FieldLabel htmlFor="provider">Provider</FieldLabel>
             <Select
               value={provider}
               onValueChange={(value) => {
@@ -148,9 +156,9 @@ export function UpGalSettingsPanel() {
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="model">Model</Label>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="model">Model</FieldLabel>
             <Input
               id="model"
               value={model}
@@ -178,12 +186,12 @@ export function UpGalSettingsPanel() {
                 providers. You can also enter any custom model ID.
               </p>
             </div>
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="api-key">
+          </Field>
+          <Field className={embedded ? undefined : "md:col-span-2"}>
+            <FieldLabel htmlFor="api-key">
               API key{" "}
               {settings.data?.configured ? "(leave blank to keep current)" : ""}
-            </Label>
+            </FieldLabel>
             <Input
               id="api-key"
               type="password"
@@ -195,9 +203,11 @@ export function UpGalSettingsPanel() {
               placeholder="sk-…"
               autoComplete="new-password"
             />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="base-url">Custom base URL (optional)</Label>
+          </Field>
+          <Field className={embedded ? undefined : "md:col-span-2"}>
+            <FieldLabel htmlFor="base-url">
+              Custom base URL (optional)
+            </FieldLabel>
             <Input
               id="base-url"
               value={baseUrl}
@@ -207,8 +217,14 @@ export function UpGalSettingsPanel() {
               }}
               placeholder="https://api.example.com/v1"
             />
-          </div>
-          <div className="flex flex-wrap gap-2 md:col-span-2">
+          </Field>
+          <div
+            className={
+              embedded
+                ? "flex flex-wrap justify-end gap-2"
+                : "flex flex-wrap gap-2 md:col-span-2"
+            }
+          >
             <Button
               onClick={saveSettings}
               disabled={!organizationId || save.isPending}
@@ -232,25 +248,36 @@ export function UpGalSettingsPanel() {
               {testProvider.isPending ? "Testing…" : "Test connection"}
             </Button>
             {settings.data ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => remove.mutate({ organizationId })}
-                  disabled={remove.isPending}
-                >
-                  <Trash2 className="mr-2 size-4" />
-                  Remove provider
-                </Button>
-              </>
+              <Button
+                variant="outline"
+                onClick={() => remove.mutate({ organizationId })}
+                disabled={remove.isPending}
+              >
+                <Trash2 className="mr-2 size-4" />
+                Remove provider
+              </Button>
             ) : null}
           </div>
         </CardContent>
       </Card>
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+      <div className="flex items-start gap-2 px-1 text-muted-foreground text-xs">
         <ShieldCheck className="size-4" />
         All UpGal mutations require an explicit approval in chat.
       </div>
       {settings.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+    </>
+  );
+
+  return embedded ? (
+    <div className="flex flex-col gap-4">{content}</div>
+  ) : (
+    <DashboardPage className="max-w-4xl gap-6">
+      <DashboardPageHeader
+        title="UpGal AI"
+        icon={<Bot className="size-6 text-primary" />}
+        description="Configure the model that powers your organization’s operations assistant."
+      />
+      {content}
     </DashboardPage>
   );
 }

@@ -2,14 +2,15 @@ import { CreateUserInputSchema } from "@upstand/usecases";
 import { CreateUserUseCaseToken } from "../di";
 import { handleUseCaseError } from "../errors";
 import { protectedProcedure, publicProcedure, router } from "../index";
-import { authRouter } from "./auth.router";
 import { aiRouter } from "./ai.router";
 import { apiKeyRouter } from "./api-key.router";
+import { authRouter } from "./auth.router";
 import { backupRouter } from "./backup.router";
 import { deploymentRouter } from "./deployment.router";
 import { dockerRegistryRouter } from "./docker-registry.router";
 import { environmentRouter } from "./environment.router";
 import { gitProviderRouter } from "./git-provider.router";
+import { memberRouter } from "./member.router";
 import { notificationRouter } from "./notification.router";
 import { projectRouter } from "./project.router";
 import { resourceRouter } from "./resource.router";
@@ -54,6 +55,7 @@ export const appRouter = router({
   dockerRegistry: dockerRegistryRouter,
   server: serverRouter,
   notification: notificationRouter,
+  member: memberRouter,
   backup: backupRouter,
   ai: aiRouter,
   apiKey: apiKeyRouter,

@@ -6,6 +6,21 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.23 - 2026-07-13
+
+### Added
+
+- Added descriptive property-level guidance to UpGal tool inputs so models can select the correct project, environment, resource, server, and Docker identifiers.
+
+### Changed
+
+- Improved UpGal tool descriptions and assistant instructions so tool results are followed by concise natural-language summaries, including explicit empty-result responses.
+- Improved UpGal interruption messages with actionable provider, authentication, rate-limit, and retry guidance.
+
+### Fixed
+
+- Persisted failed UpGal runs as failed instead of leaving them in a running state after a response stream error.
+
 ## 0.1.22 - 2026-07-13
 
 ### Added

@@ -11,8 +11,8 @@ import {
   useUpdateUser,
 } from "@better-auth-ui/react";
 import {
-  InformationCircleIcon,
   AiBrain01Icon,
+  InformationCircleIcon,
   Menu01Icon,
   MoreHorizontalCircle01Icon,
   Settings01Icon,
@@ -20,6 +20,8 @@ import {
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { PermissionAction } from "@upstand/api/permissions";
 import {
   Avatar,
   AvatarFallback,
@@ -42,6 +44,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Checkbox } from "@upstand/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -76,14 +79,13 @@ import {
   SidebarProvider,
 } from "@upstand/ui/components/sidebar";
 import { Spinner } from "@upstand/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@upstand/ui/lib/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { trpc } from "@/utils/trpc";
-import { authClient } from "@/lib/auth-client";
 import { UpGalSettingsPanel } from "@/app/(dashboard)/settings/ai/page";
 import { SelfUpdateDialog } from "@/components/self-update-dialog";
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/utils/trpc";
 
 /* ─────────────────────────────────────────────────────────────
    Root Dialog
@@ -208,10 +210,10 @@ export function SettingsDialog() {
               <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
                 {activeTab === "profile" && <ProfilePanel />}
                 {activeTab === "sessions" && <SessionsPanel />}
-                {activeTab === "members" && <MembersPanel />}
+                {activeTab === "members" && <RichMembersPanel />}
                 {activeTab === "organization" && <OrganizationPanel />}
                 {activeTab === "security" && <SecurityPanel />}
-                {activeTab === "upgal" && <UpGalSettingsPanel />}
+                {activeTab === "upgal" && <UpGalSettingsPanel embedded />}
                 {activeTab === "app" && <AppInfoPanel />}
               </div>
             </main>
@@ -519,7 +521,7 @@ function SessionsPanel() {
    3. Members Panel
    ───────────────────────────────────────────────────────────── */
 
-function MembersPanel() {
+export function LegacyMembersPanel() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const { data: members } = useListOrganizationMembers(authClient, {
     query: { organizationId: activeOrg?.id ?? "" },
@@ -564,10 +566,9 @@ function MembersPanel() {
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
-    // biome-ignore lint/suspicious/noExplicitAny: role typed strictly by better-auth-ui
     inviteMember({
       email: inviteEmail.trim(),
-      role: inviteRole as any,
+      role: inviteRole as "member" | "admin",
       organizationId: activeOrg.id,
     });
   };
@@ -692,6 +693,454 @@ function MembersPanel() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+const MEMBER_CAPABILITIES: Array<[PermissionAction, string]> = [
+  ["project:view", "View projects"],
+  ["project:create", "Create projects"],
+  ["project:delete", "Delete projects"],
+  ["environment:view", "View environments"],
+  ["environment:create", "Create environments"],
+  ["environment:delete", "Delete environments"],
+  ["resource:view", "View resources"],
+  ["resource:create", "Create resources"],
+  ["resource:update", "Update resources"],
+  ["resource:delete", "Delete resources"],
+  ["ssh_key:view", "View SSH keys"],
+  ["ssh_key:create", "Create SSH keys"],
+  ["ssh_key:delete", "Delete SSH keys"],
+  ["git_provider:view", "View Git providers"],
+  ["git_provider:create", "Create Git providers"],
+  ["git_provider:delete", "Delete Git providers"],
+  ["s3_destination:view", "View backup destinations"],
+  ["s3_destination:create", "Create backup destinations"],
+  ["s3_destination:delete", "Delete backup destinations"],
+  ["docker_registry:view", "View registries"],
+  ["docker_registry:create", "Create registries"],
+  ["docker_registry:delete", "Delete registries"],
+  ["server:view", "View servers"],
+  ["server:create", "Create servers"],
+  ["server:delete", "Delete servers"],
+  ["notification:view", "View notifications"],
+  ["notification:create", "Create notifications"],
+  ["notification:update", "Update notifications"],
+  ["notification:delete", "Delete notifications"],
+];
+
+const DEFAULT_MEMBER_CAPABILITIES: PermissionAction[] = [
+  "project:view",
+  "environment:view",
+  "resource:view",
+  "resource:update",
+  "ssh_key:view",
+  "git_provider:view",
+  "s3_destination:view",
+  "docker_registry:view",
+  "server:view",
+  "notification:view",
+];
+
+function RichMembersPanel() {
+  const { data: activeOrg } = authClient.useActiveOrganization();
+  const organizationId = activeOrg?.id ?? "";
+  const queryClient = useQueryClient();
+  const membersQuery = useQuery({
+    ...trpc.member.list.queryOptions({ organizationId }),
+    enabled: Boolean(organizationId),
+  });
+  const channelsQuery = useQuery({
+    ...trpc.notification.list.queryOptions({ organizationId }),
+    enabled: Boolean(organizationId),
+  });
+  const { data: invites, refetch: refetchInvites } =
+    useListOrganizationInvitations(authClient, { query: { organizationId } });
+  const [mode, setMode] = useState<"invite" | "create">("invite");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"member" | "admin">("member");
+  const [emailChannelId, setEmailChannelId] = useState("");
+  const [permissions, setPermissions] = useState<PermissionAction[]>(
+    DEFAULT_MEMBER_CAPABILITIES,
+  );
+  const [drafts, setDrafts] = useState<
+    Record<
+      string,
+      { role: "member" | "admin"; permissions: PermissionAction[] }
+    >
+  >({});
+
+  const refresh = () =>
+    void queryClient.invalidateQueries({
+      queryKey: trpc.member.list.queryKey({ organizationId }),
+    });
+  const create = useMutation({
+    ...trpc.member.create.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Member created");
+      setEmail("");
+      setName("");
+      setPassword("");
+      refresh();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const invite = useMutation({
+    ...trpc.member.invite.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Invitation sent");
+      setEmail("");
+      void refetchInvites();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const update = useMutation({
+    ...trpc.member.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Member permissions saved");
+      refresh();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const remove = useMutation({
+    ...trpc.member.remove.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Member removed");
+      refresh();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const { mutate: cancelInvitation } = useCancelInvitation(authClient, {
+    onSuccess: () => {
+      toast.success("Invitation cancelled");
+      void refetchInvites();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  if (!activeOrg)
+    return (
+      <p className="text-muted-foreground text-sm">
+        Select a workspace to manage members.
+      </p>
+    );
+  const emailChannels = (channelsQuery.data ?? []).filter(
+    (channel) => channel.provider === "email" || channel.provider === "resend",
+  );
+  const setRoleAndDefaults = (
+    value: string,
+    setter: (role: "member" | "admin") => void,
+  ) => {
+    const nextRole = value as "member" | "admin";
+    setter(nextRole);
+    if (setter === setRole)
+      setPermissions(
+        nextRole === "admin"
+          ? MEMBER_CAPABILITIES.map(([key]) => key)
+          : DEFAULT_MEMBER_CAPABILITIES,
+      );
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Add workspace member</CardTitle>
+          <CardDescription>
+            Grant precise capabilities, create credentials immediately, or send
+            an invitation through a configured Email/Resend channel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2 pb-4">
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === "invite" ? "default" : "outline"}
+              onClick={() => setMode("invite")}
+            >
+              Invitation
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === "create" ? "default" : "outline"}
+              onClick={() => setMode("create")}
+            >
+              Create credentials
+            </Button>
+          </div>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (mode === "create")
+                create.mutate({
+                  organizationId,
+                  email,
+                  name,
+                  password,
+                  role,
+                  permissions,
+                });
+              else
+                invite.mutate({
+                  organizationId,
+                  email,
+                  role,
+                  permissions,
+                  emailChannelId,
+                });
+            }}
+          >
+            {mode === "create" && (
+              <Field>
+                <FieldLabel htmlFor="member-name">Full name</FieldLabel>
+                <Input
+                  id="member-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Alex Johnson"
+                />
+              </Field>
+            )}
+            <Field>
+              <FieldLabel htmlFor="member-email">Email address</FieldLabel>
+              <Input
+                id="member-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="colleague@company.com"
+              />
+            </Field>
+            {mode === "create" && (
+              <Field>
+                <FieldLabel htmlFor="member-password">
+                  Initial password
+                </FieldLabel>
+                <Input
+                  id="member-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="At least 8 characters"
+                />
+              </Field>
+            )}
+            <Field>
+              <FieldLabel>Role</FieldLabel>
+              <Select
+                value={role}
+                onValueChange={(value) =>
+                  setRoleAndDefaults(String(value), setRole)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {mode === "invite" && (
+              <Field>
+                <FieldLabel>Email provider</FieldLabel>
+                <Select
+                  value={emailChannelId}
+                  onValueChange={(value) => setEmailChannelId(String(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Email or Resend" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {emailChannels.map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.name} (
+                        {channel.provider === "resend"
+                          ? "Resend"
+                          : "SMTP Email"}
+                        )
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            <Field>
+              <FieldLabel>Capabilities</FieldLabel>
+              <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
+                {MEMBER_CAPABILITIES.map(([key, label]) => (
+                  <label className="flex items-center gap-2 text-xs" key={key}>
+                    <Checkbox
+                      checked={permissions.includes(key)}
+                      onCheckedChange={(checked) =>
+                        setPermissions((current) =>
+                          checked
+                            ? [...current, key]
+                            : current.filter((item) => item !== key),
+                        )
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <Button
+              type="submit"
+              disabled={create.isPending || invite.isPending}
+            >
+              {(create.isPending || invite.isPending) && (
+                <Spinner data-icon="inline-start" />
+              )}
+              {mode === "invite" ? "Send invitation" : "Create member"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Members and permissions</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {(membersQuery.data?.members ?? []).map((member) => {
+            const draft = drafts[member.id] ?? {
+              role: member.role === "admin" ? "admin" : "member",
+              permissions: member.permissions ?? DEFAULT_MEMBER_CAPABILITIES,
+            };
+            return (
+              <div
+                className="flex flex-col gap-3 border-b pb-4 last:border-0 last:pb-0"
+                key={member.id}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="grid text-sm">
+                    <span className="font-medium">
+                      {member.user.name || member.user.email}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      {member.user.email}
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="capitalize">
+                    {member.role}
+                  </Badge>
+                </div>
+                {member.role !== "owner" && (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <Select
+                        value={draft.role}
+                        onValueChange={(value) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [member.id]: {
+                              ...draft,
+                              role: String(value) as "member" | "admin",
+                            },
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          update.mutate({
+                            organizationId,
+                            memberId: member.id,
+                            role: draft.role,
+                            permissions: draft.permissions,
+                          })
+                        }
+                      >
+                        Save capabilities
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          remove.mutate({ organizationId, memberId: member.id })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {MEMBER_CAPABILITIES.map(([key, label]) => (
+                        <label
+                          className="flex items-center gap-2 text-xs"
+                          key={key}
+                        >
+                          <Checkbox
+                            checked={draft.permissions.includes(key)}
+                            onCheckedChange={(checked) =>
+                              setDrafts((current) => ({
+                                ...current,
+                                [member.id]: {
+                                  ...draft,
+                                  permissions: checked
+                                    ? [...draft.permissions, key]
+                                    : draft.permissions.filter(
+                                        (item) => item !== key,
+                                      ),
+                                },
+                              }))
+                            }
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+      {!!invites?.length && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Pending invitations</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {invites.map((invitation) => (
+              <div
+                className="flex items-center justify-between gap-3 border-b py-2 last:border-0"
+                key={invitation.id}
+              >
+                <div className="grid text-sm">
+                  <span>{invitation.email}</span>
+                  <span className="text-muted-foreground text-xs">
+                    Role: {invitation.role}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    cancelInvitation({ invitationId: invitation.id })
+                  }
+                >
+                  Cancel
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -1048,51 +1497,51 @@ function AppInfoPanel() {
   return (
     <>
       <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Upstand Platform</CardTitle>
-        <CardDescription>System and version information.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-col divide-y text-sm">
-          {[
-            { label: "Version", value: data?.currentVersion ?? "Loading…" },
-            { label: "Channel", value: data?.channel ?? "unknown" },
-            { label: "Database", value: "Connected" },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              className="flex items-center justify-between py-2 first:pt-0 last:pb-0"
-            >
-              <span className="text-muted-foreground">{label}</span>
-              <span className="font-medium font-mono text-xs">{value}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isFetching || checkUpdates.isPending}
-            onClick={handleCheck}
-          >
-            {(isFetching || checkUpdates.isPending) && (
-              <Spinner data-icon="inline-start" />
-            )}
-            {checkUpdates.isPending ? "Checking…" : "Check for Updates"}
-          </Button>
-          {data?.updateAvailable && data.canUpdate ? (
+        <CardHeader>
+          <CardTitle className="text-sm">Upstand Platform</CardTitle>
+          <CardDescription>System and version information.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col divide-y text-sm">
+            {[
+              { label: "Version", value: data?.currentVersion ?? "Loading…" },
+              { label: "Channel", value: data?.channel ?? "unknown" },
+              { label: "Database", value: "Connected" },
+            ].map(({ label, value }) => (
+              <div
+                key={label}
+                className="flex items-center justify-between py-2 first:pt-0 last:pb-0"
+              >
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-medium font-mono text-xs">{value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end">
             <Button
               size="sm"
-              disabled={update.isPending}
-              onClick={() => update.mutate({ version: data.latestVersion })}
+              variant="outline"
+              disabled={isFetching || checkUpdates.isPending}
+              onClick={handleCheck}
             >
-              {update.isPending
-                ? "Updating…"
-                : `Update to ${data.latestVersion}`}
+              {(isFetching || checkUpdates.isPending) && (
+                <Spinner data-icon="inline-start" />
+              )}
+              {checkUpdates.isPending ? "Checking…" : "Check for Updates"}
             </Button>
-          ) : null}
-        </div>
-      </CardContent>
+            {data?.updateAvailable && data.canUpdate ? (
+              <Button
+                size="sm"
+                disabled={update.isPending}
+                onClick={() => update.mutate({ version: data.latestVersion })}
+              >
+                {update.isPending
+                  ? "Updating…"
+                  : `Update to ${data.latestVersion}`}
+              </Button>
+            ) : null}
+          </div>
+        </CardContent>
       </Card>
       {updateDialogVersion ? (
         <SelfUpdateDialog open version={updateDialogVersion} />

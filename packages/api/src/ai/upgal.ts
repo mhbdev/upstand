@@ -4,6 +4,7 @@ import { createGateway } from "@ai-sdk/gateway";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { ServiceScope, TokenLike } from "@circulo-ai/di";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import {
   type AIProvider,
   type IAIRepository,
@@ -71,38 +72,106 @@ export type UpGalContext = {
 };
 
 export const UPGAL_TOOL_METADATA = [
-  ["get_account_status", "Get a summary of the active organization.", false],
-  ["list_projects", "List all projects in the active organization.", false],
-  ["list_environments", "List environments for a project.", false],
-  ["list_resources", "List resources in an environment.", false],
-  ["get_resource_logs", "Read recent resource logs.", false],
-  ["get_resource_stats", "Get live resource statistics.", false],
-  ["list_servers", "List organization servers.", false],
-  ["list_deployments", "List deployment history.", false],
+  [
+    "get_account_status",
+    "Read counts of projects, environments, resources, servers, and recent deployments in the active organization.",
+    false,
+  ],
+  [
+    "list_projects",
+    "Read every project in the active organization, including its stable ID and name.",
+    false,
+  ],
+  [
+    "list_environments",
+    "Read all environments belonging to a project. Use the project ID, not the project name.",
+    false,
+  ],
+  [
+    "list_resources",
+    "Read all deployable resources belonging to an environment. Use the environment ID.",
+    false,
+  ],
+  [
+    "get_resource_logs",
+    "Read recent logs for a resource. Use the resource ID and optionally limit the number of lines returned.",
+    false,
+  ],
+  [
+    "get_resource_stats",
+    "Read live CPU, memory, network, and container statistics for a resource.",
+    false,
+  ],
+  [
+    "list_servers",
+    "Read all servers configured for the active organization.",
+    false,
+  ],
+  [
+    "list_deployments",
+    "Read the recent deployment history with project, environment, resource, status, and logs.",
+    false,
+  ],
   [
     "get_docker_info",
-    "Read Docker engine status for a local or configured server.",
+    "Read Docker engine status for the local engine or a configured remote server.",
     false,
   ],
   [
     "list_docker_containers",
-    "List Docker containers without changing them.",
+    "Read all Docker containers, including stopped containers, without changing them.",
     false,
   ],
-  ["list_docker_images", "List Docker images without changing them.", false],
-  ["list_docker_volumes", "List Docker volumes without changing them.", false],
+  [
+    "list_docker_images",
+    "Read all Docker images on the local engine or selected remote server.",
+    false,
+  ],
+  [
+    "list_docker_volumes",
+    "Read all Docker volumes on the local engine or selected remote server.",
+    false,
+  ],
   [
     "list_docker_services",
-    "List Docker Swarm services without changing them.",
+    "Read Docker Swarm services without changing them.",
     false,
   ],
-  ["get_docker_logs", "Read Docker container or service logs.", false],
-  ["create_project", "Create a project.", true],
-  ["create_environment", "Create an environment.", true],
-  ["deploy_resource", "Queue a resource deployment.", true],
-  ["control_resource", "Start, stop, or restart a resource.", true],
-  ["delete_resource", "Permanently delete a resource.", true],
-  ["delete_project", "Permanently delete a project.", true],
+  [
+    "get_docker_logs",
+    "Read recent Docker container or Swarm service logs from the selected target.",
+    false,
+  ],
+  [
+    "create_project",
+    "Create a project and its default production environment after approval.",
+    true,
+  ],
+  [
+    "create_environment",
+    "Create an environment inside a project after approval.",
+    true,
+  ],
+  [
+    "deploy_resource",
+    "Queue a deployment for a resource after approval; this changes infrastructure state.",
+    true,
+  ],
+  [
+    "control_resource",
+    "Start, stop, or restart a resource after approval.",
+    true,
+  ],
+  [
+    "delete_resource",
+    "Permanently delete a resource after approval. This cannot be undone.",
+    true,
+  ],
+  [
+    "delete_project",
+    "Permanently delete a project and its environments after approval. This cannot be undone.",
+    true,
+  ],
 ] as const;
 
 export type UpGalTools = {
@@ -206,32 +275,324 @@ export type UpGalExecutableTool<Input, Output> = Tool<
   ) => Promise<Output>;
 };
 
-const emptySchema = z.object({});
-const idSchema = z.object({ id: z.string().min(1) });
-const projectIdSchema = z.object({ projectId: z.string().min(1) });
-const environmentIdSchema = z.object({ environmentId: z.string().min(1) });
-const resourceLogsSchema = z.object({
-  id: z.string().min(1),
-  tail: z.number().int().positive().max(1000).optional(),
+const emptySchema = z
+  .object({})
+  .describe("This tool does not require any input.");
+const idSchema = z.object({
+  id: z
+    .string()
+    .min(1)
+    .describe(
+      "Stable ID of the resource, project, or other entity to inspect.",
+    ),
 });
-const createProjectSchema = z.object({ name: z.string().min(1).max(120) });
+const projectIdSchema = z.object({
+  projectId: z.string().min(1).describe("Stable ID of the project."),
+});
+const environmentIdSchema = z.object({
+  environmentId: z.string().min(1).describe("Stable ID of the environment."),
+});
+const resourceLogsSchema = z.object({
+  id: z.string().min(1).describe("Stable ID of the resource."),
+  tail: z
+    .number()
+    .int()
+    .positive()
+    .max(1000)
+    .optional()
+    .describe("Maximum number of recent log lines to return. Defaults to 100."),
+});
+const createProjectSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(120)
+    .describe("Human-readable project name to create."),
+});
 const createEnvironmentSchema = z.object({
-  projectId: z.string().min(1),
-  name: z.string().min(1).max(120),
-  description: z.string().max(500).optional(),
+  projectId: z.string().min(1).describe("Stable ID of the parent project."),
+  name: z
+    .string()
+    .min(1)
+    .max(120)
+    .describe("Human-readable environment name to create."),
+  description: z
+    .string()
+    .max(500)
+    .optional()
+    .describe("Optional explanation of the environment's purpose."),
 });
 const controlResourceSchema = z.object({
-  id: z.string().min(1),
-  command: z.enum(["start", "stop", "restart"]),
+  id: z.string().min(1).describe("Stable ID of the resource to control."),
+  command: z
+    .enum(["start", "stop", "restart"])
+    .describe("Lifecycle action to perform on the resource."),
 });
 const dockerTargetSchema = z.object({
-  serverId: z.string().min(1).optional(),
+  serverId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Server ID to inspect; omit or use 'local' for the local engine.",
+    ),
 });
 const dockerLogsSchema = dockerTargetSchema.extend({
-  containerId: z.string().min(1).optional(),
-  serviceName: z.string().min(1).optional(),
-  tail: z.number().int().positive().max(1000).optional(),
+  containerId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Docker container ID when reading container logs."),
+  serviceName: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Docker Swarm service name when reading service logs."),
+  tail: z
+    .number()
+    .int()
+    .positive()
+    .max(1000)
+    .optional()
+    .describe("Maximum number of recent log lines to return. Defaults to 150."),
 });
+const toolContextSchema = z.object({
+  organizationId: z
+    .string()
+    .min(1)
+    .describe("Active organization ID used to scope every tool operation."),
+});
+
+const projectOutputSchema = z
+  .object({
+    id: z.string().describe("Stable project ID."),
+    name: z.string().describe("Human-readable project name."),
+    organizationId: z.string().describe("Owning organization ID."),
+    createdAt: z.any().describe("Project creation timestamp."),
+    updatedAt: z.any().describe("Most recent project update timestamp."),
+  })
+  .describe("A project record.");
+const projectsOutputSchema = z
+  .array(projectOutputSchema)
+  .describe("Project records.");
+
+const environmentOutputSchema = z
+  .object({
+    id: z.string().describe("Stable environment ID."),
+    projectId: z.string().describe("Parent project ID."),
+    name: z.string().describe("Human-readable environment name."),
+    slug: z.string().describe("URL-safe environment slug."),
+    description: z
+      .any()
+      .optional()
+      .describe("Optional explanation of the environment."),
+    isDefault: z
+      .boolean()
+      .describe("Whether this is the project's default environment."),
+    isProtected: z
+      .boolean()
+      .describe("Whether destructive operations are protected."),
+    resourceCount: z
+      .number()
+      .describe("Number of resources in the environment."),
+    createdAt: z.any().describe("Environment creation timestamp."),
+    updatedAt: z.any().describe("Most recent environment update timestamp."),
+  })
+  .describe("An environment record.");
+const environmentsOutputSchema = z
+  .array(environmentOutputSchema)
+  .describe("Environment records.");
+
+const resourceOutputSchema = z
+  .object({
+    id: z.string().describe("Stable resource ID."),
+    environmentId: z.string().describe("Parent environment ID."),
+    name: z.string().describe("Human-readable resource name."),
+    type: z
+      .string()
+      .describe("Resource type, such as application or database."),
+    status: z.string().describe("Current resource lifecycle status."),
+    provider: z.string().describe("Deployment or source provider."),
+    appName: z.any().optional().describe("Optional deployed application name."),
+    description: z.any().optional().describe("Optional resource description."),
+    dbType: z.any().optional().describe("Optional database engine type."),
+    composeType: z.any().optional().describe("Optional Compose resource type."),
+    dockerImage: z
+      .any()
+      .optional()
+      .describe("Optional Docker image reference."),
+    credentials: z
+      .any()
+      .optional()
+      .describe("Stored resource credentials, if present."),
+    buildConfig: z.string().describe("Serialized build configuration."),
+    advancedConfig: z
+      .any()
+      .optional()
+      .describe("Serialized advanced configuration."),
+    envVars: z.string().describe("Serialized environment variables."),
+    domains: z.string().describe("Serialized domain mappings."),
+    deployments: z.string().describe("Serialized recent deployment entries."),
+    containers: z.string().describe("Serialized known container entries."),
+    serverId: z
+      .any()
+      .optional()
+      .describe("Assigned server ID, or null for local."),
+    createdAt: z.any().describe("Resource creation timestamp."),
+    updatedAt: z.any().describe("Most recent resource update timestamp."),
+  })
+  .describe("A deployable resource record.");
+const resourcesOutputSchema = z
+  .array(resourceOutputSchema)
+  .describe("Resource records.");
+const nullableResourceOutputSchema = resourceOutputSchema
+  .nullable()
+  .describe("The updated resource, or null if it no longer exists.");
+
+const serverOutputSchema = z
+  .object({
+    id: z.string().describe("Stable server ID."),
+    organizationId: z.string().describe("Owning organization ID."),
+    name: z.string().describe("Human-readable server name."),
+    description: z.any().optional().describe("Optional server description."),
+    serverType: z.string().describe("Server role, such as deploy or database."),
+    sshKeyId: z.any().optional().describe("Configured SSH key ID, if present."),
+    ipAddress: z.string().describe("Server IP address."),
+    port: z.number().describe("SSH port."),
+    username: z.string().describe("SSH username."),
+    enableDockerCleanup: z
+      .boolean()
+      .describe("Whether automatic Docker cleanup is enabled."),
+    status: z.string().describe("Current server setup status."),
+    createdAt: z.any().describe("Server creation timestamp."),
+    updatedAt: z.any().describe("Most recent server update timestamp."),
+  })
+  .describe("A configured server record.");
+const serversOutputSchema = z
+  .array(serverOutputSchema)
+  .describe("Server records.");
+
+const accountStatusOutputSchema = z
+  .object({
+    organizationId: z.string().describe("Active organization ID."),
+    projectCount: z.number().describe("Number of projects."),
+    environmentCount: z.number().describe("Number of environments."),
+    resourceCount: z.number().describe("Number of resources."),
+    serverCount: z.number().describe("Number of configured servers."),
+    recentDeploymentCount: z.number().describe("Number of recent deployments."),
+    checkedAt: z.string().describe("Timestamp when the counts were collected."),
+  })
+  .describe("Organization inventory summary.");
+
+const deploymentOutputSchema = z
+  .object({
+    id: z.string().describe("Deployment ID."),
+    resourceId: z.string().describe("Resource ID being deployed."),
+    resourceName: z.string().describe("Resource name."),
+    resourceType: z.string().describe("Resource type."),
+    environmentName: z.string().describe("Environment name."),
+    projectName: z.string().describe("Project name."),
+    serverId: z.any().describe("Target server ID, if assigned."),
+    serverName: z.any().describe("Target server name, if assigned."),
+    title: z.string().describe("Deployment title."),
+    status: z.string().describe("Deployment status."),
+    logs: z.string().describe("Deployment log output."),
+    createdAt: z.string().describe("Deployment creation timestamp."),
+  })
+  .describe("Enriched deployment history record.");
+const deploymentsOutputSchema = z
+  .array(deploymentOutputSchema)
+  .describe("Enriched deployment history records.");
+
+const resourceStatsOutputSchema = z
+  .object({
+    cpu: z.number().describe("Aggregated CPU usage percentage."),
+    ram: z.number().describe("Aggregated memory usage percentage."),
+    ramUsage: z.number().describe("Memory usage in megabytes."),
+    ramLimit: z.number().describe("Memory limit in megabytes."),
+    networkRxBytes: z.number().describe("Received network bytes."),
+    networkTxBytes: z.number().describe("Transmitted network bytes."),
+    containerCount: z
+      .number()
+      .describe("Number of containers contributing to the stats."),
+    collectedAt: z
+      .string()
+      .describe("Timestamp when the stats were collected."),
+  })
+  .describe("Live resource runtime statistics.");
+
+const dockerInfoOutputSchema = z
+  .object({
+    name: z.string().describe("Docker target name."),
+    serverVersion: z.string().describe("Docker engine version."),
+    operatingSystem: z.string().describe("Docker host operating system."),
+    architecture: z.string().describe("Docker host architecture."),
+    containers: z.number().describe("Total Docker container count."),
+    images: z.number().describe("Total Docker image count."),
+    memoryBytes: z.number().describe("Host memory in bytes."),
+    swarmState: z.string().describe("Docker Swarm node state."),
+  })
+  .describe("Docker engine status.");
+const dockerContainersOutputSchema = z
+  .array(
+    z.object({
+      id: z.string().describe("Container ID."),
+      name: z.string().describe("Container name."),
+      image: z.string().describe("Container image."),
+      state: z.string().describe("Container state."),
+      status: z.string().describe("Human-readable container status."),
+      ports: z.string().describe("Published container ports."),
+      createdAt: z
+        .any()
+        .describe("Container creation timestamp, if available."),
+    }),
+  )
+  .describe("Docker container records.");
+const dockerImagesOutputSchema = z
+  .array(
+    z.object({
+      id: z.string().describe("Image ID."),
+      tags: z.array(z.string()).describe("Image repository tags."),
+      sizeBytes: z.number().describe("Image size in bytes."),
+      createdAt: z.any().describe("Image creation timestamp, if available."),
+    }),
+  )
+  .describe("Docker image records.");
+const dockerVolumesOutputSchema = z
+  .array(
+    z.object({
+      name: z.string().describe("Volume name."),
+      driver: z.string().describe("Volume driver."),
+      mountpoint: z.string().describe("Volume mount point."),
+    }),
+  )
+  .describe("Docker volume records.");
+const dockerServicesOutputSchema = z
+  .array(
+    z.object({
+      id: z.string().describe("Swarm service ID."),
+      name: z.string().describe("Swarm service name."),
+      mode: z.string().describe("Swarm service mode."),
+      replicas: z.string().describe("Desired or active replica count."),
+      image: z.string().describe("Service image."),
+      ports: z.string().describe("Published service ports."),
+    }),
+  )
+  .describe("Docker Swarm service records.");
+const dockerOutputSchema = z
+  .union([
+    dockerInfoOutputSchema,
+    dockerContainersOutputSchema,
+    dockerImagesOutputSchema,
+    dockerVolumesOutputSchema,
+    dockerServicesOutputSchema,
+    z.string().describe("Plain-text Docker log output."),
+  ])
+  .describe("Docker inventory or log output.");
+const logsOutputSchema = z.string().describe("Plain-text log output.");
+const deletionOutputSchema = z
+  .boolean()
+  .describe("Whether the resource was deleted.");
 
 function resolve<T>(scope: ServiceScope, token: TokenLike<T>): T {
   return scope.resolve(token);
@@ -269,12 +630,14 @@ function readTool<TInput, TOutput>(
   description: string,
   inputSchema: FlexibleSchema<TInput>,
   execute: (input: TInput) => Promise<TOutput>,
+  outputSchema: FlexibleSchema<TOutput>,
 ): UpGalExecutableTool<TInput, TOutput> {
   return {
     type: "function",
     description,
     inputSchema,
-    contextSchema: z.object({ organizationId: z.string().min(1) }),
+    outputSchema,
+    contextSchema: toolContextSchema,
     execute: async (
       input: TInput,
       _options: ToolExecutionOptions<UpGalToolContext>,
@@ -286,12 +649,14 @@ function mutationTool<TInput, TOutput>(
   description: string,
   inputSchema: FlexibleSchema<TInput>,
   execute: (input: TInput) => Promise<TOutput>,
+  outputSchema: FlexibleSchema<TOutput>,
 ): UpGalExecutableTool<TInput, TOutput> {
   return {
     type: "function",
     description,
     inputSchema,
-    contextSchema: z.object({ organizationId: z.string().min(1) }),
+    outputSchema,
+    contextSchema: toolContextSchema,
     needsApproval: true,
     execute: async (
       input: TInput,
@@ -314,39 +679,43 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
     });
   return {
     get_account_status: readTool(
-      "Get counts and status for the active organization.",
+      "Read a compact health and inventory summary for the active organization.",
       emptySchema,
       async () =>
         run(GetAccountStatusUseCaseToken).execute({
           organizationId: context.organizationId,
         }),
+      accountStatusOutputSchema,
     ),
     list_projects: readTool(
-      "List all projects in the active Upstand organization.",
+      "Read all projects in the active Upstand organization. If none exist, report that clearly.",
       emptySchema,
       async () =>
         run(GetProjectsUseCaseToken).execute({
           organizationId: context.organizationId,
         }),
+      projectsOutputSchema,
     ),
     list_environments: readTool(
-      "List environments for a project.",
+      "Read environments for a project. The projectId must come from a prior project result or the user.",
       projectIdSchema,
       async ({ projectId }) => {
         await assertProject(context, projectId);
         return run(GetEnvironmentsUseCaseToken).execute({ projectId });
       },
+      environmentsOutputSchema,
     ),
     list_resources: readTool(
-      "List deployable resources in an environment.",
+      "Read deployable resources in an environment. The environmentId must come from a prior environment result or the user.",
       environmentIdSchema,
       async ({ environmentId }) => {
         await assertEnvironment(context, environmentId);
         return run(GetResourcesUseCaseToken).execute({ environmentId });
       },
+      resourcesOutputSchema,
     ),
     get_resource_logs: readTool(
-      "Read recent logs for a resource.",
+      "Read recent logs for a resource, returning at most the requested number of lines.",
       resourceLogsSchema,
       async ({ id, tail }) => {
         await assertResource(context, id);
@@ -355,55 +724,64 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
           tail: tail ?? 100,
         });
       },
+      logsOutputSchema,
     ),
     get_resource_stats: readTool(
-      "Get live CPU, memory, and runtime statistics for a resource.",
+      "Read live CPU, memory, network, and container statistics for a resource.",
       idSchema,
       async ({ id }) => {
         await assertResource(context, id);
         return run(GetResourceStatsUseCaseToken).execute({ id });
       },
+      resourceStatsOutputSchema,
     ),
     list_servers: readTool(
-      "List remote servers available to the active organization.",
+      "Read remote servers available to the active organization.",
       emptySchema,
       async () =>
         run(GetServersUseCaseToken).execute({
           organizationId: context.organizationId,
         }),
+      serversOutputSchema,
     ),
     list_deployments: readTool(
-      "List recent deployment history.",
+      "Read recent deployment history enriched with project and environment names.",
       emptySchema,
       async () => run(GetDeploymentsUseCaseToken).execute(),
+      deploymentsOutputSchema,
     ),
     get_docker_info: readTool(
-      "Read Docker engine status. Omit serverId to inspect the local Docker engine.",
+      "Read Docker engine status. Omit serverId or use 'local' to inspect the local engine.",
       dockerTargetSchema,
       async (input) => dockerRead("info", input),
+      dockerOutputSchema,
     ),
     list_docker_containers: readTool(
-      "List local or remote Docker containers, including stopped containers.",
+      "Read local or remote Docker containers, including stopped containers, without changing them.",
       dockerTargetSchema,
       async (input) => dockerRead("containers", input),
+      dockerOutputSchema,
     ),
     list_docker_images: readTool(
-      "List Docker images on the selected local or remote server.",
+      "Read Docker images on the selected local or remote server.",
       dockerTargetSchema,
       async (input) => dockerRead("images", input),
+      dockerOutputSchema,
     ),
     list_docker_volumes: readTool(
-      "List Docker volumes on the selected local or remote server.",
+      "Read Docker volumes on the selected local or remote server.",
       dockerTargetSchema,
       async (input) => dockerRead("volumes", input),
+      dockerOutputSchema,
     ),
     list_docker_services: readTool(
-      "List Docker Swarm services on the selected local or remote server.",
+      "Read Docker Swarm services without changing them.",
       dockerTargetSchema,
       async (input) => dockerRead("services", input),
+      dockerOutputSchema,
     ),
     get_docker_logs: readTool(
-      "Read recent logs for a Docker container or Swarm service. This tool is read-only.",
+      "Read recent logs for a Docker container or Swarm service. Provide exactly one containerId or serviceName.",
       dockerLogsSchema,
       async (input) =>
         run(GetDockerInventoryUseCaseToken).execute({
@@ -412,50 +790,56 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
           ...input,
           tail: input.tail ?? 150,
         }),
+      dockerOutputSchema,
     ),
     create_project: mutationTool(
-      "Create a project and its default production environment.",
+      "Create a project and its default production environment. This requires approval.",
       createProjectSchema,
       async ({ name }) =>
         run(CreateProjectUseCaseToken).execute({
           organizationId: context.organizationId,
           name,
         }),
+      projectOutputSchema,
     ),
     create_environment: mutationTool(
-      "Create an environment within a project.",
+      "Create an environment within a project. This requires approval.",
       createEnvironmentSchema,
       async (input) => {
         await assertProject(context, input.projectId);
         return run(CreateEnvironmentUseCaseToken).execute(input);
       },
+      environmentOutputSchema,
     ),
     deploy_resource: mutationTool(
-      "Queue a deployment for a resource.",
+      "Queue a deployment for a resource. This changes infrastructure and requires approval.",
       idSchema,
       async ({ id }) => {
         await assertResource(context, id);
         return run(DeployResourceUseCaseToken).execute({ id });
       },
+      resourceOutputSchema,
     ),
     control_resource: mutationTool(
-      "Start, stop, or restart a running resource.",
+      "Start, stop, or restart a resource. This changes infrastructure and requires approval.",
       controlResourceSchema,
       async (input) => {
         await assertResource(context, input.id);
         return run(ControlResourceUseCaseToken).execute(input);
       },
+      nullableResourceOutputSchema,
     ),
     delete_resource: mutationTool(
-      "Permanently delete a resource and its deployment configuration.",
+      "Permanently delete a resource and its deployment configuration. This cannot be undone and requires approval.",
       idSchema,
       async ({ id }) => {
         await assertResource(context, id);
         return run(DeleteResourceUseCaseToken).execute({ id });
       },
+      deletionOutputSchema,
     ),
     delete_project: mutationTool(
-      "Permanently delete a project and its environments.",
+      "Permanently delete a project and its environments. This cannot be undone and requires approval.",
       idSchema,
       async ({ id }) => {
         await assertProject(context, id);
@@ -464,6 +848,7 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
           id,
         });
       },
+      projectOutputSchema.nullable(),
     ),
   };
 }
@@ -631,15 +1016,16 @@ async function getProvider(
     };
   if (effectiveProvider === "openrouter")
     return {
-      model: createOpenAI({
+      model: createOpenRouter({
         apiKey,
-        baseURL: config.baseUrl || "https://openrouter.ai/api/v1",
+        baseURL: config.baseUrl || undefined,
         headers: {
           "HTTP-Referer": "https://upstand.dev",
           "X-Title": "Upstand",
         },
-        name: "openrouter",
-      })(config.model),
+        appUrl: "https://upstand.dev",
+        appName: "Upstand",
+      }).chat(config.model),
       modelId: config.model,
     };
   return {
@@ -667,6 +1053,20 @@ function decryptProviderApiKey(
     authTag: config.apiKeyAuthTag,
     keyVersion: config.apiKeyVersion,
   });
+}
+
+function upGalStreamErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("configure an ai provider")) {
+    return "UpGal needs an AI provider. Open Settings → UpGal Settings, configure a provider, and try again.";
+  }
+  if (message.includes("no api key")) {
+    return "UpGal could not authenticate with the configured AI provider. Check the API key in Settings → UpGal Settings.";
+  }
+  if (message.includes("429") || message.includes("rate limit")) {
+    return "The AI provider is busy or rate-limiting this request. Wait a moment and try again.";
+  }
+  return "UpGal could not complete this response. Completed tool results remain available above; retry to continue.";
 }
 
 const MODEL_CATALOG_BASE_URLS: Record<AIProvider, string> = {
@@ -799,8 +1199,8 @@ export async function createUpGalResponse(
   const agent = new ToolLoopAgent({
     id: "upgal",
     model: provider.model,
-    temperature: 0.7,
-    instructions: `You are UpGal, Upstand's operations assistant. Be precise, transparent, and concise. You may inspect organization resources automatically. Every mutation requires user approval. Never invent IDs or claim an action completed until the tool returns success. The active organization is ${context.organizationId}.`,
+    temperature: 0.5,
+    instructions: `You are UpGal, Upstand's operations assistant. Be precise, transparent, and concise. You may inspect organization resources automatically. Every mutation requires user approval. Never invent IDs or claim an action completed until the tool returns success. After every tool call, continue with a concise plain-language answer; never leave the user with only a tool result card. If a list is empty, say that explicitly. Use IDs from tool results for follow-up calls and do not guess them. The active organization is ${context.organizationId}.`,
     tools: createUpGalTools(context),
     toolsContext: {
       get_account_status: { organizationId: context.organizationId },
@@ -858,6 +1258,16 @@ export async function createUpGalResponse(
           err: error instanceof Error ? error.message : String(error),
         });
       }
+    },
+    onError: (error) => {
+      void updateRunSafely({ status: "failed", finishedAt: new Date() });
+      log.error({
+        message: "UpGal response stream failed",
+        runId,
+        model: provider.modelId,
+        err: error instanceof Error ? error.message : String(error),
+      });
+      return upGalStreamErrorMessage(error);
     },
     headers: { "X-UpGal-Run-Id": runId },
   });

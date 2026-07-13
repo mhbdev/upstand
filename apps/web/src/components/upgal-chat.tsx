@@ -79,6 +79,13 @@ const conversationDateFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
+function displayChatError(error: Error): string {
+  if (error.message === "An error occurred.") {
+    return "UpGal could not complete this response. Completed tool results remain available above; retry to continue.";
+  }
+  return error.message;
+}
+
 function Part({
   part,
   approve,
@@ -399,8 +406,8 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
               {chat.messages.length === 0 ? (
                 <ConversationEmptyState
                   icon={<Bot className="size-8" />}
-                  title="How can I help?"
-                  description="Ask me to inspect or manage your Upstand infrastructure."
+                  title="What should I inspect?"
+                  description="Ask UpGal to list projects, inspect environments, read logs, or check Docker. Any change requires your approval."
                 />
               ) : null}
               {chat.messages.map((message) => (
@@ -427,7 +434,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
               {chat.status === "submitted" || chat.status === "streaming" ? (
                 <div className="flex items-center gap-2 text-muted-foreground text-xs">
                   <Loader2 aria-hidden="true" className="size-3 animate-spin" />
-                  UpGal is working…
+                  UpGal is inspecting your infrastructure…
                 </div>
               ) : null}
               {loadError ? (
@@ -438,20 +445,16 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
               ) : null}
               {chat.error ? (
                 <Alert variant="destructive">
-                  <AlertTitle>Response interrupted</AlertTitle>
+                  <AlertTitle>UpGal could not finish that request</AlertTitle>
                   <AlertDescription>
-                    <span>
-                      {chat.error.message === "An error occurred."
-                        ? "UpGal could not finish this response. Completed tool results remain available above."
-                        : chat.error.message}
-                    </span>
+                    <span>{displayChatError(chat.error)}</span>
                     <Button
                       className="mt-2"
                       onClick={() => void chat.regenerate()}
                       size="sm"
                       variant="outline"
                     >
-                      Try again
+                      Retry response
                     </Button>
                   </AlertDescription>
                 </Alert>
@@ -480,7 +483,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
               />
             </PromptInputFooter>
             <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              UpGal asks before making changes.
+              UpGal will ask before making any changes.
             </p>
           </PromptInput>
         </section>

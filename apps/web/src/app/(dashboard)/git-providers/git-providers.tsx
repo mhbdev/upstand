@@ -14,13 +14,11 @@ import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
-  CardDescription,
   CardContent,
-  CardFooter,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +40,10 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -277,7 +279,12 @@ export default function GitProviders({
     <DashboardPage>
       <DashboardPageHeader
         title="Git Providers"
-        icon={<HugeiconsIcon icon={SourceCodeIcon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon
+            icon={SourceCodeIcon}
+            className="size-6 text-primary"
+          />
+        }
         description="Add and manage Git providers to pull source code and enable automatic deployments."
         actions={
           <Button
@@ -321,80 +328,80 @@ export default function GitProviders({
             }
 
             return (
-              <Card
-                key={provider.id}
-                className="group flex h-full flex-col overflow-hidden border-border/40 bg-card/30 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:bg-card/60 hover:shadow-lg hover:shadow-primary/5"
-              >
-                <CardHeader className="gap-4 pb-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 font-bold text-primary text-sm uppercase shadow-sm">
-                        {provider.provider.slice(0, 2)}
-                      </div>
-                      <div className="min-w-0 space-y-1">
-                        <CardTitle className="flex flex-wrap items-center gap-2 font-bold text-base">
-                          <span className="truncate">{provider.name}</span>
-                          <Badge variant="secondary" className="text-[10px] capitalize">
-                            {provider.provider}
-                          </Badge>
-                        </CardTitle>
-                        <CardDescription className="truncate text-xs">
-                          {provider.provider === "github" &&
-                            `App ID: ${config.githubAppId || "N/A"}`}
-                          {provider.provider === "gitlab" &&
-                            `Instance: ${config.gitlabUrl}`}
-                          {provider.provider === "gitea" &&
-                            `Instance: ${config.giteaUrl}`}
-                          {provider.provider === "bitbucket" &&
-                            `Username: ${config.bitbucketUsername}`}
-                        </CardDescription>
+              <Card key={provider.id} className="flex h-full flex-col">
+                <CardHeader className="gap-3 pb-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted font-semibold text-muted-foreground text-xs uppercase">
+                      {provider.provider.slice(0, 2)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <CardTitle className="truncate text-sm">
+                            {provider.name}
+                          </CardTitle>
+                          <CardDescription className="mt-1 truncate text-xs capitalize">
+                            {provider.provider} ·{" "}
+                            {provider.provider === "github"
+                              ? "GitHub App"
+                              : provider.provider === "bitbucket"
+                                ? "App password"
+                                : "OAuth"}
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedProvider({
+                              id: provider.id,
+                              name: provider.name,
+                            });
+                            setDeleteProviderOpen(true);
+                          }}
+                          className="-mt-2 -mr-2 size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                          aria-label={`Delete ${provider.name}`}
+                        >
+                          <HugeiconsIcon icon={Delete02Icon} />
+                        </Button>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedProvider({
-                          id: provider.id,
-                          name: provider.name,
-                        });
-                        setDeleteProviderOpen(true);
-                      }}
-                      className="size-8 shrink-0 text-destructive opacity-70 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                      aria-label={`Delete ${provider.name}`}
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                    </Button>
                   </div>
-                  <div className="flex flex-wrap gap-2 text-muted-foreground text-xs">
-                    <Badge variant={isInstalled ? "secondary" : "outline"} className="gap-1.5">
-                      <span className={isInstalled ? "size-1.5 rounded-full bg-primary" : "size-1.5 rounded-full bg-muted-foreground"} />
-                      {isInstalled ? "Connected" : "Setup required"}
+                  <div className="flex items-center gap-2 text-xs">
+                    <Badge
+                      variant={isInstalled ? "secondary" : "outline"}
+                      className="gap-1.5"
+                    >
+                      <span
+                        className={
+                          isInstalled
+                            ? "size-1.5 rounded-full bg-emerald-500"
+                            : "size-1.5 rounded-full bg-muted-foreground"
+                        }
+                      />
+                      {isInstalled ? "Connected" : "Needs setup"}
                     </Badge>
-                    <span className="self-center">Added {new Date(provider.createdAt).toLocaleDateString()}</span>
+                    <span className="truncate text-muted-foreground">
+                      {provider.provider === "github"
+                        ? config.githubAppName || "GitHub App"
+                        : provider.provider === "bitbucket"
+                          ? config.bitbucketUsername || "Bitbucket account"
+                          : config.gitlabUrl || config.giteaUrl}
+                    </span>
                   </div>
                 </CardHeader>
-                <CardContent className="flex flex-1 flex-col gap-4 border-border/40 border-t pt-4">
-                  <div className="grid gap-3 text-xs sm:grid-cols-2">
-                    <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
-                      <p className="font-medium text-muted-foreground">Access</p>
-                      <p className="mt-1 font-medium text-foreground">
-                        {isInstalled ? "Repository access enabled" : "Authorization needed"}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
-                      <p className="font-medium text-muted-foreground">Connection</p>
-                      <p className="mt-1 font-medium text-foreground capitalize">
-                        {provider.provider === "github" ? "GitHub App" : provider.provider === "bitbucket" ? "App password" : "OAuth"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-auto flex flex-wrap gap-2">
+                <CardContent className="flex flex-1 flex-col gap-4 pt-0">
+                  <p className="text-muted-foreground text-xs">
+                    {isInstalled
+                      ? "Repository access is ready for deployments."
+                      : "Authorize this provider to access repositories."}
+                  </p>
+                  <div className="mt-auto flex items-center justify-between gap-2">
                     {!isInstalled ? (
                       provider.provider === "github" ? (
                         <a
                           href={`${config.githubAppName}/installations/new?state=gh_setup:${provider.id}`}
-                          className="flex items-center gap-1 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-600 transition-colors hover:bg-yellow-500/20"
+                          className="inline-flex items-center gap-1.5 text-primary text-xs hover:underline"
                         >
                           <HugeiconsIcon
                             icon={Alert02Icon}
@@ -411,7 +418,7 @@ export default function GitProviders({
                           )}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-1 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-xs text-yellow-600 transition-colors hover:bg-yellow-500/20"
+                          className="inline-flex items-center gap-1.5 text-primary text-xs hover:underline"
                         >
                           <HugeiconsIcon
                             icon={Alert02Icon}
@@ -430,7 +437,7 @@ export default function GitProviders({
                             icon={CheckmarkCircle02Icon}
                             className="size-3"
                           />
-                          Active
+                          Connected
                         </Badge>
                         <a
                           href={getInstallationManagementUrl(
@@ -439,17 +446,15 @@ export default function GitProviders({
                           )}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-primary text-xs transition-colors hover:bg-primary/20"
+                          className="inline-flex items-center gap-1.5 text-primary text-xs hover:underline"
                         >
                           Manage access
                         </a>
                       </div>
                     )}
+                    <HugeiconsIcon icon={ArrowRight01Icon} />
                   </div>
                 </CardContent>
-                <CardFooter className="border-border/40 border-t py-3 text-muted-foreground text-xs">
-                  <span className="truncate">Provider ID: {provider.id}</span>
-                </CardFooter>
               </Card>
             );
           })}

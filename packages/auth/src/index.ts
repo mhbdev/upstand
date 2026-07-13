@@ -2,15 +2,26 @@ import { randomUUID } from "node:crypto";
 import { apiKey } from "@better-auth/api-key";
 import { createDb } from "@upstand/db";
 import * as schema from "@upstand/db/schema/auth";
+import { notificationChannel } from "@upstand/db/schema/notification";
+import { NotificationChannelSchema } from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import { redis } from "@upstand/redis";
+import {
+  decryptNotificationConfiguration,
+  NotificationTransportRegistry,
+} from "@upstand/usecases";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
-import { organization } from "better-auth/plugins";
+import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { count, eq } from "drizzle-orm";
+
+const memberPermissionField = {
+  type: "string",
+  required: false,
+} as const;
 
 function getSharedCookieDomain(): string | undefined {
   const dashboardHost = new URL(env.CORS_ORIGIN).hostname;
@@ -72,6 +83,11 @@ export function createAuth() {
     trustedOrigins: [env.CORS_ORIGIN, env.BETTER_AUTH_URL],
     emailAndPassword: {
       enabled: true,
+    },
+    user: {
+      // Admin-created members still use Better Auth's normal credential
+      // account and can sign in immediately with the password they were given.
+      additionalFields: {},
     },
     socialProviders: {
       google:
@@ -247,9 +263,71 @@ export function createAuth() {
       }),
     },
     plugins: [
+      admin(),
       organization({
         ac: organizationAccessControl,
         roles: organizationRoles,
+        schema: {
+          member: {
+            additionalFields: { permissions: memberPermissionField },
+          },
+          invitation: {
+            additionalFields: {
+              permissions: memberPermissionField,
+              emailChannelId: { type: "string", required: false },
+            },
+          },
+        },
+        sendInvitationEmail: async ({
+          id,
+          email,
+          role,
+          organization,
+          invitation,
+        }) => {
+          const channelId = (invitation as Record<string, unknown>)
+            .emailChannelId as string | undefined;
+          if (!channelId) return;
+          const channel = await db
+            .select()
+            .from(notificationChannel)
+            .where(eq(notificationChannel.id, channelId))
+            .limit(1)
+            .then((rows) => rows[0]);
+          if (!channel || channel.organizationId !== organization.id) {
+            throw new Error("Invitation email provider was not found");
+          }
+          if (channel.provider !== "email" && channel.provider !== "resend") {
+            throw new Error(
+              "Invitation email provider must be Email or Resend",
+            );
+          }
+          const configuration = decryptNotificationConfiguration(
+            NotificationChannelSchema.parse(channel),
+          );
+          const recipientConfiguration =
+            configuration.type === "email" || configuration.type === "resend"
+              ? { ...configuration, toAddresses: [email] }
+              : configuration;
+          const url = `${env.CORS_ORIGIN}/invitation?token=${encodeURIComponent(id)}`;
+          await new NotificationTransportRegistry().send(
+            recipientConfiguration,
+            {
+              title: `Invitation to join ${organization.name}`,
+              message: `You have been invited to join ${organization.name} as ${role}.\n\nAccept your invitation: ${url}`,
+            },
+          );
+        },
+        organizationHooks: {
+          afterAcceptInvitation: async ({ invitation, member }) => {
+            if (invitation.permissions) {
+              await db
+                .update(schema.member)
+                .set({ permissions: invitation.permissions })
+                .where(eq(schema.member.id, member.id));
+            }
+          },
+        },
       }),
       apiKey({
         configId: "upstand",

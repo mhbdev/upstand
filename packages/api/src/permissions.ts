@@ -128,7 +128,14 @@ export async function checkPermission(
   action: PermissionAction,
 ) {
   const membership = await ensureOrganizationAccess(userId, organizationId);
-  const permissions = ROLE_PERMISSIONS[membership.role] || [];
+  let permissions = ROLE_PERMISSIONS[membership.role] || [];
+  if (membership.permissions) {
+    try {
+      permissions = JSON.parse(membership.permissions) as PermissionAction[];
+    } catch {
+      permissions = [];
+    }
+  }
 
   if (!permissions.includes(action)) {
     throw new TRPCError({
