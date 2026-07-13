@@ -3,6 +3,7 @@ import { log } from "evlog";
 import { z } from "zod";
 import type { CaddyService } from "../web-server/caddy.service";
 import type { DockerService } from "./docker.service";
+import { resolveServicesForResource } from "./docker-client";
 
 export const DeleteResourceInputSchema = z.object({
   id: z.string().min(1, "Resource ID is required"),
@@ -25,41 +26,61 @@ export class DeleteResourceUseCase {
     }
 
     const resources = await this.uow.resourceRepository.findMany();
-    const remainingResources = resources.filter(
+    const serverResources = resource.serverId && !["local", "manager"].includes(resource.serverId)
+      ? resources.filter((candidate) => candidate.serverId === resource.serverId)
+      : resources.filter(
+          (candidate) =>
+            !candidate.serverId ||
+            candidate.serverId === "local" ||
+            candidate.serverId === "manager",
+        );
+    const remainingResources = serverResources.filter(
       (item) => item.id !== resource.id,
     );
     const settings = await this.uow.webServerSettingsRepository.findGlobal();
 
-    await this.caddyService.syncResourceConfigs(
-      remainingResources,
-      settings || {},
-    );
+    const { dockerService, caddyService, cleanup } =
+      await resolveServicesForResource(
+        resource,
+        this.uow,
+        this.dockerService,
+        this.caddyService,
+      );
+
     try {
-      await this.dockerService.removeResource(resource, !!input.deleteVolumes);
-      return await this.uow.transaction(async (tx) => {
-        const environment = await tx.environmentRepository.findById(
-          resource.environmentId,
-        );
-        if (environment) {
-          await tx.environmentRepository.updateById(resource.environmentId, {
-            resourceCount: Math.max(0, environment.resourceCount - 1),
+      await caddyService.syncResourceConfigs(
+        remainingResources,
+        settings || {},
+      );
+      try {
+        await dockerService.removeResource(resource, !!input.deleteVolumes);
+        return await this.uow.transaction(async (tx) => {
+          const environment = await tx.environmentRepository.findById(
+            resource.environmentId,
+          );
+          if (environment) {
+            await tx.environmentRepository.updateById(resource.environmentId, {
+              resourceCount: Math.max(0, environment.resourceCount - 1),
+            });
+          }
+          return tx.resourceRepository.deleteById(input.id);
+        });
+      } catch (error) {
+        try {
+          await caddyService.syncResourceConfigs(serverResources, settings || {});
+        } catch (rollbackError) {
+          log.error({
+            message: "Failed to restore Caddy after resource deletion rollback",
+            err:
+              rollbackError instanceof Error
+                ? rollbackError.message
+                : rollbackError,
           });
         }
-        return tx.resourceRepository.deleteById(input.id);
-      });
-    } catch (error) {
-      try {
-        await this.caddyService.syncResourceConfigs(resources, settings || {});
-      } catch (rollbackError) {
-        log.error({
-          message: "Failed to restore Caddy after resource deletion rollback",
-          err:
-            rollbackError instanceof Error
-              ? rollbackError.message
-              : rollbackError,
-        });
+        throw error;
       }
-      throw error;
+    } finally {
+      cleanup();
     }
   }
 }

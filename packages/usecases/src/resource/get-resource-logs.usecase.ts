@@ -1,6 +1,7 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { z } from "zod";
 import type { DockerService } from "./docker.service";
+import { resolveDockerServiceForServer } from "./docker-client";
 
 export const GetResourceLogsInputSchema = z.object({
   id: z.string().min(1, "Resource ID is required"),
@@ -23,11 +24,21 @@ export class GetResourceLogsUseCase {
         throw new ValidationError("Resource not found");
       }
 
-      return await this.dockerService.getLogs(
-        resource,
-        input.containerId,
-        input.tail ?? 150,
+      const { dockerService, cleanup } = await resolveDockerServiceForServer(
+        resource.serverId,
+        tx,
+        this.dockerService,
       );
+
+      try {
+        return await dockerService.getLogs(
+          resource,
+          input.containerId,
+          input.tail ?? 150,
+        );
+      } finally {
+        cleanup();
+      }
     });
   }
 }

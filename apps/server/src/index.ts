@@ -782,6 +782,13 @@ async function discoverDeploymentServerIds(): Promise<string[]> {
     const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
     const settings = await uow.serverBuildSettingsRepository.findMany();
     for (const setting of settings) serverIds.add(setting.id);
+
+    const servers = await uow.serverRepository.findMany();
+    for (const server of servers) {
+      if (server.status === "ready") {
+        serverIds.add(server.id);
+      }
+    }
   } finally {
     await scope.dispose();
   }

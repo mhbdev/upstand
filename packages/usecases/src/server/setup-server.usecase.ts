@@ -3,15 +3,8 @@ import { decryptSecret } from "@upstand/domain/crypto/secret-box";
 import { log } from "evlog";
 import { Client } from "ssh2";
 import { z } from "zod";
-import { getDockerInstance } from "../resource/docker-client";
-import {
-  formatSwarmEndpoint,
-  requireActiveManager,
-  validateSwarmAddress,
-} from "../swarm/swarm.helpers";
-
-const SWARM_JOIN_POLL_ATTEMPTS = 12;
-const SWARM_JOIN_POLL_INTERVAL_MS = 2500;
+import { createRemoteDocker } from "../resource/docker-client";
+import { CaddyService } from "../web-server/caddy.service";
 
 interface CommandResult {
   code: number | null;
@@ -140,7 +133,10 @@ export class SetupServerUseCase {
 
       await privileged("systemctl enable --now docker");
 
-      // 2. Swarm node join
+      // 2. Remote deployment servers are independent Docker environments.
+      // They must not join the control-plane Swarm. This mirrors Dokploy's
+      // remote-server model and keeps each server's scheduler and networking
+      // isolated from the control plane.
       log.info({
         message: `[Server Setup] Checking Swarm status on ${server.ipAddress}`,
       });
@@ -151,59 +147,35 @@ export class SetupServerUseCase {
         .then((status) => status.trim())
         .catch(() => "inactive");
 
-      const localDocker = getDockerInstance();
-      const localInfo = await requireActiveManager(localDocker);
-      const swarmInspect = await localDocker.swarmInspect();
-
-      if (remoteSwarmStatus === "active") {
-        const remoteClusterId = await executeCommand(
-          `${sudo ? `${sudo} ` : ""}docker info --format '{{.Swarm.Cluster.ID}}'`,
-        ).then((clusterId) => clusterId.trim());
-
-        if (!remoteClusterId || remoteClusterId !== swarmInspect.ID) {
-          throw new Error(
-            "Remote server already belongs to a different Docker Swarm cluster. Leave that cluster explicitly before adding it to this one.",
-          );
-        }
-      } else if (remoteSwarmStatus !== "pending") {
+      if (remoteSwarmStatus !== "active") {
         log.info({
-          message: `[Server Setup] Joining ${server.ipAddress} to the Docker Swarm cluster...`,
+          message: `[Server Setup] Initializing an independent Docker Swarm on ${server.ipAddress}...`,
         });
-        const joinToken = swarmInspect.JoinTokens.Worker;
-        const managerAddress = validateSwarmAddress(
-          localInfo.Swarm?.NodeAddr ?? "",
-          "Swarm manager address",
+        await privileged(
+          `docker swarm init --advertise-addr ${shellQuote(server.ipAddress)}`,
         );
-
-        if (!joinToken) {
-          throw new Error(
-            "The Swarm manager did not provide a worker join command.",
-          );
-        }
-
-        const joinResult = await executeCommandResult(
-          `${remoteDockerPrefix}docker swarm join --token ${joinToken} ${formatSwarmEndpoint(managerAddress)}`,
-        );
-
-        if (joinResult.code !== 0) {
-          log.info({
-            message: `[Server Setup] Docker reported that the Swarm join is continuing asynchronously on ${server.ipAddress}. Waiting for the daemon to become active.`,
-          });
-        }
       }
 
-      const managerEndpoint = formatSwarmEndpoint(
-        validateSwarmAddress(
-          localInfo.Swarm?.NodeAddr ?? "",
-          "Swarm manager address",
-        ),
+      await privileged(
+        "docker network inspect upstand-network >/dev/null 2>&1 || docker network create --driver overlay --attachable upstand-network",
       );
-      await waitForSwarmJoin(
-        executeCommandResult,
-        remoteDockerPrefix,
-        swarmInspect.ID,
-        managerEndpoint,
-      );
+
+      const remoteDocker = createRemoteDocker({
+        host: server.ipAddress,
+        port: server.port,
+        username: server.username,
+        privateKey,
+      });
+      const remoteInfo = await remoteDocker.info();
+      if (remoteInfo.Swarm?.LocalNodeState !== "active") {
+        throw new Error(
+          `Remote Docker Swarm is not active after initialization (state: ${remoteInfo.Swarm?.LocalNodeState ?? "unknown"}).`,
+        );
+      }
+
+      // Caddy is installed on every deployment server, just like Dokploy's
+      // Traefik instance. Resource routing is synchronized during deployment.
+      await new CaddyService(remoteDocker).initializeCaddy();
 
       log.info({
         message: `[Server Setup] Server ${server.name} set up successfully.`,
@@ -232,50 +204,8 @@ export class SetupServerUseCase {
   }
 }
 
-async function waitForSwarmJoin(
-  executeCommandResult: (command: string) => Promise<CommandResult>,
-  dockerPrefix: string,
-  expectedClusterId: string,
-  managerEndpoint: string,
-): Promise<void> {
-  let lastStatus = "unknown";
-  let lastError = "";
-
-  for (let attempt = 0; attempt < SWARM_JOIN_POLL_ATTEMPTS; attempt += 1) {
-    const result = await executeCommandResult(
-      `${dockerPrefix}docker info --format '{{.Swarm.LocalNodeState}}|{{.Swarm.Cluster.ID}}'`,
-    );
-
-    if (result.code === 0) {
-      const [state, clusterId] = result.stdout.trim().split("|");
-      lastStatus = state || "inactive";
-
-      if (state === "active" && clusterId === expectedClusterId) {
-        return;
-      }
-
-      if (state === "active" && clusterId && clusterId !== expectedClusterId) {
-        throw new Error(
-          "Remote server joined a different Docker Swarm cluster. Leave that cluster explicitly before adding it to this one.",
-        );
-      }
-    } else {
-      lastError = result.stderr.trim() || result.stdout.trim();
-    }
-
-    if (attempt < SWARM_JOIN_POLL_ATTEMPTS - 1) {
-      await delay(SWARM_JOIN_POLL_INTERVAL_MS);
-    }
-  }
-
-  const details = lastError ? ` Docker reported: ${lastError}` : "";
-  throw new Error(
-    `Docker Swarm join did not complete within ${Math.round((SWARM_JOIN_POLL_ATTEMPTS * SWARM_JOIN_POLL_INTERVAL_MS) / 1000)} seconds (last state: ${lastStatus}). Ensure ${managerEndpoint} is reachable from the remote host on TCP 2377 and that the manager advertises a routable address.${details}`,
-  );
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function toSetupErrorMessage(error: unknown): string {

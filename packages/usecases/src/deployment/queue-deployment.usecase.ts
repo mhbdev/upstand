@@ -77,11 +77,17 @@ export class QueueDeploymentUseCase {
         });
       } else {
         // Fetch server name
-        const settings =
-          await tx.serverBuildSettingsRepository.findById(serverId);
-        if (settings) {
-          serverName = settings.hostname;
-          serverIp = settings.ip;
+        const server = await tx.serverRepository.findById(serverId);
+        if (server) {
+          serverName = server.name;
+          serverIp = server.ipAddress;
+        } else {
+          const settings =
+            await tx.serverBuildSettingsRepository.findById(serverId);
+          if (settings) {
+            serverName = settings.hostname;
+            serverIp = settings.ip;
+          }
         }
       }
 

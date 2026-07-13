@@ -14,7 +14,9 @@ import {
 import { encryptSecret } from "@upstand/domain/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
-import type { CaddyService } from "../web-server/caddy.service";
+import { CaddyService } from "../web-server/caddy.service";
+import { decryptSecret } from "@upstand/domain/crypto/secret-box";
+import { createRemoteDocker } from "./docker-client";
 
 export const UpdateResourceInputSchema = z.object({
   id: z.string().min(1, "Resource ID is required"),
@@ -161,11 +163,23 @@ export class UpdateResourceUseCase {
       input.name !== undefined ||
       input.advancedConfig !== undefined;
     const candidate = { ...resource, ...patch } as Resource;
-    const existingResources = routingChanged
+
+    const resources = routingChanged
       ? await this.uow.resourceRepository.findMany()
       : [];
+    const serverId = resource.serverId;
+    const sameServerResources = serverId && !["local", "manager"].includes(serverId)
+      ? resources.filter((c) => c.serverId === serverId)
+      : resources.filter(
+          (c) =>
+            !c.serverId ||
+            c.serverId === "local" ||
+            c.serverId === "manager",
+        );
+
+    const existingResources = routingChanged ? sameServerResources : [];
     const candidateResources = routingChanged
-      ? existingResources.map((item) =>
+      ? sameServerResources.map((item) =>
           item.id === resource.id ? candidate : item,
         )
       : [];
@@ -173,10 +187,38 @@ export class UpdateResourceUseCase {
       ? await this.uow.webServerSettingsRepository.findGlobal()
       : null;
 
+    let caddyService = this.caddyService;
+    if (routingChanged && serverId && !["local", "manager"].includes(serverId)) {
+      const server = await this.uow.serverRepository.findById(serverId);
+      if (server) {
+        if (!server.sshKeyId) {
+          throw new Error("Target deployment server has no SSH key configured");
+        }
+        const sshKey = await this.uow.sshKeyRepository.findById(server.sshKeyId);
+        if (!sshKey) {
+          throw new Error("Target deployment server SSH key not found");
+        }
+        const privateKey = decryptSecret({
+          ciphertext: sshKey.privateKeyCiphertext,
+          iv: sshKey.privateKeyIv,
+          authTag: sshKey.privateKeyAuthTag,
+          keyVersion: sshKey.privateKeyVersion,
+        });
+        const connection = {
+          host: server.ipAddress,
+          port: server.port,
+          username: server.username,
+          privateKey,
+        };
+        const remoteDocker = createRemoteDocker(connection);
+        caddyService = new CaddyService(remoteDocker);
+      }
+    }
+
     // Apply the fully validated Caddy configuration before committing the metadata.
     // If the database write fails, immediately restore the previous known-good config.
     if (routingChanged) {
-      await this.caddyService.syncResourceConfigs(
+      await caddyService.syncResourceConfigs(
         candidateResources,
         settings || {},
       );
@@ -189,7 +231,7 @@ export class UpdateResourceUseCase {
     } catch (error) {
       if (routingChanged) {
         try {
-          await this.caddyService.syncResourceConfigs(
+          await caddyService.syncResourceConfigs(
             existingResources,
             settings || {},
           );

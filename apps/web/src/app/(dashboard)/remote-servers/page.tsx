@@ -167,8 +167,8 @@ export default function RemoteServersPage() {
         <div>
           <h1 className="font-bold text-3xl tracking-tight">Remote Servers</h1>
           <p className="text-muted-foreground text-sm">
-            Add and set up remote servers to deploy containerized services and
-            database clusters.
+            Add isolated deployment servers for applications, databases, and
+            Compose workloads.
           </p>
         </div>
         <Button
@@ -280,8 +280,8 @@ export default function RemoteServersPage() {
             No Remote Servers
           </h2>
           <p className="mt-2 max-w-sm text-muted-foreground text-sm">
-            Configure your remote nodes via secure SSH tunnels to scale
-            deployments across multiple Swarm hosts.
+            Provision independent Docker environments through secure SSH. Each
+            server owns its Swarm, network, workloads, and routing.
           </p>
           <Button onClick={() => setDialogOpen(true)} className="mt-6 gap-2">
             <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
@@ -444,8 +444,8 @@ export default function RemoteServersPage() {
                   : `Setting up ${setupServer?.name ?? "server"}`}
             </DialogTitle>
             <DialogDescription>
-              Upstand installs and verifies Docker, then safely reconciles this
-              host with the active Swarm cluster.
+              Upstand installs and verifies Docker, initializes this server's
+              independent Swarm, creates its network, and starts Caddy routing.
             </DialogDescription>
           </DialogHeader>
 
@@ -474,8 +474,8 @@ export default function RemoteServersPage() {
 
             {setupMutation.isPending && (
               <p className="text-muted-foreground text-sm">
-                Waiting for Docker to confirm the node joined. This can take a
-                few seconds when the daemon completes the join asynchronously.
+                Provisioning Docker, the local Swarm, the Upstand network, and
+                the routing service. This can take a few minutes on a new VPS.
               </p>
             )}
 
@@ -491,9 +491,10 @@ export default function RemoteServersPage() {
                   {setupMutation.error.message}
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  For safety, Upstand does not automatically leave an existing
-                  Swarm. Resolve the stated network or cluster issue on the
-                  server, then retry setup.
+                  Upstand does not force-leave an existing Swarm. An active
+                  existing Swarm can be reused; if initialization failed,
+                  resolve the Docker or advertised-address issue on the server,
+                  then retry setup.
                 </p>
               </div>
             )}

@@ -9,6 +9,7 @@ import {
   QueueDeploymentUseCase,
 } from "../deployment/queue-deployment.usecase";
 import type { DockerService } from "./docker.service";
+import { resolveDockerServiceForServer } from "./docker-client";
 
 export const ControlResourceInputSchema = z.object({
   id: z.string().min(1, "Resource ID is required"),
@@ -48,22 +49,32 @@ export class ControlResourceUseCase {
     }
 
     return this.uow.transaction(async (tx) => {
-      await this.dockerService.controlService(resource, input.command);
+      const { dockerService, cleanup } = await resolveDockerServiceForServer(
+        resource.serverId,
+        tx,
+        this.dockerService,
+      );
 
-      const status = input.command === "stop" ? "stopped" : "running";
+      try {
+        await dockerService.controlService(resource, input.command);
 
-      // Instantly query updated containers
-      const containers = await this.dockerService.getContainers(resource);
+        const status = input.command === "stop" ? "stopped" : "running";
 
-      const updated = await tx.resourceRepository.updateById(resource.id, {
-        status,
-        containers: JSON.stringify(containers),
-      });
+        // Instantly query updated containers
+        const containers = await dockerService.getContainers(resource);
 
-      if (!updated) {
-        throw new ValidationError("Resource could not be updated");
+        const updated = await tx.resourceRepository.updateById(resource.id, {
+          status,
+          containers: JSON.stringify(containers),
+        });
+
+        if (!updated) {
+          throw new ValidationError("Resource could not be updated");
+        }
+        return updated;
+      } finally {
+        cleanup();
       }
-      return updated;
     });
   }
 }

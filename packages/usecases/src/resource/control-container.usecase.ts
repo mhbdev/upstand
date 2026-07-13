@@ -5,6 +5,7 @@ import {
 } from "@upstand/domain";
 import { z } from "zod";
 import type { DockerService } from "./docker.service";
+import { resolveDockerServiceForServer } from "./docker-client";
 
 export const ControlContainerInputSchema = z.object({
   resourceId: z.string().min(1, "Resource ID is required"),
@@ -28,18 +29,28 @@ export class ControlContainerUseCase {
       const resource = await tx.resourceRepository.findById(input.resourceId);
       if (!resource) throw new ValidationError("Resource not found");
 
-      await this.dockerService.controlContainer(
-        resource,
-        input.containerId,
-        input.command,
+      const { dockerService, cleanup } = await resolveDockerServiceForServer(
+        resource.serverId,
+        tx,
+        this.dockerService,
       );
 
-      const containers = await this.dockerService.getContainers(resource);
-      const updated = await tx.resourceRepository.updateById(resource.id, {
-        containers: JSON.stringify(containers),
-      });
-      if (!updated) throw new ValidationError("Resource could not be updated");
-      return updated;
+      try {
+        await dockerService.controlContainer(
+          resource,
+          input.containerId,
+          input.command,
+        );
+
+        const containers = await dockerService.getContainers(resource);
+        const updated = await tx.resourceRepository.updateById(resource.id, {
+          containers: JSON.stringify(containers),
+        });
+        if (!updated) throw new ValidationError("Resource could not be updated");
+        return updated;
+      } finally {
+        cleanup();
+      }
     });
   }
 }

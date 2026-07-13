@@ -10,14 +10,17 @@ import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
 import { getInstallationToken } from "../git-provider/github-client";
-import type { DockerService } from "../resource/docker.service";
-import { getDockerInstance } from "../resource/docker-client";
+import { DockerService } from "../resource/docker.service";
+import {
+  createRemoteDocker,
+  createRemoteDockerCliEnvironment,
+} from "../resource/docker-client";
 import {
   CaddyServiceToken,
   DockerServiceToken,
   PublishNotificationUseCaseToken,
 } from "../tokens";
-import type { CaddyService } from "../web-server/caddy.service";
+import { CaddyService } from "../web-server/caddy.service";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 import { ResourceLock } from "./resource-lock";
 
@@ -212,6 +215,7 @@ export class DeploymentWorker {
     let logsAccumulator = "Deployment pipeline started in queue worker...\n";
     let flushTimeout: ReturnType<typeof setTimeout> | null = null;
     let flushInFlight: Promise<void> | null = null;
+    let remoteCliCleanup: (() => void) | null = null;
 
     const scope = this.getServiceProvider().createScope();
     let uow: IUnitOfWork;
@@ -401,67 +405,47 @@ export class DeploymentWorker {
       if (!resource) {
         throw new Error("Resource not found");
       }
+      const deployedResource = resource;
 
-      // Resolve Swarm Node constraints if deploying to a remote server
-      let constraints: string[] | undefined;
-      const targetServerId = resource.serverId;
       if (
-        targetServerId &&
-        targetServerId !== "local" &&
-        targetServerId !== "manager"
+        deployedResource.serverId &&
+        !["local", "manager"].includes(deployedResource.serverId)
       ) {
-        appendLog(
-          `Resolving target remote server with ID: ${targetServerId}...\n`,
+        const server = await uow.serverRepository.findById(
+          deployedResource.serverId,
         );
-        const server = await uow.transaction(async (tx) => {
-          return await tx.serverRepository.findById(targetServerId);
-        });
-        if (server) {
-          appendLog(
-            `Target server resolved to '${server.name}' (${server.ipAddress}). Matching with Swarm nodes...\n`,
-          );
-          try {
-            const dockerClient = getDockerInstance();
-            const nodes = await dockerClient.listNodes().catch(() => []);
-            const matchedNode = nodes.find(
-              (node: any) =>
-                node.Status?.Addr === server.ipAddress ||
-                (node.ManagerStatus?.Addr &&
-                  node.ManagerStatus.Addr.split(":")[0] === server.ipAddress),
-            );
-            if (matchedNode) {
-              appendLog(
-                `Matched with Swarm Node ID: ${matchedNode.ID}. Adding placement constraint.\n`,
-              );
-              constraints = [`node.id == ${matchedNode.ID}`];
-            } else {
-              const matchedByName = nodes.find(
-                (node: any) =>
-                  node.Description?.Hostname === server.name ||
-                  node.Spec?.Name === server.name,
-              );
-              if (matchedByName) {
-                appendLog(
-                  `Matched with Swarm Node Hostname: ${matchedByName.Description?.Hostname}. Adding placement constraint.\n`,
-                );
-                constraints = [`node.id == ${matchedByName.ID}`];
-              } else {
-                appendLog(
-                  `Warning: No active Swarm Node matches server IP '${server.ipAddress}' or name '${server.name}'. Swarm scheduler will decide node placement.\n`,
-                );
-              }
-            }
-          } catch (err: any) {
-            appendLog(
-              `Warning: Failed to list Swarm nodes for placement matching: ${err.message}\n`,
-            );
-          }
-        } else {
-          appendLog(
-            `Warning: Server with ID '${targetServerId}' not found in database. Swarm scheduler will decide node placement.\n`,
-          );
+        if (!server) throw new Error("Target deployment server not found");
+        if (!server.sshKeyId) {
+          throw new Error("Target deployment server has no SSH key configured");
         }
+        const sshKey = await uow.sshKeyRepository.findById(server.sshKeyId);
+        if (!sshKey)
+          throw new Error("Target deployment server SSH key not found");
+        const privateKey = decryptSecret({
+          ciphertext: sshKey.privateKeyCiphertext,
+          iv: sshKey.privateKeyIv,
+          authTag: sshKey.privateKeyAuthTag,
+          keyVersion: sshKey.privateKeyVersion,
+        });
+        const connection = {
+          host: server.ipAddress,
+          port: server.port,
+          username: server.username,
+          privateKey,
+        };
+        const remoteDocker = createRemoteDocker(connection);
+        const remoteCli = createRemoteDockerCliEnvironment(connection);
+        remoteCliCleanup = remoteCli.cleanup;
+        dockerService = new DockerService(remoteDocker, remoteCli.environment);
+        caddyService = new CaddyService(remoteDocker);
+        appendLog(
+          `Using independent Docker environment on '${server.name}'.\n`,
+        );
       }
+
+      // Remote servers have their own scheduler, so placement constraints from
+      // the control-plane Swarm are intentionally not applied.
+      const constraints: string[] | undefined = undefined;
 
       const envVars = JSON.parse(resource.envVars || "{}");
 
@@ -690,7 +674,22 @@ export class DeploymentWorker {
           await tx.resourceRepository.findMany(),
           await tx.webServerSettingsRepository.findGlobal(),
         ]);
-        await caddyService.syncResourceConfigs(resources, settings || {});
+        const routingResources =
+          deployedResource.serverId &&
+          !["local", "manager"].includes(deployedResource.serverId)
+            ? resources.filter(
+                (candidate) => candidate.serverId === deployedResource.serverId,
+              )
+            : resources.filter(
+                (candidate) =>
+                  !candidate.serverId ||
+                  candidate.serverId === "local" ||
+                  candidate.serverId === "manager",
+              );
+        await caddyService.syncResourceConfigs(
+          routingResources,
+          settings || {},
+        );
         appendLog("Caddy routing reloaded successfully.\n");
       }
 
@@ -731,6 +730,7 @@ export class DeploymentWorker {
         }
       }
       await scope.dispose();
+      remoteCliCleanup?.();
       await resourceLock.release().catch((error) => {
         log.error({
           message: "Failed to release resource deployment lock",

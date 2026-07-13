@@ -3,6 +3,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -57,7 +64,16 @@ const formatBytes = (bytes: number): string => {
 export default function MonitoringPage() {
   const { data: activeOrganization, isPending: organizationPending } =
     authClient.useActiveOrganization();
+  const [selectedServerId, setSelectedServerId] = useState<string>("local");
   const [history, setHistory] = useState<MetricPoint[]>([]);
+
+  const { data: servers } = useQuery({
+    ...trpc.server.list.queryOptions({
+      organizationId: activeOrganization?.id ?? "",
+    }),
+    enabled: Boolean(activeOrganization?.id),
+  });
+
   const {
     data: stats,
     isPending,
@@ -65,10 +81,15 @@ export default function MonitoringPage() {
   } = useQuery({
     ...trpc.server.runtimeStats.queryOptions({
       organizationId: activeOrganization?.id ?? "",
+      serverId: selectedServerId === "local" ? undefined : selectedServerId,
     }),
     enabled: Boolean(activeOrganization?.id),
     refetchInterval: 5_000,
   });
+
+  useEffect(() => {
+    setHistory([]);
+  }, [selectedServerId]);
 
   useEffect(() => {
     if (!stats) return;
@@ -138,7 +159,7 @@ export default function MonitoringPage() {
     {
       label: "Active containers",
       value: String(stats.activeContainers),
-      description: "Running on this manager",
+      description: selectedServerId === "local" ? "Running on this manager" : "Running on this server",
       icon: Server,
     },
     {
@@ -164,7 +185,29 @@ export default function MonitoringPage() {
             when this page opens and refreshes every five seconds.
           </>
         }
-        actions={<Badge variant="outline">Docker {stats.dockerVersion}</Badge>}
+        actions={
+          <div className="flex items-center gap-3">
+            <Select
+              value={selectedServerId}
+              onValueChange={(val) => val && setSelectedServerId(val)}
+            >
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Local Server" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="local">Local Server (Leader)</SelectItem>
+                {servers
+                  ?.filter((srv: any) => srv.status === "ready")
+                  ?.map((srv: any) => (
+                    <SelectItem key={srv.id} value={srv.id}>
+                      {srv.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Badge variant="outline">Docker {stats.dockerVersion}</Badge>
+          </div>
+        }
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

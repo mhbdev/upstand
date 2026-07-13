@@ -418,7 +418,11 @@ services.addTransient(
 );
 services.addTransient(
   GetServerRuntimeStatsUseCaseToken,
-  (c) => new GetServerRuntimeStatsUseCase(c.resolve(DockerServiceToken)),
+  (c) =>
+    new GetServerRuntimeStatsUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(DockerServiceToken),
+    ),
 );
 services.addTransient(
   GetAccountStatusUseCaseToken,

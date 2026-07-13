@@ -13,7 +13,6 @@ import {
   requireActiveManager,
 } from "../swarm/swarm.helpers";
 
-const docker = getDockerInstance();
 const CADDY_CONTAINER_NAME = "upstand-caddy";
 const CADDY_IMAGE = "caddy:2.8-alpine";
 const CADDYFILE_PATH = "/etc/caddy/Caddyfile";
@@ -388,9 +387,14 @@ export function generateCaddyfileContent(
 }
 
 export class CaddyService {
+  private readonly docker: Docker;
   private readonly networkName =
     process.env.DOCKER_NETWORK || "upstand-network";
   private configurationTail: Promise<void> = Promise.resolve();
+
+  constructor(docker: Docker = getDockerInstance()) {
+    this.docker = docker;
+  }
 
   private async serializeConfiguration<T>(work: () => Promise<T>): Promise<T> {
     const previous = this.configurationTail;
@@ -408,12 +412,12 @@ export class CaddyService {
   }
 
   private async initializeSwarm(): Promise<void> {
-    await requireActiveManager(docker);
+    await requireActiveManager(this.docker);
   }
 
   private async ensureNetwork(): Promise<void> {
     await this.initializeSwarm();
-    await ensureUpstandOverlayNetwork(docker);
+    await ensureUpstandOverlayNetwork(this.docker);
   }
 
   private async reconcileResourceNetworks(
@@ -422,7 +426,7 @@ export class CaddyService {
     const routes = getRoutes(resources);
     if (routes.length === 0) return new Set();
 
-    const sharedNetwork = await ensureUpstandOverlayNetwork(docker);
+    const sharedNetwork = await ensureUpstandOverlayNetwork(this.docker);
     const resourcesById = new Map(
       resources.map((resource) => [resource.id, resource]),
     );
@@ -439,13 +443,13 @@ export class CaddyService {
           resource.advancedConfig,
         ).isolatedDeployment;
         network = isolated
-          ? await ensureResourceOverlayNetwork(docker, resource.id)
+          ? await ensureResourceOverlayNetwork(this.docker, resource.id)
           : { id: sharedNetwork.id, name: this.networkName };
         networksByResource.set(resource.id, network);
         desiredNetworkNames.add(network.name);
 
         try {
-          await docker.getNetwork(network.name).connect({
+          await this.docker.getNetwork(network.name).connect({
             Container: CADDY_CONTAINER_NAME,
           });
         } catch (error: unknown) {
@@ -461,7 +465,7 @@ export class CaddyService {
         0,
         route.upstream.lastIndexOf(":"),
       );
-      const service = docker.getService(serviceName);
+      const service = this.docker.getService(serviceName);
       let inspect: Docker.Service;
       try {
         inspect = await service.inspect();
@@ -512,7 +516,7 @@ export class CaddyService {
   private async detachStaleResourceNetworks(
     desiredNetworkNames: Set<string>,
   ): Promise<void> {
-    const managedNetworks = await docker.listNetworks({
+    const managedNetworks = await this.docker.listNetworks({
       filters: JSON.stringify({
         label: ["com.upstand.purpose=resource-isolation"],
       }),
@@ -521,7 +525,7 @@ export class CaddyService {
     for (const network of managedNetworks) {
       if (!network.Name || desiredNetworkNames.has(network.Name)) continue;
       try {
-        await docker.getNetwork(network.Id).disconnect({
+        await this.docker.getNetwork(network.Id).disconnect({
           Container: CADDY_CONTAINER_NAME,
           Force: true,
         });
@@ -540,13 +544,13 @@ export class CaddyService {
   }
 
   private async ensureVolume(name: string): Promise<void> {
-    const volumes = await docker.listVolumes();
+    const volumes = await this.docker.listVolumes();
     if (volumes.Volumes?.some((volume) => volume.Name === name)) return;
-    await docker.createVolume({ Name: name });
+    await this.docker.createVolume({ Name: name });
   }
 
   private async ensureImage(): Promise<void> {
-    const images = await docker.listImages();
+    const images = await this.docker.listImages();
     if (
       images.some((image) => image.RepoTags?.some((tag) => tag === CADDY_IMAGE))
     ) {
@@ -554,16 +558,16 @@ export class CaddyService {
     }
 
     log.info({ message: `Pulling ${CADDY_IMAGE} image...` });
-    const stream = await docker.pull(CADDY_IMAGE);
+    const stream = await this.docker.pull(CADDY_IMAGE);
     await new Promise<void>((resolve, reject) => {
-      docker.modem.followProgress(stream, (error) =>
+      this.docker.modem.followProgress(stream, (error) =>
         error ? reject(error) : resolve(),
       );
     });
   }
 
   private async findContainer() {
-    const container = docker.getContainer(CADDY_CONTAINER_NAME);
+    const container = this.docker.getContainer(CADDY_CONTAINER_NAME);
     try {
       await container.inspect();
       return container;
@@ -619,7 +623,7 @@ export class CaddyService {
         const details = await container.inspect();
         if (!details.State.Running) await container.start();
         try {
-          await docker.getNetwork(this.networkName).connect({
+          await this.docker.getNetwork(this.networkName).connect({
             Container: container.id,
           });
         } catch (error: unknown) {
@@ -662,7 +666,7 @@ export class CaddyService {
         ...parseCaddyEnvironment(settings.caddyEnvironment),
         `UPSTAND_CADDYFILE_B64=${bootstrapConfig}`,
       ];
-      const created = await docker.createContainer({
+      const created = await this.docker.createContainer({
         name: CADDY_CONTAINER_NAME,
         Image: CADDY_IMAGE,
         Env: env,
@@ -686,7 +690,7 @@ export class CaddyService {
         },
       });
 
-      const network = docker.getNetwork(this.networkName);
+      const network = this.docker.getNetwork(this.networkName);
       await network.connect({ Container: created.id });
       await created.start();
       log.info({ message: "Caddy container created and started." });
@@ -694,7 +698,7 @@ export class CaddyService {
   }
 
   private async exec(
-    container: ReturnType<typeof docker.getContainer>,
+    container: ReturnType<Docker["getContainer"]>,
     command: string[],
   ): Promise<string> {
     const execution = await container.exec({
@@ -726,7 +730,7 @@ export class CaddyService {
   }
 
   private async writeFile(
-    container: ReturnType<typeof docker.getContainer>,
+    container: ReturnType<Docker["getContainer"]>,
     fileName: string,
     content: string,
   ): Promise<void> {

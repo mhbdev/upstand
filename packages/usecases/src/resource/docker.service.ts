@@ -330,9 +330,18 @@ function applyComposeIngressNetwork(
 }
 
 export class DockerService {
-  private readonly docker = getDockerInstance();
+  private readonly docker: Docker;
+  private readonly commandEnvironment: NodeJS.ProcessEnv;
   private readonly networkName =
     process.env.DOCKER_NETWORK || "upstand-network";
+
+  constructor(
+    docker: Docker = getDockerInstance(),
+    commandEnvironment: NodeJS.ProcessEnv = {} as NodeJS.ProcessEnv,
+  ) {
+    this.docker = docker;
+    this.commandEnvironment = commandEnvironment;
+  }
 
   private applyAdvancedConfig(
     resource: Resource,
@@ -2085,7 +2094,11 @@ export class DockerService {
     return new Promise((resolve, reject) => {
       const p = spawn(cmd, args, {
         shell: false,
-        env: env ? { ...process.env, ...env } : undefined,
+        env: {
+          ...process.env,
+          ...this.commandEnvironment,
+          ...(env ?? {}),
+        },
       });
 
       p.stdout.on("data", (data) => {
