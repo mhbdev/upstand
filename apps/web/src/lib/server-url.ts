@@ -26,7 +26,8 @@ export function getServerUrl(configured = env.NEXT_PUBLIC_SERVER_URL): string {
     return `${window.location.protocol}//${apiHost}`;
   }
 
-  return configuredUrl?.hostname === "localhost" || configuredUrl?.hostname === "127.0.0.1"
+  return configuredUrl?.hostname === "localhost" ||
+    configuredUrl?.hostname === "127.0.0.1"
     ? normalized
     : "http://localhost:3000";
 }

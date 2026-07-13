@@ -91,11 +91,15 @@ export class GetWebServerSettingsUseCase {
 ${apiHost} {
 \tencode zstd gzip
 \treverse_proxy upstand_server:3000
-}${validHost(docsHost) ? `
+}${
+      validHost(docsHost)
+        ? `
 
 ${docsHost} {
 	encode zstd gzip
 	reverse_proxy upstand_fumadocs:4000
-}` : ""}`;
+}`
+        : ""
+    }`;
   }
 }

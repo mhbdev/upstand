@@ -34,9 +34,9 @@ import {
 } from "@upstand/ui/components/select";
 import { useState } from "react";
 import { toast } from "sonner";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
 
 export default function RemoteServersPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
@@ -180,7 +180,7 @@ export default function RemoteServersPage() {
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <CardTitle className="font-semibold text-base">
                         {srv.name}
                       </CardTitle>
@@ -190,10 +190,12 @@ export default function RemoteServersPage() {
                       >
                         {srv.status.replace("_", " ")}
                       </Badge>
-                      </div>
-                      {srv.setupError ? (
-                        <p className="mt-2 text-destructive text-xs">{srv.setupError}</p>
-                      ) : null}
+                    </div>
+                    {srv.setupError ? (
+                      <p className="mt-2 text-destructive text-xs">
+                        {srv.setupError}
+                      </p>
+                    ) : null}
                     <CardDescription className="text-muted-foreground text-xs">
                       {srv.description || "Deploy server"}
                     </CardDescription>

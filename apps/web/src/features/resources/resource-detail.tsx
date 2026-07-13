@@ -1,0 +1,355 @@
+"use client";
+
+import {
+  ComputerIcon,
+  DatabaseIcon,
+  ServerStack01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { Badge } from "@upstand/ui/components/badge";
+import { Button } from "@upstand/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@upstand/ui/components/card";
+import { Label } from "@upstand/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@upstand/ui/components/tabs";
+import { cn } from "@upstand/ui/lib/utils";
+import {
+  Activity,
+  Code,
+  Globe,
+  HardDrive,
+  RefreshCw,
+  Settings,
+  Terminal,
+} from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
+import { ShowDockerLogs } from "@/components/shared/docker-logs";
+import { BackupPanel } from "@/features/backups";
+import { ContainersTab } from "./components/containers-tab";
+import { DeploymentsTab } from "./components/deployments-tab";
+import { DomainsTab } from "./components/domains-tab";
+import { EnvironmentTab } from "./components/environment-tab";
+import { GeneralTab } from "./components/general-tab";
+import { MonitoringTab } from "./components/monitoring-tab";
+import { useResourceDetail } from "./hooks/use-resource-detail";
+
+const TYPE_ICONS: Record<string, IconSvgElement> = {
+  application: ComputerIcon,
+  database: DatabaseIcon,
+  compose: ServerStack01Icon,
+};
+
+const TYPE_BG: Record<string, string> = {
+  application: "bg-primary/10 text-primary",
+  database: "bg-amber-500/10 text-amber-500",
+  compose: "bg-violet-500/10 text-violet-500",
+};
+
+interface ResourceDetailProps {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  session: any;
+}
+
+export default function ResourceDetail({
+  projectId,
+  environmentId,
+  resourceId,
+}: ResourceDetailProps) {
+  const [selectedLogContainerId, setSelectedLogContainerId] = useState("all");
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(
+    null,
+  );
+  const [containerModalOpen, setContainerModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
+
+  const {
+    project,
+    sshKeys,
+    gitProviders,
+    resource,
+    loadingResource,
+    routingTargets,
+    liveContainers,
+    logsData,
+    statsData,
+    containerLogsData,
+    updateResource,
+    isUpdatingResource,
+    deployResource,
+    isDeployingResource,
+    controlResource,
+    isControllingResource,
+    deleteResource,
+    isDeletingResource,
+  } = useResourceDetail({
+    projectId,
+    environmentId,
+    resourceId,
+    selectedLogContainerId,
+    selectedContainerId: selectedContainerId || undefined,
+    containerModalOpen,
+    statsIntervalEnabled: activeTab === "monitoring",
+  });
+
+  const realLogs = useMemo(() => {
+    if (!logsData) return [];
+    return logsData.trim().split("\n");
+  }, [logsData]);
+
+  const containerList = useMemo(() => {
+    if (liveContainers) return liveContainers;
+    if (resource?.containers) {
+      try {
+        const parsed = JSON.parse(resource.containers);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [liveContainers, resource]);
+
+  if (loadingResource || !resource) {
+    return (
+      <div className="flex h-[50dvh] items-center justify-center">
+        <RefreshCw className="size-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const Icon = TYPE_ICONS[resource.type] || ComputerIcon;
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+      {/* Header section */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "rounded-xl p-2.5",
+              TYPE_BG[resource.type] || "bg-primary/10",
+            )}
+          >
+            <HugeiconsIcon icon={Icon} className="size-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-bold text-2xl text-foreground">
+                {resource.name}
+              </h1>
+              <Badge variant="outline" className="capitalize">
+                {resource.type}
+              </Badge>
+            </div>
+            <p className="mt-1 font-normal text-muted-foreground text-xs">
+              Status:{" "}
+              <span
+                className={cn(
+                  "font-bold",
+                  resource.status === "running"
+                    ? "text-emerald-500"
+                    : "text-muted-foreground",
+                )}
+              >
+                {resource.status}
+              </span>
+            </p>
+          </div>
+        </div>
+        <Link href={`/projects/${projectId}/${environmentId}` as Route}>
+          <Button variant="outline">Back to Environment</Button>
+        </Link>
+      </div>
+
+      {/* Tabs */}
+      <Tabs
+        defaultValue="general"
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
+        <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
+          <TabsTrigger value="general" className="shrink-0 gap-2">
+            <Settings className="size-4" /> General
+          </TabsTrigger>
+          <TabsTrigger value="environment" className="shrink-0 gap-2">
+            <Code className="size-4" /> Environment
+          </TabsTrigger>
+          <TabsTrigger value="advanced" className="shrink-0 gap-2">
+            <Settings className="size-4" /> Advanced
+          </TabsTrigger>
+          <TabsTrigger value="domains" className="shrink-0 gap-2">
+            <Globe className="size-4" /> Domains
+          </TabsTrigger>
+          <TabsTrigger value="deployments" className="shrink-0 gap-2">
+            <RefreshCw className="size-4" /> Deployments
+          </TabsTrigger>
+          <TabsTrigger value="containers" className="shrink-0 gap-2">
+            <HugeiconsIcon icon={ServerStack01Icon} className="size-4" />{" "}
+            Containers
+          </TabsTrigger>
+          <TabsTrigger value="backups" className="shrink-0 gap-2">
+            <HardDrive className="size-4" /> Backups
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="shrink-0 gap-2">
+            <Terminal className="size-4" /> Logs
+          </TabsTrigger>
+          <TabsTrigger value="monitoring" className="shrink-0 gap-2">
+            <Activity className="size-4" /> Monitoring
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="outline-none">
+          <GeneralTab
+            resource={resource}
+            sshKeys={sshKeys}
+            gitProviders={gitProviders}
+            updateResource={updateResource}
+            isUpdatingResource={isUpdatingResource}
+            deployResource={deployResource}
+            isDeployingResource={isDeployingResource}
+            controlResource={controlResource}
+            isControllingResource={isControllingResource}
+            deleteResource={deleteResource}
+            isDeletingResource={isDeletingResource}
+          />
+        </TabsContent>
+
+        <TabsContent value="environment" className="outline-none">
+          <EnvironmentTab
+            resource={resource}
+            updateResource={updateResource}
+            isUpdatingResource={isUpdatingResource}
+          />
+        </TabsContent>
+
+        <TabsContent value="advanced" className="outline-none">
+          <ResourceAdvancedSettings
+            resourceId={resourceId}
+            resourceType={resource.type}
+            advancedConfig={resource.advancedConfig}
+          />
+        </TabsContent>
+
+        <TabsContent value="domains" className="outline-none">
+          <DomainsTab
+            resource={resource}
+            updateResource={updateResource}
+            isUpdatingResource={isUpdatingResource}
+            routingTargets={routingTargets}
+          />
+        </TabsContent>
+
+        <TabsContent value="deployments" className="outline-none">
+          <DeploymentsTab
+            resource={resource}
+            updateResource={updateResource}
+            deployResource={deployResource}
+            isDeployingResource={isDeployingResource}
+          />
+        </TabsContent>
+
+        <TabsContent value="containers" className="outline-none">
+          <ContainersTab
+            resource={resource}
+            liveContainers={liveContainers}
+            containerLogsData={containerLogsData}
+            controlResource={controlResource}
+            setContainerModalOpen={setContainerModalOpen}
+            setSelectedContainerId={setSelectedContainerId}
+          />
+        </TabsContent>
+
+        <TabsContent value="backups" className="outline-none">
+          {project?.organizationId && (
+            <BackupPanel
+              resource={resource}
+              organizationId={project.organizationId}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="logs" className="outline-none">
+          <Card className="border border-border/40 bg-card/20">
+            <CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="font-semibold text-lg">
+                  Container Logs
+                </CardTitle>
+                <CardDescription className="font-normal text-muted-foreground text-sm">
+                  View live stderr/stdout output streams from active containers.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor="log-container-select"
+                  className="whitespace-nowrap font-medium text-muted-foreground text-xs"
+                >
+                  Filter by Container:
+                </Label>
+                <Select
+                  value={selectedLogContainerId}
+                  onValueChange={(value) =>
+                    setSelectedLogContainerId(value ?? "all")
+                  }
+                >
+                  <SelectTrigger
+                    id="log-container-select"
+                    className="h-9 w-56 border-border/40 bg-background text-xs"
+                  >
+                    <SelectValue placeholder="Select Container" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">
+                      All Containers
+                    </SelectItem>
+                    {containerList.map((con: any) => (
+                      <SelectItem
+                        key={con.id}
+                        value={con.id}
+                        className="text-xs"
+                      >
+                        {con.name} ({con.id.substring(0, 7)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="border-border/20 border-t pt-4">
+              <ShowDockerLogs
+                containerId={selectedLogContainerId}
+                logs={realLogs}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="monitoring" className="outline-none">
+          <MonitoringTab statsData={statsData} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

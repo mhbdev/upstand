@@ -26,9 +26,9 @@ import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { useState } from "react";
 import { toast } from "sonner";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
 
 export default function DockerRegistryPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();

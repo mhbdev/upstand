@@ -45,8 +45,8 @@ import { CreateOrganizationDialog } from "@/components/auth/organization/create-
 import { OrganizationSwitcher } from "@/components/auth/organization/organization-switcher";
 import { UserButton } from "@/components/auth/user/user-button";
 import { ModeToggle } from "@/components/mode-toggle";
-import { SettingsDialog } from "@/components/settings-dialog";
 import { UpGalChat } from "@/components/upgal-chat";
+import { SettingsDialog } from "@/features/settings";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 

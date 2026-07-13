@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import { cn } from "@upstand/ui/lib/utils";
+import type { ReactNode } from "react";
 
 export function DashboardPage({
   children,
@@ -51,7 +51,9 @@ export function DashboardPageHeader({
           </p>
         )}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>
+      )}
     </header>
   );
 }

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import ResourceDetail from "@/features/resources";
 import { getServerSession } from "@/lib/server-session";
-import ResourceDetail from "./resource-detail";
 
 export const dynamic = "force-dynamic";
 

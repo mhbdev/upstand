@@ -1,6 +1,14 @@
 "use client";
 
 import {
+  CopyIcon,
+  RefreshCcwIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+} from "lucide-react";
+import { nanoid } from "nanoid";
+import { memo, useCallback, useState } from "react";
+import {
   Attachment,
   AttachmentPreview,
   AttachmentRemove,
@@ -20,14 +28,6 @@ import {
   MessageResponse,
   MessageToolbar,
 } from "@/components/ai-elements/message";
-import {
-  CopyIcon,
-  RefreshCcwIcon,
-  ThumbsDownIcon,
-  ThumbsUpIcon,
-} from "lucide-react";
-import { nanoid } from "nanoid";
-import { memo, useCallback, useState } from "react";
 
 const messages: {
   key: string;
@@ -186,7 +186,7 @@ const LikeAction = memo(
   ({ messageKey, isLiked, onToggle }: LikeActionProps) => {
     const handleClick = useCallback(
       () => onToggle(messageKey),
-      [messageKey, onToggle]
+      [messageKey, onToggle],
     );
     return (
       <MessageAction
@@ -200,7 +200,7 @@ const LikeAction = memo(
         />
       </MessageAction>
     );
-  }
+  },
 );
 
 LikeAction.displayName = "LikeAction";
@@ -215,7 +215,7 @@ const DislikeAction = memo(
   ({ messageKey, isDisliked, onToggle }: DislikeActionProps) => {
     const handleClick = useCallback(
       () => onToggle(messageKey),
-      [messageKey, onToggle]
+      [messageKey, onToggle],
     );
     return (
       <MessageAction
@@ -229,7 +229,7 @@ const DislikeAction = memo(
         />
       </MessageAction>
     );
-  }
+  },
 );
 
 DislikeAction.displayName = "DislikeAction";

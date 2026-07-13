@@ -1,48 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { ServiceScope } from "@circulo-ai/di";
-import { validateUIMessages } from "ai";
 import { trpcServer } from "@hono/trpc-server";
-import { createContext } from "@upstand/api/context";
-import { serviceProvider } from "@upstand/api/di";
-import {
-  BackupSchedulerToken,
-  CreateGitProviderUseCaseToken,
-  GetUpdateStatusUseCaseToken,
-  GetWebServerSettingsUseCaseToken,
-  TriggerUpdateUseCaseToken,
-} from "@upstand/usecases/tokens";
-import { appRouter } from "@upstand/api/routers/index";
-import { auth } from "@upstand/auth";
-import { db } from "@upstand/db";
-import * as authSchema from "@upstand/db/schema/auth";
-import {
-  isJsonObject,
-  type IUnitOfWork,
-  UnitOfWorkToken,
-} from "@upstand/domain";
-import { AIRepositoryToken } from "@upstand/repositories";
-import { decryptSecret } from "@upstand/domain/crypto/secret-box";
-import { env } from "@upstand/env/server";
-import { closeRedis, pingRedis, redis } from "@upstand/redis";
-import {
-  BackupRunWorker,
-  DeploymentWorker,
-  getDockerInstance,
-  NotificationDeliveryWorker,
-  QueueDeploymentUseCase,
-  reconcileQueuedJobs,
-} from "@upstand/usecases";
-import { initLogger, log } from "evlog";
-import {
-  type BetterAuthInstance,
-  createAuthMiddleware,
-} from "evlog/better-auth";
-import { type EvlogVariables, evlog } from "evlog/hono";
-import { Hono } from "hono";
-import { upgradeWebSocket, websocket } from "hono/bun";
-import { cors } from "hono/cors";
-import { count } from "drizzle-orm";
-import { runDatabaseMigrations } from "./startup";
-import { terminalBroker } from "./terminal-broker";
+import { ensureOrganizationAccess } from "@upstand/api/access-control";
 import {
   createUpGalResponse,
   createUpGalTools,
@@ -57,9 +16,50 @@ import {
   authenticateApiKey,
   setApiKeyRateLimitHeaders,
 } from "@upstand/api/api-key-auth";
-import { ensureOrganizationAccess } from "@upstand/api/access-control";
-import { randomUUID } from "node:crypto";
+import { createContext } from "@upstand/api/context";
+import { serviceProvider } from "@upstand/api/di";
+import { appRouter } from "@upstand/api/routers/index";
+import { auth } from "@upstand/auth";
+import { db } from "@upstand/db";
+import * as authSchema from "@upstand/db/schema/auth";
+import {
+  type IUnitOfWork,
+  isJsonObject,
+  UnitOfWorkToken,
+} from "@upstand/domain";
+import { decryptSecret } from "@upstand/domain/crypto/secret-box";
+import { env } from "@upstand/env/server";
+import { closeRedis, pingRedis, redis } from "@upstand/redis";
+import { AIRepositoryToken } from "@upstand/repositories";
+import {
+  BackupRunWorker,
+  DeploymentWorker,
+  getDockerInstance,
+  NotificationDeliveryWorker,
+  QueueDeploymentUseCase,
+  reconcileQueuedJobs,
+} from "@upstand/usecases";
+import {
+  BackupSchedulerToken,
+  CreateGitProviderUseCaseToken,
+  GetUpdateStatusUseCaseToken,
+  GetWebServerSettingsUseCaseToken,
+  TriggerUpdateUseCaseToken,
+} from "@upstand/usecases/tokens";
+import { validateUIMessages } from "ai";
+import { count } from "drizzle-orm";
+import { initLogger, log } from "evlog";
+import {
+  type BetterAuthInstance,
+  createAuthMiddleware,
+} from "evlog/better-auth";
+import { type EvlogVariables, evlog } from "evlog/hono";
+import { Hono } from "hono";
+import { upgradeWebSocket, websocket } from "hono/bun";
+import { cors } from "hono/cors";
 import { z } from "zod";
+import { runDatabaseMigrations } from "./startup";
+import { terminalBroker } from "./terminal-broker";
 
 initLogger({
   env: { service: "upstand-server" },

@@ -50,7 +50,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { trpc } from "@/utils/trpc";
 
 export default function DeploymentsPage() {

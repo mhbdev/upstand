@@ -77,9 +77,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 type SwarmNode = {
   id: string;
@@ -351,7 +354,9 @@ export default function DockerSwarmPage() {
     <DashboardPage className="gap-6">
       <DashboardPageHeader
         title="Docker Swarm"
-        icon={<HugeiconsIcon icon={Layers01Icon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon icon={Layers01Icon} className="size-6 text-primary" />
+        }
         description="Manage the manager node, workload scheduling, and joining credentials for this Docker Swarm cluster."
         actions={
           <Button

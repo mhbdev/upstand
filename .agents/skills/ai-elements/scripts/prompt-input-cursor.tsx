@@ -1,5 +1,15 @@
 "use client";
 
+import type { SourceDocumentUIPart } from "ai";
+import {
+  AtSignIcon,
+  CheckIcon,
+  FilesIcon,
+  GlobeIcon,
+  ImageIcon,
+  RulerIcon,
+} from "lucide-react";
+import { memo, useCallback, useState } from "react";
 import type { AttachmentData } from "@/components/ai-elements/attachments";
 import {
   Attachment,
@@ -50,16 +60,6 @@ import {
   usePromptInputReferencedSources,
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
-import type { SourceDocumentUIPart } from "ai";
-import {
-  AtSignIcon,
-  CheckIcon,
-  FilesIcon,
-  GlobeIcon,
-  ImageIcon,
-  RulerIcon,
-} from "lucide-react";
-import { memo, useCallback, useState } from "react";
 
 const models = [
   {
@@ -110,7 +110,7 @@ interface AttachmentItemProps {
 const AttachmentItem = memo(({ attachment, onRemove }: AttachmentItemProps) => {
   const handleRemove = useCallback(
     () => onRemove(attachment.id),
-    [onRemove, attachment.id]
+    [onRemove, attachment.id],
   );
   return (
     <Attachment data={attachment} key={attachment.id} onRemove={handleRemove}>
@@ -130,7 +130,7 @@ interface SourceItemProps {
 const SourceItem = memo(({ source, onRemove }: SourceItemProps) => {
   const handleRemove = useCallback(
     () => onRemove(source.id),
-    [onRemove, source.id]
+    [onRemove, source.id],
   );
   return (
     <Attachment data={source} key={source.id} onRemove={handleRemove}>
@@ -235,7 +235,7 @@ const PromptInputAttachmentsDisplay = () => {
 
   const handleRemove = useCallback(
     (id: string) => attachments.remove(id),
-    [attachments]
+    [attachments],
   );
 
   if (attachments.files.length === 0) {
@@ -282,7 +282,7 @@ const SampleFilesMenu = () => {
 
   const handleAdd = useCallback(
     (source: SourceDocumentUIPart) => refs.add(source),
-    [refs]
+    [refs],
   );
 
   return (
@@ -309,8 +309,8 @@ const SampleFilesMenu = () => {
               (source) =>
                 !refs.sources.some(
                   (s) =>
-                    s.title === source.title && s.filename === source.filename
-                )
+                    s.title === source.title && s.filename === source.filename,
+                ),
             )
             .map((source) => (
               <SourceCommandItem
