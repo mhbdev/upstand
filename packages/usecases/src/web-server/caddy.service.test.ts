@@ -16,6 +16,7 @@ describe("Caddy domain configuration", () => {
         stripPath: false,
         port: 3000,
         serviceName: undefined,
+        certificateType: "letsencrypt",
         https: true,
         middlewares: [],
       },
@@ -154,6 +155,27 @@ describe("Caddy domain configuration", () => {
         },
       ]),
     ).toThrow("same HTTPS setting");
+  });
+
+  test("emits an internal certificate policy for private HTTPS routes", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "resource-1",
+        name: "Private app",
+        type: "application",
+        appName: "private-app",
+        domains: JSON.stringify([
+          {
+            host: "private.example.com",
+            port: 3000,
+            certificateType: "internal",
+          },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).toContain("private.example.com {");
+    expect(caddyfile).toContain("tls internal");
   });
 
   test("does not allow custom configuration to expose Caddy's admin API", () => {

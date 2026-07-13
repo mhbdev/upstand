@@ -62,6 +62,11 @@ const DomainMappingInputSchema = z.object({
   serviceName: z.string().regex(SERVICE_NAME_PATTERN).optional(),
   /** true uses Caddy Automatic HTTPS; false serves HTTP only. */
   https: z.boolean().optional().default(true),
+  /** Certificate strategy used by the edge proxy for HTTPS routes. */
+  certificateType: z
+    .enum(["letsencrypt", "internal"])
+    .optional()
+    .default("letsencrypt"),
   /** Names of administrator-defined Caddy snippets to import for this route. */
   middlewares: z
     .array(z.string().regex(MIDDLEWARE_NAME_PATTERN))
@@ -82,6 +87,9 @@ export const DomainMappingSchema = DomainMappingInputSchema.transform(
         path,
         internalPath,
         serviceName: mapping.serviceName?.toLowerCase(),
+        certificateType: mapping.https
+          ? mapping.certificateType
+          : "letsencrypt",
         middlewares: [...new Set(mapping.middlewares)],
       };
     } catch (error) {
@@ -95,7 +103,17 @@ export const DomainMappingSchema = DomainMappingInputSchema.transform(
   },
 );
 
-export type DomainMapping = z.output<typeof DomainMappingSchema>;
+export type DomainMapping = {
+  host: string;
+  path: string;
+  internalPath: string;
+  stripPath: boolean;
+  port: number;
+  serviceName?: string;
+  https: boolean;
+  certificateType: "letsencrypt" | "internal";
+  middlewares: string[];
+};
 
 /**
  * Parses both the current mapping format and the former `{ host, port }` format.

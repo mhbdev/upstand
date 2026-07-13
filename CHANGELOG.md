@@ -6,6 +6,25 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.24 - 2026-07-13
+
+### Added
+
+- Added a responsive, validated domain dialog with clearer route and certificate strategy controls.
+- Added certificate strategy support for Let&apos;s Encrypt automatic renewal and Caddy&apos;s internal CA.
+- Added persistent remote-server setup errors and actionable SSH authentication diagnostics.
+- Added the audit logs dashboard, storage, filtering, pagination, and automatic redacted operation capture.
+
+### Changed
+
+- Made the audit log repository a required dependency of every unit of work.
+- Improved domain route tables with service, rewrite, path, and certificate details.
+- Improved remote setup to run to completion, support passwordless sudo, validate the Swarm manager address, and surface failures to the API.
+
+### Fixed
+
+- Serialized UpGal tool results to JSON-safe values before returning them to the AI SDK, preventing interrupted responses caused by database dates.
+
 ## 0.1.23 - 2026-07-13
 
 ### Added

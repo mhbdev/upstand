@@ -33,6 +33,7 @@ export class CreateServerUseCase {
         username: input.username,
         enableDockerCleanup: input.enableDockerCleanup,
         status: "idle",
+        setupError: null,
       });
     });
   }

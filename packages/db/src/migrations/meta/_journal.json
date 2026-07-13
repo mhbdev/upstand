@@ -155,6 +155,20 @@
       "when": 1783906273440,
       "tag": "0021_true_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1783930601380,
+      "tag": "0022_massive_hannibal_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1783931049066,
+      "tag": "0023_small_jane_foster",
+      "breakpoints": true
     }
   ]
 }

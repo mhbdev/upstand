@@ -641,7 +641,7 @@ function readTool<TInput, TOutput>(
     execute: async (
       input: TInput,
       _options: ToolExecutionOptions<UpGalToolContext>,
-    ) => execute(input),
+    ) => toJsonValue(await execute(input)) as TOutput,
   } satisfies UpGalExecutableTool<TInput, TOutput>;
 }
 
@@ -661,7 +661,7 @@ function mutationTool<TInput, TOutput>(
     execute: async (
       input: TInput,
       _options: ToolExecutionOptions<UpGalToolContext>,
-    ) => execute(input),
+    ) => toJsonValue(await execute(input)) as TOutput,
   } satisfies UpGalExecutableTool<TInput, TOutput>;
 }
 

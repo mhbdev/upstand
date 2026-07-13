@@ -36,6 +36,7 @@ import {
   CaddyService,
   CaddyServiceToken,
   ControlResourceUseCase,
+  CreateAuditLogUseCase,
   CreateBackupScheduleUseCase,
   CreateDockerRegistryUseCase,
   CreateEnvironmentUseCase,
@@ -94,6 +95,7 @@ import {
   GetWebServerLogsUseCase,
   GetWebServerSettingsUseCase,
   InitSwarmUseCase,
+  ListAuditLogsUseCase,
   ListBackupVolumesUseCase,
   ListGitBranchesUseCase,
   ListGitRepositoriesUseCase,
@@ -121,6 +123,7 @@ import { GenerateSshKeyUseCase } from "@upstand/usecases/ssh-key/generate-ssh-ke
 import {
   BackupSchedulerToken,
   ControlResourceUseCaseToken,
+  CreateAuditLogUseCaseToken,
   CreateBackupScheduleUseCaseToken,
   CreateDockerRegistryUseCaseToken,
   CreateEnvironmentUseCaseToken,
@@ -178,6 +181,7 @@ import {
   GetWebServerLogsUseCaseToken,
   GetWebServerSettingsUseCaseToken,
   InitSwarmUseCaseToken,
+  ListAuditLogsUseCaseToken,
   ListBackupVolumesUseCaseToken,
   ListGitBranchesUseCaseToken,
   ListGitRepositoriesUseCaseToken,
@@ -280,6 +284,15 @@ services.addScoped(UnitOfWorkToken, (c) => {
   const executor = c.resolve(DbToken);
   return new DrizzleUnitOfWork(executor);
 });
+
+services.addTransient(
+  CreateAuditLogUseCaseToken,
+  (c) => new CreateAuditLogUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  ListAuditLogsUseCaseToken,
+  (c) => new ListAuditLogsUseCase(c.resolve(UnitOfWorkToken)),
+);
 
 // 4. Use Cases (transient)
 services.addTransient(CreateUserUseCaseToken, (c) => {

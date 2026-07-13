@@ -180,7 +180,7 @@ export default function RemoteServersPage() {
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                       <CardTitle className="font-semibold text-base">
                         {srv.name}
                       </CardTitle>
@@ -190,7 +190,10 @@ export default function RemoteServersPage() {
                       >
                         {srv.status.replace("_", " ")}
                       </Badge>
-                    </div>
+                      </div>
+                      {srv.setupError ? (
+                        <p className="mt-2 text-destructive text-xs">{srv.setupError}</p>
+                      ) : null}
                     <CardDescription className="text-muted-foreground text-xs">
                       {srv.description || "Deploy server"}
                     </CardDescription>

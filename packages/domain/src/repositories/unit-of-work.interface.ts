@@ -1,4 +1,5 @@
 import type { IBackupRunRepository } from "./backup-run-repository.interface";
+import type { IAuditLogRepository } from "./audit-log-repository.interface";
 import type { IBackupScheduleRepository } from "./backup-schedule-repository.interface";
 import type { IDeploymentRepository } from "./deployment-repository.interface";
 import type { IDockerRegistryRepository } from "./docker-registry-repository.interface";
@@ -16,6 +17,7 @@ import type { IUserRepository } from "./user-repository.interface";
 import type { IWebServerSettingsRepository } from "./web-server-settings-repository.interface";
 
 export interface IUnitOfWork {
+  readonly auditLogRepository: IAuditLogRepository;
   readonly backupScheduleRepository: IBackupScheduleRepository;
   readonly backupRunRepository: IBackupRunRepository;
   readonly userRepository: IUserRepository;

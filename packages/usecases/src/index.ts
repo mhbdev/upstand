@@ -1,5 +1,7 @@
 // Backups
 export * from "./backup/backup-run-worker";
+export * from "./audit-log/create-audit-log.usecase";
+export * from "./audit-log/list-audit-logs.usecase";
 export * from "./backup/backup-scheduler";
 export * from "./backup/create-backup-schedule.usecase";
 export * from "./backup/delete-backup-schedule.usecase";

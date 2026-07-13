@@ -1,12 +1,19 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import {
+  type AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+  type JsonObject,
+} from "@upstand/domain";
 import { redis } from "@upstand/redis";
 import { log } from "evlog";
+import { ensureOrganizationAccess } from "./access-control";
 import {
   enforceApiKeyRoute,
   isApiKeyPrincipal,
   setApiKeyRateLimitHeaders,
 } from "./api-key-auth";
 import type { Context } from "./context";
+import { CreateAuditLogUseCaseToken, UnitOfWorkToken } from "./di";
 
 export const t = initTRPC.context<Context>().create();
 
@@ -94,8 +101,172 @@ export const protectedProcedure = t.procedure
     if (isApiKeyPrincipal(ctx.actor)) {
       await enforceApiKeyRoute(path, ctx.actor, await getRawInput());
     }
-    return next();
+    const result = await next();
+    if (path !== "auditLog.list" && result.ok) {
+      const input = await getRawInput();
+      const organizationId = await resolveAuditOrganizationId(ctx, path, input);
+      if (organizationId) {
+        void recordAuditEvent(ctx, path, organizationId, input);
+      }
+    }
+    return result;
   });
+
+async function recordAuditEvent(
+  ctx: Context,
+  path: string,
+  organizationId: string,
+  input: unknown,
+) {
+  try {
+    if (!ctx.session || !ctx.actor) return;
+    const membership = await ensureOrganizationAccess(
+      ctx.session.user.id,
+      organizationId,
+    );
+    const [resource = "system", operation = "read"] = path.split(".");
+    const action = resolveAuditAction(operation);
+    const resourceType = resolveAuditResourceType(resource);
+    const metadata = sanitizeAuditInput(input);
+    await ctx.scope.resolve(CreateAuditLogUseCaseToken).execute({
+      organizationId,
+      actorId: ctx.actor.userId,
+      actorName: ctx.session.user.name,
+      actorEmail: ctx.session.user.email,
+      actorRole: membership.role,
+      action,
+      resourceType,
+      resourceId: typeof metadata.id === "string" ? metadata.id : null,
+      resourceName: typeof metadata.name === "string" ? metadata.name : null,
+      route: path,
+      metadata,
+      ipAddress: ctx.honoContext.req.header("x-forwarded-for") ?? null,
+      userAgent: ctx.honoContext.req.header("user-agent") ?? null,
+    });
+  } catch (error) {
+    log.error({
+      message: "Failed to persist audit event",
+      route: path,
+      organizationId,
+      err: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function resolveAuditOrganizationId(
+  ctx: Context,
+  path: string,
+  input: unknown,
+): Promise<string | undefined> {
+  if (input && typeof input === "object" && "organizationId" in input) {
+    const value = input.organizationId;
+    if (typeof value === "string" && value) return value;
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    return undefined;
+  const values = input as Record<string, unknown>;
+  const id = ["resourceId", "environmentId", "projectId", "serverId", "id"]
+    .map((key) => values[key])
+    .find(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
+  if (!id) return undefined;
+  const uow = ctx.scope.resolve(UnitOfWorkToken);
+  const resource = path.split(".")[0];
+  if (resource === "project")
+    return (await uow.projectRepository.findById(id))?.organizationId;
+  if (resource === "environment") {
+    const environment = await uow.environmentRepository.findById(id);
+    return environment
+      ? (await uow.projectRepository.findById(environment.projectId))
+          ?.organizationId
+      : undefined;
+  }
+  if (resource === "resource") {
+    const service = await uow.resourceRepository.findById(id);
+    if (!service) return undefined;
+    const environment = await uow.environmentRepository.findById(
+      service.environmentId,
+    );
+    return environment
+      ? (await uow.projectRepository.findById(environment.projectId))
+          ?.organizationId
+      : undefined;
+  }
+  if (resource === "deployment") {
+    const deployment = await uow.deploymentRepository.findById(id);
+    if (!deployment) return undefined;
+    const service = await uow.resourceRepository.findById(
+      deployment.resourceId,
+    );
+    if (!service) return undefined;
+    const environment = await uow.environmentRepository.findById(
+      service.environmentId,
+    );
+    return environment
+      ? (await uow.projectRepository.findById(environment.projectId))
+          ?.organizationId
+      : undefined;
+  }
+  if (resource === "server")
+    return (await uow.serverRepository.findById(id))?.organizationId;
+  return undefined;
+}
+
+function resolveAuditAction(operation: string): (typeof AUDIT_ACTIONS)[number] {
+  if (operation.toLowerCase().includes("delete")) return "delete";
+  if (operation.toLowerCase().includes("create")) return "create";
+  if (operation.toLowerCase().includes("update")) return "update";
+  if (operation.toLowerCase().includes("deploy")) return "deploy";
+  if (operation.toLowerCase().includes("cancel")) return "cancel";
+  if (operation.toLowerCase().includes("start")) return "start";
+  if (operation.toLowerCase().includes("stop")) return "stop";
+  if (operation.toLowerCase().includes("reload")) return "reload";
+  if (operation.toLowerCase().includes("run")) return "run";
+  return "read";
+}
+
+function resolveAuditResourceType(
+  resource: string,
+): (typeof AUDIT_RESOURCE_TYPES)[number] {
+  const aliases: Record<string, (typeof AUDIT_RESOURCE_TYPES)[number]> = {
+    ai: "settings",
+    apiKey: "settings",
+    dockerRegistry: "registry",
+    gitProvider: "git_provider",
+    sshKey: "ssh_key",
+    webServer: "settings",
+  };
+  return (
+    aliases[resource] ??
+    ((AUDIT_RESOURCE_TYPES as readonly string[]).includes(resource)
+      ? (resource as (typeof AUDIT_RESOURCE_TYPES)[number])
+      : "system")
+  );
+}
+
+function sanitizeAuditInput(input: unknown): JsonObject {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const sensitive =
+    /key|token|password|secret|credential|cookie|authorization|environment/i;
+  const result: JsonObject = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (sensitive.test(key)) continue;
+    if (
+      value === null ||
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      result[key] = value;
+    } else if (Array.isArray(value)) {
+      result[key] = value.length;
+    } else if (typeof value === "object") {
+      result[key] = "[redacted object]";
+    }
+  }
+  return result;
+}
 
 // Two-Factor verified procedures check if user has 2FA enabled and if it's verified in Redis
 export const twoFactorVerifiedProcedure = protectedProcedure.use(

@@ -12,6 +12,7 @@ export const ServerSchema = z.object({
   username: z.string(),
   enableDockerCleanup: z.boolean(),
   status: z.string(), // 'idle' | 'setting_up' | 'ready' | 'failed'
+  setupError: z.string().nullable().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -30,4 +31,5 @@ export interface CreateServerDTO {
   username: string;
   enableDockerCleanup?: boolean;
   status?: string;
+  setupError?: string | null;
 }

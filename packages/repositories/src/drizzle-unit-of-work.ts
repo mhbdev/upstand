@@ -1,4 +1,5 @@
 import type { IUnitOfWork } from "@upstand/domain";
+import { DrizzleAuditLogRepository } from "./audit-log/drizzle-audit-log.repository";
 import { DrizzleBackupRunRepository } from "./backup/drizzle-backup-run.repository";
 import { DrizzleBackupScheduleRepository } from "./backup/drizzle-backup-schedule.repository";
 import { DrizzleDeploymentRepository } from "./deployment/drizzle-deployment.repository";
@@ -18,6 +19,7 @@ import { DrizzleUserRepository } from "./user/drizzle-user.repository";
 import { DrizzleWebServerSettingsRepository } from "./web-server/drizzle-web-server-settings.repository";
 
 export class DrizzleUnitOfWork implements IUnitOfWork {
+  public readonly auditLogRepository: DrizzleAuditLogRepository;
   public readonly backupScheduleRepository: DrizzleBackupScheduleRepository;
   public readonly backupRunRepository: DrizzleBackupRunRepository;
   public readonly userRepository: DrizzleUserRepository;
@@ -36,6 +38,7 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly notificationDeliveryRepository: DrizzleNotificationDeliveryRepository;
 
   constructor(private readonly executor: Executor) {
+    this.auditLogRepository = new DrizzleAuditLogRepository(this.executor);
     this.backupScheduleRepository = new DrizzleBackupScheduleRepository(
       this.executor,
     );

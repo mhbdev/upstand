@@ -138,6 +138,7 @@ type DomainMapping = {
   port: number;
   serviceName?: string;
   https: boolean;
+  certificateType: "letsencrypt" | "internal";
   middlewares: string[];
 };
 
@@ -329,6 +330,7 @@ const emptyDomainMapping = (): DomainMapping => ({
   port: 80,
   serviceName: "",
   https: true,
+  certificateType: "letsencrypt",
   middlewares: [],
 });
 
@@ -350,6 +352,8 @@ function parseDomainMappings(value: string): DomainMapping[] {
           port: Number(mapping.port) || 80,
           serviceName: mapping.serviceName || "",
           https: mapping.https !== false,
+          certificateType:
+            mapping.certificateType === "internal" ? "internal" : "letsencrypt",
           middlewares: Array.isArray(mapping.middlewares)
             ? mapping.middlewares.filter(
                 (middleware): middleware is string =>
@@ -408,6 +412,8 @@ export default function ResourceDetail({
   const [domainList, setDomainList] = useState<DomainMapping[]>([]);
   const [domainDraft, setDomainDraft] =
     useState<DomainMapping>(emptyDomainMapping);
+  const [domainDialogOpen, setDomainDialogOpen] = useState(false);
+  const [domainError, setDomainError] = useState<string | null>(null);
   const [editingDomainIndex, setEditingDomainIndex] = useState<number | null>(
     null,
   );
@@ -910,11 +916,23 @@ services:
   // ─── Domain Event Handlers ─────────────────────────────────────────────────────
   const saveDomain = () => {
     if (!domainDraft.host.trim()) {
-      toast.error("A hostname is required");
+      setDomainError("A hostname is required.");
+      return;
+    }
+    if (
+      !/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(
+        domainDraft.host.trim(),
+      )
+    ) {
+      setDomainError("Enter a valid hostname such as app.example.com.");
       return;
     }
     if (resource?.type === "compose" && !domainDraft.serviceName?.trim()) {
-      toast.error("Select or enter the Compose service name");
+      setDomainError("Select or enter the Compose service name.");
+      return;
+    }
+    if (domainDraft.port < 1 || domainDraft.port > 65535) {
+      setDomainError("Container port must be between 1 and 65535.");
       return;
     }
 
@@ -946,6 +964,8 @@ services:
           );
           setDomainDraft(emptyDomainMapping());
           setEditingDomainIndex(null);
+          setDomainDialogOpen(false);
+          setDomainError(null);
         },
       },
     );
@@ -971,6 +991,8 @@ services:
   const editDomain = (index: number) => {
     setDomainDraft(domainList[index]);
     setEditingDomainIndex(index);
+    setDomainError(null);
+    setDomainDialogOpen(true);
   };
 
   // ─── Deployment Handlers ───────────────────────────────────────────────────────
@@ -2530,235 +2552,38 @@ services:
                 Encrypt.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-6 border-border/20 border-t pt-4">
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="domain-service">Service name</FieldLabel>
-                  {routingTargets.length > 0 && (
-                    <Select
-                      value={domainDraft.serviceName || "manual"}
-                      onValueChange={(serviceName) => {
-                        markDirty();
-                        setDomainDraft((current) => ({
-                          ...current,
-                          serviceName:
-                            serviceName === "manual" || !serviceName
-                              ? ""
-                              : serviceName,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a deployed service" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {routingTargets.map((target) => (
-                            <SelectItem key={target} value={target}>
-                              {target}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="manual">Manual entry</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <Input
-                    id="domain-service"
-                    value={domainDraft.serviceName || ""}
-                    onChange={(event) =>
-                      setDomainDraft((current) => ({
-                        ...current,
-                        serviceName: event.target.value,
-                      }))
-                    }
-                    placeholder={
-                      resource?.type === "compose"
-                        ? "e.g. storefront_web"
-                        : resource?.appName || resource?.name || "service-name"
-                    }
-                  />
-                  <FieldDescription>
-                    {resource?.type === "compose"
-                      ? "Compose resources require the exact deployed Swarm service name."
-                      : "Leave blank to use this resource's Swarm service name."}
-                  </FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="domain-host">Host</FieldLabel>
-                  <Input
-                    id="domain-host"
-                    inputMode="url"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    placeholder="app.example.com"
-                    value={domainDraft.host}
-                    onChange={(event) =>
-                      setDomainDraft((current) => ({
-                        ...current,
-                        host: event.target.value,
-                      }))
-                    }
-                  />
-                  <FieldDescription>
-                    DNS must point to this server and ports 80 and 443 must be
-                    publicly reachable for Let&apos;s Encrypt.
-                  </FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="domain-path">Public path</FieldLabel>
-                  <Input
-                    id="domain-path"
-                    value={domainDraft.path}
-                    onChange={(event) =>
-                      setDomainDraft((current) => ({
-                        ...current,
-                        path: event.target.value,
-                      }))
-                    }
-                    placeholder="/"
-                  />
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="domain-internal-path">
-                    Internal path prefix
-                  </FieldLabel>
-                  <Input
-                    id="domain-internal-path"
-                    value={domainDraft.internalPath}
-                    onChange={(event) =>
-                      setDomainDraft((current) => ({
-                        ...current,
-                        internalPath: event.target.value,
-                      }))
-                    }
-                    placeholder="/"
-                  />
-                  <FieldDescription>
-                    Requests are rewritten to this prefix before reaching the
-                    application.
-                  </FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="domain-port">Container port</FieldLabel>
-                  <Input
-                    id="domain-port"
-                    type="number"
-                    min={1}
-                    max={65535}
-                    value={domainDraft.port}
-                    onChange={(event) =>
-                      setDomainDraft((current) => ({
-                        ...current,
-                        port: Number.parseInt(event.target.value, 10) || 80,
-                      }))
-                    }
-                  />
-                  <FieldDescription>
-                    This is the internal service port, not a published host
-                    port.
-                  </FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="domain-middlewares">
-                    Caddy snippets
-                  </FieldLabel>
-                  <Input
-                    id="domain-middlewares"
-                    value={domainDraft.middlewares.join(", ")}
-                    onChange={(event) =>
-                      setDomainDraft((current) => ({
-                        ...current,
-                        middlewares: event.target.value.split(","),
-                      }))
-                    }
-                    placeholder="e.g. security-headers, auth"
-                  />
-                  <FieldDescription>
-                    Comma-separated administrator-defined Caddy snippets. These
-                    are Caddy imports, not Traefik middleware names.
-                  </FieldDescription>
-                </Field>
-              </FieldGroup>
-
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldLabel htmlFor="strip-domain-path">
-                      Strip path
-                    </FieldLabel>
-                    <FieldDescription>
-                      Remove the public path prefix before proxying the request.
-                    </FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    id="strip-domain-path"
-                    checked={domainDraft.stripPath}
-                    onCheckedChange={(stripPath) => {
-                      markDirty();
-                      setDomainDraft((current) => ({ ...current, stripPath }));
-                    }}
-                  />
-                </Field>
-
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldLabel htmlFor="domain-https">HTTPS</FieldLabel>
-                    <FieldDescription>
-                      Caddy obtains and renews the certificate automatically.
-                    </FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    id="domain-https"
-                    checked={domainDraft.https}
-                    onCheckedChange={(https) => {
-                      markDirty();
-                      setDomainDraft((current) => ({ ...current, https }));
-                    }}
-                  />
-                </Field>
-              </FieldGroup>
-
-              <div className="flex flex-wrap justify-end gap-2">
-                {editingDomainIndex !== null && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setDomainDraft(emptyDomainMapping());
-                      setEditingDomainIndex(null);
-                    }}
-                  >
-                    <X data-icon="inline-start" />
-                    Cancel
-                  </Button>
-                )}
+            <CardContent className="flex flex-col gap-5 border-border/20 border-t pt-4">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <p className="font-medium text-sm">Public routes</p>
+                  <p className="text-muted-foreground text-xs">
+                    Add hostnames and route them to this resource&apos;s
+                    internal service.
+                  </p>
+                </div>
                 <Button
                   type="button"
-                  onClick={saveDomain}
-                  disabled={updateResourceMutation.isPending}
+                  onClick={() => {
+                    setDomainDraft(emptyDomainMapping());
+                    setEditingDomainIndex(null);
+                    setDomainError(null);
+                    setDomainDialogOpen(true);
+                  }}
                 >
-                  <LinkIcon data-icon="inline-start" />
-                  {editingDomainIndex === null
-                    ? "Connect domain"
-                    : "Save domain"}
+                  <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+                  Add domain
                 </Button>
               </div>
 
               {domainList.length > 0 ? (
-                <div className="overflow-hidden rounded-xl border border-border/20">
+                <div className="overflow-x-auto rounded-xl border border-border/20">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/20 text-muted-foreground text-xs uppercase">
-                        <TableHead>Host</TableHead>
-                        <TableHead>Path</TableHead>
-                        <TableHead>Upstream</TableHead>
-                        <TableHead>Protocol</TableHead>
+                        <TableHead>Hostname</TableHead>
+                        <TableHead>Route</TableHead>
+                        <TableHead>Service</TableHead>
+                        <TableHead>Security</TableHead>
                         <TableHead className="w-24 text-right">
                           Actions
                         </TableHead>
@@ -2767,25 +2592,41 @@ services:
                     <TableBody>
                       {domainList.map((item, idx) => (
                         <TableRow key={`${item.host}:${item.path}`}>
-                          <TableCell className="font-medium text-primary">
-                            {item.host}
+                          <TableCell>
+                            <div className="flex min-w-48 flex-col gap-1">
+                              <span className="font-medium text-primary">
+                                {item.host}
+                              </span>
+                              <span className="text-muted-foreground text-xs">
+                                {item.stripPath
+                                  ? "Path prefix removed"
+                                  : "Path preserved"}
+                              </span>
+                            </div>
                           </TableCell>
-                          <TableCell className="font-mono">
-                            {item.path}
+                          <TableCell className="min-w-28 font-mono text-xs">
+                            <div>{item.path}</div>
+                            {item.internalPath !== "/" && (
+                              <div className="text-muted-foreground">
+                                → {item.internalPath}
+                              </div>
+                            )}
                           </TableCell>
-                          <TableCell className="font-mono text-muted-foreground">
+                          <TableCell className="min-w-40 font-mono text-muted-foreground text-xs">
                             {item.serviceName ||
                             resource?.appName ||
                             resource?.name
                               ? `${item.serviceName || resource?.appName || resource?.name}:${item.port}`
                               : item.port}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="min-w-32">
                             <Badge
                               variant={item.https ? "default" : "secondary"}
                             >
                               {item.https
-                                ? "HTTPS / Let’s Encrypt"
+                                ? item.certificateType === "internal"
+                                  ? "HTTPS / Internal CA"
+                                  : "HTTPS / Let’s Encrypt"
                                 : "HTTP only"}
                             </Badge>
                           </TableCell>
@@ -3340,6 +3181,278 @@ services:
       </Tabs>
 
       {/* ─── MODALS ───────────────────────────────────────────────────────────── */}
+
+      <Dialog
+        open={domainDialogOpen}
+        onOpenChange={(open) => {
+          setDomainDialogOpen(open);
+          if (!open) {
+            setDomainDraft(emptyDomainMapping());
+            setEditingDomainIndex(null);
+            setDomainError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingDomainIndex === null ? "Add domain" : "Edit domain"}
+            </DialogTitle>
+            <DialogDescription>
+              Configure the public hostname, route, and service destination for
+              this resource.
+            </DialogDescription>
+          </DialogHeader>
+
+          <FieldGroup className="grid gap-4 md:grid-cols-2">
+            <Field
+              data-invalid={domainError?.includes("hostname") || undefined}
+            >
+              <FieldLabel htmlFor="domain-host">Hostname</FieldLabel>
+              <Input
+                id="domain-host"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                aria-invalid={domainError?.includes("hostname") || undefined}
+                placeholder="app.example.com"
+                value={domainDraft.host}
+                onChange={(event) => {
+                  setDomainError(null);
+                  setDomainDraft((current) => ({
+                    ...current,
+                    host: event.target.value,
+                  }));
+                }}
+              />
+              <FieldDescription>
+                DNS must point to this server; ports 80 and 443 must be
+                reachable for HTTPS.
+              </FieldDescription>
+            </Field>
+
+            <Field
+              data-invalid={
+                (resource?.type === "compose" &&
+                  Boolean(domainError?.includes("service"))) ||
+                undefined
+              }
+            >
+              <FieldLabel htmlFor="domain-service">Service name</FieldLabel>
+              {routingTargets.length > 0 && (
+                <Select
+                  value={domainDraft.serviceName || "manual"}
+                  onValueChange={(serviceName) => {
+                    setDomainError(null);
+                    markDirty();
+                    setDomainDraft((current) => ({
+                      ...current,
+                      serviceName:
+                        serviceName === "manual" ? "" : serviceName || "",
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a deployed service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {routingTargets.map((target) => (
+                        <SelectItem key={target} value={target}>
+                          {target}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="manual">Manual entry</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              )}
+              <Input
+                id="domain-service"
+                value={domainDraft.serviceName || ""}
+                onChange={(event) => {
+                  setDomainError(null);
+                  setDomainDraft((current) => ({
+                    ...current,
+                    serviceName: event.target.value,
+                  }));
+                }}
+                placeholder={
+                  resource?.type === "compose"
+                    ? "e.g. storefront_web"
+                    : resource?.appName || resource?.name || "service-name"
+                }
+              />
+              <FieldDescription>
+                {resource?.type === "compose"
+                  ? "Compose requires the exact deployed Swarm service name."
+                  : "Leave blank to use this resource's service name."}
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="domain-certificate">Certificate</FieldLabel>
+              <Select
+                value={domainDraft.certificateType}
+                onValueChange={(certificateType) =>
+                  certificateType &&
+                  setDomainDraft((current) => ({ ...current, certificateType }))
+                }
+              >
+                <SelectTrigger id="domain-certificate" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="letsencrypt">
+                      Let&apos;s Encrypt (automatic renewal)
+                    </SelectItem>
+                    <SelectItem value="internal">
+                      Caddy internal CA (development)
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                Let&apos;s Encrypt is the production default. Internal
+                certificates are not publicly trusted.
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="domain-path">Public path</FieldLabel>
+              <Input
+                id="domain-path"
+                value={domainDraft.path}
+                placeholder="/"
+                onChange={(event) =>
+                  setDomainDraft((current) => ({
+                    ...current,
+                    path: event.target.value,
+                  }))
+                }
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="domain-internal-path">
+                Internal path prefix
+              </FieldLabel>
+              <Input
+                id="domain-internal-path"
+                value={domainDraft.internalPath}
+                placeholder="/"
+                onChange={(event) =>
+                  setDomainDraft((current) => ({
+                    ...current,
+                    internalPath: event.target.value,
+                  }))
+                }
+              />
+              <FieldDescription>
+                Requests are rewritten to this prefix before reaching the
+                application.
+              </FieldDescription>
+            </Field>
+            <Field data-invalid={domainError?.includes("port") || undefined}>
+              <FieldLabel htmlFor="domain-port">Container port</FieldLabel>
+              <Input
+                id="domain-port"
+                type="number"
+                min={1}
+                max={65535}
+                aria-invalid={domainError?.includes("port") || undefined}
+                value={domainDraft.port}
+                onChange={(event) =>
+                  setDomainDraft((current) => ({
+                    ...current,
+                    port: Number.parseInt(event.target.value, 10) || 0,
+                  }))
+                }
+              />
+              <FieldDescription>
+                Internal service port, not a published host port.
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="domain-middlewares">
+                Caddy snippets
+              </FieldLabel>
+              <Input
+                id="domain-middlewares"
+                value={domainDraft.middlewares.join(", ")}
+                placeholder="e.g. security-headers, auth"
+                onChange={(event) =>
+                  setDomainDraft((current) => ({
+                    ...current,
+                    middlewares: event.target.value.split(","),
+                  }))
+                }
+              />
+              <FieldDescription>
+                Comma-separated administrator-defined Caddy imports.
+              </FieldDescription>
+            </Field>
+          </FieldGroup>
+
+          <FieldGroup className="grid gap-3 md:grid-cols-2">
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="strip-domain-path">Strip path</FieldLabel>
+                <FieldDescription>
+                  Remove the public path prefix before proxying.
+                </FieldDescription>
+              </FieldContent>
+              <Switch
+                id="strip-domain-path"
+                checked={domainDraft.stripPath}
+                onCheckedChange={(stripPath) =>
+                  setDomainDraft((current) => ({ ...current, stripPath }))
+                }
+              />
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="domain-https">HTTPS</FieldLabel>
+                <FieldDescription>
+                  Caddy obtains and renews the certificate automatically.
+                </FieldDescription>
+              </FieldContent>
+              <Switch
+                id="domain-https"
+                checked={domainDraft.https}
+                onCheckedChange={(https) =>
+                  setDomainDraft((current) => ({ ...current, https }))
+                }
+              />
+            </Field>
+          </FieldGroup>
+
+          {domainError && (
+            <FieldDescription className="text-destructive">
+              {domainError}
+            </FieldDescription>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDomainDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={saveDomain}
+              disabled={updateResourceMutation.isPending}
+            >
+              {updateResourceMutation.isPending && (
+                <Spinner data-icon="inline-start" />
+              )}
+              {editingDomainIndex === null ? "Add domain" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

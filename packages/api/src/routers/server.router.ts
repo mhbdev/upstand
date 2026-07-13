@@ -118,6 +118,13 @@ export const serverRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
+        if (error instanceof Error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+            cause: error,
+          });
+        }
         handleUseCaseError(error);
       }
     }),

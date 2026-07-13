@@ -14,6 +14,10 @@ export const PublishNotificationUseCaseToken =
   createToken<UseCases.PublishNotificationUseCase>(
     "PublishNotificationUseCase",
   );
+export const CreateAuditLogUseCaseToken =
+  createToken<UseCases.CreateAuditLogUseCase>("CreateAuditLogUseCase");
+export const ListAuditLogsUseCaseToken =
+  createToken<UseCases.ListAuditLogsUseCase>("ListAuditLogsUseCase");
 
 export const CreateUserUseCaseToken =
   createToken<UseCases.CreateUserUseCase>("CreateUserUseCase");

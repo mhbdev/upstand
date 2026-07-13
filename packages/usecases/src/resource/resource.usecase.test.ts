@@ -99,6 +99,7 @@ class MockServerBuildSettingsRepository {
 }
 
 class MockUnitOfWork implements IUnitOfWork {
+  public readonly auditLogRepository = {} as any;
   public readonly backupScheduleRepository = {} as any;
   public readonly backupRunRepository = {} as any;
   public readonly environmentRepository =

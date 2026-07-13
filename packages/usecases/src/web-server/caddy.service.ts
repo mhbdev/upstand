@@ -198,6 +198,7 @@ function getRoutes(resources: CaddyResource[]): CaddyRoute[] {
   const routes: CaddyRoute[] = [];
   const routeOwners = new Map<string, string>();
   const hostHttps = new Map<string, boolean>();
+  const hostCertificate = new Map<string, string>();
 
   for (const resource of resources) {
     let mappings: DomainMapping[];
@@ -226,6 +227,17 @@ function getRoutes(resources: CaddyResource[]): CaddyRoute[] {
         );
       }
       hostHttps.set(mapping.host, mapping.https);
+
+      const certificateType = hostCertificate.get(mapping.host);
+      if (
+        certificateType !== undefined &&
+        certificateType !== mapping.certificateType
+      ) {
+        throw new Error(
+          `All HTTPS routes for ${mapping.host} must use the same certificate strategy`,
+        );
+      }
+      hostCertificate.set(mapping.host, mapping.certificateType);
 
       if (resource.type === "compose" && !mapping.serviceName) {
         throw new Error(
@@ -322,6 +334,10 @@ export function generateCaddyfileContent(
     sites.push(`# upstand-domain ${host}`);
     sites.push(`${address} {`);
     sites.push("\tencode zstd gzip");
+    const certificateType = routesForHost[0]?.certificateType;
+    if (protocol === "https" && certificateType === "internal") {
+      sites.push("\ttls internal");
+    }
     orderedRoutes.forEach((route, index) => {
       sites.push(`# Resource: ${route.resourceName} (${route.resourceId})`);
       sites.push(...routeBlock(route, index));

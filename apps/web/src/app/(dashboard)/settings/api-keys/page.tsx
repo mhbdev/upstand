@@ -286,8 +286,8 @@ export default function ApiKeysPage() {
           ) : null}
         </CardContent>
       </Card>
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <ShieldCheck />
+      <div className="flex items-center gap-2 text-muted-foreground text-xs">
+        <ShieldCheck className="size-4" />
         Organization keys never create browser sessions.
       </div>
     </DashboardPage>
