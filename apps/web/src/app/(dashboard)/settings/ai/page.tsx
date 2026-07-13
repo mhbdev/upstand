@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 export function UpGalSettingsPanel() {
   const { data: activeOrg } = authClient.useActiveOrganization();
@@ -52,11 +53,10 @@ export function UpGalSettingsPanel() {
   });
   const listModels = useMutation({
     ...trpc.ai.listModels.mutationOptions(),
-    onSuccess: (models) => {
-      setModels(models);
-      toast.success(`Loaded ${models.length} ${providerLabel} models`);
+    onError: () => {
+      // Model catalogs are an enhancement; an unavailable catalog should not
+      // interrupt editing or saving provider settings.
     },
-    onError: (error) => toast.error(error.message),
   });
   const [provider, setProvider] = useState<AIProvider>("openai");
   const [model, setModel] = useState("gpt-5.4-mini");
@@ -65,39 +65,32 @@ export function UpGalSettingsPanel() {
   const [models, setModels] = useState<
     Array<{ id: string; name: string; contextLength?: number }>
   >([]);
-  const autoLoadedCatalog = useRef("");
+  const [draftDirty, setDraftDirty] = useState(false);
+  const providerRef = useRef(provider);
 
   useEffect(() => {
-    if (!settings.data) return;
+    if (!settings.data || draftDirty) return;
     if (isAIProvider(settings.data.provider))
       setProvider(settings.data.provider);
     setModel(settings.data.model);
     setBaseUrl(settings.data.baseUrl || "");
-  }, [settings.data]);
+  }, [settings.data, draftDirty]);
 
-  useEffect(() => {
-    if (!organizationId || !settings.data?.configured) return;
-    const key = `${organizationId}:${provider}`;
-    if (autoLoadedCatalog.current === key) return;
-    autoLoadedCatalog.current = key;
-    listModels.mutate({ organizationId, provider });
-  }, [organizationId, provider, settings.data?.configured]);
-
-  const providerLabel =
-    provider === "openrouter"
-      ? "OpenRouter"
-      : provider === "gateway"
-        ? "Gateway"
-        : provider[0].toUpperCase() + provider.slice(1);
-
-  function loadModels() {
+  function fetchModels(nextProvider: AIProvider) {
     if (!organizationId) return;
-    listModels.mutate({
-      organizationId,
-      provider,
-      apiKey: apiKey || undefined,
-      baseUrl: baseUrl || undefined,
-    });
+    listModels.mutate(
+      {
+        organizationId,
+        provider: nextProvider,
+        apiKey: apiKey || undefined,
+        baseUrl: baseUrl || undefined,
+      },
+      {
+        onSuccess: (nextModels) => {
+          if (providerRef.current === nextProvider) setModels(nextModels);
+        },
+      },
+    );
   }
 
   function saveSettings() {
@@ -113,17 +106,12 @@ export function UpGalSettingsPanel() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-1">
-      <div>
-        <h1 className="flex items-center gap-2 font-semibold text-2xl">
-          <Bot className="size-6" />
-          UpGal AI
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Configure the model that powers your organization’s operations
-          assistant.
-        </p>
-      </div>
+    <DashboardPage className="max-w-4xl gap-6">
+      <DashboardPageHeader
+        title="UpGal AI"
+        icon={<Bot className="size-6 text-primary" />}
+        description="Configure the model that powers your organization’s operations assistant."
+      />
       <Card>
         <CardHeader>
           <CardTitle>Provider</CardTitle>
@@ -139,8 +127,11 @@ export function UpGalSettingsPanel() {
               value={provider}
               onValueChange={(value) => {
                 if (value && isAIProvider(value)) {
+                  setDraftDirty(true);
+                  providerRef.current = value;
                   setProvider(value);
                   setModels([]);
+                  fetchModels(value);
                 }
               }}
             >
@@ -163,7 +154,10 @@ export function UpGalSettingsPanel() {
             <Input
               id="model"
               value={model}
-              onChange={(event) => setModel(event.target.value)}
+              onChange={(event) => {
+                setDraftDirty(true);
+                setModel(event.target.value);
+              }}
               placeholder={
                 provider === "openrouter"
                   ? "provider/model (or custom)"
@@ -180,17 +174,9 @@ export function UpGalSettingsPanel() {
             </datalist>
             <div className="flex items-center justify-between gap-3">
               <p className="text-muted-foreground text-xs">
-                Load the current provider catalog or enter any custom model ID.
+                Provider models are loaded automatically when you switch
+                providers. You can also enter any custom model ID.
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={loadModels}
-                disabled={listModels.isPending}
-              >
-                {listModels.isPending ? "Loading…" : "Load models"}
-              </Button>
             </div>
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -202,7 +188,10 @@ export function UpGalSettingsPanel() {
               id="api-key"
               type="password"
               value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
+              onChange={(event) => {
+                setDraftDirty(true);
+                setApiKey(event.target.value);
+              }}
               placeholder="sk-…"
               autoComplete="new-password"
             />
@@ -212,7 +201,10 @@ export function UpGalSettingsPanel() {
             <Input
               id="base-url"
               value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
+              onChange={(event) => {
+                setDraftDirty(true);
+                setBaseUrl(event.target.value);
+              }}
               placeholder="https://api.example.com/v1"
             />
           </div>
@@ -259,14 +251,10 @@ export function UpGalSettingsPanel() {
         All UpGal mutations require an explicit approval in chat.
       </div>
       {settings.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-    </div>
+    </DashboardPage>
   );
 }
 
 export default function AiSettingsPage() {
-  return (
-    <main className="h-full overflow-y-auto p-6">
-      <UpGalSettingsPanel />
-    </main>
-  );
+  return <UpGalSettingsPanel />;
 }

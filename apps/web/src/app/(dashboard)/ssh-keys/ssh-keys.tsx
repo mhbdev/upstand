@@ -34,6 +34,7 @@ import { Textarea } from "@upstand/ui/components/textarea";
 import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -184,7 +185,7 @@ export default function SSHKeys({
   const isSubmitting = generateMutation.isPending || createMutation.isPending;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <DashboardPage>
       {/* Header */}
       <div className="flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -617,6 +618,6 @@ export default function SSHKeys({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPage>
   );
 }

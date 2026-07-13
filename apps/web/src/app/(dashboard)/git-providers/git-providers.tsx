@@ -15,10 +15,12 @@ import { Button } from "@upstand/ui/components/button";
 import {
   Card,
   CardDescription,
+  CardContent,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import { CardContent } from "@upstand/ui/components/card";
+import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 import {
   Dialog,
   DialogContent,
@@ -272,34 +274,25 @@ export default function GitProviders({
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 font-bold text-2xl text-foreground">
-            <HugeiconsIcon
-              icon={SourceCodeIcon}
-              className="size-6 text-primary"
-            />
-            Git Providers
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Add and manage Git providers to pull source code and enable
-            automatic deployments.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            resetForms();
-            setProviderType("github");
-            setAddProviderOpen(true);
-          }}
-          className="gap-2 font-medium"
-        >
-          <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-          Add Git Provider
-        </Button>
-      </div>
+    <DashboardPage>
+      <DashboardPageHeader
+        title="Git Providers"
+        icon={<HugeiconsIcon icon={SourceCodeIcon} className="size-6 text-primary" />}
+        description="Add and manage Git providers to pull source code and enable automatic deployments."
+        actions={
+          <Button
+            onClick={() => {
+              resetForms();
+              setProviderType("github");
+              setAddProviderOpen(true);
+            }}
+            className="gap-2 font-medium"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+            Add Git Provider
+          </Button>
+        }
+      />
 
       {/* Main List */}
       {loadingProviders ? (
@@ -330,36 +323,73 @@ export default function GitProviders({
             return (
               <Card
                 key={provider.id}
-                className="border border-border/40 bg-card/30 transition-colors hover:border-primary/45"
+                className="group flex h-full flex-col overflow-hidden border-border/40 bg-card/30 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:bg-card/60 hover:shadow-lg hover:shadow-primary/5"
               >
-                <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 font-semibold text-primary uppercase">
-                      {provider.provider.slice(0, 2)}
+                <CardHeader className="gap-4 pb-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 font-bold text-primary text-sm uppercase shadow-sm">
+                        {provider.provider.slice(0, 2)}
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        <CardTitle className="flex flex-wrap items-center gap-2 font-bold text-base">
+                          <span className="truncate">{provider.name}</span>
+                          <Badge variant="secondary" className="text-[10px] capitalize">
+                            {provider.provider}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="truncate text-xs">
+                          {provider.provider === "github" &&
+                            `App ID: ${config.githubAppId || "N/A"}`}
+                          {provider.provider === "gitlab" &&
+                            `Instance: ${config.gitlabUrl}`}
+                          {provider.provider === "gitea" &&
+                            `Instance: ${config.giteaUrl}`}
+                          {provider.provider === "bitbucket" &&
+                            `Username: ${config.bitbucketUsername}`}
+                        </CardDescription>
+                      </div>
                     </div>
-                    <div className="min-w-0 space-y-1">
-                      <CardTitle className="flex flex-wrap items-center gap-2 font-bold text-base">
-                        <span className="truncate">{provider.name}</span>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] capitalize"
-                        >
-                          {provider.provider}
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription className="truncate text-muted-foreground text-xs">
-                        {provider.provider === "github" &&
-                          `App ID: ${config.githubAppId || "N/A"}`}
-                        {provider.provider === "gitlab" &&
-                          `Instance: ${config.gitlabUrl}`}
-                        {provider.provider === "gitea" &&
-                          `Instance: ${config.giteaUrl}`}
-                        {provider.provider === "bitbucket" &&
-                          `Username: ${config.bitbucketUsername}`}
-                      </CardDescription>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedProvider({
+                          id: provider.id,
+                          name: provider.name,
+                        });
+                        setDeleteProviderOpen(true);
+                      }}
+                      className="size-8 shrink-0 text-destructive opacity-70 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                      aria-label={`Delete ${provider.name}`}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-muted-foreground text-xs">
+                    <Badge variant={isInstalled ? "secondary" : "outline"} className="gap-1.5">
+                      <span className={isInstalled ? "size-1.5 rounded-full bg-primary" : "size-1.5 rounded-full bg-muted-foreground"} />
+                      {isInstalled ? "Connected" : "Setup required"}
+                    </Badge>
+                    <span className="self-center">Added {new Date(provider.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col gap-4 border-border/40 border-t pt-4">
+                  <div className="grid gap-3 text-xs sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
+                      <p className="font-medium text-muted-foreground">Access</p>
+                      <p className="mt-1 font-medium text-foreground">
+                        {isInstalled ? "Repository access enabled" : "Authorization needed"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
+                      <p className="font-medium text-muted-foreground">Connection</p>
+                      <p className="mt-1 font-medium text-foreground capitalize">
+                        {provider.provider === "github" ? "GitHub App" : provider.provider === "bitbucket" ? "App password" : "OAuth"}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
+                  <div className="mt-auto flex flex-wrap gap-2">
                     {!isInstalled ? (
                       provider.provider === "github" ? (
                         <a
@@ -415,32 +445,11 @@ export default function GitProviders({
                         </a>
                       </div>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedProvider({
-                          id: provider.id,
-                          name: provider.name,
-                        });
-                        setDeleteProviderOpen(true);
-                      }}
-                      className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                    </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between gap-3 border-border/40 border-t pt-3 text-muted-foreground text-xs">
-                  <span>
-                    Added {new Date(provider.createdAt).toLocaleDateString()}
-                  </span>
-                  <span>
-                    {isInstalled
-                      ? "Repository access enabled"
-                      : "Setup required"}
-                  </span>
                 </CardContent>
+                <CardFooter className="border-border/40 border-t py-3 text-muted-foreground text-xs">
+                  <span className="truncate">Provider ID: {provider.id}</span>
+                </CardFooter>
               </Card>
             );
           })}
@@ -474,7 +483,7 @@ export default function GitProviders({
 
       {/* Add Provider Dialog */}
       <Dialog open={addProviderOpen} onOpenChange={setAddProviderOpen}>
-        <DialogContent className="max-h-[92svh] w-[calc(100vw-1rem)] max-w-[min(96vw,720px)] overflow-y-auto">
+        <DialogContent className="max-h-[92svh] w-[calc(100vw-1rem)] max-w-[min(96vw,720px)] overflow-y-auto sm:min-w-[36rem]">
           <DialogHeader>
             <DialogTitle>Add Git Provider</DialogTitle>
             <DialogDescription>
@@ -780,6 +789,6 @@ export default function GitProviders({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPage>
   );
 }

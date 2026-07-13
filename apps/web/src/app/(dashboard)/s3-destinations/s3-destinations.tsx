@@ -41,6 +41,7 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -279,7 +280,7 @@ export default function S3Destinations({
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <DashboardPage>
       {/* Header */}
       <div className="flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -633,6 +634,6 @@ export default function S3Destinations({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPage>
   );
 }

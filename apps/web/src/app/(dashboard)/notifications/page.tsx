@@ -69,6 +69,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 type NotificationChannelDto = Omit<
   NotificationChannelView,
@@ -664,21 +665,17 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 md:px-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <h1 className="font-heading text-3xl tracking-tight">
-            Notifications
-          </h1>
-          <p className="max-w-2xl text-muted-foreground text-sm">
-            Route operational alerts to multiple channels. Credentials stay
-            encrypted and delivery failures never block deployments.
-          </p>
-        </div>
-        <Button onClick={openCreate} disabled={!organizationId}>
-          Add notification
-        </Button>
-      </div>
+    <DashboardPage>
+      <DashboardPageHeader
+        title="Notifications"
+        icon={<Bell className="size-6 text-primary" />}
+        description="Route operational alerts to multiple channels. Credentials stay encrypted and delivery failures never block deployments."
+        actions={
+          <Button onClick={openCreate} disabled={!organizationId}>
+            Add notification
+          </Button>
+        }
+      />
 
       {channels.length === 0 ? (
         <Empty>
@@ -771,8 +768,8 @@ export default function NotificationsPage() {
         open={dialogOpen}
         onOpenChange={(open) => (open ? setDialogOpen(true) : closeDialog())}
       >
-        <DialogContent className="h-[min(92svh,860px)] w-[calc(100vw-1rem)] max-w-[min(96vw,900px)] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex h-[min(92svh,900px)] w-[calc(100vw-1rem)] max-w-[min(96vw,960px)] flex-col gap-0 overflow-hidden p-0 sm:min-w-[min(42rem,calc(100vw-2rem))]">
+          <DialogHeader className="shrink-0 border-border/60 border-b px-6 py-5">
             <DialogTitle>
               {editing ? "Edit notification" : "Add notification"}
             </DialogTitle>
@@ -781,7 +778,7 @@ export default function NotificationsPage() {
               operational events it should receive.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submit} className="flex flex-col gap-7">
+          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-6 py-5">
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="notification-provider">
@@ -857,7 +854,7 @@ export default function NotificationsPage() {
               </div>
             </FieldSet>
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 -mx-6 mt-auto border-border/60 border-t bg-popover/95 px-6 py-4 backdrop-blur supports-backdrop-filter:bg-popover/80">
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>
@@ -869,6 +866,6 @@ export default function NotificationsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPage>
   );
 }

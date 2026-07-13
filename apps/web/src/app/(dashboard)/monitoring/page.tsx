@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 type MetricPoint = {
   time: string;
@@ -96,15 +97,15 @@ export default function MonitoringPage() {
 
   if (!activeOrganization) {
     return (
-      <div className="mx-auto max-w-7xl p-6 text-muted-foreground">
+      <DashboardPage className="text-muted-foreground">
         Select an organization to view server monitoring.
-      </div>
+      </DashboardPage>
     );
   }
 
   if (error || !stats) {
     return (
-      <div className="mx-auto max-w-7xl p-6">
+      <DashboardPage>
         <Card className="border-destructive/40">
           <CardHeader>
             <CardTitle>Monitoring is unavailable</CardTitle>
@@ -114,7 +115,7 @@ export default function MonitoringPage() {
             </CardDescription>
           </CardHeader>
         </Card>
-      </div>
+      </DashboardPage>
     );
   }
 
@@ -150,22 +151,13 @@ export default function MonitoringPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="size-5 text-primary" />
-            <h1 className="font-semibold text-2xl tracking-tight">
-              Server Monitoring
-            </h1>
-          </div>
-          <p className="mt-1 text-muted-foreground text-sm">
-            Live Docker Engine telemetry for {stats.serverName}. History begins
-            when this page opens and refreshes every five seconds.
-          </p>
-        </div>
-        <Badge variant="outline">Docker {stats.dockerVersion}</Badge>
-      </section>
+    <DashboardPage className="gap-6">
+      <DashboardPageHeader
+        title="Server Monitoring"
+        icon={<Activity className="size-6 text-primary" />}
+        description={<>Live Docker Engine telemetry for {stats.serverName}. History begins when this page opens and refreshes every five seconds.</>}
+        actions={<Badge variant="outline">Docker {stats.dockerVersion}</Badge>}
+      />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
@@ -331,6 +323,6 @@ export default function MonitoringPage() {
           </div>
         </CardContent>
       </Card>
-    </main>
+    </DashboardPage>
   );
 }

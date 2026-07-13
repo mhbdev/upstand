@@ -1,10 +1,10 @@
+import { randomUUID } from "node:crypto";
 import {
   aiConversation,
   aiMessage,
   aiProviderConfig,
   aiRun,
 } from "@upstand/db";
-import { randomUUID } from "node:crypto";
 import type {
   AIConversationRecord,
   AIMessageRecord,
@@ -165,19 +165,24 @@ export class DrizzleAIRepository implements IAIRepository {
     conversationId: string,
     messages: readonly AIMessageRecord[],
   ): Promise<void> {
-    if (messages.length > 0) {
+    for (const message of messages) {
       await this.executor
         .insert(aiMessage)
-        .values(
-          messages.map((message) => ({
-            id: message.id,
-            conversationId,
+        .values({
+          id: message.id,
+          conversationId,
+          role: message.role,
+          parts: message.parts as JsonValue[],
+          createdAt: message.createdAt,
+        })
+        .onConflictDoUpdate({
+          target: aiMessage.id,
+          set: {
             role: message.role,
             parts: message.parts as JsonValue[],
             createdAt: message.createdAt,
-          })),
-        )
-        .onConflictDoNothing();
+          },
+        });
     }
     await this.executor
       .update(aiConversation)

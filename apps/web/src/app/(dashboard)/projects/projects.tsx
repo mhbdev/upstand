@@ -37,6 +37,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -440,7 +441,7 @@ export default function Projects({
   const totalProjects = projects?.length ?? 0;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <DashboardPage>
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -505,6 +506,6 @@ export default function Projects({
         organizationId={organizationId}
         onDeleted={refetch}
       />
-    </div>
+    </DashboardPage>
   );
 }

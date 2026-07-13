@@ -8,6 +8,8 @@ export const CaddyServiceToken =
   createToken<UseCases.CaddyService>("CaddyService");
 export const DockerServiceToken =
   createToken<UseCases.DockerService>("DockerService");
+export const DockerReadOnlyServiceToken =
+  createToken<UseCases.DockerReadOnlyService>("DockerReadOnlyService");
 export const PublishNotificationUseCaseToken =
   createToken<UseCases.PublishNotificationUseCase>(
     "PublishNotificationUseCase",
@@ -61,6 +63,10 @@ export const GetServerRuntimeStatsUseCaseToken =
   createToken<UseCases.GetServerRuntimeStatsUseCase>(
     "GetServerRuntimeStatsUseCase",
   );
+export const GetAccountStatusUseCaseToken =
+  createToken<UseCases.GetAccountStatusUseCase>("GetAccountStatusUseCase");
+export const GetDockerInventoryUseCaseToken =
+  createToken<UseCases.GetDockerInventoryUseCase>("GetDockerInventoryUseCase");
 export const CreateSshKeyUseCaseToken =
   createToken<UseCases.CreateSshKeyUseCase>("CreateSshKeyUseCase");
 export const GetSshKeysUseCaseToken =

@@ -40,6 +40,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -497,7 +498,7 @@ export default function Dashboard({
   }
 
   return (
-    <div className="space-y-6 p-6 md:p-8">
+    <DashboardPage className="gap-6">
       <h1 className="sr-only">Dashboard — {activeOrg.name}</h1>
 
       {/* Stat row */}
@@ -603,6 +604,6 @@ export default function Dashboard({
         orgName={activeOrg.name}
         orgId={activeOrg.id}
       />
-    </div>
+    </DashboardPage>
   );
 }

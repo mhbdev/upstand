@@ -58,6 +58,7 @@ import {
 } from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
 import { SelfUpdateDialog } from "@/components/self-update-dialog";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -190,7 +191,6 @@ export default function WebServerDashboard({
     ...trpc.webServer.updateSettings.mutationOptions(),
     onSuccess: () => {
       toast.success("Web Server settings updated successfully");
-      setEditingSettings(false);
       refetchInfo();
       refetchCaddyLogs();
     },
@@ -418,6 +418,7 @@ export default function WebServerDashboard({
   };
 
   const handleSaveEnv = () => {
+    setEditingSettings(true);
     const issues = validateKeyValuePairs(envVars);
     if (issues.length > 0) {
       toast.error(issues[0]?.message ?? "Fix the environment variables");
@@ -463,6 +464,7 @@ export default function WebServerDashboard({
   };
 
   const handleSavePorts = () => {
+    setEditingSettings(true);
     const filtered = portMappings.filter(
       (p) => p.targetPort > 0 && p.publishedPort > 0,
     );
@@ -476,7 +478,7 @@ export default function WebServerDashboard({
   const isOperating = reloadMutation.isPending;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <DashboardPage>
       {/* Page Header */}
       <div className="flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -1163,7 +1165,7 @@ export default function WebServerDashboard({
 
       {/* ─── SERVER LOGS DIALOG ─────────────────────────────────────────── */}
       <Dialog open={serverLogsOpen} onOpenChange={setServerLogsOpen}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] overflow-y-auto sm:min-w-[min(42rem,calc(100vw-2rem))]">
           <DialogHeader className="flex w-full flex-row items-center justify-between">
             <div>
               <DialogTitle>Upstand Server Logs</DialogTitle>
@@ -1327,7 +1329,7 @@ export default function WebServerDashboard({
 
       {/* ─── MODIFY ENVIRONMENT DIALOG ──────────────────────────────────── */}
       <Dialog open={envModalOpen} onOpenChange={setEnvModalOpen}>
-        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+        <DialogContent className="max-h-[85svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] overflow-y-auto sm:min-w-[36rem]">
           <DialogHeader>
             <DialogTitle>Modify Environment Variables</DialogTitle>
             <DialogDescription>
@@ -1356,7 +1358,7 @@ export default function WebServerDashboard({
 
       {/* ─── ADDITIONAL PORTS DIALOG ────────────────────────────────────── */}
       <Dialog open={portsModalOpen} onOpenChange={setPortsModalOpen}>
-        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+        <DialogContent className="max-h-[85svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] overflow-y-auto sm:min-w-[36rem]">
           <DialogHeader>
             <DialogTitle>Additional Port Mappings</DialogTitle>
             <DialogDescription>
@@ -1474,6 +1476,6 @@ export default function WebServerDashboard({
       {updateDialogVersion ? (
         <SelfUpdateDialog open version={updateDialogVersion} />
       ) : null}
-    </div>
+    </DashboardPage>
   );
 }

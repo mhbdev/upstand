@@ -59,12 +59,15 @@ import {
   DeleteSshKeyUseCase,
   DeliverNotificationUseCase,
   DeployResourceUseCase,
+  DockerReadOnlyService,
   DockerService,
   DockerServiceToken,
   ExecuteBackupRunUseCase,
+  GetAccountStatusUseCase,
   GetBackupRunsUseCase,
   GetBackupSchedulesUseCase,
   GetDeploymentsUseCase,
+  GetDockerInventoryUseCase,
   GetDockerRegistriesUseCase,
   GetEnvironmentsUseCase,
   GetEnvironmentUseCase,
@@ -141,10 +144,14 @@ import {
   DeleteSshKeyUseCaseToken,
   DeliverNotificationUseCaseToken,
   DeployResourceUseCaseToken,
+  DockerReadOnlyServiceToken,
   ExecuteBackupRunUseCaseToken,
+  GenerateSshKeyUseCaseToken,
+  GetAccountStatusUseCaseToken,
   GetBackupRunsUseCaseToken,
   GetBackupSchedulesUseCaseToken,
   GetDeploymentsUseCaseToken,
+  GetDockerInventoryUseCaseToken,
   GetDockerRegistriesUseCaseToken,
   GetEnvironmentsUseCaseToken,
   GetEnvironmentUseCaseToken,
@@ -170,7 +177,6 @@ import {
   GetUpdateStatusUseCaseToken,
   GetWebServerLogsUseCaseToken,
   GetWebServerSettingsUseCaseToken,
-  GenerateSshKeyUseCaseToken,
   InitSwarmUseCaseToken,
   ListBackupVolumesUseCaseToken,
   ListGitBranchesUseCaseToken,
@@ -196,9 +202,9 @@ import {
   UpdateWebServerSettingsUseCaseToken,
 } from "@upstand/usecases/tokens";
 
-export * from "@upstand/usecases/tokens";
-export * from "@upstand/repositories/tokens";
 export { UnitOfWorkToken } from "@upstand/domain";
+export * from "@upstand/repositories/tokens";
+export * from "@upstand/usecases/tokens";
 
 export const services = new ServiceCollection();
 
@@ -210,6 +216,10 @@ services.addScoped(
 );
 services.addSingleton(CaddyServiceToken, () => new CaddyService());
 services.addSingleton(DockerServiceToken, () => new DockerService());
+services.addSingleton(
+  DockerReadOnlyServiceToken,
+  () => new DockerReadOnlyService(),
+);
 services.addSingleton(
   NotificationTransportToken,
   () => new NotificationTransportRegistry(),
@@ -386,6 +396,18 @@ services.addTransient(
 services.addTransient(
   GetServerRuntimeStatsUseCaseToken,
   (c) => new GetServerRuntimeStatsUseCase(c.resolve(DockerServiceToken)),
+);
+services.addTransient(
+  GetAccountStatusUseCaseToken,
+  (c) => new GetAccountStatusUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  GetDockerInventoryUseCaseToken,
+  (c) =>
+    new GetDockerInventoryUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(DockerReadOnlyServiceToken),
+    ),
 );
 
 services.addTransient(

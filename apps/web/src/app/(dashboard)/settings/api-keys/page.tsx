@@ -26,6 +26,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 const PRESETS: Array<{
   value: ApiKeyPreset;
@@ -122,15 +123,12 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
-      <div>
-        <h1 className="flex items-center gap-2 font-semibold text-2xl">
-          <KeyRound /> API keys
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Create organization keys for REST, tRPC, CI, and MCP integrations.
-        </p>
-      </div>
+    <DashboardPage className="max-w-5xl gap-6">
+      <DashboardPageHeader
+        title="API keys"
+        icon={<KeyRound className="size-6 text-primary" />}
+        description="Create organization keys for REST, tRPC, CI, and MCP integrations."
+      />
 
       <Card>
         <CardHeader>
@@ -292,6 +290,6 @@ export default function ApiKeysPage() {
         <ShieldCheck />
         Organization keys never create browser sessions.
       </div>
-    </main>
+    </DashboardPage>
   );
 }

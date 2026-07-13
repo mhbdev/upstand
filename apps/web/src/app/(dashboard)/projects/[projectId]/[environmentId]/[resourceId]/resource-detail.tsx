@@ -382,6 +382,17 @@ export default function ResourceDetail({
   const [metrics, setMetrics] = useState<MetricPoint[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const hydratedResourceId = useRef<string | null>(null);
+  const draftLocked = useRef(false);
+  const markDirty = () => {
+    draftLocked.current = true;
+    setIsDirty(true);
+  };
+
+  useEffect(() => {
+    draftLocked.current = false;
+    hydratedResourceId.current = null;
+    setIsDirty(false);
+  }, [resourceId]);
   const [nameInput, setNameInput] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteVolumes, setDeleteVolumes] = useState(false);
@@ -601,7 +612,7 @@ services:
       // must never overwrite a form that the operator is editing. A successful
       // save clears the dirty flag and allows the next response to hydrate the
       // local draft again.
-      if (isDirty && hydratedResourceId.current === resource.id) {
+      if (draftLocked.current && hydratedResourceId.current === resource.id) {
         if (liveContainers) setContainerList(liveContainers);
         return;
       }
@@ -662,7 +673,7 @@ services:
         }
       }
     }
-  }, [resource, liveContainers, isDirty]);
+  }, [resource, liveContainers]);
 
   // Automatically select the first provider of the chosen type when switching tabs
   useEffect(() => {
@@ -856,6 +867,7 @@ services:
   // ─── Environment Variables Event Handlers ─────────────────────────────────────
   const addEnvVar = () => {
     if (!newEnvKey.trim()) return;
+    markDirty();
     const updated = [...envList];
     const index = updated.findIndex((e) => e.key === newEnvKey.trim());
     if (index > -1) {
@@ -875,6 +887,7 @@ services:
   };
 
   const deleteEnvVar = (key: string) => {
+    markDirty();
     setEnvList(envList.filter((e) => e.key !== key));
   };
 
@@ -939,6 +952,7 @@ services:
   };
 
   const deleteDomain = (idx: number) => {
+    markDirty();
     const updated = domainList.filter((_, i) => i !== idx);
     updateResourceMutation.mutate(
       { id: resourceId, domains: JSON.stringify(updated) },
@@ -992,8 +1006,8 @@ services:
   return (
     <div
       className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8"
-      onInput={() => setIsDirty(true)}
-      onChange={() => setIsDirty(true)}
+      onInput={markDirty}
+      onChange={markDirty}
     >
       {/* Breadcrumbs */}
       <div className="space-y-2">
@@ -1178,6 +1192,7 @@ services:
                         checked={autoDeploy}
                         onChange={(e) => {
                           const val = e.target.checked;
+                          markDirty();
                           setAutoDeploy(val);
                           const config = {
                             ...parseResourceCredentials(resource.credentials),
@@ -1259,6 +1274,7 @@ services:
                           onValueChange={(value) => {
                             const nextType =
                               value as ApplicationBuildConfig["type"];
+                            markDirty();
                             setBuildConfig(createBuildConfig(nextType));
                           }}
                         >
@@ -1409,6 +1425,7 @@ services:
                           }
                           onValueChange={(value) => {
                             if (value !== "custom") {
+                              markDirty();
                               setBuildConfig({
                                 ...buildConfig,
                                 railpackVersion: value ?? "",
@@ -1483,12 +1500,13 @@ services:
                         </Label>
                         <Select
                           value={buildConfig.herokuVersion}
-                          onValueChange={(value) =>
+                          onValueChange={(value) => {
+                            markDirty();
                             setBuildConfig({
                               ...buildConfig,
                               herokuVersion: value as "24" | "26",
-                            })
-                          }
+                            });
+                          }}
                         >
                           <SelectTrigger
                             id="heroku-version"
@@ -1547,9 +1565,10 @@ services:
                           <Switch
                             id="static-spa"
                             checked={buildConfig.spa}
-                            onCheckedChange={(spa) =>
-                              setBuildConfig({ ...buildConfig, spa })
-                            }
+                            onCheckedChange={(spa) => {
+                              markDirty();
+                              setBuildConfig({ ...buildConfig, spa });
+                            }}
                           />
                         </Field>
                       </div>
@@ -1609,9 +1628,10 @@ services:
                             aria-selected={active}
                             role="tab"
                             type="button"
-                            onClick={() =>
-                              setProviderType(prov.id as ResourceProvider)
-                            }
+                            onClick={() => {
+                              markDirty();
+                              setProviderType(prov.id as ResourceProvider);
+                            }}
                             className={cn(
                               "flex shrink-0 cursor-pointer items-center gap-2 border-none px-3 py-1.5 font-semibold text-xs transition-colors",
                               active
@@ -1658,9 +1678,10 @@ services:
                           </Label>
                           <Select
                             value={githubAccount}
-                            onValueChange={(value) =>
-                              setGithubAccount(value ?? "")
-                            }
+                            onValueChange={(value) => {
+                              markDirty();
+                              setGithubAccount(value ?? "");
+                            }}
                             disabled={
                               gitProviders?.filter(
                                 (p) => p.provider === providerType,
@@ -1701,9 +1722,10 @@ services:
                           <Label>Repository</Label>
                           <Select
                             value={githubRepo}
-                            onValueChange={(value) =>
-                              setGithubRepo(value ?? "")
-                            }
+                            onValueChange={(value) => {
+                              markDirty();
+                              setGithubRepo(value ?? "");
+                            }}
                             disabled={
                               !githubAccount ||
                               gitProviders?.filter(
@@ -1739,9 +1761,10 @@ services:
                             <Label>Branch</Label>
                             <Select
                               value={githubBranch}
-                              onValueChange={(value) =>
-                                setGithubBranch(value ?? "")
-                              }
+                              onValueChange={(value) => {
+                                markDirty();
+                                setGithubBranch(value ?? "");
+                              }}
                               disabled={
                                 !githubRepo ||
                                 gitProviders?.filter(
@@ -1788,9 +1811,10 @@ services:
                           <Label>Trigger Type</Label>
                           <Select
                             value={githubTriggerType}
-                            onValueChange={(value) =>
-                              setGithubTriggerType(value ?? "On Push")
-                            }
+                            onValueChange={(value) => {
+                              markDirty();
+                              setGithubTriggerType(value ?? "On Push");
+                            }}
                           >
                             <SelectTrigger className="border-border/40">
                               <SelectValue placeholder="Select Trigger" />
@@ -1820,6 +1844,7 @@ services:
                                   e.preventDefault();
                                   const val = e.currentTarget.value.trim();
                                   if (val && !githubWatchPaths.includes(val)) {
+                                    markDirty();
                                     setGithubWatchPaths([
                                       ...githubWatchPaths,
                                       val,
@@ -1838,6 +1863,7 @@ services:
                                 ) as HTMLInputElement;
                                 const val = input?.value?.trim();
                                 if (val && !githubWatchPaths.includes(val)) {
+                                  markDirty();
                                   setGithubWatchPaths([
                                     ...githubWatchPaths,
                                     val,
@@ -1860,11 +1886,12 @@ services:
                                   {p}
                                   <button
                                     type="button"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      markDirty();
                                       setGithubWatchPaths(
                                         githubWatchPaths.filter((x) => x !== p),
-                                      )
-                                    }
+                                      );
+                                    }}
                                     className="text-[10px] text-muted-foreground hover:text-foreground"
                                   >
                                     ✕
@@ -1923,9 +1950,10 @@ services:
                             </Label>
                             <Select
                               value={gitSshKeyId}
-                              onValueChange={(value) =>
-                                setGitSshKeyId(value ?? "")
-                              }
+                              onValueChange={(value) => {
+                                markDirty();
+                                setGitSshKeyId(value ?? "");
+                              }}
                             >
                               <SelectTrigger className="border-border/40">
                                 <SelectValue placeholder="Select SSH Key" />
@@ -1981,6 +2009,7 @@ services:
                                   e.preventDefault();
                                   const val = e.currentTarget.value.trim();
                                   if (val && !gitWatchPaths.includes(val)) {
+                                    markDirty();
                                     setGitWatchPaths([...gitWatchPaths, val]);
                                     e.currentTarget.value = "";
                                   }
@@ -1996,6 +2025,7 @@ services:
                                 ) as HTMLInputElement;
                                 const val = input?.value?.trim();
                                 if (val && !gitWatchPaths.includes(val)) {
+                                  markDirty();
                                   setGitWatchPaths([...gitWatchPaths, val]);
                                   input.value = "";
                                 }
@@ -2015,11 +2045,12 @@ services:
                                   {p}
                                   <button
                                     type="button"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      markDirty();
                                       setGitWatchPaths(
                                         gitWatchPaths.filter((x) => x !== p),
-                                      )
-                                    }
+                                      );
+                                    }}
                                     className="text-[10px] text-muted-foreground hover:text-foreground"
                                   >
                                     ✕
@@ -2506,15 +2537,16 @@ services:
                   {routingTargets.length > 0 && (
                     <Select
                       value={domainDraft.serviceName || "manual"}
-                      onValueChange={(serviceName) =>
+                      onValueChange={(serviceName) => {
+                        markDirty();
                         setDomainDraft((current) => ({
                           ...current,
                           serviceName:
                             serviceName === "manual" || !serviceName
                               ? ""
                               : serviceName,
-                        }))
-                      }
+                        }));
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a deployed service" />
@@ -2667,9 +2699,10 @@ services:
                   <Switch
                     id="strip-domain-path"
                     checked={domainDraft.stripPath}
-                    onCheckedChange={(stripPath) =>
-                      setDomainDraft((current) => ({ ...current, stripPath }))
-                    }
+                    onCheckedChange={(stripPath) => {
+                      markDirty();
+                      setDomainDraft((current) => ({ ...current, stripPath }));
+                    }}
                   />
                 </Field>
 
@@ -2683,9 +2716,10 @@ services:
                   <Switch
                     id="domain-https"
                     checked={domainDraft.https}
-                    onCheckedChange={(https) =>
-                      setDomainDraft((current) => ({ ...current, https }))
-                    }
+                    onCheckedChange={(https) => {
+                      markDirty();
+                      setDomainDraft((current) => ({ ...current, https }));
+                    }}
                   />
                 </Field>
               </FieldGroup>
@@ -3373,7 +3407,7 @@ services:
         open={viewDeploymentLogsOpen}
         onOpenChange={setViewDeploymentLogsOpen}
       >
-        <DialogContent className="max-w-2xl rounded-2xl border border-border bg-black font-mono shadow-2xl">
+        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,56rem)] rounded-2xl border border-border bg-black font-mono shadow-2xl sm:min-w-[min(42rem,calc(100vw-2rem))]">
           <DialogHeader className="border-zinc-800 border-b pb-3">
             <DialogTitle className="font-semibold text-zinc-300">
               Build & Deploy Logs: {selectedDeployment?.id}
@@ -3405,7 +3439,7 @@ services:
           if (!v) setContainerModalType(null);
         }}
       >
-        <DialogContent className="max-w-xl rounded-2xl border border-border bg-card shadow-2xl">
+        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[36rem]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-bold text-foreground text-lg">
               {containerModalType === "logs" && (

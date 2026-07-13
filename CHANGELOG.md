@@ -6,6 +6,24 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.22 - 2026-07-13
+
+### Added
+
+- Added read-only UpGal account and Docker inventory tools for organization status, containers, images, volumes, services, engine information, and logs.
+- Added shared dashboard page layout primitives for consistent page hierarchy across dashboard routes.
+
+### Changed
+
+- Improved Git provider cards with clearer connection status, access metadata, actions, and responsive layouts.
+- Improved large data dialogs, including terminal, notification channel, deployment log, and resource dialogs, with responsive sizing, scrolling, and clearer content hierarchy.
+- Expanded the dashboard UI consistency across settings, monitoring, deployments, storage, server, and resource pages.
+
+### Fixed
+
+- Prevented live polling and background refetches from overwriting unsaved resource, web-server, deployment concurrency, and AI settings edits.
+- Preserved local drafts when saving one section while another section still contains unsaved changes.
+
 ## 0.1.21 - 2026-07-13
 
 ### Fixed

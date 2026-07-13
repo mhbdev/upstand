@@ -79,6 +79,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 
 type SwarmNode = {
   id: string;
@@ -325,7 +326,7 @@ export default function DockerSwarmPage() {
 
   if (!organizationId) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <DashboardPage className="gap-4">
         <Alert>
           <HugeiconsIcon icon={Alert02Icon} />
           <AlertTitle>Select an organization</AlertTitle>
@@ -334,7 +335,7 @@ export default function DockerSwarmPage() {
             that owns this control plane to continue.
           </AlertDescription>
         </Alert>
-      </div>
+      </DashboardPage>
     );
   }
 
@@ -347,27 +348,22 @@ export default function DockerSwarmPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 font-bold text-3xl tracking-tight">
-            <HugeiconsIcon icon={Layers01Icon} className="size-7" />
-            Docker Swarm
-          </h1>
-          <p className="max-w-3xl text-muted-foreground text-sm">
-            Manage the manager node, workload scheduling, and joining
-            credentials for this Docker Swarm cluster.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={refreshCluster}
-          disabled={swarmInfoQuery.isFetching}
-        >
-          <RefreshCw data-icon="inline-start" />
-          Refresh status
-        </Button>
-      </div>
+    <DashboardPage className="gap-6">
+      <DashboardPageHeader
+        title="Docker Swarm"
+        icon={<HugeiconsIcon icon={Layers01Icon} className="size-6 text-primary" />}
+        description="Manage the manager node, workload scheduling, and joining credentials for this Docker Swarm cluster."
+        actions={
+          <Button
+            variant="outline"
+            onClick={refreshCluster}
+            disabled={swarmInfoQuery.isFetching}
+          >
+            <RefreshCw data-icon="inline-start" />
+            Refresh status
+          </Button>
+        }
+      />
 
       {swarmInfo?.error ? (
         <Alert variant="destructive">
@@ -879,7 +875,7 @@ export default function DockerSwarmPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </DashboardPage>
   );
 }
 

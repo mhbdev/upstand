@@ -220,7 +220,7 @@ function CreateAppDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl border border-border bg-card shadow-2xl">
+      <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,42rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[32rem]">
         <DialogHeader>
           <DialogTitle className="font-bold text-xl">
             New Application
@@ -455,7 +455,7 @@ function CreateDbDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
+      <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[36rem]">
         <DialogHeader>
           <DialogTitle className="font-bold text-xl">New Database</DialogTitle>
           <DialogDescription className="text-muted-foreground text-sm">
@@ -812,7 +812,7 @@ function CreateComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl border border-border bg-card shadow-2xl">
+      <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,42rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[32rem]">
         <DialogHeader>
           <DialogTitle className="font-bold text-xl">
             New Docker Compose

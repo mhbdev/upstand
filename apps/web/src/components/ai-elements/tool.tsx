@@ -55,13 +55,17 @@ const statusLabels: Record<ToolPart["state"], string> = {
 };
 
 const statusIcons: Record<ToolPart["state"], ReactNode> = {
-  "approval-requested": <ClockIcon className="size-4 text-yellow-600" />,
-  "approval-responded": <CheckCircleIcon className="size-4 text-blue-600" />,
-  "input-available": <ClockIcon className="size-4 animate-pulse" />,
-  "input-streaming": <CircleIcon className="size-4" />,
-  "output-available": <CheckCircleIcon className="size-4 text-green-600" />,
-  "output-denied": <XCircleIcon className="size-4 text-orange-600" />,
-  "output-error": <XCircleIcon className="size-4 text-red-600" />,
+  "approval-requested": <ClockIcon aria-hidden="true" className="size-4" />,
+  "approval-responded": (
+    <CheckCircleIcon aria-hidden="true" className="size-4" />
+  ),
+  "input-available": (
+    <ClockIcon aria-hidden="true" className="size-4 animate-pulse" />
+  ),
+  "input-streaming": <CircleIcon aria-hidden="true" className="size-4" />,
+  "output-available": <CheckCircleIcon aria-hidden="true" className="size-4" />,
+  "output-denied": <XCircleIcon aria-hidden="true" className="size-4" />,
+  "output-error": <XCircleIcon aria-hidden="true" className="size-4" />,
 };
 
 export const getStatusBadge = (status: ToolPart["state"]) => (
@@ -95,11 +99,19 @@ export const ToolHeader = ({
       {...props}
     >
       <div className="flex items-center gap-2">
-        <WrenchIcon className="size-4 text-muted-foreground" />
-        <span className="font-medium text-sm">{title ?? derivedName}</span>
+        <WrenchIcon
+          aria-hidden="true"
+          className="size-4 text-muted-foreground"
+        />
+        <span className="min-w-0 truncate font-medium text-sm">
+          {title ?? derivedName}
+        </span>
         {getStatusBadge(state)}
       </div>
-      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      <ChevronDownIcon
+        aria-hidden="true"
+        className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+      />
     </CollapsibleTrigger>
   );
 };
@@ -145,18 +157,24 @@ export const ToolOutput = ({
   errorText,
   ...props
 }: ToolOutputProps) => {
-  if (!(output || errorText)) {
+  if (output === undefined && !errorText) {
     return null;
   }
 
-  let Output = <div>{output as ReactNode}</div>;
+  let Output: ReactNode = null;
 
-  if (typeof output === "object" && !isValidElement(output)) {
+  if (
+    output !== undefined &&
+    typeof output === "object" &&
+    !isValidElement(output)
+  ) {
     Output = (
       <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />
     );
   } else if (typeof output === "string") {
     Output = <CodeBlock code={output} language="json" />;
+  } else if (output !== undefined) {
+    Output = <div className="p-3">{output as ReactNode}</div>;
   }
 
   return (
@@ -172,7 +190,7 @@ export const ToolOutput = ({
             : "bg-muted/50 text-foreground",
         )}
       >
-        {errorText && <div>{errorText}</div>}
+        {errorText && <div className="p-3">{errorText}</div>}
         {Output}
       </div>
     </div>

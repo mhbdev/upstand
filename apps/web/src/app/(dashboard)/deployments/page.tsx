@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { DashboardPage, DashboardPageHeader } from "@/components/dashboard/dashboard-page";
 import { trpc } from "@/utils/trpc";
 
 export default function DeploymentsPage() {
@@ -58,6 +59,9 @@ export default function DeploymentsPage() {
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
   const [concurrencyInputs, setConcurrencyInputs] = useState<
     Record<string, number>
+  >({});
+  const [dirtyConcurrency, setDirtyConcurrency] = useState<
+    Record<string, boolean>
   >({});
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -95,9 +99,15 @@ export default function DeploymentsPage() {
       for (const server of servers) {
         inputs[server.id] = server.concurrency;
       }
-      setConcurrencyInputs(inputs);
+      setConcurrencyInputs((current) => {
+        const next = { ...current };
+        for (const [serverId, value] of Object.entries(inputs)) {
+          if (!dirtyConcurrency[serverId]) next[serverId] = value;
+        }
+        return next;
+      });
     }
-  }, [servers]);
+  }, [servers, dirtyConcurrency]);
 
   // Auto-scroll logs modal to bottom
   useEffect(() => {
@@ -121,9 +131,18 @@ export default function DeploymentsPage() {
   // Mutations
   const updateConcurrencyMutation = useMutation({
     ...trpc.deployment.updateServerConcurrency.mutationOptions(),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       toast.success(`Concurrency updated for server ${data.hostname}`);
-      refetchServers();
+      setConcurrencyInputs((current) => ({
+        ...current,
+        [variables.serverId]: variables.concurrency,
+      }));
+      void refetchServers().then(() => {
+        setDirtyConcurrency((current) => ({
+          ...current,
+          [variables.serverId]: false,
+        }));
+      });
     },
     onError: (err) => {
       toast.error(err.message || "Failed to update concurrency");
@@ -210,30 +229,26 @@ export default function DeploymentsPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-3xl tracking-tight">
-            Deployments & Queues
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Observe build histories, monitor live queues, and manage
-            server-level concurrency.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            refetchDeployments();
-            refetchQueue();
-            refetchServers();
-          }}
-          className="size-9"
-        >
-          <RefreshCw className="size-4" />
-        </Button>
-      </div>
+    <DashboardPage className="flex-1">
+      <DashboardPageHeader
+        title="Deployments & Queues"
+        icon={<Activity className="size-6 text-primary" />}
+        description="Observe build histories, monitor live queues, and manage server-level concurrency."
+        actions={
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              refetchDeployments();
+              refetchQueue();
+              refetchServers();
+            }}
+            aria-label="Refresh deployments"
+          >
+            <RefreshCw className="size-4" />
+          </Button>
+        }
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="border-b pb-px">
@@ -498,13 +513,17 @@ export default function DeploymentsPage() {
                               min="1"
                               max="16"
                               value={concurrencyInputs[server.id] ?? 1}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                setDirtyConcurrency((current) => ({
+                                  ...current,
+                                  [server.id]: true,
+                                }));
                                 setConcurrencyInputs({
                                   ...concurrencyInputs,
                                   [server.id]:
                                     Number.parseInt(e.target.value) || 1,
-                                })
-                              }
+                                });
+                              }}
                               className="h-9 w-24"
                             />
                             <Button
@@ -536,7 +555,7 @@ export default function DeploymentsPage() {
         open={!!selectedDeployment}
         onOpenChange={(open) => !open && setSelectedDeployment(null)}
       >
-        <DialogContent className="flex h-[80vh] max-w-4xl flex-col border-muted/40 p-6">
+        <DialogContent className="flex h-[min(88svh,900px)] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] flex-col border-muted/40 p-4 sm:min-w-[min(42rem,calc(100vw-2rem))] sm:p-6">
           <DialogHeader className="border-b pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -575,6 +594,6 @@ export default function DeploymentsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPage>
   );
 }

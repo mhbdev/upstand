@@ -140,8 +140,8 @@ export function WebServerTerminalDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(92svh,820px)] w-[calc(100vw-1rem)] max-w-[min(96vw,1120px)] gap-0 overflow-hidden border-border/60 bg-background p-0">
-        <DialogHeader className="border-border/60 border-b bg-muted/20 px-6 py-5">
+      <DialogContent className="h-[min(92svh,820px)] w-[calc(100vw-1rem)] max-w-[min(96vw,1120px)] gap-0 overflow-hidden border-border/60 bg-background p-0 sm:min-w-[min(42rem,calc(100vw-2rem))]">
+        <DialogHeader className="border-border/60 border-b bg-muted/20 px-4 py-5 sm:px-6">
           <DialogTitle className="flex items-center gap-2">
             <HugeiconsIcon
               icon={TerminalIcon}

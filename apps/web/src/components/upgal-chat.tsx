@@ -3,6 +3,21 @@
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpGalUIMessage } from "@upstand/api/ai/upgal";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@upstand/ui/components/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@upstand/ui/components/alert-dialog";
 import { Button } from "@upstand/ui/components/button";
 import {
   Popover,
@@ -27,7 +42,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -40,23 +55,29 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
-import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
+import { UpGalToolOutput } from "@/components/upgal-tool-output";
 import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 type UpGalChatProps = { organizationId?: string };
+
+const conversationDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 function Part({
   part,
@@ -70,6 +91,11 @@ function Part({
     const toolName =
       part.type === "dynamic-tool" ? getToolName(part) : getToolName(part);
     const approval = part.approval;
+    const hasInput =
+      part.input !== undefined &&
+      (typeof part.input !== "object" ||
+        part.input === null ||
+        Object.keys(part.input).length > 0);
     return (
       <Tool
         defaultOpen={part.state !== "output-available"}
@@ -85,7 +111,7 @@ function Part({
           <ToolHeader type={part.type} state={part.state} />
         )}
         <ToolContent>
-          <ToolInput input={part.input} />
+          {hasInput ? <ToolInput input={part.input} /> : null}
           {approval && part.state === "approval-requested" ? (
             <div
               className="flex items-center gap-2 border-t p-3"
@@ -100,17 +126,17 @@ function Part({
                 variant="outline"
                 onClick={() => approve(approval.id, false)}
               >
-                <X className="mr-1 size-3" />
+                <X data-icon="inline-start" />
                 Reject
               </Button>
               <Button size="sm" onClick={() => approve(approval.id, true)}>
-                <Check className="mr-1 size-3" />
+                <Check data-icon="inline-start" />
                 Approve
               </Button>
             </div>
           ) : null}
           {part.state === "output-available" ? (
-            <AdaptiveToolOutput name={toolName} output={part.output} />
+            <UpGalToolOutput name={toolName} output={part.output} />
           ) : part.state === "output-error" ? (
             <ToolOutput output={undefined} errorText={part.errorText} />
           ) : null}
@@ -121,66 +147,15 @@ function Part({
   return null;
 }
 
-function AdaptiveToolOutput({
-  name,
-  output,
-}: {
-  name: string;
-  output: unknown;
-}) {
-  const records = Array.isArray(output)
-    ? output.filter(
-        (item): item is Record<string, unknown> =>
-          typeof item === "object" && item !== null,
-      )
-    : [];
-  if (records.length > 0 && records.length <= 12) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-            {name.replaceAll("_", " ")}
-          </h4>
-          <span className="text-muted-foreground text-xs">
-            {records.length} result{records.length === 1 ? "" : "s"}
-          </span>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {records.map((record, index) => {
-            const title = String(
-              record.name ??
-                record.appName ??
-                record.hostname ??
-                record.id ??
-                `Result ${index + 1}`,
-            );
-            const detail = record.status ?? record.type ?? record.ipAddress;
-            return (
-              <div
-                key={`${title}-${index}`}
-                className="rounded-md border bg-muted/30 p-2"
-              >
-                <p className="truncate font-medium text-sm">{title}</p>
-                {detail ? (
-                  <p className="mt-0.5 truncate text-muted-foreground text-xs">
-                    {String(detail)}
-                  </p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-        <ToolOutput output={output} errorText={undefined} />
-      </div>
-    );
-  }
-  return <ToolOutput output={output} errorText={undefined} />;
-}
-
 export function UpGalChat({ organizationId }: UpGalChatProps) {
   const [open, setOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string>();
+  const [loadError, setLoadError] = useState<string>();
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  }>();
   const queryClient = useQueryClient();
   const loadedConversationId = useRef<{ value?: string }>({});
   const manualNewConversation = useRef(false);
@@ -221,6 +196,51 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
       lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
   });
 
+  async function ensureConversation() {
+    if (conversationId || !organizationId) return conversationId;
+    const result = await createConversation.mutateAsync({ organizationId });
+    setConversationId(result.id);
+    void conversations.refetch();
+    return result.id;
+  }
+
+  const loadConversation = useCallback(
+    async (id: string) => {
+      if (!organizationId || loadedConversationId.current.value === id) return;
+      try {
+        setLoadError(undefined);
+        const result = await queryClient.fetchQuery(
+          trpc.ai.getConversation.queryOptions({
+            organizationId,
+            conversationId: id,
+          }),
+        );
+        if (!result) {
+          setLoadError("This conversation is no longer available.");
+          return;
+        }
+        setConversationId(id);
+        manualNewConversation.current = false;
+        loadedConversationId.current.value = id;
+        chat.setMessages(
+          result.messages.map((message) => ({
+            id: message.id,
+            role: message.role as UpGalUIMessage["role"],
+            parts: message.parts as UpGalUIMessage["parts"],
+          })),
+        );
+        setHistoryOpen(false);
+      } catch (error) {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load this conversation.",
+        );
+      }
+    },
+    [chat, organizationId, queryClient],
+  );
+
   useEffect(() => {
     if (
       !organizationId ||
@@ -231,36 +251,13 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
     )
       return;
     void loadConversation(conversations.data[0].id);
-  }, [organizationId, open, conversationId, conversations.data]);
-
-  async function ensureConversation() {
-    if (conversationId || !organizationId) return conversationId;
-    const result = await createConversation.mutateAsync({ organizationId });
-    setConversationId(result.id);
-    return result.id;
-  }
-
-  async function loadConversation(id: string) {
-    if (!organizationId || loadedConversationId.current.value === id) return;
-    const result = await queryClient.fetchQuery(
-      trpc.ai.getConversation.queryOptions({
-        organizationId,
-        conversationId: id,
-      }),
-    );
-    if (!result) return;
-    setConversationId(id);
-    manualNewConversation.current = false;
-    loadedConversationId.current.value = id;
-    chat.setMessages(
-      result.messages.map((message) => ({
-        id: message.id,
-        role: message.role as UpGalUIMessage["role"],
-        parts: message.parts as UpGalUIMessage["parts"],
-      })),
-    );
-    setHistoryOpen(false);
-  }
+  }, [
+    conversationId,
+    conversations.data,
+    loadConversation,
+    open,
+    organizationId,
+  ]);
 
   async function send(text: string) {
     const trimmedText = text.trim();
@@ -277,6 +274,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
     loadedConversationId.current.value = undefined;
     manualNewConversation.current = true;
     chat.setMessages([]);
+    setLoadError(undefined);
     setHistoryOpen(false);
   }
 
@@ -323,11 +321,14 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
                     Previous conversations
                   </p>
                   {conversations.isFetching ? (
-                    <Loader2 className="size-3 animate-spin" />
+                    <Loader2
+                      aria-hidden="true"
+                      className="size-3 animate-spin"
+                    />
                   ) : null}
                 </div>
                 <ScrollArea className="max-h-64">
-                  <div className="space-y-1">
+                  <div className="flex flex-col gap-1">
                     {conversations.data?.length ? (
                       conversations.data.map((conversation) => (
                         <div
@@ -344,28 +345,23 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
                             <span className="block truncate font-medium text-sm">
                               {conversation.title || "UpGal conversation"}
                             </span>
-                            <span className="block text-muted-foreground text-[11px]">
-                              {new Date(
-                                conversation.updatedAt,
-                              ).toLocaleString()}
+                            <span className="block text-[11px] text-muted-foreground">
+                              {conversationDateFormatter.format(
+                                new Date(conversation.updatedAt),
+                              )}
                             </span>
                           </button>
                           <Button
                             aria-label={`Remove ${conversation.title || "conversation"}`}
                             size="icon-sm"
                             variant="ghost"
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  "Remove this conversation and its messages?",
-                                )
-                              ) {
-                                deleteConversation.mutate({
-                                  organizationId: organizationId || "",
-                                  conversationId: conversation.id,
-                                });
-                              }
-                            }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                id: conversation.id,
+                                title:
+                                  conversation.title || "UpGal conversation",
+                              })
+                            }
                             disabled={deleteConversation.isPending}
                           >
                             <Trash2 className="size-3.5 text-destructive" />
@@ -430,12 +426,35 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
               ))}
               {chat.status === "submitted" || chat.status === "streaming" ? (
                 <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                  <Loader2 className="size-3 animate-spin" />
+                  <Loader2 aria-hidden="true" className="size-3 animate-spin" />
                   UpGal is working…
                 </div>
               ) : null}
+              {loadError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Conversation unavailable</AlertTitle>
+                  <AlertDescription>{loadError}</AlertDescription>
+                </Alert>
+              ) : null}
               {chat.error ? (
-                <p className="text-destructive text-sm">{chat.error.message}</p>
+                <Alert variant="destructive">
+                  <AlertTitle>Response interrupted</AlertTitle>
+                  <AlertDescription>
+                    <span>
+                      {chat.error.message === "An error occurred."
+                        ? "UpGal could not finish this response. Completed tool results remain available above."
+                        : chat.error.message}
+                    </span>
+                    <Button
+                      className="mt-2"
+                      onClick={() => void chat.regenerate()}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Try again
+                    </Button>
+                  </AlertDescription>
+                </Alert>
               ) : null}
             </ConversationContent>
             <ConversationScrollButton />
@@ -466,6 +485,37 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
           </PromptInput>
         </section>
       )}
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(undefined);
+        }}
+        open={Boolean(deleteTarget)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleteTarget?.title}” and its saved tool results will be
+              permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deleteTarget || !organizationId) return;
+                deleteConversation.mutate({
+                  organizationId,
+                  conversationId: deleteTarget.id,
+                });
+                setDeleteTarget(undefined);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

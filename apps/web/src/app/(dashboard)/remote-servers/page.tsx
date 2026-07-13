@@ -36,6 +36,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 
 export default function RemoteServersPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
@@ -150,7 +151,7 @@ export default function RemoteServersPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
+    <DashboardPage>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-bold text-3xl tracking-tight">Remote Servers</h1>
@@ -407,6 +408,6 @@ export default function RemoteServersPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardPage>
   );
 }
