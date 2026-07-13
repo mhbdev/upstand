@@ -137,15 +137,16 @@ export type UpGalTools = {
 };
 export type UpGalUIMessage = UIMessage<never, never, InferUITools<UpGalTools>>;
 export type UpGalToolName = keyof UpGalTools & string;
+type UpGalToolContext = { organizationId: string };
 
 export type UpGalExecutableTool<Input, Output> = Tool<
   Input,
   Output,
-  Record<string, never>
+  UpGalToolContext
 > & {
   execute: (
     input: Input,
-    options: ToolExecutionOptions<Record<string, never>>,
+    options: ToolExecutionOptions<UpGalToolContext>,
   ) => Promise<Output>;
 };
 
@@ -209,10 +210,10 @@ function readTool<TInput, TOutput>(
     type: "function",
     description,
     inputSchema,
-    contextSchema: z.object({}),
+    contextSchema: z.object({ organizationId: z.string().min(1) }),
     execute: async (
       input: TInput,
-      _options: ToolExecutionOptions<Record<string, never>>,
+      _options: ToolExecutionOptions<UpGalToolContext>,
     ) => execute(input),
   } satisfies UpGalExecutableTool<TInput, TOutput>;
 }
@@ -226,11 +227,11 @@ function mutationTool<TInput, TOutput>(
     type: "function",
     description,
     inputSchema,
-    contextSchema: z.object({}),
+    contextSchema: z.object({ organizationId: z.string().min(1) }),
     needsApproval: true,
     execute: async (
       input: TInput,
-      _options: ToolExecutionOptions<Record<string, never>>,
+      _options: ToolExecutionOptions<UpGalToolContext>,
     ) => execute(input),
   } satisfies UpGalExecutableTool<TInput, TOutput>;
 }
@@ -359,10 +360,10 @@ export async function executeUpGalReadTool(
   context: UpGalContext,
 ): Promise<JsonValue> {
   const tools = createUpGalTools(context);
-  const options: ToolExecutionOptions<Record<string, never>> = {
+  const options: ToolExecutionOptions<UpGalToolContext> = {
     toolCallId: randomUUID(),
     messages: [],
-    context: {},
+    context: { organizationId: context.organizationId },
   };
   switch (name) {
     case "list_projects":
@@ -609,8 +610,24 @@ export async function createUpGalResponse(
   const agent = new ToolLoopAgent({
     id: "upgal",
     model: provider.model,
+    temperature: 0.7,
     instructions: `You are UpGal, Upstand's operations assistant. Be precise, transparent, and concise. You may inspect organization resources automatically. Every mutation requires user approval. Never invent IDs or claim an action completed until the tool returns success. The active organization is ${context.organizationId}.`,
     tools: createUpGalTools(context),
+    toolsContext: {
+      list_projects: { organizationId: context.organizationId },
+      list_environments: { organizationId: context.organizationId },
+      list_resources: { organizationId: context.organizationId },
+      get_resource_logs: { organizationId: context.organizationId },
+      get_resource_stats: { organizationId: context.organizationId },
+      list_servers: { organizationId: context.organizationId },
+      list_deployments: { organizationId: context.organizationId },
+      create_project: { organizationId: context.organizationId },
+      create_environment: { organizationId: context.organizationId },
+      deploy_resource: { organizationId: context.organizationId },
+      control_resource: { organizationId: context.organizationId },
+      delete_resource: { organizationId: context.organizationId },
+      delete_project: { organizationId: context.organizationId },
+    },
     stopWhen: stepCountIs(12),
     runtimeContext: context,
     onStepEnd: async ({ stepNumber }) => {
@@ -648,6 +665,15 @@ export async function saveIncomingMessages(
       createdAt: new Date(),
     })),
   );
+  const firstUserText = messages
+    .find((message) => message.role === "user")
+    ?.parts.find((part) => part.type === "text")?.text;
+  if (firstUserText?.trim()) {
+    await ai.updateConversationTitle(
+      conversationId,
+      firstUserText.trim().replace(/\s+/g, " "),
+    );
+  }
 }
 
 export async function getConversationForUser(

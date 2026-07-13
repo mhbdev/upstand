@@ -57,6 +57,7 @@ import {
   validateKeyValuePairs,
 } from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
+import { SelfUpdateDialog } from "@/components/self-update-dialog";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -92,6 +93,7 @@ export default function WebServerDashboard({
   const [envModalOpen, setEnvModalOpen] = useState(false);
   const [portsModalOpen, setPortsModalOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [updateDialogVersion, setUpdateDialogVersion] = useState<string>();
 
   // Additional settings states
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
@@ -339,10 +341,8 @@ export default function WebServerDashboard({
 
   const triggerUpdateMutation = useMutation({
     ...trpc.webServer.triggerUpdate.mutationOptions(),
-    onSuccess: () => {
-      toast.success(
-        "Self-update initiated successfully! The system is updating in the background.",
-      );
+    onSuccess: (_, variables) => {
+      setUpdateDialogVersion(variables.version);
       refetchUpdates();
     },
     onError: (err) => {
@@ -1471,6 +1471,9 @@ export default function WebServerDashboard({
         open={terminalOpen}
         onOpenChange={setTerminalOpen}
       />
+      {updateDialogVersion ? (
+        <SelfUpdateDialog open version={updateDialogVersion} />
+      ) : null}
     </div>
   );
 }

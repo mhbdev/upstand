@@ -167,6 +167,30 @@ export const aiRouter = router({
       const messages = await ctx.scope
         .resolve(AIRepositoryToken)
         .listMessages(conversation.id);
-      return { conversation, messages: messages.reverse() };
+      return { conversation, messages };
+    }),
+
+  deleteConversation: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        conversationId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      const repository = ctx.scope.resolve(AIRepositoryToken);
+      const conversation = await repository.findConversation(
+        input.conversationId,
+        input.organizationId,
+        ctx.session.user.id,
+      );
+      if (!conversation) return { deleted: false };
+      await repository.deleteConversation(
+        input.conversationId,
+        input.organizationId,
+        ctx.session.user.id,
+      );
+      return { deleted: true };
     }),
 });

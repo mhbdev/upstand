@@ -93,6 +93,12 @@ export interface IAIRepository {
     organizationId: string,
     userId: string,
   ): Promise<AIConversationRecord[]>;
+  updateConversationTitle(conversationId: string, title: string): Promise<void>;
+  deleteConversation(
+    conversationId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<void>;
   listMessages(conversationId: string): Promise<AIMessageRecord[]>;
   saveMessages(
     conversationId: string,

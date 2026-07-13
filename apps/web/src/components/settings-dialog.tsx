@@ -83,6 +83,7 @@ import { toast } from "sonner";
 import { trpc } from "@/utils/trpc";
 import { authClient } from "@/lib/auth-client";
 import { UpGalSettingsPanel } from "@/app/(dashboard)/settings/ai/page";
+import { SelfUpdateDialog } from "@/components/self-update-dialog";
 
 /* ─────────────────────────────────────────────────────────────
    Root Dialog
@@ -1005,6 +1006,7 @@ function SecurityPanel() {
 
 function AppInfoPanel() {
   const queryClient = useQueryClient();
+  const [updateDialogVersion, setUpdateDialogVersion] = useState<string>();
   const { data, isFetching, refetch } = useQuery({
     ...trpc.webServer.getUpdateData.queryOptions(),
   });
@@ -1017,8 +1019,8 @@ function AppInfoPanel() {
   });
   const update = useMutation({
     ...trpc.webServer.triggerUpdate.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Update started; services will roll forward safely.");
+    onSuccess: (_, variables) => {
+      setUpdateDialogVersion(variables.version);
       void refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -1044,7 +1046,8 @@ function AppInfoPanel() {
   };
 
   return (
-    <Card>
+    <>
+      <Card>
       <CardHeader>
         <CardTitle className="text-sm">Upstand Platform</CardTitle>
         <CardDescription>System and version information.</CardDescription>
@@ -1090,6 +1093,10 @@ function AppInfoPanel() {
           ) : null}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+      {updateDialogVersion ? (
+        <SelfUpdateDialog open version={updateDialogVersion} />
+      ) : null}
+    </>
   );
 }

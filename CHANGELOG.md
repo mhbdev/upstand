@@ -6,6 +6,20 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.20 - 2026-07-13
+
+### Added
+
+- Added end-to-end UpGal conversation history: titled conversations can be loaded, continued, or removed from a compact history popover.
+- Added AI Elements `PromptInput`, adaptive tool result cards, approval status announcements, and a non-destructive fallback for incomplete tool payloads.
+- Added a controlled self-update dialog with rollout progress, API reconnection messaging, and automatic reload after the target version is healthy.
+
+### Fixed
+
+- UpGal tool execution now supplies the AI SDK v7 tool context required by every read and mutation tool, fixing `list_projects` validation failures.
+- Tool approvals preserve the active organization and conversation ID when the follow-up request is sent.
+- Persisted conversation messages load in chronological order and the first user message becomes the conversation title.
+
 ## 0.1.19 - 2026-07-13
 
 ### Fixed

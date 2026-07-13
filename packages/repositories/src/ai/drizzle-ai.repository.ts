@@ -127,6 +127,32 @@ export class DrizzleAIRepository implements IAIRepository {
       .limit(50);
   }
 
+  async updateConversationTitle(
+    conversationId: string,
+    title: string,
+  ): Promise<void> {
+    await this.executor
+      .update(aiConversation)
+      .set({ title: title.slice(0, 120), updatedAt: new Date() })
+      .where(eq(aiConversation.id, conversationId));
+  }
+
+  async deleteConversation(
+    conversationId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.executor
+      .delete(aiConversation)
+      .where(
+        and(
+          eq(aiConversation.id, conversationId),
+          eq(aiConversation.organizationId, organizationId),
+          eq(aiConversation.userId, userId),
+        ),
+      );
+  }
+
   async listMessages(conversationId: string): Promise<AIMessageRecord[]> {
     return this.executor
       .select()
@@ -169,5 +195,4 @@ export class DrizzleAIRepository implements IAIRepository {
   ): Promise<void> {
     await this.executor.update(aiRun).set(patch).where(eq(aiRun.id, runId));
   }
-
 }
