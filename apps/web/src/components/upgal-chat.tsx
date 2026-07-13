@@ -75,11 +75,15 @@ function Part({
         defaultOpen={part.state !== "output-available"}
         className="my-2 w-full"
       >
-        <ToolHeader
-          type={part.type}
-          {...(part.type === "dynamic-tool" ? { toolName } : {})}
-          state={part.state}
-        />
+        {part.type === "dynamic-tool" ? (
+          <ToolHeader
+            type="dynamic-tool"
+            toolName={toolName}
+            state={part.state}
+          />
+        ) : (
+          <ToolHeader type={part.type} state={part.state} />
+        )}
         <ToolContent>
           <ToolInput input={part.input} />
           {approval && part.state === "approval-requested" ? (

@@ -6,6 +6,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 Changes after the latest tag are collected here until the next release.
 
+## 0.1.21 - 2026-07-13
+
+### Fixed
+
+- Included the Better Auth session schema and migration generated for database-backed sessions, so fresh installs and upgrades create the `session` table before the API starts.
+- Fixed the UpGal tool header type narrowing that caused the release CI typecheck to fail for static tools.
+
 ## 0.1.20 - 2026-07-13
 
 ### Added
