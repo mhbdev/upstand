@@ -137,7 +137,7 @@ export function DeploymentsTab({
               <Input
                 readOnly
                 value={getWebhookUrl()}
-                className="select-all border-border/40 bg-black/40 font-mono text-xs text-zinc-300"
+                className="select-all border-border/40 bg-muted/20 font-mono text-foreground text-xs"
               />
               <Button
                 onClick={handleCopyWebhook}
@@ -264,24 +264,24 @@ export function DeploymentsTab({
         open={viewDeploymentLogsOpen}
         onOpenChange={setViewDeploymentLogsOpen}
       >
-        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,56rem)] rounded-2xl border border-border bg-black font-mono shadow-2xl sm:min-w-[min(42rem,calc(100vw-2rem))]">
-          <DialogHeader className="border-zinc-800 border-b pb-3">
-            <DialogTitle className="font-semibold text-zinc-300">
+        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,56rem)] rounded-2xl border border-border bg-card font-mono shadow-2xl sm:min-w-[min(42rem,calc(100vw-2rem))]">
+          <DialogHeader className="border-border border-b pb-3">
+            <DialogTitle className="font-semibold text-foreground">
               Build & Deploy Logs: {selectedDeployment?.id}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-500">
+            <DialogDescription className="text-muted-foreground text-xs">
               Generated on{" "}
               {selectedDeployment &&
                 new Date(selectedDeployment.createdAt).toLocaleString()}
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-96 select-text overflow-y-auto whitespace-pre-wrap bg-zinc-950 p-4 font-mono text-xs text-zinc-300 leading-relaxed">
+          <div className="max-h-96 select-text overflow-y-auto whitespace-pre-wrap rounded-md border border-border/40 bg-muted/20 p-4 font-mono text-foreground text-xs leading-relaxed">
             {selectedDeployment?.logs || "No logs available."}
           </div>
-          <DialogFooter className="border-zinc-800 border-t pt-3">
+          <DialogFooter className="border-border border-t pt-3">
             <Button
               onClick={() => setViewDeploymentLogsOpen(false)}
-              className="border-none bg-zinc-800 hover:bg-zinc-700"
+              variant="outline"
             >
               Close Logs
             </Button>

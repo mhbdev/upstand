@@ -35,6 +35,7 @@ import { cn } from "@upstand/ui/lib/utils";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { KeyValueEditor } from "@/components/resource/key-value-editor";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { trpc } from "@/utils/trpc";
 
@@ -173,6 +174,25 @@ export function ResourceAdvancedSettings({
                 />
               </CodeSurface>
             </Field>
+          </FieldGroup>
+
+          <FieldGroup className="grid gap-5 lg:grid-cols-2">
+            <KeyValueEditor
+              id="advanced-environment"
+              label="Environment overrides"
+              description="Values override the environment generated for the resource."
+              value={config.environment}
+              onChange={(environment) =>
+                updateConfig("environment", environment)
+              }
+            />
+            <KeyValueEditor
+              id="advanced-labels"
+              label="Service labels"
+              description="Labels are applied to the deployed Swarm service."
+              value={config.labels}
+              onChange={(labels) => updateConfig("labels", labels)}
+            />
           </FieldGroup>
 
           <div className="flex flex-col gap-3">
@@ -468,6 +488,50 @@ export function ResourceAdvancedSettings({
                   <SelectItem value="none">Never</SelectItem>
                 </SelectContent>
               </Select>
+              <FieldGroup className="grid gap-2 sm:grid-cols-3">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Max attempts"
+                  value={config.restartPolicy.maxAttempts ?? ""}
+                  onChange={(event) =>
+                    updateConfig("restartPolicy", {
+                      ...config.restartPolicy,
+                      maxAttempts: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Delay (s)"
+                  value={config.restartPolicy.delaySeconds ?? ""}
+                  onChange={(event) =>
+                    updateConfig("restartPolicy", {
+                      ...config.restartPolicy,
+                      delaySeconds: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Window (s)"
+                  value={config.restartPolicy.windowSeconds ?? ""}
+                  onChange={(event) =>
+                    updateConfig("restartPolicy", {
+                      ...config.restartPolicy,
+                      windowSeconds: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+              </FieldGroup>
             </Field>
             <Field className="lg:col-span-2">
               <FieldLabel htmlFor="placement-constraints">
@@ -487,6 +551,354 @@ export function ResourceAdvancedSettings({
                     updateConfig("placementConstraints", splitLines(value))
                   }
                   aria-label="Placement constraints"
+                />
+              </CodeSurface>
+            </Field>
+          </FieldGroup>
+
+          <FieldGroup className="grid gap-5 lg:grid-cols-2">
+            <Field>
+              <FieldLabel>Service runtime</FieldLabel>
+              <FieldDescription>
+                Container identity and replica controls.
+              </FieldDescription>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  min={0}
+                  max={1000}
+                  placeholder="Replicas"
+                  value={config.replicas ?? ""}
+                  onChange={(event) =>
+                    updateConfig(
+                      "replicas",
+                      event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    )
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Stop grace (s)"
+                  value={config.stopGracePeriodSeconds ?? ""}
+                  onChange={(event) =>
+                    updateConfig(
+                      "stopGracePeriodSeconds",
+                      event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    )
+                  }
+                />
+                <Input
+                  placeholder="Working directory"
+                  value={config.workingDir ?? ""}
+                  onChange={(event) =>
+                    updateConfig("workingDir", event.target.value || undefined)
+                  }
+                />
+                <Input
+                  placeholder="User (UID or name)"
+                  value={config.user ?? ""}
+                  onChange={(event) =>
+                    updateConfig("user", event.target.value || undefined)
+                  }
+                />
+                <Input
+                  placeholder="Hostname"
+                  value={config.hostname ?? ""}
+                  onChange={(event) =>
+                    updateConfig("hostname", event.target.value || undefined)
+                  }
+                />
+              </div>
+            </Field>
+            <Field>
+              <FieldLabel>Networking</FieldLabel>
+              <FieldDescription>
+                One value per line for DNS and extra host entries.
+              </FieldDescription>
+              <CodeSurface>
+                <CodeEditor
+                  language="shell"
+                  height="120px"
+                  value={[
+                    ...config.dns,
+                    ...config.dnsSearch,
+                    ...config.extraHosts,
+                  ].join("\n")}
+                  onChange={(value) => {
+                    const lines = splitLines(value);
+                    updateConfig("dns", lines.slice(0, config.dns.length));
+                    updateConfig("dnsSearch", []);
+                    updateConfig("extraHosts", lines.slice(config.dns.length));
+                  }}
+                  aria-label="DNS and extra host entries"
+                />
+              </CodeSurface>
+            </Field>
+          </FieldGroup>
+
+          <Field>
+            <FieldLabel>Health check</FieldLabel>
+            <FieldDescription>
+              Configure the container health command and timing.
+            </FieldDescription>
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
+              <CodeSurface>
+                <CodeEditor
+                  language="shell"
+                  height="90px"
+                  value={config.healthcheck?.command.join("\n") ?? ""}
+                  onChange={(value) =>
+                    updateConfig(
+                      "healthcheck",
+                      value.trim()
+                        ? {
+                            command: splitLines(value),
+                            intervalSeconds:
+                              config.healthcheck?.intervalSeconds ?? 30,
+                            timeoutSeconds:
+                              config.healthcheck?.timeoutSeconds ?? 5,
+                            retries: config.healthcheck?.retries ?? 3,
+                            startPeriodSeconds:
+                              config.healthcheck?.startPeriodSeconds ?? 10,
+                          }
+                        : null,
+                    )
+                  }
+                  aria-label="Health check command"
+                />
+              </CodeSurface>
+              {(
+                [
+                  "intervalSeconds",
+                  "timeoutSeconds",
+                  "retries",
+                  "startPeriodSeconds",
+                ] as const
+              ).map((key) => (
+                <Input
+                  key={key}
+                  type="number"
+                  min={key === "startPeriodSeconds" ? 0 : 1}
+                  placeholder={key.replace("Seconds", " (s)")}
+                  value={config.healthcheck?.[key] ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value
+                      ? Number(event.target.value)
+                      : 0;
+                    updateConfig(
+                      "healthcheck",
+                      config.healthcheck
+                        ? { ...config.healthcheck, [key]: value }
+                        : {
+                            command: ["CMD-SHELL", "true"],
+                            intervalSeconds: 30,
+                            timeoutSeconds: 5,
+                            retries: 3,
+                            startPeriodSeconds: 10,
+                            [key]: value,
+                          },
+                    );
+                  }}
+                />
+              ))}
+            </div>
+          </Field>
+
+          <FieldGroup className="grid gap-5 lg:grid-cols-2">
+            <Field>
+              <FieldLabel>Rolling update</FieldLabel>
+              <FieldDescription>
+                Control how Swarm replaces tasks during deployment.
+              </FieldDescription>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Parallelism"
+                  value={config.updateConfig.parallelism ?? ""}
+                  onChange={(event) =>
+                    updateConfig("updateConfig", {
+                      ...config.updateConfig,
+                      parallelism: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Delay (s)"
+                  value={config.updateConfig.delaySeconds ?? ""}
+                  onChange={(event) =>
+                    updateConfig("updateConfig", {
+                      ...config.updateConfig,
+                      delaySeconds: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <Select
+                  value={config.updateConfig.failureAction ?? "pause"}
+                  onValueChange={(failureAction) =>
+                    failureAction &&
+                    updateConfig("updateConfig", {
+                      ...config.updateConfig,
+                      failureAction: failureAction as
+                        | "continue"
+                        | "pause"
+                        | "rollback",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Failure action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pause">Pause</SelectItem>
+                    <SelectItem value="continue">Continue</SelectItem>
+                    <SelectItem value="rollback">Rollback</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={config.updateConfig.order ?? "stop-first"}
+                  onValueChange={(order) =>
+                    order &&
+                    updateConfig("updateConfig", {
+                      ...config.updateConfig,
+                      order: order as "stop-first" | "start-first",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Update order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stop-first">Stop first</SelectItem>
+                    <SelectItem value="start-first">Start first</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </Field>
+            <Field>
+              <FieldLabel>Rollback behavior</FieldLabel>
+              <FieldDescription>
+                Define the fallback strategy when an update fails.
+              </FieldDescription>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Parallelism"
+                  value={config.rollbackConfig.parallelism ?? ""}
+                  onChange={(event) =>
+                    updateConfig("rollbackConfig", {
+                      ...config.rollbackConfig,
+                      parallelism: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Delay (s)"
+                  value={config.rollbackConfig.delaySeconds ?? ""}
+                  onChange={(event) =>
+                    updateConfig("rollbackConfig", {
+                      ...config.rollbackConfig,
+                      delaySeconds: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <Select
+                  value={config.rollbackConfig.failureAction ?? "pause"}
+                  onValueChange={(failureAction) =>
+                    failureAction &&
+                    updateConfig("rollbackConfig", {
+                      ...config.rollbackConfig,
+                      failureAction: failureAction as "continue" | "pause",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Failure action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pause">Pause</SelectItem>
+                    <SelectItem value="continue">Continue</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={config.rollbackConfig.order ?? "stop-first"}
+                  onValueChange={(order) =>
+                    order &&
+                    updateConfig("rollbackConfig", {
+                      ...config.rollbackConfig,
+                      order: order as "stop-first" | "start-first",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Rollback order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stop-first">Stop first</SelectItem>
+                    <SelectItem value="start-first">Start first</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </Field>
+          </FieldGroup>
+
+          <FieldGroup className="grid gap-5 lg:grid-cols-3">
+            <KeyValueEditor
+              id="advanced-sysctls"
+              label="Sysctls"
+              description="Kernel parameters passed to the container."
+              value={config.sysctls}
+              onChange={(sysctls) => updateConfig("sysctls", sysctls)}
+            />
+            <Field>
+              <FieldLabel>Added capabilities</FieldLabel>
+              <FieldDescription>
+                One Linux capability per line.
+              </FieldDescription>
+              <CodeSurface>
+                <CodeEditor
+                  language="shell"
+                  height="100px"
+                  value={config.capAdd.join("\n")}
+                  onChange={(value) =>
+                    updateConfig("capAdd", splitLines(value))
+                  }
+                  aria-label="Added capabilities"
+                />
+              </CodeSurface>
+            </Field>
+            <Field>
+              <FieldLabel>Dropped capabilities</FieldLabel>
+              <FieldDescription>
+                One Linux capability per line.
+              </FieldDescription>
+              <CodeSurface>
+                <CodeEditor
+                  language="shell"
+                  height="100px"
+                  value={config.capDrop.join("\n")}
+                  onChange={(value) =>
+                    updateConfig("capDrop", splitLines(value))
+                  }
+                  aria-label="Dropped capabilities"
                 />
               </CodeSurface>
             </Field>

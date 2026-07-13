@@ -623,7 +623,7 @@ function CreateDbDialog({
                   }}
                   placeholder="e.g. admin"
                   autoComplete="off"
-                  className="border-border/40 bg-black/20 focus:border-primary"
+                  className="border-border/40 bg-muted/20 focus:border-primary"
                 />
                 {formErrors.dbUser && (
                   <span className="text-[10px] text-red-500">
@@ -646,7 +646,7 @@ function CreateDbDialog({
                   }}
                   placeholder="Password"
                   autoComplete="off"
-                  className="border-border/40 bg-black/20 font-mono focus:border-primary"
+                  className="border-border/40 bg-muted/20 font-mono focus:border-primary"
                 />
                 <Button
                   type="button"
@@ -682,7 +682,7 @@ function CreateDbDialog({
                     }}
                     placeholder="Root Password"
                     autoComplete="off"
-                    className="border-border/40 bg-black/20 font-mono focus:border-primary"
+                    className="border-border/40 bg-muted/20 font-mono focus:border-primary"
                   />
                   <Button
                     type="button"
@@ -715,7 +715,7 @@ function CreateDbDialog({
                   }}
                   placeholder="e.g. app_db"
                   autoComplete="off"
-                  className="border-border/40 bg-black/20 focus:border-primary"
+                  className="border-border/40 bg-muted/20 focus:border-primary"
                 />
                 {formErrors.dbName && (
                   <span className="text-[10px] text-red-500">

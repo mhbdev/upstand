@@ -312,7 +312,7 @@ export function ContainersTab({
           )}
 
           {containerModalType === "config" && (
-            <pre className="max-h-80 select-text overflow-auto bg-black/40 p-4 font-mono text-xs">
+            <pre className="max-h-80 select-text overflow-auto rounded-md border border-border/40 bg-muted/20 p-4 font-mono text-xs">
               {JSON.stringify(
                 {
                   Image: resource.dockerImage || "app:latest",

@@ -218,7 +218,7 @@ export function WebServerTerminalDialog({
           <pre
             ref={outputRef}
             aria-live="polite"
-            className="h-full min-h-52 overflow-auto rounded-md border border-emerald-500/20 bg-black p-3 font-mono text-[12px] text-emerald-300 leading-6 shadow-inner sm:p-4 sm:text-[13px]"
+            className="h-full min-h-52 overflow-auto rounded-md border border-border/40 bg-muted/30 p-3 font-mono text-[12px] text-foreground leading-6 shadow-inner sm:p-4 sm:text-[13px]"
           >
             {output}
           </pre>

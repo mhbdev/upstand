@@ -1261,7 +1261,7 @@ export function GeneralTab({
                 <div className="space-y-4 pt-2">
                   <div className="space-y-2">
                     <Label>Compose File</Label>
-                    <div className="overflow-hidden rounded-md border border-border/30 bg-zinc-950 p-2">
+                    <div className="overflow-hidden rounded-md border border-border/30 bg-muted/20 p-2">
                       <CodeEditor
                         height="350px"
                         language="yaml"

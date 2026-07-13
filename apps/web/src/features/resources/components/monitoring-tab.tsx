@@ -68,7 +68,7 @@ export function MonitoringTab({ statsData }: MonitoringTabProps) {
       <CardContent className="space-y-6 border-border/20 border-t pt-4">
         <div className="grid gap-6 md:grid-cols-2">
           {/* CPU usage */}
-          <Card className="border border-border/40 bg-black/20 p-4">
+          <Card className="border border-border/40 bg-card p-4">
             <CardHeader className="p-0 pb-4">
               <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
                 Workload CPU (%)
@@ -127,7 +127,7 @@ export function MonitoringTab({ statsData }: MonitoringTabProps) {
           </Card>
 
           {/* RAM usage */}
-          <Card className="border border-border/40 bg-black/20 p-4">
+          <Card className="border border-border/40 bg-card p-4">
             <CardHeader className="p-0 pb-4">
               <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
                 Memory Utilization (%)
