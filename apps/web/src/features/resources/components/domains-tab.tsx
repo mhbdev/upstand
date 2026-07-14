@@ -3,7 +3,7 @@
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -123,6 +123,26 @@ const emptyDomainMapping = (): DomainMapping => ({
   },
 });
 
+function isPublicIpv4(value: string | undefined): value is string {
+  if (!value) return false;
+  const octets = value.split(".").map(Number);
+  if (
+    octets.length !== 4 ||
+    octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
+  ) {
+    return false;
+  }
+  const [first, second] = octets;
+  return !(
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
 const parseDomainMappings = (
   value: string | null | undefined,
 ): DomainMapping[] => {
@@ -233,6 +253,7 @@ export function DomainsTab({
   const [editingDomainIndex, setEditingDomainIndex] = useState<number | null>(
     null,
   );
+  const domainVersion = resource?.domains ?? "";
   const validateDomain = useMutation({
     ...trpc.domain.validate.mutationOptions(),
     onSuccess: (result) => {
@@ -246,16 +267,17 @@ export function DomainsTab({
     },
     onError: (error) => toast.error(error.message),
   });
+  const webServerSettings = useQuery({
+    ...trpc.webServer.getSettings.queryOptions(),
+  });
 
   const validateHost = (host: string) => {
     validateDomain.mutate({ organizationId, host });
   };
 
   useEffect(() => {
-    if (resource) {
-      setDomainList(parseDomainMappings(resource.domains));
-    }
-  }, [resource]);
+    setDomainList(parseDomainMappings(domainVersion));
+  }, [domainVersion]);
 
   const form = useForm({
     defaultValues: emptyDomainMapping(),
@@ -436,12 +458,12 @@ export function DomainsTab({
     const defaultIp = resourceServer?.ipAddress?.match(
       /^(?:\d{1,3}\.){3}\d{1,3}$/,
     )?.[0];
-    const ip = window.prompt(
-      "Public IPv4 address that points to this resource's Docker host",
-      defaultIp ?? "",
-    );
-    if (!ip || !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
-      if (ip) toast.error("Enter a valid public IPv4 address");
+    const configuredIp = webServerSettings.data?.settings.serverIp;
+    const ip = configuredIp || defaultIp;
+    if (!isPublicIpv4(ip)) {
+      toast.error(
+        "Set the installation's public IPv4 address before generating sslip.io domains",
+      );
       return;
     }
     const name =
@@ -450,7 +472,8 @@ export function DomainsTab({
         .replace(/[^a-z0-9-]+/g, "-")
         .replace(/^-+|-+$/g, "")
         .slice(0, 32) || "app";
-    const host = `${name}-${String(resource.id).slice(0, 8)}.${ip}.sslip.io`;
+    const normalizedIp = ip.split(".").map(Number).join(".");
+    const host = `${name}-${String(resource.id).slice(0, 8)}.${normalizedIp}.sslip.io`;
     if (domainList.some((domain) => domain.host === host)) {
       toast.info("This generated domain is already linked");
       return;
@@ -594,7 +617,7 @@ export function DomainsTab({
       </CardContent>
 
       <Dialog open={domainDialogOpen} onOpenChange={setDomainDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-h-[min(90dvh,56rem)] w-[calc(100%-1rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingDomainIndex !== null
@@ -814,7 +837,7 @@ export function DomainsTab({
                 }
               </form.Subscribe>
 
-              <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
                 <p className="font-medium text-sm">
                   Redirect & security policy
                 </p>

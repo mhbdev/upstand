@@ -375,7 +375,42 @@ export function GeneralTab({
     (deployment) => deployment.status === "running",
   );
 
+  // Deployment polling updates status, logs, and container snapshots every few
+  // seconds. Those changes must not re-hydrate the editable form and destroy a
+  // draft. Only fields represented by this tab participate in hydration.
+  const resourceFormVersion = JSON.stringify({
+    id: resource.id,
+    name: resource.name,
+    appName: resource.appName,
+    description: resource.description,
+    buildConfig: resource.buildConfig,
+    preview: [
+      resource.isPreviewDeploymentsActive,
+      resource.previewLimit,
+      resource.previewWildcard,
+      resource.previewHttps,
+      resource.previewPort,
+    ],
+    server: [
+      resource.serverId,
+      resource.buildServerId,
+      resource.buildRegistryId,
+    ],
+    provider: resource.provider,
+    db: [
+      resource.dbType,
+      resource.dockerImage,
+      resource.externalPort,
+      resource.libsqlGrpcPort,
+      resource.libsqlAdminPort,
+    ],
+    composeType: resource.composeType,
+    credentials: resource.credentials,
+    watchPaths: resource.watchPaths,
+  });
+
   // Hydrate states when resource changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the serialized configuration snapshot is intentionally the only dependency; deployment status and runtime snapshots must not reset drafts.
   useEffect(() => {
     if (resource) {
       setNameInput(resource.name);
@@ -505,7 +540,7 @@ export function GeneralTab({
         }
       }
     }
-  }, [resource]);
+  }, [resourceFormVersion]);
 
   // Fetch Repositories and Branches for select provider type
   const isSupported = ["github", "gitlab", "bitbucket", "gitea"].includes(

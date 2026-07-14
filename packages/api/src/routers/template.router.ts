@@ -3,6 +3,7 @@ import {
   DeleteTemplateInputSchema,
   DeployTemplateInputSchema,
   ListTemplatesInputSchema,
+  STARTER_TEMPLATES,
   UpdateTemplateInputSchema,
 } from "@upstand/usecases";
 import {
@@ -17,6 +18,8 @@ import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
 export const templateRouter = router({
+  starters: twoFactorVerifiedProcedure.query(() => STARTER_TEMPLATES),
+
   list: twoFactorVerifiedProcedure
     .input(ListTemplatesInputSchema)
     .query(async ({ ctx, input }) => {

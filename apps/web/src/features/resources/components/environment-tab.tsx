@@ -32,11 +32,12 @@ export function EnvironmentTab({
   const [visibleEnvKeys, setVisibleEnvKeys] = useState<Record<string, boolean>>(
     {},
   );
+  const environmentVersion = resource?.envVars ?? "";
 
   useEffect(() => {
-    if (resource) {
+    if (environmentVersion) {
       try {
-        const parsed = JSON.parse(resource.envVars || "{}");
+        const parsed = JSON.parse(environmentVersion || "{}");
         setEnvList(
           Object.entries(parsed).map(([key, value]) => ({
             key,
@@ -47,7 +48,7 @@ export function EnvironmentTab({
         setEnvList([]);
       }
     }
-  }, [resource]);
+  }, [environmentVersion]);
 
   const addEnvVar = () => {
     if (!newEnvKey.trim()) return;

@@ -22,6 +22,10 @@ export const webServerSettings = pgTable("web_server_settings", {
   caddyDashboardEnabled: boolean("caddy_dashboard_enabled")
     .default(false)
     .notNull(),
+  accessLogsEnabled: boolean("access_logs_enabled").default(false).notNull(),
+  accessLogCleanupCron: text("access_log_cleanup_cron")
+    .default("0 3 * * *")
+    .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

@@ -22,6 +22,8 @@ const CADDYFILE_BACKUP_PATH = "/etc/caddy/Caddyfile.previous";
 const CADDY_RUNTIME_VOLUME = "upstand-caddy-runtime";
 const CADDY_DATA_VOLUME = "upstand-caddy-data";
 const CADDY_CONFIG_VOLUME = "upstand-caddy-config";
+const CADDY_LOG_VOLUME = "upstand-caddy-logs";
+export const CADDY_ACCESS_LOG_PATH = "/var/log/caddy/access.log";
 
 export type CaddySettings = {
   letsEncryptEmail?: string | null;
@@ -34,6 +36,7 @@ export type CaddySettings = {
   caddyEnvironment?: string;
   caddyPorts?: string;
   caddyDashboardEnabled?: boolean;
+  accessLogsEnabled?: boolean;
 };
 
 type CaddyResource = Pick<
@@ -76,6 +79,7 @@ function caddySettingsWithDefaults(settings: CaddySettings = {}) {
     globalCaddyfile: settings.globalCaddyfile ?? null,
     caddySnippets: settings.caddySnippets ?? "",
     caddyMiddlewares: settings.caddyMiddlewares ?? "[]",
+    accessLogsEnabled: settings.accessLogsEnabled ?? false,
   };
 
   if (effectiveSettings.httpPort === effectiveSettings.httpsPort) {
@@ -438,6 +442,15 @@ export function generateCaddyfileContent(
     sites.push(`# upstand-domain ${host}`);
     sites.push(`${address} {`);
     sites.push("\tencode zstd gzip");
+    if (effectiveSettings.accessLogsEnabled) {
+      sites.push("\tlog {");
+      sites.push(`\t\toutput file ${CADDY_ACCESS_LOG_PATH} {`);
+      sites.push("\t\t\troll_size 100MiB");
+      sites.push("\t\t\troll_keep 7");
+      sites.push("\t\t}");
+      sites.push("\t\tformat json");
+      sites.push("\t}");
+    }
     const certificateType = routesForHost[0]?.certificateType;
     if (protocol === "https" && certificateType === "internal") {
       sites.push("\ttls internal");
@@ -692,6 +705,7 @@ export class CaddyService {
         this.ensureVolume(CADDY_RUNTIME_VOLUME),
         this.ensureVolume(CADDY_DATA_VOLUME),
         this.ensureVolume(CADDY_CONFIG_VOLUME),
+        this.ensureVolume(CADDY_LOG_VOLUME),
       ]);
       await this.ensureImage();
 
@@ -701,6 +715,7 @@ export class CaddyService {
         ["/etc/caddy", CADDY_RUNTIME_VOLUME],
         ["/data", CADDY_DATA_VOLUME],
         ["/config", CADDY_CONFIG_VOLUME],
+        ["/var/log/caddy", CADDY_LOG_VOLUME],
       ].every(([destination, volume]) =>
         existingContainer?.Mounts?.some(
           (mount) =>
@@ -784,6 +799,11 @@ export class CaddyService {
             },
             { Type: "volume", Source: CADDY_DATA_VOLUME, Target: "/data" },
             { Type: "volume", Source: CADDY_CONFIG_VOLUME, Target: "/config" },
+            {
+              Type: "volume",
+              Source: CADDY_LOG_VOLUME,
+              Target: "/var/log/caddy",
+            },
           ],
         },
       });
@@ -1066,6 +1086,35 @@ export class CaddyService {
     } catch (error) {
       return `Failed to fetch Caddy logs: ${error instanceof Error ? error.message : "unknown error"}`;
     }
+  }
+
+  async getAccessLogs(tail = 20_000): Promise<string> {
+    const container = await this.findContainer();
+    if (!container) return "";
+    try {
+      const safeTail = Math.max(1, Math.min(Math.trunc(tail), 50_000));
+      return await this.exec(container, [
+        "sh",
+        "-ec",
+        `if [ -f ${CADDY_ACCESS_LOG_PATH} ]; then tail -n ${safeTail} ${CADDY_ACCESS_LOG_PATH}; fi`,
+      ]);
+    } catch (error) {
+      log.warn({
+        message: "Unable to read Caddy access logs",
+        err: error instanceof Error ? error.message : error,
+      });
+      return "";
+    }
+  }
+
+  async cleanupAccessLogs(): Promise<void> {
+    const container = await this.findContainer();
+    if (!container) return;
+    await this.exec(container, [
+      "sh",
+      "-ec",
+      "find /var/log/caddy -type f -name 'access.log-*' -mtime +7 -delete",
+    ]);
   }
 
   private cleanDockerLogs(buffer: Buffer): string {

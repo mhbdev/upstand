@@ -18,9 +18,6 @@ import {
 } from "@upstand/ui/components/card";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
-import { Textarea } from "@upstand/ui/components/textarea";
-import { useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -29,6 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Textarea } from "@upstand/ui/components/textarea";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -71,6 +71,9 @@ export default function TemplatesPage() {
       search: search || undefined,
     }),
     enabled: Boolean(organizationId),
+  });
+  const starters = useQuery({
+    ...trpc.template.starters.queryOptions(),
   });
   const projects = useQuery({
     ...trpc.project.list.queryOptions({ organizationId }),
@@ -166,6 +169,16 @@ export default function TemplatesPage() {
     URL.revokeObjectURL(url);
   };
 
+  const applyStarter = (starter: NonNullable<typeof starters.data>[number]) => {
+    setEditingId(null);
+    setName(starter.name);
+    setDescription(starter.description);
+    setTags(starter.tags.join(", "));
+    setComposeFile(starter.composeFile);
+    toast.success(`${starter.name} loaded into the editor`);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  };
+
   return (
     <DashboardPage>
       <DashboardPageHeader
@@ -175,6 +188,48 @@ export default function TemplatesPage() {
         }
         description="Save, search, import, and deploy organization-scoped Compose templates with collision-safe isolation."
       />
+      <Card>
+        <CardHeader>
+          <CardTitle>Ready-to-use starters</CardTitle>
+          <CardDescription>
+            Safe, self-hostable Compose blueprints inspired by the practical
+            starter catalog pattern in Dokploy. Review credentials and ports
+            before saving.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {starters.data?.map((starter) => (
+            <div
+              key={starter.id}
+              className="flex min-w-0 flex-col gap-3 rounded-xl border bg-muted/20 p-4"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{starter.name}</p>
+                  <p className="mt-1 line-clamp-3 text-muted-foreground text-xs">
+                    {starter.description}
+                  </p>
+                </div>
+                <Badge variant="outline">Starter</Badge>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {starter.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-[10px]">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => applyStarter(starter)}
+              >
+                Use starter
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
         <Card>
           <CardHeader>
@@ -434,7 +489,7 @@ export default function TemplatesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm flex flex-col">
+            <label className="flex flex-col space-y-2 text-sm">
               <span className="mb-1">Project</span>
               <Select
                 items={[
@@ -465,7 +520,7 @@ export default function TemplatesPage() {
                 </SelectContent>
               </Select>
             </label>
-            <label className="space-y-2 text-sm flex flex-col">
+            <label className="flex flex-col space-y-2 text-sm">
               <span className="mb-1">Environment</span>
               <Select
                 items={[
@@ -476,7 +531,9 @@ export default function TemplatesPage() {
                   })),
                 ]}
                 value={environmentId || "_none"}
-                onValueChange={(val) => setEnvironmentId(val === "_none" || !val ? "" : val)}
+                onValueChange={(val) =>
+                  setEnvironmentId(val === "_none" || !val ? "" : val)
+                }
                 disabled={!projectId}
               >
                 <SelectTrigger className="w-full">

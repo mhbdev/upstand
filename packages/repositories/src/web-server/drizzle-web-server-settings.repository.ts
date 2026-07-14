@@ -38,6 +38,8 @@ export class DrizzleWebServerSettingsRepository
     caddyEnvironment?: string;
     caddyPorts?: string;
     caddyDashboardEnabled?: boolean;
+    accessLogsEnabled?: boolean;
+    accessLogCleanupCron?: string;
   }): Promise<WebServerSettings> {
     return this.create({
       id: "global",
@@ -53,6 +55,8 @@ export class DrizzleWebServerSettingsRepository
       caddyEnvironment: data.caddyEnvironment ?? "{}",
       caddyPorts: data.caddyPorts ?? "[]",
       caddyDashboardEnabled: data.caddyDashboardEnabled ?? false,
+      accessLogsEnabled: data.accessLogsEnabled ?? false,
+      accessLogCleanupCron: data.accessLogCleanupCron ?? "0 3 * * *",
     });
   }
 }

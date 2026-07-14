@@ -1,12 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import type { IUnitOfWork } from "@upstand/domain";
 import {
+  AccessLogCleanupCronSchema,
+  AccessLogQuerySchema,
+  aggregateAccessLogStats,
   getDockerInstance,
   PublishNotificationUseCaseToken,
+  queryAccessLogEntries,
   TriggerUpdateInputSchema,
   UpdateWebServerSettingsInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
+import { CaddyServiceToken, UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 import { z } from "zod";
 
@@ -380,8 +384,6 @@ async function getSecurityAudit(uow: IUnitOfWork) {
 }
 
 export const webServerRouter = router({
-
-
   securityAudit: twoFactorVerifiedProcedure
     .input(z.object({ organizationId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
@@ -419,7 +421,73 @@ export const webServerRouter = router({
       }
     }),
 
+  accessLogStatus: twoFactorVerifiedProcedure.query(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:view");
+    const uow = ctx.scope.resolve(UnitOfWorkToken);
+    const settings = await uow.webServerSettingsRepository.findGlobal();
+    return {
+      enabled: settings?.accessLogsEnabled ?? false,
+      cleanupCron: settings?.accessLogCleanupCron ?? "0 3 * * *",
+    };
+  }),
 
+  toggleAccessLogs: twoFactorVerifiedProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:update");
+      const useCase = ctx.scope.resolve(UpdateWebServerSettingsUseCaseToken);
+      try {
+        const settings = await useCase.execute({
+          accessLogsEnabled: input.enabled,
+        });
+        return { enabled: settings?.accessLogsEnabled ?? input.enabled };
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  updateAccessLogCleanup: twoFactorVerifiedProcedure
+    .input(z.object({ cron: AccessLogCleanupCronSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:update");
+      const useCase = ctx.scope.resolve(UpdateWebServerSettingsUseCaseToken);
+      try {
+        const settings = await useCase.execute({
+          accessLogCleanupCron: input.cron,
+        });
+        return { cleanupCron: settings?.accessLogCleanupCron ?? input.cron };
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  accessLogs: twoFactorVerifiedProcedure
+    .input(AccessLogQuerySchema)
+    .query(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:view");
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
+      const settings = await uow.webServerSettingsRepository.findGlobal();
+      if (!settings?.accessLogsEnabled) {
+        return { entries: [], total: 0, pageCount: 1, page: input.page };
+      }
+      const content = await ctx.scope
+        .resolve(CaddyServiceToken)
+        .getAccessLogs();
+      return { ...queryAccessLogEntries(content, input), page: input.page };
+    }),
+
+  accessLogStats: twoFactorVerifiedProcedure
+    .input(z.object({ from: z.coerce.date(), to: z.coerce.date() }))
+    .query(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:view");
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
+      const settings = await uow.webServerSettingsRepository.findGlobal();
+      if (!settings?.accessLogsEnabled) return [];
+      const content = await ctx.scope
+        .resolve(CaddyServiceToken)
+        .getAccessLogs();
+      return aggregateAccessLogStats(content, input.from, input.to);
+    }),
 
   getLogs: twoFactorVerifiedProcedure
     .input(z.object({ tail: z.number().optional() }))

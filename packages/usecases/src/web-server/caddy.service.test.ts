@@ -398,4 +398,29 @@ describe("Caddy domain configuration", () => {
       generateCaddyfileContent({ httpPort: 8443, httpsPort: 8443 }),
     ).toThrow("must be different");
   });
+
+  test("enables structured access logs only when requested", () => {
+    const disabled = generateCaddyfileContent({}, [
+      {
+        id: "resource-logs",
+        name: "Logged app",
+        type: "application",
+        appName: "logged-app",
+        domains: JSON.stringify([{ host: "logs.example.com", port: 3000 }]),
+      },
+    ]);
+    const enabled = generateCaddyfileContent({ accessLogsEnabled: true }, [
+      {
+        id: "resource-logs",
+        name: "Logged app",
+        type: "application",
+        appName: "logged-app",
+        domains: JSON.stringify([{ host: "logs.example.com", port: 3000 }]),
+      },
+    ]);
+
+    expect(disabled).not.toContain("output file /var/log/caddy/access.log");
+    expect(enabled).toContain("format json");
+    expect(enabled).toContain("output file /var/log/caddy/access.log");
+  });
 });

@@ -41,6 +41,7 @@ import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";
 import { AIRepositoryToken } from "@upstand/repositories";
 import {
+  AccessLogCleanupScheduler,
   BackupRunWorker,
   CaddyService,
   DeploymentWorker,
@@ -114,6 +115,9 @@ const notificationWorker = new NotificationDeliveryWorker(
 const backupWorker = new BackupRunWorker(() => serviceProvider);
 const backupScheduler = serviceProvider.resolve(BackupSchedulerToken);
 const generalScheduler = serviceProvider.resolve(GeneralSchedulerToken);
+const accessLogCleanupScheduler = new AccessLogCleanupScheduler(
+  () => serviceProvider,
+);
 let deploymentWorkerRefresh: Promise<void> | null = null;
 let workerRefreshInterval: ReturnType<typeof setInterval> | null = null;
 let queueReconcileInterval: ReturnType<typeof setInterval> | null = null;
@@ -2462,7 +2466,13 @@ async function initializeMonitoring() {
       : path.join(process.cwd(), "apps", "monitoring");
 
   if (process.env.NODE_ENV !== "production" && !fs.existsSync(monitoringPath)) {
-    const alternativePath = path.join(process.cwd(), "..", "..", "apps", "monitoring");
+    const alternativePath = path.join(
+      process.cwd(),
+      "..",
+      "..",
+      "apps",
+      "monitoring",
+    );
     if (fs.existsSync(alternativePath)) {
       monitoringPath = alternativePath;
     }
@@ -2607,6 +2617,7 @@ await notificationWorker.start();
 await backupWorker.start();
 await backupScheduler.start();
 await generalScheduler.start();
+await accessLogCleanupScheduler.start();
 await reconcileQueues();
 log.info({ message: "Background job workers and schedulers started" });
 
@@ -2804,6 +2815,7 @@ async function shutdown(signal: string): Promise<void> {
     backupWorker.stop(),
     backupScheduler.stop(),
     generalScheduler.stop(),
+    accessLogCleanupScheduler.stop(),
   ]);
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<"timeout">((resolve) => {
