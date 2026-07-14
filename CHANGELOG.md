@@ -4,12 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.31 - 2026-07-14
+## 0.1.32 - 2026-07-14
 
 ### Changed
 
 - Remove all licensing implementation, enterprise plans, and billing restrictions.
 - Unlock all features (SSO, SCIM, Custom Roles, Branding/Whitelabeling) for free as OSS.
+- Fix workspace dependencies configuration in Dockerfiles.
 
 ## 0.1.30 - 2026-07-13
 

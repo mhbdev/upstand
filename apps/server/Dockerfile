@@ -98,12 +98,14 @@ COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/
 COPY packages/domain/package.json ./packages/domain/
 COPY packages/usecases/package.json ./packages/usecases/
+COPY packages/platform/package.json ./packages/platform/
 
 # Fumadocs owns a workspace postinstall hook. It must have its source config
 # available while Bun installs production dependencies, even though it is not
 # included in the final server command.
 COPY apps/fumadocs ./apps/fumadocs
 COPY apps/monitoring ./apps/monitoring
+COPY packages/platform ./packages/platform
 
 # Install production dependencies with their platform-specific install steps.
 # This is required by ssh2's optional native CPU-feature module used for remote
