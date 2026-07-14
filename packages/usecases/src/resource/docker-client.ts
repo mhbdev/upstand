@@ -38,7 +38,9 @@ export interface RemoteDockerConnection {
  */
 export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
   return new Docker({
-    host: connection.host,
+    host: connection.host.startsWith("ssh://")
+      ? connection.host
+      : `ssh://${connection.host}`,
     port: connection.port,
     username: connection.username,
     protocol: "ssh",

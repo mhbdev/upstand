@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.34 - 2026-07-14
+
+### Changed
+
+- Fix remote docker host SSH parsing bug in docker-modem compatibility.
+
 ## 0.1.33 - 2026-07-14
 
 ### Changed
