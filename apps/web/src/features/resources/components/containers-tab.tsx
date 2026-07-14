@@ -23,6 +23,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@upstand/ui/components/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { cn } from "@upstand/ui/lib/utils";
 import {
   CircleX,
@@ -38,16 +46,9 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@upstand/ui/components/select";
 import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
+import { TerminalEmulator } from "@/components/shared/terminal-emulator";
 import { authClient } from "@/lib/auth-client";
 import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -513,20 +514,18 @@ function ContainerTerminalDialog({
     enabled: Boolean(organization?.id && container),
   });
   const [keyId, setKeyId] = useState("");
-  const [command, setCommand] = useState("");
-  const [output, setOutput] = useState("");
-  const [connected, setConnected] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const socket = useState<{ current: WebSocket | null }>({ current: null })[0];
 
   useEffect(() => {
     if (!container) {
-      socket.current?.close();
-      socket.current = null;
-      setConnected(false);
-      setOutput("");
+      setToken(null);
     }
-  }, [container, socket]);
+  }, [container]);
+
+  const disconnect = () => {
+    setToken(null);
+  };
 
   const connect = async () => {
     if (!organization?.id || !container || !keyId) {
@@ -555,48 +554,13 @@ function ContainerTerminalDialog({
       };
       if (!response.ok || !data.token)
         throw new Error(data.error || "Unable to open terminal");
-      const url = new URL(
-        `/api/terminal/connect?token=${encodeURIComponent(data.token)}`,
-        getServerUrl(),
-      );
-      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(url);
-      socket.current = ws;
-      ws.binaryType = "arraybuffer";
-      ws.onopen = () => {
-        setConnecting(false);
-        setConnected(true);
-        setOutput("Connected to container.\r\n");
-      };
-      ws.onmessage = async (event) => {
-        const text =
-          typeof event.data === "string"
-            ? event.data
-            : new TextDecoder().decode(
-                event.data instanceof Blob
-                  ? await event.data.arrayBuffer()
-                  : event.data,
-              );
-        setOutput((value) => `${value}${text}`);
-      };
-      ws.onerror = () => toast.error("Container terminal connection failed");
-      ws.onclose = () => {
-        setConnected(false);
-        setConnecting(false);
-      };
+      setToken(data.token);
     } catch (error) {
-      setConnecting(false);
       toast.error(
         error instanceof Error ? error.message : "Unable to open terminal",
       );
-    }
-  };
-
-  const send = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (command && socket.current?.readyState === WebSocket.OPEN) {
-      socket.current.send(`${command}\n`);
-      setCommand("");
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -605,15 +569,18 @@ function ContainerTerminalDialog({
       open={Boolean(container)}
       onOpenChange={(open) => !open && onClose()}
     >
-      <DialogContent className="flex h-[min(86svh,760px)] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] flex-col">
-        <DialogHeader>
+      <DialogContent className="flex h-[min(86svh,760px)] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-border/60 border-b bg-muted/20 px-4 py-5 sm:px-6">
           <DialogTitle>Container terminal</DialogTitle>
           <DialogDescription>
-            Interactive shell for {container?.name}. The selected SSH key stays
-            on the server.
+            Interactive shell for container{" "}
+            <span className="font-mono font-semibold text-foreground">
+              {container?.name}
+            </span>
+            . The selected SSH key stays on the server.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 border-border/60 border-b bg-background p-4">
           <Select
             items={[
               { value: "_none", label: "Select SSH key" },
@@ -623,7 +590,9 @@ function ContainerTerminalDialog({
               })),
             ]}
             value={keyId || "_none"}
-            onValueChange={(val) => setKeyId(val === "_none" || !val ? "" : val)}
+            onValueChange={(val) =>
+              setKeyId(val === "_none" || !val ? "" : val)
+            }
           >
             <SelectTrigger className="min-w-56">
               <SelectValue />
@@ -639,30 +608,28 @@ function ContainerTerminalDialog({
               </SelectGroup>
             </SelectContent>
           </Select>
-          <Button onClick={connect} disabled={connecting || connected}>
-            {connecting ? "Connecting…" : "Connect"}
+          <Button onClick={connect} disabled={connecting || token !== null}>
+            {connecting
+              ? "Connecting…"
+              : token !== null
+                ? "Connected"
+                : "Connect"}
           </Button>
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
         </div>
-        <pre className="min-h-0 flex-1 overflow-auto rounded-md border bg-[#0b0f0d] p-3 font-mono text-foreground text-xs">
-          {output || "Disconnected. Choose an SSH key and connect."}
-        </pre>
-        <DialogFooter>
-          <form onSubmit={send} className="flex w-full gap-2">
-            <input
-              className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 font-mono text-sm"
-              value={command}
-              onChange={(event) => setCommand(event.target.value)}
-              placeholder="Run a command inside the container"
-              disabled={!connected}
-            />
-            <Button type="submit" disabled={!connected || !command}>
-              Run
-            </Button>
-          </form>
-        </DialogFooter>
+        <div className="min-h-0 flex-1 overflow-hidden bg-[#080c0a] p-1">
+          {token ? (
+            <TerminalEmulator token={token} onClose={disconnect} />
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
+              {connecting
+                ? "Initializing terminal..."
+                : "Select an SSH key and click Connect to start terminal session"}
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

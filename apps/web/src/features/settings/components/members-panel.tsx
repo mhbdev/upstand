@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { PermissionAction } from "@upstand/api/permissions";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
@@ -22,6 +22,9 @@ import {
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { toast } from "sonner";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -83,6 +86,19 @@ export function MembersPanel() {
     enabled: Boolean(organizationId),
   });
 
+  const createCustomRole = useMutation({
+    ...trpc.customRole.create.mutationOptions(),
+  });
+
+  const removeCustomRole = useMutation({
+    ...trpc.customRole.remove.mutationOptions(),
+    onSuccess: () => {
+      void customRolesQuery.refetch();
+      toast.success("Custom role deleted");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const {
     members,
     notificationChannels,
@@ -118,13 +134,36 @@ export function MembersPanel() {
       email: "",
       password: "",
       role: "member" as string,
+      customRoleName: "",
       emailChannelId: "",
       permissions: DEFAULT_MEMBER_CAPABILITIES,
     },
     onSubmit: async ({ value }) => {
-      const isCustom = value.role.startsWith("custom:");
+      let customRoleId: string | undefined;
+
+      if (value.role === "create-custom") {
+        if (!value.customRoleName?.trim()) {
+          toast.error("Please enter a name for the custom role");
+          return;
+        }
+        try {
+          const newRole = await createCustomRole.mutateAsync({
+            organizationId,
+            name: value.customRoleName.trim(),
+            description: `Created during member invitation`,
+            permissions: value.permissions,
+          });
+          customRoleId = newRole.id;
+        } catch (err: any) {
+          toast.error(`Failed to create custom role: ${err.message}`);
+          return;
+        }
+      } else if (value.role.startsWith("custom:")) {
+        customRoleId = value.role.slice("custom:".length);
+      }
+
+      const isCustom = value.role === "create-custom" || value.role.startsWith("custom:");
       const apiRole = (isCustom ? "member" : value.role) as "member" | "admin";
-      const customRoleId = isCustom ? value.role.slice("custom:".length) : undefined;
 
       if (mode === "create") {
         createMember({
@@ -152,6 +191,9 @@ export function MembersPanel() {
         if (!value.email.includes("@")) {
           return "Invalid email address";
         }
+        if (value.role === "create-custom" && !value.customRoleName?.trim()) {
+          return "Custom role name is required";
+        }
         if (mode === "create") {
           if (!value.name) return "Full name is required";
           if (!value.password || value.password.length < 8) {
@@ -167,7 +209,10 @@ export function MembersPanel() {
 
   const handleRoleChange = (roleVal: string) => {
     form.setFieldValue("role", roleVal);
-    if (!roleVal.startsWith("custom:")) {
+    if (roleVal === "create-custom") {
+      form.setFieldValue("permissions", DEFAULT_MEMBER_CAPABILITIES);
+      form.setFieldValue("customRoleName", "");
+    } else if (!roleVal.startsWith("custom:")) {
       form.setFieldValue(
         "permissions",
         roleVal === "admin"
@@ -316,6 +361,15 @@ export function MembersPanel() {
                 <Field>
                   <FieldLabel>Role</FieldLabel>
                   <Select
+                    items={[
+                      { value: "member", label: "Member" },
+                      { value: "admin", label: "Admin" },
+                      ...(customRolesQuery.data ?? []).map((role) => ({
+                        value: `custom:${role.id}`,
+                        label: `${role.name} (Custom)`,
+                      })),
+                      { value: "create-custom", label: "Create custom role..." },
+                    ]}
                     value={field.state.value}
                     onValueChange={(val) =>
                       handleRoleChange(val ?? "")
@@ -329,14 +383,53 @@ export function MembersPanel() {
                       <SelectItem value="admin">Admin</SelectItem>
                       {(customRolesQuery.data ?? []).map((role) => (
                         <SelectItem key={role.id} value={`custom:${role.id}`}>
-                          {role.name} (Custom)
+                          <div className="flex w-full items-center justify-between gap-4">
+                            <span>{role.name}</span>
+                            <button
+                              type="button"
+                              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (confirm(`Are you sure you want to delete the custom role "${role.name}"? Active members with this role will be degraded to the Member role.`)) {
+                                  removeCustomRole.mutate({ organizationId, id: role.id });
+                                }
+                              }}
+                            >
+                              <HugeiconsIcon icon={Delete02Icon} className="size-3.5" />
+                            </button>
+                          </div>
                         </SelectItem>
                       ))}
+                      <SelectItem value="create-custom">Create custom role...</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
               )}
             </form.Field>
+
+            <form.Subscribe selector={(state) => state.values.role}>
+              {(role) =>
+                role === "create-custom" ? (
+                  <form.Field name="customRoleName">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>Custom Role Name</FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          placeholder="e.g. Developer, Support, Auditor"
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                ) : null
+              }
+            </form.Subscribe>
 
             {mode === "invite" && (
               <form.Field
@@ -351,8 +444,16 @@ export function MembersPanel() {
                   <Field>
                     <FieldLabel>Email provider</FieldLabel>
                     <Select
+                      items={emailChannels.map((channel) => ({
+                        value: channel.id,
+                        label: `${channel.name} (${
+                          channel.provider === "resend"
+                            ? "Resend"
+                            : "SMTP Email"
+                        })`,
+                      }))}
                       value={field.state.value}
-                      onValueChange={(val) => field.handleChange(val || "")}
+                      onValueChange={(val) => field.handleChange(val ?? "")}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select Email or Resend" />
@@ -375,34 +476,42 @@ export function MembersPanel() {
               </form.Field>
             )}
 
-            <form.Field name="permissions">
-              {(field) => (
-                <Field>
-                  <FieldLabel>Capabilities</FieldLabel>
-                  <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
-                    {MEMBER_CAPABILITIES.map(([key, label]) => (
-                      <label
-                        className="flex items-center gap-2 text-xs"
-                        key={key}
-                      >
-                        <Checkbox
-                          checked={field.state.value.includes(key)}
-                          onCheckedChange={(checked) => {
-                            const next = checked
-                              ? [...field.state.value, key]
-                              : field.state.value.filter(
-                                  (item) => item !== key,
-                                );
-                            field.handleChange(next);
-                          }}
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </Field>
-              )}
-            </form.Field>
+            <form.Subscribe selector={(state) => state.values.role}>
+              {(role) => {
+                const isPermissionsEditable = role === "create-custom";
+                return (
+                  <form.Field name="permissions">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Capabilities</FieldLabel>
+                        <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
+                          {MEMBER_CAPABILITIES.map(([key, label]) => (
+                            <label
+                              className="flex items-center gap-2 text-xs"
+                              key={key}
+                            >
+                              <Checkbox
+                                disabled={!isPermissionsEditable}
+                                checked={field.state.value.includes(key)}
+                                onCheckedChange={(checked) => {
+                                  const next = checked
+                                    ? [...field.state.value, key]
+                                    : field.state.value.filter(
+                                        (item) => item !== key,
+                                      );
+                                  field.handleChange(next);
+                                }}
+                              />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      </Field>
+                    )}
+                  </form.Field>
+                );
+              }}
+            </form.Subscribe>
 
             <form.Subscribe
               selector={(state) => ({

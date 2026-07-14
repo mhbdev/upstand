@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { createDb } from "@upstand/db";
-import { member } from "@upstand/db/schema/auth";
+import { member, invitation } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -141,22 +141,35 @@ export const customRoleRouter = router({
         "custom_roles",
       );
       const db = createDb();
-      const assigned = await db
-        .select({ id: member.id })
-        .from(member)
+
+      // Degrade active members with this custom role to standard "member"
+      await db
+        .update(member)
+        .set({
+          role: "member",
+          permissions: JSON.stringify(ROLE_PERMISSIONS.member),
+        })
         .where(
           and(
             eq(member.organizationId, input.organizationId),
             eq(member.role, `custom:${input.id}`),
           ),
-        )
-        .limit(1);
-      if (assigned.length) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Reassign members before deleting this custom role",
-        });
-      }
+        );
+
+      // Degrade pending invitations with this custom role to standard "member"
+      await db
+        .update(invitation)
+        .set({
+          role: "member",
+          permissions: JSON.stringify(ROLE_PERMISSIONS.member),
+        })
+        .where(
+          and(
+            eq(invitation.organizationId, input.organizationId),
+            eq(invitation.role, `custom:${input.id}`),
+          ),
+        );
+
       const deleted = await db
         .delete(customRole)
         .where(

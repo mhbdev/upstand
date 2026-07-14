@@ -1,5 +1,6 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
+import * as fs from "node:fs";
 
 export const GetServerHistoricalMetricsInputSchema = z.object({
   organizationId: z.string().min(1),
@@ -33,6 +34,10 @@ export class GetServerHistoricalMetricsUseCase {
         throw new Error(`Server ${serverId} not found`);
       }
       serverIp = serverRecord.ipAddress;
+    } else {
+      if (fs.existsSync("/.dockerenv")) {
+        serverIp = "upstand-monitoring-agent";
+      }
     }
 
     const limit = input.limit ?? "50";

@@ -7,6 +7,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import type { ServiceScope } from "@circulo-ai/di";
 import { trpcServer } from "@hono/trpc-server";
@@ -2499,6 +2500,20 @@ async function initializeMonitoring() {
     });
 
     const containerName = "upstand-monitoring-agent";
+
+    let networkMode: string | undefined;
+    try {
+      const me = docker.getContainer(os.hostname());
+      const info = await me.inspect();
+      const networks = Object.keys(info.NetworkSettings.Networks || {});
+      networkMode = networks.find((n) => n !== "bridge") || networks[0];
+    } catch (e) {
+      log.warn({
+        message: "Could not detect container network",
+        err: e instanceof Error ? e.message : String(e),
+      });
+    }
+
     const scope = serviceProvider.createScope();
     let token = "";
     try {
@@ -2550,6 +2565,7 @@ async function initializeMonitoring() {
       Image: "upstand-monitoring-agent:latest",
       HostConfig: {
         RestartPolicy: { Name: "always" },
+        ...(networkMode ? { NetworkMode: networkMode } : {}),
         PortBindings: {
           "3001/tcp": [{ HostPort: "3001" }],
         },

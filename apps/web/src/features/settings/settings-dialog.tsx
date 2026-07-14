@@ -58,7 +58,6 @@ import { ProfilePanel } from "./components/profile-panel";
 import { SecurityPanel } from "./components/security-panel";
 import { SessionsPanel } from "./components/sessions-panel";
 import { ApiKeysPanel } from "./components/api-keys-panel";
-import { CustomRolesPanel } from "./components/custom-roles-panel";
 
 type SettingsLeafItem = {
   name: string;
@@ -118,15 +117,7 @@ export function SettingsDialog() {
       visible: !!activeOrg,
       items: [
         { name: "organization", label: "Workspace", icon: Briefcase01Icon },
-        {
-          name: "members-group",
-          label: "Members",
-          icon: UserIcon,
-          subItems: [
-            { name: "members", label: "Members & Permissions" },
-            { name: "custom-roles", label: "Custom Roles" },
-          ],
-        },
+        { name: "members", label: "Members", icon: UserIcon },
         { name: "api-keys", label: "API Keys", icon: Key01Icon },
         { name: "upgal", label: "UpGal Settings", icon: AiBrain01Icon },
       ],
@@ -281,7 +272,6 @@ export function SettingsDialog() {
                 {activeTab === "profile" && <ProfilePanel />}
                 {activeTab === "sessions" && <SessionsPanel />}
                 {activeTab === "members" && <MembersPanel />}
-                {activeTab === "custom-roles" && <CustomRolesPanel />}
                 {activeTab === "api-keys" && <ApiKeysPanel />}
                 {activeTab === "organization" && <OrganizationPanel />}
                 {activeTab === "security" && <SecurityPanel />}

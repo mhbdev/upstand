@@ -3,6 +3,7 @@
 import {
   CloudServerIcon,
   Delete02Icon,
+  Key01Icon,
   PlusSignIcon,
   ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
@@ -271,95 +272,124 @@ export default function RemoteServersPage() {
             return (
               <Card
                 key={srv.id}
-                className="relative overflow-hidden border-border/40 bg-card/30"
+                className="group relative overflow-hidden border border-border/30 bg-gradient-to-br from-card/60 via-card/40 to-card/20 hover:from-card/85 hover:via-card/60 hover:to-card/35 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1 rounded-xl flex flex-col justify-between"
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="font-semibold text-base">
-                        {srv.name}
-                      </CardTitle>
-                      <Badge
-                        variant={getStatusBadgeVariant(srv.status)}
-                        className="h-4 px-1.5 font-medium text-[10px] capitalize"
+                <CardHeader className="space-y-1 pb-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          {srv.status === "ready" ? (
+                            <>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </>
+                          ) : srv.status === "setting_up" ? (
+                            <>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500 animate-pulse"></span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                            </>
+                          )}
+                        </span>
+                        <CardTitle className="font-semibold text-base tracking-tight text-foreground/90 group-hover:text-foreground transition-colors duration-300">
+                          {srv.name}
+                        </CardTitle>
+                        <Badge
+                          variant={getStatusBadgeVariant(srv.status)}
+                          className="h-4 px-1.5 font-medium text-[9px] capitalize tracking-wide rounded-md"
+                        >
+                          {srv.status.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <CardDescription className="text-muted-foreground/80 text-xs line-clamp-1">
+                        {srv.description || "Remote deployment environment"}
+                      </CardDescription>
+                    </div>
+
+                    <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(srv)}
+                        className="size-7 hover:bg-muted/65"
                       >
-                        {srv.status.replace("_", " ")}
-                      </Badge>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(srv.id)}
+                        className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <HugeiconsIcon icon={Delete02Icon} className="size-3.5" />
+                      </Button>
                     </div>
-                    {srv.setupError ? (
-                      <p className="mt-2 text-destructive text-xs">
-                        {srv.setupError}
-                      </p>
-                    ) : null}
-                    <CardDescription className="text-muted-foreground text-xs">
-                      {srv.description || "Deploy server"}
-                    </CardDescription>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(srv)}
-                    className="mr-1 h-8 text-xs"
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(srv.id)}
-                    className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                  </Button>
+                  {srv.setupError && (
+                    <div className="mt-2.5 rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-destructive text-[11px] leading-relaxed flex gap-1.5 items-start">
+                      <span className="font-semibold shrink-0">Setup Error:</span> 
+                      <span className="break-all text-left">{srv.setupError}</span>
+                    </div>
+                  )}
                 </CardHeader>
-                <CardContent className="space-y-4 pt-2 text-muted-foreground text-xs">
-                  <div className="flex flex-col gap-1.5">
-                    <div>
-                      <span className="font-medium text-foreground">
-                        IP Address:{" "}
-                      </span>
-                      <span className="font-mono">
-                        {srv.ipAddress}:{srv.port}
+
+                <CardContent className="space-y-4 pt-0">
+                  <div className="grid grid-cols-2 gap-2 text-xs py-3 border-y border-border/20">
+                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
+                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">Host Address</span>
+                      <span className="font-mono font-semibold text-foreground/90 truncate">{srv.ipAddress}:{srv.port}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
+                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">Role</span>
+                      <span className="capitalize font-semibold text-foreground/90 flex items-center gap-1">
+                        <HugeiconsIcon icon={CloudServerIcon} className="size-3 text-primary/75" />
+                        {srv.serverType}
                       </span>
                     </div>
-                    <div>
-                      <span className="font-medium text-foreground">
-                        Type:{" "}
-                      </span>
-                      <span className="capitalize">
-                        {srv.serverType} Server
+                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
+                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">SSH Key</span>
+                      <span className="font-semibold text-foreground/90 flex items-center gap-1 truncate">
+                        <HugeiconsIcon icon={Key01Icon} className="size-3 text-amber-500/75" />
+                        {matchedKey?.name || "None"}
                       </span>
                     </div>
-                    <div>
-                      <span className="font-medium text-foreground">
-                        SSH Key:{" "}
-                      </span>
-                      {matchedKey?.name || "None"}
-                    </div>
-                    <div>
-                      <span className="font-medium text-foreground">
-                        User:{" "}
-                      </span>
-                      {srv.username}
+                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
+                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">Username</span>
+                      <span className="font-semibold text-foreground/90 truncate">{srv.username}</span>
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 pt-1">
                     <Button
                       size="sm"
-                      className="w-full font-semibold text-xs"
+                      className="w-full font-semibold text-xs transition-all duration-300"
                       variant={srv.status === "ready" ? "outline" : "default"}
                       onClick={() => handleSetup(srv.id)}
                       disabled={srv.status === "setting_up"}
                     >
-                      {srv.status === "setting_up"
-                        ? "Setting up..."
-                        : "Setup Server"}
+                      {srv.status === "setting_up" ? (
+                        <span className="flex items-center gap-1.5">
+                          <svg className="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Setting up...
+                        </span>
+                      ) : srv.status === "ready" ? (
+                        "Reinstall Server"
+                      ) : (
+                        "Setup Server"
+                      )}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="font-semibold text-xs"
+                      className="font-semibold text-xs border-primary/20 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300"
                       onClick={() => setInspectServerId(srv.id)}
                     >
                       Validate
@@ -396,58 +426,94 @@ export default function RemoteServersPage() {
         </div>
       )}
 
-      {inspectServerId && (
-        <Card className="border-border/40 bg-card/30">
-          <CardHeader>
-            <CardTitle className="text-base">Remote validation</CardTitle>
-            <CardDescription>
-              Docker info and UTC host time from the selected remote server.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm md:grid-cols-2">
-            <div className="rounded-md border p-3">
-              <p className="font-medium">Docker validation</p>
-              <p className="mt-1 text-muted-foreground text-xs">
+      <Dialog open={!!inspectServerId} onOpenChange={(open) => !open && setInspectServerId(null)}>
+        <DialogContent className="sm:max-w-lg border-border/40 bg-card/95 backdrop-blur-md overflow-hidden rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <HugeiconsIcon icon={CloudServerIcon} className="size-5 text-primary animate-pulse" />
+              Server Validation: {servers?.find(s => s.id === inspectServerId)?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Real-time Docker daemon validation, clock synchronization, and system resource metrics.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 text-sm">
+            <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
+              <p className="font-semibold text-foreground flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  {validationQuery.isPending ? (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/75"></span>
+                  ) : null}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${validationQuery.isPending ? 'bg-primary' : validationQuery.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                </span>
+                Docker Daemon Validation
+              </p>
+              <p className="mt-2 font-mono text-xs text-muted-foreground break-all whitespace-pre-wrap leading-relaxed">
                 {validationQuery.isPending
-                  ? "Checking Docker…"
+                  ? "Checking Docker version and daemon state..."
                   : validationQuery.isError
                     ? validationQuery.error.message
-                    : `${validationInfo?.serverVersion ?? "unknown"} · Swarm ${validationInfo?.swarmState ?? "unknown"}`}
+                    : `Version: ${validationInfo?.serverVersion ?? "unknown"}\nSwarm State: ${validationInfo?.swarmState ?? "unknown"}`}
               </p>
             </div>
-            <div className="rounded-md border p-3">
-              <p className="font-medium">Host time</p>
-              <p className="mt-1 text-muted-foreground text-xs">
+
+            <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
+              <p className="font-semibold text-foreground flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  {hostTimeQuery.isPending ? (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/75"></span>
+                  ) : null}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${hostTimeQuery.isPending ? 'bg-primary' : hostTimeQuery.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                </span>
+                Host Time Sync
+              </p>
+              <p className="mt-2 font-mono text-xs text-muted-foreground break-all">
                 {hostTimeQuery.isPending
-                  ? "Reading host clock…"
+                  ? "Reading host clock..."
                   : hostTimeQuery.isError
                     ? hostTimeQuery.error.message
-                    : hostTimeQuery.data?.iso}
+                    : `ISO: ${hostTimeQuery.data?.iso}`}
               </p>
             </div>
-            <div className="rounded-md border p-3 md:col-span-2">
-              <p className="font-medium">Runtime metrics</p>
-              <p className="mt-1 text-muted-foreground text-xs">
-                {runtimeStatsQuery.isPending
-                  ? "Reading Docker runtime…"
-                  : runtimeStatsQuery.isError
-                    ? runtimeStatsQuery.error.message
-                    : runtimeStatsQuery.data
-                      ? `${runtimeStatsQuery.data.dockerVersion || "Docker unknown"} · ${runtimeStatsQuery.data.activeContainers} active containers · ${runtimeStatsQuery.data.cpu}% CPU · ${runtimeStatsQuery.data.memoryPercent}% memory`
-                      : "No runtime metrics available"}
+
+            <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
+              <p className="font-semibold text-foreground flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  {runtimeStatsQuery.isPending ? (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/75"></span>
+                  ) : null}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${runtimeStatsQuery.isPending ? 'bg-primary' : runtimeStatsQuery.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                </span>
+                Runtime Metrics
               </p>
+              <div className="mt-2 font-mono text-xs text-muted-foreground space-y-1">
+                {runtimeStatsQuery.isPending ? (
+                  <p>Reading Docker runtime stats...</p>
+                ) : runtimeStatsQuery.isError ? (
+                  <p className="text-rose-400">{runtimeStatsQuery.error.message}</p>
+                ) : runtimeStatsQuery.data ? (
+                  <>
+                    <p>Docker Version: {runtimeStatsQuery.data.dockerVersion || "unknown"}</p>
+                    <p>Containers: {runtimeStatsQuery.data.activeContainers} active</p>
+                    <p>CPU Usage: {runtimeStatsQuery.data.cpu}%</p>
+                    <p>Memory Usage: {runtimeStatsQuery.data.memoryPercent}%</p>
+                  </>
+                ) : (
+                  <p>No runtime metrics available</p>
+                )}
+              </div>
             </div>
+          </div>
+          <DialogFooter>
             <Button
-              size="sm"
-              variant="ghost"
-              className="w-fit"
+              className="w-full"
               onClick={() => setInspectServerId(null)}
             >
-              Close validation
+              Close Validation
             </Button>
-          </CardContent>
-        </Card>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">

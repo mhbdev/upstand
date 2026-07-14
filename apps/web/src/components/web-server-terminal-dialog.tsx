@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -20,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { TerminalEmulator } from "@/components/shared/terminal-emulator";
 import { authClient } from "@/lib/auth-client";
 import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -47,19 +47,14 @@ export function WebServerTerminalDialog({
   const [keyId, setKeyId] = useState("");
   const [username, setUsername] = useState("root");
   const [port, setPort] = useState("22");
-  const [output, setOutput] = useState(
-    "Select an SSH key authorized on the control-plane server, then connect.\r\n",
-  );
-  const [command, setCommand] = useState("");
+  const [token, setToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const socket = useRef<WebSocket | null>(null);
-  const outputRef = useRef<HTMLPreElement>(null);
 
-  useEffect(() => () => socket.current?.close(), []);
   useEffect(() => {
-    outputRef.current?.scrollTo({ top: outputRef.current.scrollHeight });
-  }, []);
+    if (!open) {
+      setToken(null);
+    }
+  }, [open]);
 
   const connect = async () => {
     if (!organization?.id || !keyId)
@@ -83,64 +78,23 @@ export function WebServerTerminalDialog({
       };
       if (!response.ok || !data.token)
         throw new Error(data.error || "Unable to create terminal session");
-      const url = new URL(apiUrl(`/api/terminal/connect?token=${data.token}`));
-      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(url);
-      socket.current = ws;
-      ws.binaryType = "arraybuffer";
-      ws.onopen = () => {
-        setOutput((value) => `${value}\r\nConnected.\r\n`);
-        setConnecting(false);
-        setConnected(true);
-      };
-      ws.onmessage = async (event) => {
-        const text =
-          typeof event.data === "string"
-            ? event.data
-            : new TextDecoder().decode(
-                event.data instanceof Blob
-                  ? await event.data.arrayBuffer()
-                  : event.data,
-              );
-        setOutput((value) => `${value}${text}`);
-      };
-      ws.onerror = () => {
-        toast.error("Terminal connection failed");
-        setConnecting(false);
-        setConnected(false);
-      };
-      ws.onclose = (event) => {
-        setOutput(
-          (value) =>
-            `${value}\r\n[Disconnected: ${event.reason || "connection closed"}]\r\n`,
-        );
-        setConnecting(false);
-        setConnected(false);
-      };
+      setToken(data.token);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Terminal connection failed",
       );
+    } finally {
       setConnecting(false);
-      setConnected(false);
     }
   };
+
   const disconnect = () => {
-    socket.current?.close(1000, "Closed by operator");
-    socket.current = null;
-    setConnected(false);
-  };
-  const send = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (command && socket.current?.readyState === WebSocket.OPEN) {
-      socket.current.send(`${command}\n`);
-      setCommand("");
-    }
+    setToken(null);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(92svh,820px)] w-[calc(100vw-1rem)] max-w-[min(96vw,1120px)] gap-0 overflow-hidden border-border/60 bg-background p-0 sm:min-w-[min(42rem,calc(100vw-2rem))]">
+      <DialogContent className="flex h-[min(92svh,820px)] w-[calc(100vw-1rem)] max-w-[min(96vw,1120px)] flex-col gap-0 overflow-hidden border-border/60 bg-background p-0 sm:min-w-[min(42rem,calc(100vw-2rem))]">
         <DialogHeader className="border-border/60 border-b bg-muted/20 px-4 py-5 sm:px-6">
           <DialogTitle className="flex items-center gap-2">
             <HugeiconsIcon
@@ -150,18 +104,8 @@ export function WebServerTerminalDialog({
             Control-plane terminal
           </DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">
-            SSH uses the selected encrypted key. The private key never leaves
-            the server.
-            <span
-              aria-live="polite"
-              className="rounded-full border px-2 py-0.5 font-medium text-[11px]"
-            >
-              {connected
-                ? "Connected"
-                : connecting
-                  ? "Connecting"
-                  : "Disconnected"}
-            </span>
+            SSH session connected to control-plane server via selected encrypted
+            key.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 border-border/60 border-b bg-background p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_6rem_auto_auto]">
@@ -201,47 +145,34 @@ export function WebServerTerminalDialog({
           <Button
             className="w-full"
             onClick={connect}
-            disabled={connecting || connected}
+            disabled={connecting || token !== null}
           >
-            {connecting ? "Connecting…" : "Connect"}
+            {connecting
+              ? "Connecting…"
+              : token !== null
+                ? "Connected"
+                : "Connect"}
           </Button>
           <Button
             className="w-full"
             variant="outline"
             onClick={disconnect}
-            disabled={!connected}
+            disabled={token === null}
           >
             Disconnect
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden bg-[#0b0f0d] p-3 sm:p-4">
-          <pre
-            ref={outputRef}
-            aria-live="polite"
-            className="h-full min-h-52 overflow-auto rounded-md border border-border/40 bg-muted/30 p-3 font-mono text-[12px] text-foreground leading-6 shadow-inner sm:p-4 sm:text-[13px]"
-          >
-            {output}
-          </pre>
+        <div className="min-h-0 flex-1 overflow-hidden bg-[#080c0a] p-1">
+          {token ? (
+            <TerminalEmulator token={token} onClose={disconnect} />
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
+              {connecting
+                ? "Initializing SSH terminal session..."
+                : "Configure key, port and click Connect"}
+            </div>
+          )}
         </div>
-        <form
-          onSubmit={send}
-          className="flex flex-col gap-2 border-border/60 border-t bg-muted/10 p-3 sm:flex-row sm:p-4"
-        >
-          <Label className="sr-only" htmlFor="terminal-command">
-            Command
-          </Label>
-          <Input
-            id="terminal-command"
-            autoComplete="off"
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder="Enter a command"
-            disabled={!connected}
-          />
-          <Button type="submit" disabled={!command || !connected}>
-            Run
-          </Button>
-        </form>
       </DialogContent>
     </Dialog>
   );
