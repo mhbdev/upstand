@@ -161,7 +161,12 @@ export default function DockerInventoryPage() {
           : undefined,
       tail: Math.min(1000, Math.max(1, Number(tail) || 150)),
     }),
-    enabled: Boolean(organizationId),
+    enabled:
+      Boolean(organizationId) &&
+      // logs requires at least a container ID or service name to avoid a server-side error
+      (kind !== "logs" || Boolean(containerId) || Boolean(serviceName)) &&
+      // stats requires a container ID
+      (kind !== "stats" || Boolean(containerId)),
     refetchInterval:
       kind === "stats" ? 3_000 : kind === "info" ? 10_000 : false,
   });

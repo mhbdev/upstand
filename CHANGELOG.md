@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.38 - 2026-07-15
+
+### Fixed
+
+- Fix `server.inventory` tRPC endpoint returning 500 for `logs` and `stats` kinds when no container is selected — the query is now disabled client-side until a `containerId` (or `serviceName` for logs) is selected.
+- Fix CI test failures in `@upstand/api`: the custom-role integration tests now skip gracefully when no `DATABASE_URL` is available, using `test.skipIf` and the same env-stub pattern as the rest of the API test suite.
+
 ## 0.1.37 - 2026-07-14
 
 ### Added
