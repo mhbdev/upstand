@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.33 - 2026-07-14
+
+### Changed
+
+- Add detailed error trace logging on server setup failures.
+
 ## 0.1.32 - 2026-07-14
 
 ### Changed

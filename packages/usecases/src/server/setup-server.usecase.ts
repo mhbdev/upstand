@@ -205,6 +205,7 @@ export class SetupServerUseCase {
       const message = toSetupErrorMessage(err);
       log.error({
         message: `[Server Setup] Error setting up server ${server.name}: ${message}`,
+        err: err instanceof Error ? err.stack : String(err),
       });
       await this.uow.serverRepository.updateById(server.id, {
         status: "failed",
