@@ -27,15 +27,30 @@ describe("Custom Roles & Member Degradation Tests", () => {
     } else {
       // Fallback if not configured
       testUserId = randomUUID();
-      await db.insert(user).values({
-        id: testUserId,
-        name: "Role Test User",
-        email: `test-user-${testUserId}@upstand.test`,
-        emailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      createdUser = true;
+      try {
+        await db.insert(user).values({
+          id: testUserId,
+          name: "Role Test User",
+          email: `test-user-${testUserId}@upstand.test`,
+          emailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        createdUser = true;
+      } catch (err) {
+        // If insertion failed (e.g. concurrent race condition where another test file inserted a user),
+        // fetch the user that was inserted by the concurrent runner.
+        const retryUsers = await db
+          .select({ id: user.id })
+          .from(user)
+          .limit(1);
+        if (retryUsers.length > 0) {
+          testUserId = retryUsers[0]!.id;
+          createdUser = false;
+        } else {
+          throw err;
+        }
+      }
     }
 
     // 2. Create a test organization
