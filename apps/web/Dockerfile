@@ -17,6 +17,7 @@ COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/
 COPY packages/domain/package.json ./packages/domain/
 COPY packages/usecases/package.json ./packages/usecases/
+COPY packages/platform/package.json ./packages/platform/
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --ignore-scripts --frozen-lockfile
 
 COPY apps/web ./apps/web
@@ -30,6 +31,7 @@ COPY packages/redis ./packages/redis
 COPY packages/repositories ./packages/repositories
 COPY packages/domain ./packages/domain
 COPY packages/usecases ./packages/usecases
+COPY packages/platform ./packages/platform
 
 ARG NEXT_PUBLIC_SERVER_URL
 ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
