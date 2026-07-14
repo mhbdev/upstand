@@ -19,16 +19,6 @@ export const UpdateWebServerSettingsInputSchema = z.object({
   dailyDockerCleanup: z.boolean().optional(),
   caddyEnvironment: z.string().optional(),
   caddyPorts: z.string().optional(),
-  appName: z.string().trim().max(128).nullable().optional(),
-  appDescription: z.string().trim().max(512).nullable().optional(),
-  logoUrl: z.string().url().nullable().optional(),
-  faviconUrl: z.string().url().nullable().optional(),
-  customCss: z.string().max(100_000).nullable().optional(),
-  loginLogoUrl: z.string().url().nullable().optional(),
-  supportUrl: z.string().url().nullable().optional(),
-  docsUrl: z.string().url().nullable().optional(),
-  metaTitle: z.string().trim().max(160).nullable().optional(),
-  footerText: z.string().trim().max(512).nullable().optional(),
 });
 
 export type UpdateWebServerSettingsInput = z.infer<
@@ -69,18 +59,6 @@ export class UpdateWebServerSettingsUseCase {
     if (input.caddyEnvironment !== undefined)
       patch.caddyEnvironment = input.caddyEnvironment;
     if (input.caddyPorts !== undefined) patch.caddyPorts = input.caddyPorts;
-    if (input.appName !== undefined) patch.appName = input.appName;
-    if (input.appDescription !== undefined)
-      patch.appDescription = input.appDescription;
-    if (input.logoUrl !== undefined) patch.logoUrl = input.logoUrl;
-    if (input.faviconUrl !== undefined) patch.faviconUrl = input.faviconUrl;
-    if (input.customCss !== undefined) patch.customCss = input.customCss;
-    if (input.loginLogoUrl !== undefined)
-      patch.loginLogoUrl = input.loginLogoUrl;
-    if (input.supportUrl !== undefined) patch.supportUrl = input.supportUrl;
-    if (input.docsUrl !== undefined) patch.docsUrl = input.docsUrl;
-    if (input.metaTitle !== undefined) patch.metaTitle = input.metaTitle;
-    if (input.footerText !== undefined) patch.footerText = input.footerText;
 
     const candidate = { ...settings, ...patch };
     const needsRecreate =

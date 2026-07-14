@@ -25,7 +25,10 @@ import { cn } from "@upstand/ui/lib/utils";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -517,31 +520,34 @@ export default function Projects(_props: {
   return (
     <DashboardPage>
       {/* Header section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-bold text-2xl text-foreground">Projects</h1>
-          <p className="text-muted-foreground text-sm">
+      <DashboardPageHeader
+        title="Projects"
+        description={
+          <>
             Manage your apps, databases, and environments under{" "}
-            {activeOrg?.name || "your organization"}.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search projects…"
-            className="w-full min-w-0 border-border/40 bg-card/30 sm:w-64"
-          />
-          <Button
-            onClick={() => setCreateProjectOpen(true)}
-            className="gap-2 font-medium"
-            disabled={!organizationId}
-          >
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            New Project
-          </Button>
-        </div>
-      </div>
+            <span className="font-semibold text-foreground">{activeOrg?.name || "your organization"}</span>.
+          </>
+        }
+        icon={<HugeiconsIcon icon={Folder01Icon} className="size-6 text-primary" />}
+        actions={
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search projects…"
+              className="w-full min-w-0 border-border/40 bg-card/30 sm:w-64"
+            />
+            <Button
+              onClick={() => setCreateProjectOpen(true)}
+              className="gap-2 font-medium"
+              disabled={!organizationId}
+            >
+              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              New Project
+            </Button>
+          </div>
+        }
+      />
 
       {/* Projects Grid */}
       {loadingProjects ? (

@@ -18,8 +18,21 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ### Changed
 
 - Fix remote docker host SSH parsing bug in docker-modem compatibility.
+- Standardize all 22 dashboard pages to use the unified `DashboardPageHeader` component for consistent title, description, icon, and action bar layout.
+- Group dashboard sidebar navigation into collapsible sections: **Workloads**, **Infrastructure**, **Integrations**, and **Management** — all expanded by default.
+- Replace generic sidebar icons with premium Hugeicons across the dashboard and settings sidebars.
+- Move **API Keys** and **Custom Roles** pages into the Settings modal. Custom Roles is nested under a Members submenu.
+- Remove the **Branding / White-label** feature entirely:
+  - Deleted `BrandingPanel`, standalone `/settings/branding` route, and all related settings UI.
+  - Removed `getPublicBranding` and `updateBranding` tRPC endpoints and their API-key permission mappings.
+  - Removed branding columns (`appName`, `appDescription`, `logoUrl`, `faviconUrl`, `customCss`, `loginLogoUrl`, `supportUrl`, `docsUrl`, `metaTitle`, `footerText`) from the `web_server_settings` DB schema, Drizzle model, domain entity, and use-case input schema.
+  - Removed branding-driven `<title>`, favicon, and custom-CSS injection from the dashboard layout.
+  - Removed branding logo/name block and dynamic title from the login page.
+  - Removed the White-label branding section from the documentation.
+- Delete legacy standalone routes for `/settings/branding`, `/settings/custom-roles`, and `/settings/api-keys` that have been migrated into the settings modal.
 
 ## 0.1.33 - 2026-07-14
+
 
 ### Changed
 

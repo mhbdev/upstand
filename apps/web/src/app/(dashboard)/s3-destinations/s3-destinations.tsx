@@ -37,7 +37,10 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -276,22 +279,17 @@ export default function S3Destinations(_props: {
   return (
     <DashboardPage>
       {/* Header */}
-      <div className="flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 font-bold text-2xl text-foreground">
-            <HugeiconsIcon icon={CloudIcon} className="size-6 text-primary" />
-            S3 Storage
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Manage your S3-compatible destinations. These providers will be used
-            to store backups of your resources.
-          </p>
-        </div>
-        <Button onClick={handleOpenAdd} className="gap-2 font-medium">
-          <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-          Add Destination
-        </Button>
-      </div>
+      <DashboardPageHeader
+        title="S3 Storage"
+        description="Manage your S3-compatible destinations. These providers will be used to store backups of your resources."
+        icon={<HugeiconsIcon icon={CloudIcon} className="size-6 text-primary" />}
+        actions={
+          <Button onClick={handleOpenAdd} className="gap-2 font-medium">
+            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+            Add Destination
+          </Button>
+        }
+      />
 
       {/* Main List */}
       {loadingDestinations ? (

@@ -152,8 +152,6 @@ const ROUTE_PERMISSIONS: Record<string, string> = {
   "server.validate": "server:view",
   "server.time": "server:view",
   "webServer.securityAudit": "server:view",
-  "webServer.getPublicBranding": "resource:view",
-  "webServer.updateBranding": "server:update",
   "backup.listWebServerSchedules": "backup:view",
   "backup.listWebServerRuns": "backup:view",
   "backup.createWebServerSchedule": "backup:manage",

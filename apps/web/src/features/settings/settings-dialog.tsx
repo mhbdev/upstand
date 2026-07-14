@@ -2,14 +2,16 @@
 
 import {
   AiBrain01Icon,
+  Briefcase01Icon,
   InformationCircleIcon,
+  Key01Icon,
   Menu01Icon,
   MoreHorizontalCircle01Icon,
-  Settings01Icon,
   Shield01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { IconSvgElement } from "@hugeicons/react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -40,6 +42,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
 } from "@upstand/ui/components/sidebar";
 import { cn } from "@upstand/ui/lib/utils";
@@ -52,6 +57,31 @@ import { OrganizationPanel } from "./components/organization-panel";
 import { ProfilePanel } from "./components/profile-panel";
 import { SecurityPanel } from "./components/security-panel";
 import { SessionsPanel } from "./components/sessions-panel";
+import { ApiKeysPanel } from "./components/api-keys-panel";
+import { CustomRolesPanel } from "./components/custom-roles-panel";
+
+type SettingsLeafItem = {
+  name: string;
+  label: string;
+  icon: IconSvgElement;
+  subItems?: never;
+};
+
+type SettingsGroupItem = {
+  name: string;
+  label: string;
+  icon: IconSvgElement;
+  subItems: Array<{ name: string; label: string }>;
+};
+
+type SettingsItem = SettingsLeafItem | SettingsGroupItem;
+
+type SettingsGroup = {
+  id: string;
+  label: string;
+  visible?: boolean;
+  items: SettingsItem[];
+};
 
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
@@ -72,23 +102,58 @@ export function SettingsDialog() {
     return () => window.removeEventListener("open-settings-dialog", handleOpen);
   }, []);
 
-  const navItems = [
-    { name: "profile", label: "Profile", icon: UserIcon },
-    { name: "sessions", label: "Sessions", icon: InformationCircleIcon },
-    ...(activeOrg
-      ? [
-          { name: "members", label: "Members", icon: UserIcon },
-          {
-            name: "organization",
-            label: "Workspace",
-            icon: Settings01Icon,
-          },
-        ]
-      : []),
-    { name: "security", label: "Security & 2FA", icon: Shield01Icon },
-    { name: "upgal", label: "UpGal Settings", icon: AiBrain01Icon },
-    { name: "app", label: "About", icon: MoreHorizontalCircle01Icon },
+  const groups: SettingsGroup[] = [
+    {
+      id: "user",
+      label: "User Settings",
+      items: [
+        { name: "profile", label: "Profile", icon: UserIcon },
+        { name: "sessions", label: "Sessions", icon: InformationCircleIcon },
+        { name: "security", label: "Security & 2FA", icon: Shield01Icon },
+      ],
+    },
+    {
+      id: "workspace",
+      label: "Workspace Settings",
+      visible: !!activeOrg,
+      items: [
+        { name: "organization", label: "Workspace", icon: Briefcase01Icon },
+        {
+          name: "members-group",
+          label: "Members",
+          icon: UserIcon,
+          subItems: [
+            { name: "members", label: "Members & Permissions" },
+            { name: "custom-roles", label: "Custom Roles" },
+          ],
+        },
+        { name: "api-keys", label: "API Keys", icon: Key01Icon },
+        { name: "upgal", label: "UpGal Settings", icon: AiBrain01Icon },
+      ],
+    },
+    {
+      id: "system",
+      label: "System",
+      items: [
+        { name: "app", label: "About", icon: MoreHorizontalCircle01Icon },
+      ],
+    },
   ];
+
+  const getActiveTabLabel = () => {
+    for (const group of groups) {
+      if (group.visible === false) continue;
+      for (const item of group.items) {
+        if ("subItems" in item) {
+          const match = item.subItems!.find((s) => s.name === activeTab);
+          if (match) return match.label;
+        } else if (item.name === activeTab) {
+          return item.label;
+        }
+      }
+    }
+    return activeTab;
+  };
 
   return (
     <>
@@ -111,29 +176,71 @@ export function SettingsDialog() {
               collapsible="none"
               className="hidden w-48 shrink-0 border-r md:flex"
             >
-              <SidebarContent className="py-2">
-                <SidebarGroup>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {navItems.map((item) => (
-                        <SidebarMenuItem key={item.name}>
-                          <SidebarMenuButton
-                            render={
-                              <button
-                                type="button"
-                                onClick={() => setActiveTab(item.name)}
-                              />
+              <SidebarContent className="py-2 space-y-4">
+                {groups.map((group) => {
+                  if (group.visible === false) return null;
+                  return (
+                    <SidebarGroup key={group.id} className="p-0 px-2">
+                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                        {group.label}
+                      </div>
+                      <SidebarGroupContent>
+                        <SidebarMenu>
+                          {group.items.map((item) => {
+                            if ("subItems" in item) {
+                              return (
+                                <SidebarMenuItem key={item.name} className="space-y-1">
+                                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-muted-foreground/80">
+                                    <HugeiconsIcon icon={item.icon} className="size-4" />
+                                    <span>{item.label}</span>
+                                  </div>
+                                  <SidebarMenuSub className="ml-4 border-l pl-3 space-y-1">
+                                    {item.subItems!.map((subItem) => (
+                                      <SidebarMenuSubItem key={subItem.name}>
+                                        <SidebarMenuSubButton
+                                          render={
+                                            <button
+                                              type="button"
+                                              onClick={() => setActiveTab(subItem.name)}
+                                            />
+                                          }
+                                          isActive={activeTab === subItem.name}
+                                          className="text-xs h-7"
+                                        >
+                                          <span>{subItem.label}</span>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    ))
+                                  }
+                                  </SidebarMenuSub>
+                                </SidebarMenuItem>
+                              );
                             }
-                            isActive={activeTab === item.name}
-                          >
-                            <HugeiconsIcon icon={item.icon} />
-                            <span>{item.label}</span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
+
+                            return (
+                              <SidebarMenuItem key={item.name}>
+                                <SidebarMenuButton
+                                  render={
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveTab(item.name)}
+                                    />
+                                  }
+                                  isActive={activeTab === item.name}
+                                  tooltip={item.label}
+                                  className="text-xs"
+                                >
+                                  <HugeiconsIcon icon={item.icon} />
+                                  <span>{item.label}</span>
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            );
+                          })}
+                        </SidebarMenu>
+                      </SidebarGroupContent>
+                    </SidebarGroup>
+                  );
+                })}
               </SidebarContent>
             </Sidebar>
 
@@ -163,8 +270,7 @@ export function SettingsDialog() {
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                       <BreadcrumbPage>
-                        {navItems.find((n) => n.name === activeTab)?.label ??
-                          activeTab}
+                        {getActiveTabLabel()}
                       </BreadcrumbPage>
                     </BreadcrumbItem>
                   </BreadcrumbList>
@@ -175,6 +281,8 @@ export function SettingsDialog() {
                 {activeTab === "profile" && <ProfilePanel />}
                 {activeTab === "sessions" && <SessionsPanel />}
                 {activeTab === "members" && <MembersPanel />}
+                {activeTab === "custom-roles" && <CustomRolesPanel />}
+                {activeTab === "api-keys" && <ApiKeysPanel />}
                 {activeTab === "organization" && <OrganizationPanel />}
                 {activeTab === "security" && <SecurityPanel />}
                 {activeTab === "upgal" && <UpGalSettingsPanel embedded />}
@@ -192,26 +300,69 @@ export function SettingsDialog() {
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>Choose a section to manage.</SheetDescription>
           </SheetHeader>
-          <nav className="p-2">
-            {navItems.map((item) => (
-              <button
-                key={item.name}
-                type="button"
-                onClick={() => {
-                  setActiveTab(item.name);
-                  setMobileMenuOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                  activeTab === item.name
-                    ? "bg-accent font-medium text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-                )}
-              >
-                <HugeiconsIcon icon={item.icon} className="size-4 shrink-0" />
-                {item.label}
-              </button>
-            ))}
+          <nav className="p-2 space-y-4">
+            {groups.map((group) => {
+              if (group.visible === false) return null;
+              return (
+                <div key={group.id} className="space-y-1">
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                    {group.label}
+                  </div>
+                  {group.items.map((item) => {
+                    if ("subItems" in item) {
+                      return (
+                        <div key={item.name} className="space-y-1">
+                          <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-muted-foreground/80">
+                            <HugeiconsIcon icon={item.icon} className="size-4 shrink-0" />
+                            <span>{item.label}</span>
+                          </div>
+                          <div className="ml-4 border-l pl-3 space-y-1">
+                            {item.subItems!.map((subItem) => (
+                              <button
+                                key={subItem.name}
+                                type="button"
+                                onClick={() => {
+                                  setActiveTab(subItem.name);
+                                  setMobileMenuOpen(false);
+                                }}
+                                className={cn(
+                                  "flex w-full items-center rounded-md px-3 py-1.5 text-xs transition-colors text-left",
+                                  activeTab === subItem.name
+                                    ? "bg-accent font-medium text-accent-foreground"
+                                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                                )}
+                              >
+                                {subItem.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(item.name);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-xs transition-colors",
+                          activeTab === item.name
+                            ? "bg-accent font-medium text-accent-foreground"
+                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                        )}
+                      >
+                        <HugeiconsIcon icon={item.icon} className="size-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </nav>
         </SheetContent>
       </Sheet>
