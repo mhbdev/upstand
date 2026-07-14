@@ -13,6 +13,8 @@ export const CaddyServiceToken =
   createToken<UseCases.CaddyService>("CaddyService");
 export const DockerServiceToken =
   createToken<UseCases.DockerService>("DockerService");
+export const DatabaseCommandUseCaseToken =
+  createToken<UseCases.DatabaseCommandUseCase>("DatabaseCommandUseCase");
 export const DockerReadOnlyServiceToken =
   createToken<UseCases.DockerReadOnlyService>("DockerReadOnlyService");
 export const PublishNotificationUseCaseToken =
@@ -34,6 +36,32 @@ export const GetProjectUseCaseToken =
   createToken<UseCases.GetProjectUseCase>("GetProjectUseCase");
 export const DeleteProjectUseCaseToken =
   createToken<UseCases.DeleteProjectUseCase>("DeleteProjectUseCase");
+export const DuplicateProjectUseCaseToken =
+  createToken<UseCases.DuplicateProjectUseCase>("DuplicateProjectUseCase");
+export const ListTagsUseCaseToken =
+  createToken<UseCases.ListTagsUseCase>("ListTagsUseCase");
+export const CreateTagUseCaseToken =
+  createToken<UseCases.CreateTagUseCase>("CreateTagUseCase");
+export const UpdateTagUseCaseToken =
+  createToken<UseCases.UpdateTagUseCase>("UpdateTagUseCase");
+export const DeleteTagUseCaseToken =
+  createToken<UseCases.DeleteTagUseCase>("DeleteTagUseCase");
+export const ListResourceTagsUseCaseToken =
+  createToken<UseCases.ListResourceTagsUseCase>("ListResourceTagsUseCase");
+export const AssignResourceTagUseCaseToken =
+  createToken<UseCases.AssignResourceTagUseCase>("AssignResourceTagUseCase");
+export const RemoveResourceTagUseCaseToken =
+  createToken<UseCases.RemoveResourceTagUseCase>("RemoveResourceTagUseCase");
+export const ListTemplatesUseCaseToken =
+  createToken<UseCases.ListTemplatesUseCase>("ListTemplatesUseCase");
+export const CreateTemplateUseCaseToken =
+  createToken<UseCases.CreateTemplateUseCase>("CreateTemplateUseCase");
+export const UpdateTemplateUseCaseToken =
+  createToken<UseCases.UpdateTemplateUseCase>("UpdateTemplateUseCase");
+export const DeleteTemplateUseCaseToken =
+  createToken<UseCases.DeleteTemplateUseCase>("DeleteTemplateUseCase");
+export const DeployTemplateUseCaseToken =
+  createToken<UseCases.DeployTemplateUseCase>("DeployTemplateUseCase");
 export const CreateEnvironmentUseCaseToken =
   createToken<UseCases.CreateEnvironmentUseCase>("CreateEnvironmentUseCase");
 export const GetEnvironmentsUseCaseToken =
@@ -50,12 +78,26 @@ export const GetResourceUseCaseToken =
   createToken<UseCases.GetResourceUseCase>("GetResourceUseCase");
 export const UpdateResourceUseCaseToken =
   createToken<UseCases.UpdateResourceUseCase>("UpdateResourceUseCase");
+export const RotateResourceWebhookTokenUseCaseToken =
+  createToken<UseCases.RotateResourceWebhookTokenUseCase>(
+    "RotateResourceWebhookTokenUseCase",
+  );
 export const DeleteResourceUseCaseToken =
   createToken<UseCases.DeleteResourceUseCase>("DeleteResourceUseCase");
 export const DeployResourceUseCaseToken =
   createToken<UseCases.DeployResourceUseCase>("DeployResourceUseCase");
 export const ControlResourceUseCaseToken =
   createToken<UseCases.ControlResourceUseCase>("ControlResourceUseCase");
+export const RollbackResourceUseCaseToken =
+  createToken<UseCases.RollbackResourceUseCase>("RollbackResourceUseCase");
+export const RebuildDatabaseUseCaseToken =
+  createToken<UseCases.RebuildDatabaseUseCase>("RebuildDatabaseUseCase");
+export const RandomizeComposeUseCaseToken =
+  createToken<UseCases.RandomizeComposeUseCase>("RandomizeComposeUseCase");
+export const InspectComposeUseCaseToken =
+  createToken<UseCases.InspectComposeUseCase>("InspectComposeUseCase");
+export const ValidateDomainUseCaseToken =
+  createToken<UseCases.ValidateDomainUseCase>("ValidateDomainUseCase");
 export const ControlContainerUseCaseToken =
   createToken<UseCases.ControlContainerUseCase>("ControlContainerUseCase");
 export const GetResourceContainersUseCaseToken =
@@ -64,6 +106,10 @@ export const GetResourceContainersUseCaseToken =
   );
 export const GetResourceLogsUseCaseToken =
   createToken<UseCases.GetResourceLogsUseCase>("GetResourceLogsUseCase");
+export const GetResourcePreviewsUseCaseToken =
+  createToken<UseCases.GetResourcePreviewsUseCase>(
+    "GetResourcePreviewsUseCase",
+  );
 export const GetResourceRoutingTargetsUseCaseToken =
   createToken<UseCases.GetResourceRoutingTargetsUseCase>(
     "GetResourceRoutingTargetsUseCase",
@@ -74,6 +120,8 @@ export const GetServerRuntimeStatsUseCaseToken =
   createToken<UseCases.GetServerRuntimeStatsUseCase>(
     "GetServerRuntimeStatsUseCase",
   );
+export const GetServerCountUseCaseToken =
+  createToken<UseCases.GetServerCountUseCase>("GetServerCountUseCase");
 export const GetAccountStatusUseCaseToken =
   createToken<UseCases.GetAccountStatusUseCase>("GetAccountStatusUseCase");
 export const GetDockerInventoryUseCaseToken =
@@ -86,12 +134,16 @@ export const DeleteSshKeyUseCaseToken =
   createToken<UseCases.DeleteSshKeyUseCase>("DeleteSshKeyUseCase");
 export const GenerateSshKeyUseCaseToken =
   createToken<UseCases.GenerateSshKeyUseCase>("GenerateSshKeyUseCase");
+export const UpdateSshKeyUseCaseToken =
+  createToken<UseCases.UpdateSshKeyUseCase>("UpdateSshKeyUseCase");
 export const CreateGitProviderUseCaseToken =
   createToken<UseCases.CreateGitProviderUseCase>("CreateGitProviderUseCase");
 export const GetGitProvidersUseCaseToken =
   createToken<UseCases.GetGitProvidersUseCase>("GetGitProvidersUseCase");
 export const DeleteGitProviderUseCaseToken =
   createToken<UseCases.DeleteGitProviderUseCase>("DeleteGitProviderUseCase");
+export const UpdateGitProviderUseCaseToken =
+  createToken<UseCases.UpdateGitProviderUseCase>("UpdateGitProviderUseCase");
 export const ListGitRepositoriesUseCaseToken =
   createToken<UseCases.ListGitRepositoriesUseCase>(
     "ListGitRepositoriesUseCase",
@@ -118,11 +170,35 @@ export const TestS3DestinationConnectionUseCaseToken =
   );
 export const BackupSchedulerToken =
   createToken<UseCases.BackupScheduler>("BackupScheduler");
+export const CreateCertificateUseCaseToken =
+  createToken<UseCases.CreateCertificateUseCase>("CreateCertificateUseCase");
+export const ListCertificatesUseCaseToken =
+  createToken<UseCases.ListCertificatesUseCase>("ListCertificatesUseCase");
+export const UpdateCertificateUseCaseToken =
+  createToken<UseCases.UpdateCertificateUseCase>("UpdateCertificateUseCase");
+export const DeleteCertificateUseCaseToken =
+  createToken<UseCases.DeleteCertificateUseCase>("DeleteCertificateUseCase");
 export const GeneralSchedulerToken =
   createToken<UseCases.GeneralScheduler>("GeneralScheduler");
+export const GetSchedulesUseCaseToken =
+  createToken<UseCases.GetSchedulesUseCase>("GetSchedulesUseCase");
+export const CreateScheduleUseCaseToken =
+  createToken<UseCases.CreateScheduleUseCase>("CreateScheduleUseCase");
+export const UpdateScheduleUseCaseToken =
+  createToken<UseCases.UpdateScheduleUseCase>("UpdateScheduleUseCase");
+export const DeleteScheduleUseCaseToken =
+  createToken<UseCases.DeleteScheduleUseCase>("DeleteScheduleUseCase");
 export const CreateBackupScheduleUseCaseToken =
   createToken<UseCases.CreateBackupScheduleUseCase>(
     "CreateBackupScheduleUseCase",
+  );
+export const CreateWebServerBackupScheduleUseCaseToken =
+  createToken<UseCases.CreateWebServerBackupScheduleUseCase>(
+    "CreateWebServerBackupScheduleUseCase",
+  );
+export const UpdateWebServerBackupScheduleUseCaseToken =
+  createToken<UseCases.UpdateWebServerBackupScheduleUseCase>(
+    "UpdateWebServerBackupScheduleUseCase",
   );
 export const GetBackupSchedulesUseCaseToken =
   createToken<UseCases.GetBackupSchedulesUseCase>("GetBackupSchedulesUseCase");
@@ -144,6 +220,10 @@ export const ExecuteBackupRunUseCaseToken =
   createToken<UseCases.ExecuteBackupRunUseCase>("ExecuteBackupRunUseCase");
 export const ListBackupVolumesUseCaseToken =
   createToken<UseCases.ListBackupVolumesUseCase>("ListBackupVolumesUseCase");
+export const ListComposeServicesUseCaseToken =
+  createToken<UseCases.ListComposeServicesUseCase>(
+    "ListComposeServicesUseCase",
+  );
 export const GetWebServerSettingsUseCaseToken =
   createToken<UseCases.GetWebServerSettingsUseCase>(
     "GetWebServerSettingsUseCase",
@@ -182,6 +262,10 @@ export const GetDeploymentsUseCaseToken =
   createToken<UseCases.GetDeploymentsUseCase>("GetDeploymentsUseCase");
 export const GetQueueUseCaseToken =
   createToken<UseCases.GetQueueUseCase>("GetQueueUseCase");
+export const GetRequestsUseCaseToken =
+  createToken<UseCases.GetRequestsUseCase>("GetRequestsUseCase");
+export const GlobalSearchUseCaseToken =
+  createToken<UseCases.GlobalSearchUseCase>("GlobalSearchUseCase");
 export const UpdateConcurrencyUseCaseToken =
   createToken<UseCases.UpdateConcurrencyUseCase>("UpdateConcurrencyUseCase");
 export const CreateDockerRegistryUseCaseToken =
@@ -200,14 +284,22 @@ export const TestDockerRegistryConnectionUseCaseToken =
   createToken<UseCases.TestDockerRegistryConnectionUseCase>(
     "TestDockerRegistryConnectionUseCase",
   );
+export const UpdateDockerRegistryUseCaseToken =
+  createToken<UseCases.UpdateDockerRegistryUseCase>(
+    "UpdateDockerRegistryUseCase",
+  );
 export const CreateServerUseCaseToken =
   createToken<UseCases.CreateServerUseCase>("CreateServerUseCase");
 export const DeleteServerUseCaseToken =
   createToken<UseCases.DeleteServerUseCase>("DeleteServerUseCase");
 export const GetServersUseCaseToken =
   createToken<UseCases.GetServersUseCase>("GetServersUseCase");
+export const GetServerUseCaseToken =
+  createToken<UseCases.GetServerUseCase>("GetServerUseCase");
 export const SetupServerUseCaseToken =
   createToken<UseCases.SetupServerUseCase>("SetupServerUseCase");
+export const UpdateServerUseCaseToken =
+  createToken<UseCases.UpdateServerUseCase>("UpdateServerUseCase");
 export const GetServerHistoricalMetricsUseCaseToken =
   createToken<UseCases.GetServerHistoricalMetricsUseCase>(
     "GetServerHistoricalMetricsUseCase",
@@ -237,4 +329,8 @@ export const TestNotificationChannelUseCaseToken =
 export const DeliverNotificationUseCaseToken =
   createToken<UseCases.DeliverNotificationUseCase>(
     "DeliverNotificationUseCase",
+  );
+export const RetryNotificationDeliveryUseCaseToken =
+  createToken<UseCases.RetryNotificationDeliveryUseCase>(
+    "RetryNotificationDeliveryUseCase",
   );

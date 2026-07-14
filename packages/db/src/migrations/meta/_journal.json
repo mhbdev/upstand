@@ -190,6 +190,13 @@
       "when": 1783961818971,
       "tag": "0026_tricky_human_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1784048742199,
+      "tag": "0027_wild_raider",
+      "breakpoints": true
     }
   ]
 }

@@ -29,8 +29,12 @@ export class DeleteBackupScheduleUseCase {
       10_000,
     );
     for (const run of runs) {
-      if (run.fileKey)
+      if (!run.fileKey) continue;
+      if (schedule.kind === "web-server") {
+        await this.runtime.deleteWebServerBackup(destination, run.fileKey);
+      } else {
         await this.runtime.deleteBackup(destination, run.fileKey);
+      }
     }
     return this.uow.transaction((tx) =>
       tx.backupScheduleRepository.deleteById(schedule.id),

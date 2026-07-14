@@ -18,6 +18,14 @@ export const SshKeySchema = z.object({
 
 export type SshKey = z.infer<typeof SshKeySchema>;
 
+export type SshKeyView = Omit<
+  SshKey,
+  | "privateKeyCiphertext"
+  | "privateKeyIv"
+  | "privateKeyAuthTag"
+  | "privateKeyVersion"
+>;
+
 export interface CreateSshKeyDTO {
   id?: string;
   organizationId: string;
@@ -31,4 +39,16 @@ export interface CreateSshKeyDTO {
   privateKeyAuthTag: string;
   privateKeyVersion?: number;
   createdBy: string;
+}
+
+export interface UpdateSshKeyDTO {
+  name?: string;
+  description?: string | null;
+  publicKey?: string;
+  fingerprint?: string;
+  algorithm?: "ed25519" | "rsa";
+  privateKeyCiphertext?: string;
+  privateKeyIv?: string;
+  privateKeyAuthTag?: string;
+  privateKeyVersion?: number;
 }

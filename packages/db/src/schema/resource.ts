@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import { dockerRegistry } from "./docker-registry";
 import { environment } from "./environment";
 import { server } from "./server";
 
@@ -23,12 +24,29 @@ export const resource = pgTable("resource", {
   dbType: text("db_type"),
   composeType: text("compose_type"),
   dockerImage: text("docker_image"),
+  buildRegistryId: text("build_registry_id").references(
+    () => dockerRegistry.id,
+    { onDelete: "set null" },
+  ),
+  rollbackActive: boolean("rollback_active").default(false).notNull(),
+  rollbackRegistryId: text("rollback_registry_id").references(
+    () => dockerRegistry.id,
+    { onDelete: "set null" },
+  ),
+  externalPort: integer("external_port"),
+  libsqlGrpcPort: integer("libsql_grpc_port"),
+  libsqlAdminPort: integer("libsql_admin_port"),
   credentials: text("credentials"),
+  triggerType: text("trigger_type").default("push").notNull(),
+  watchPaths: text("watch_paths").default("[]").notNull(),
+  webhookTokenHash: text("webhook_token_hash").unique(),
+  webhookTokenPrefix: text("webhook_token_prefix"),
   buildConfig: text("build_config")
     .default(
       '{"type":"dockerfile","dockerfilePath":"Dockerfile","dockerContextPath":"."}',
     )
     .notNull(),
+  buildSecrets: text("build_secrets"),
   advancedConfig: text("advanced_config").default("{}").notNull(),
   envVars: text("env_vars").default("{}").notNull(),
   domains: text("domains").default("[]").notNull(),
@@ -60,5 +78,13 @@ export const resourceRelations = relations(resource, ({ one }) => ({
   buildServer: one(server, {
     fields: [resource.buildServerId],
     references: [server.id],
+  }),
+  rollbackRegistry: one(dockerRegistry, {
+    fields: [resource.rollbackRegistryId],
+    references: [dockerRegistry.id],
+  }),
+  buildRegistry: one(dockerRegistry, {
+    fields: [resource.buildRegistryId],
+    references: [dockerRegistry.id],
   }),
 }));

@@ -25,6 +25,11 @@ export class UpdateBackupScheduleUseCase {
     if (!existing) throw new ValidationError("Backup schedule not found");
 
     const resourceId = input.resourceId ?? existing.resourceId;
+    if (!resourceId) {
+      throw new ValidationError(
+        "Use the web-server backup schedule update workflow for global backups",
+      );
+    }
     if (resourceId !== existing.resourceId) {
       throw new ValidationError(
         "A backup schedule cannot be moved to another resource",

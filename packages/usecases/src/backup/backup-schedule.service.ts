@@ -9,21 +9,19 @@ import {
 } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { Cron } from "croner";
+import { parseResourceCredentials as parseCredentials } from "../resource/resource-credentials";
 
 const DATABASE_ENGINES: Record<string, BackupDatabaseEngine> = {
   postgres: "postgres",
   mysql: "mysql",
   mariadb: "mariadb",
   mongodb: "mongodb",
+  libsql: "libsql",
+  redis: "redis",
 };
 
 function parseResourceCredentials(resource: Resource): Record<string, string> {
-  if (!resource.credentials) return {};
-  try {
-    return JSON.parse(resource.credentials) as Record<string, string>;
-  } catch {
-    return {};
-  }
+  return parseCredentials(resource.credentials) as Record<string, string>;
 }
 
 function defaultsForDatabase(resource: Resource): { databaseName?: string } {
@@ -34,10 +32,17 @@ function defaultsForDatabase(resource: Resource): { databaseName?: string } {
 }
 
 export function validateBackupSchedule(input: CreateBackupScheduleInput): void {
+  validateBackupTiming(input.cronExpression, input.timezone);
+}
+
+export function validateBackupTiming(
+  cronExpression: string,
+  timezone: string,
+): void {
   try {
-    const cron = new Cron(input.cronExpression, {
+    const cron = new Cron(cronExpression, {
       paused: true,
-      timezone: input.timezone,
+      timezone,
       mode: "5-part",
     });
     const next = cron.nextRun();
@@ -49,7 +54,7 @@ export function validateBackupSchedule(input: CreateBackupScheduleInput): void {
   }
 
   try {
-    Intl.DateTimeFormat("en-US", { timeZone: input.timezone });
+    Intl.DateTimeFormat("en-US", { timeZone: timezone });
   } catch {
     throw new ValidationError("Backup timezone must be a valid IANA timezone");
   }
@@ -67,7 +72,7 @@ export function normalizeBackupScheduleInput(
 
   if (rawInput.kind === "database" && !databaseEngine) {
     throw new ValidationError(
-      "Choose a supported database engine (PostgreSQL, MySQL, MariaDB, or MongoDB)",
+      "Choose a supported database engine (PostgreSQL, MySQL, MariaDB, MongoDB, libSQL, or Redis)",
     );
   }
 
@@ -142,6 +147,11 @@ export function toScheduleUpdate(
 export function scheduleWithInput(
   schedule: BackupSchedule,
 ): CreateBackupScheduleInput {
+  if (!schedule.resourceId) {
+    throw new ValidationError(
+      "Use the web-server backup schedule workflow for global backups",
+    );
+  }
   return {
     resourceId: schedule.resourceId,
     destinationId: schedule.destinationId,

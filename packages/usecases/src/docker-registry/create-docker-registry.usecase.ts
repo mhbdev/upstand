@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { DockerRegistry, IUnitOfWork } from "@upstand/domain";
+import {
+  type DockerRegistry,
+  type IUnitOfWork,
+  ValidationError,
+} from "@upstand/domain";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 
 export const CreateDockerRegistryInputSchema = z.object({
@@ -20,13 +25,23 @@ export class CreateDockerRegistryUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: CreateDockerRegistryInput): Promise<DockerRegistry> {
+    let password: string | null = null;
+    if (input.password) {
+      try {
+        password = JSON.stringify(encryptSecret(input.password));
+      } catch {
+        throw new ValidationError(
+          "Docker registry credentials could not be encrypted",
+        );
+      }
+    }
     return this.uow.transaction(async (tx) => {
       return tx.dockerRegistryRepository.create({
         id: randomUUID(),
         organizationId: input.organizationId,
         name: input.name,
         username: input.username || null,
-        password: input.password || null,
+        password,
         imagePrefix: input.imagePrefix || null,
         registryUrl: input.registryUrl || null,
         serverId: input.serverId || null,

@@ -2,6 +2,7 @@ import type { IUnitOfWork } from "@upstand/domain";
 import { DrizzleAuditLogRepository } from "./audit-log/drizzle-audit-log.repository";
 import { DrizzleBackupRunRepository } from "./backup/drizzle-backup-run.repository";
 import { DrizzleBackupScheduleRepository } from "./backup/drizzle-backup-schedule.repository";
+import { DrizzleCertificateRepository } from "./certificate/drizzle-certificate.repository";
 import { DrizzleDeploymentRepository } from "./deployment/drizzle-deployment.repository";
 import { DrizzleDockerRegistryRepository } from "./docker-registry/drizzle-docker-registry.repository";
 import { DrizzleEnvironmentRepository } from "./environment/drizzle-environment.repository";
@@ -18,15 +19,20 @@ import { DrizzleServerRepository } from "./server/drizzle-server.repository";
 import { DrizzleServerBuildSettingsRepository } from "./server-build-settings/drizzle-server-build-settings.repository";
 import type { Executor } from "./shared/types";
 import { DrizzleSshKeyRepository } from "./ssh-key/drizzle-ssh-key.repository";
+import { DrizzleTagRepository } from "./tag/drizzle-tag.repository";
+import { DrizzleTemplateRepository } from "./template/drizzle-template.repository";
 import { DrizzleUserRepository } from "./user/drizzle-user.repository";
 import { DrizzleWebServerSettingsRepository } from "./web-server/drizzle-web-server-settings.repository";
 
 export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly auditLogRepository: DrizzleAuditLogRepository;
   public readonly backupScheduleRepository: DrizzleBackupScheduleRepository;
+  public readonly certificateRepository: DrizzleCertificateRepository;
   public readonly backupRunRepository: DrizzleBackupRunRepository;
   public readonly userRepository: DrizzleUserRepository;
   public readonly projectRepository: DrizzleProjectRepository;
+  public readonly tagRepository: DrizzleTagRepository;
+  public readonly templateRepository: DrizzleTemplateRepository;
   public readonly environmentRepository: DrizzleEnvironmentRepository;
   public readonly resourceRepository: DrizzleResourceRepository;
   public readonly sshKeyRepository: DrizzleSshKeyRepository;
@@ -48,9 +54,14 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
     this.backupScheduleRepository = new DrizzleBackupScheduleRepository(
       this.executor,
     );
+    this.certificateRepository = new DrizzleCertificateRepository(
+      this.executor,
+    );
     this.backupRunRepository = new DrizzleBackupRunRepository(this.executor);
     this.userRepository = new DrizzleUserRepository(this.executor);
     this.projectRepository = new DrizzleProjectRepository(this.executor);
+    this.tagRepository = new DrizzleTagRepository(this.executor);
+    this.templateRepository = new DrizzleTemplateRepository(this.executor);
     this.environmentRepository = new DrizzleEnvironmentRepository(
       this.executor,
     );

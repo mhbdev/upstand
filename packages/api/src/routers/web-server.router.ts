@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import type { IUnitOfWork } from "@upstand/domain";
 import {
   getDockerInstance,
@@ -8,6 +9,7 @@ import {
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 import { z } from "zod";
+import { ensureOrganizationAccess } from "../access-control";
 import {
   GetUpdateStatusUseCaseToken,
   GetWebServerLogsUseCaseToken,
@@ -16,8 +18,10 @@ import {
   TriggerUpdateUseCaseToken,
   UpdateWebServerSettingsUseCaseToken,
 } from "../di";
+import { assertEnterpriseFeature } from "../enterprise";
 import { handleUseCaseError } from "../errors";
-import { router, twoFactorVerifiedProcedure } from "../index";
+import { publicProcedure, router, twoFactorVerifiedProcedure } from "../index";
+import { checkPermission } from "../permissions";
 
 async function queueDockerCleanupNotification(publisher: {
   execute(input: {
@@ -88,6 +92,20 @@ async function dockerLogBuffer(logs: unknown): Promise<Buffer> {
 
 const UPSTAND_SERVER_SERVICE = "upstand_server";
 const UPSTAND_REDIS_SERVICE = "upstand_redis";
+
+async function requireActiveOrganizationPermission(
+  ctx: any,
+  permission: Parameters<typeof checkPermission>[2],
+): Promise<void> {
+  const organizationId = ctx.session.session.activeOrganizationId;
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Select an active organization before using server operations",
+    });
+  }
+  await checkPermission(ctx.session.user.id, organizationId, permission);
+}
 
 async function getRunningServiceContainer(serviceName: string) {
   const docker = getDockerInstance();
@@ -287,8 +305,116 @@ async function setupGpuSupport() {
   await execAsync(setupCommands);
 }
 
+async function getSecurityAudit(uow: IUnitOfWork) {
+  const docker = getDockerInstance();
+  const checks: Array<{
+    id: string;
+    title: string;
+    status: "pass" | "warn" | "fail";
+    detail: string;
+  }> = [];
+
+  try {
+    const info = await docker.info();
+    checks.push({
+      id: "docker-version",
+      title: "Docker engine reachable",
+      status: "pass",
+      detail: `${info.ServerVersion || "unknown"} on ${info.OperatingSystem || "unknown"}`,
+    });
+    checks.push({
+      id: "swarm",
+      title: "Swarm control plane",
+      status: info.Swarm?.LocalNodeState === "active" ? "pass" : "warn",
+      detail: `Local node state: ${info.Swarm?.LocalNodeState || "unknown"}`,
+    });
+  } catch (error) {
+    checks.push({
+      id: "docker-version",
+      title: "Docker engine reachable",
+      status: "fail",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    const network = await docker
+      .getNetwork(process.env.DOCKER_NETWORK || "upstand-network")
+      .inspect();
+    const valid = network.Driver === "overlay" && network.Attachable === true;
+    checks.push({
+      id: "managed-network",
+      title: "Managed ingress network",
+      status: valid ? "pass" : "fail",
+      detail: valid
+        ? "Attachable overlay network is configured."
+        : "The managed network must be an attachable overlay network.",
+    });
+  } catch (error) {
+    checks.push({
+      id: "managed-network",
+      title: "Managed ingress network",
+      status: "fail",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  const settings = await uow.webServerSettingsRepository.findGlobal();
+  const snippets = `${settings?.globalCaddyfile || ""}\n${settings?.caddySnippets || ""}`;
+  checks.push({
+    id: "caddy-admin",
+    title: "Caddy admin surface",
+    status: snippets.includes(":2019") ? "fail" : "pass",
+    detail: snippets.includes(":2019")
+      ? "Caddy admin port appears to be exposed in the configured snippet."
+      : "No Caddy admin listener was found in environment configuration.",
+  });
+
+  const failed = checks.filter((check) => check.status === "fail").length;
+  const warnings = checks.filter((check) => check.status === "warn").length;
+  return {
+    generatedAt: new Date().toISOString(),
+    score: Math.max(0, 100 - failed * 35 - warnings * 10),
+    checks,
+  };
+}
+
 export const webServerRouter = router({
+  getPublicBranding: publicProcedure.query(async ({ ctx }) => {
+    const settings = await ctx.scope
+      .resolve(UnitOfWorkToken)
+      .webServerSettingsRepository.findGlobal();
+    return {
+      appName: settings?.appName ?? null,
+      appDescription: settings?.appDescription ?? null,
+      logoUrl: settings?.logoUrl ?? null,
+      faviconUrl: settings?.faviconUrl ?? null,
+      loginLogoUrl: settings?.loginLogoUrl ?? null,
+      supportUrl: settings?.supportUrl ?? null,
+      docsUrl: settings?.docsUrl ?? null,
+      metaTitle: settings?.metaTitle ?? null,
+      footerText: settings?.footerText ?? null,
+      customCss: settings?.customCss ?? null,
+    };
+  }),
+
+  securityAudit: twoFactorVerifiedProcedure
+    .input(z.object({ organizationId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+      try {
+        return await getSecurityAudit(ctx.scope.resolve(UnitOfWorkToken));
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
   getSettings: twoFactorVerifiedProcedure.query(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:view");
     const useCase = ctx.scope.resolve(GetWebServerSettingsUseCaseToken);
     try {
       return await useCase.execute();
@@ -300,6 +426,7 @@ export const webServerRouter = router({
   updateSettings: twoFactorVerifiedProcedure
     .input(UpdateWebServerSettingsInputSchema)
     .mutation(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:update");
       const useCase = ctx.scope.resolve(UpdateWebServerSettingsUseCaseToken);
       try {
         return await useCase.execute(input);
@@ -308,9 +435,52 @@ export const webServerRouter = router({
       }
     }),
 
+  updateBranding: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        appName: z.string().trim().max(128).nullable().optional(),
+        appDescription: z.string().trim().max(512).nullable().optional(),
+        logoUrl: z.string().url().nullable().optional(),
+        faviconUrl: z.string().url().nullable().optional(),
+        customCss: z.string().max(100_000).nullable().optional(),
+        loginLogoUrl: z.string().url().nullable().optional(),
+        supportUrl: z.string().url().nullable().optional(),
+        docsUrl: z.string().url().nullable().optional(),
+        metaTitle: z.string().trim().max(160).nullable().optional(),
+        footerText: z.string().trim().max(512).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await ensureOrganizationAccess(
+        ctx.session.user.id,
+        input.organizationId,
+      );
+      await assertEnterpriseFeature(
+        ctx.session.user.id,
+        input.organizationId,
+        "whitelabel",
+      );
+      if (membership.role !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can update branding",
+        });
+      }
+      const { organizationId: _organizationId, ...branding } = input;
+      try {
+        return await ctx.scope
+          .resolve(UpdateWebServerSettingsUseCaseToken)
+          .execute(branding);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
   getLogs: twoFactorVerifiedProcedure
     .input(z.object({ tail: z.number().optional() }))
     .query(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:view");
       const useCase = ctx.scope.resolve(GetWebServerLogsUseCaseToken);
       try {
         return await useCase.execute(input.tail);
@@ -321,7 +491,8 @@ export const webServerRouter = router({
 
   getServerLogs: twoFactorVerifiedProcedure
     .input(z.object({ tail: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:view");
       const docker = getDockerInstance();
       try {
         const service = docker.getService(UPSTAND_SERVER_SERVICE);
@@ -339,6 +510,7 @@ export const webServerRouter = router({
   reload: twoFactorVerifiedProcedure
     .input(z.object({ action: z.enum(["reload", "restart"]) }))
     .mutation(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:update");
       const useCase = ctx.scope.resolve(ReloadWebServerUseCaseToken);
       try {
         return await useCase.execute(input.action);
@@ -347,7 +519,8 @@ export const webServerRouter = router({
       }
     }),
 
-  reloadServer: twoFactorVerifiedProcedure.mutation(async () => {
+  reloadServer: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:update");
     try {
       await forceServiceUpdate(UPSTAND_SERVER_SERVICE);
       return { success: true };
@@ -356,7 +529,8 @@ export const webServerRouter = router({
     }
   }),
 
-  cleanRedis: twoFactorVerifiedProcedure.mutation(async () => {
+  cleanRedis: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:delete");
     try {
       const [container, password] = await Promise.all([
         getRunningServiceContainer(UPSTAND_REDIS_SERVICE),
@@ -375,7 +549,8 @@ export const webServerRouter = router({
     }
   }),
 
-  reloadRedis: twoFactorVerifiedProcedure.mutation(async () => {
+  reloadRedis: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:update");
     try {
       await forceServiceUpdate(UPSTAND_REDIS_SERVICE);
       return { success: true };
@@ -384,8 +559,19 @@ export const webServerRouter = router({
     }
   }),
 
-  cleanAllDeploymentQueue: twoFactorVerifiedProcedure.mutation(
-    async ({ ctx }) => {
+  cleanAllDeploymentQueue: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        confirm: z.literal("CLEANUP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:delete",
+      );
       const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
       try {
         await uow.transaction(async (tx) => {
@@ -418,41 +604,75 @@ export const webServerRouter = router({
       } catch (error: any) {
         throw new Error(error?.message || "Failed to clean deployment queue");
       }
-    },
-  ),
+    }),
 
-  cleanUnusedImages: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-    try {
-      await execAsync("docker image prune --all --force");
-      await queueDockerCleanupNotification(
-        ctx.scope.resolve(PublishNotificationUseCaseToken),
+  cleanUnusedImages: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        confirm: z.literal("CLEANUP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:delete",
       );
-      return { success: true };
-    } catch (error: any) {
-      throw new Error(error?.message || "Failed to clean unused images");
-    }
-  }),
+      const { exec } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execAsync = promisify(exec);
+      try {
+        await execAsync("docker image prune --all --force");
+        await queueDockerCleanupNotification(
+          ctx.scope.resolve(PublishNotificationUseCaseToken),
+        );
+        return { success: true };
+      } catch (error: any) {
+        throw new Error(error?.message || "Failed to clean unused images");
+      }
+    }),
 
-  cleanUnusedVolumes: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-    try {
-      await execAsync("docker volume prune --all --force");
-      await queueDockerCleanupNotification(
-        ctx.scope.resolve(PublishNotificationUseCaseToken),
+  cleanUnusedVolumes: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        confirm: z.literal("CLEANUP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:delete",
       );
-      return { success: true };
-    } catch (error: any) {
-      throw new Error(error?.message || "Failed to clean unused volumes");
-    }
-  }),
+      const { exec } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execAsync = promisify(exec);
+      try {
+        await execAsync("docker volume prune --all --force");
+        await queueDockerCleanupNotification(
+          ctx.scope.resolve(PublishNotificationUseCaseToken),
+        );
+        return { success: true };
+      } catch (error: any) {
+        throw new Error(error?.message || "Failed to clean unused volumes");
+      }
+    }),
 
-  cleanStoppedContainers: twoFactorVerifiedProcedure.mutation(
-    async ({ ctx }) => {
+  cleanStoppedContainers: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        confirm: z.literal("CLEANUP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:delete",
+      );
       const { exec } = await import("node:child_process");
       const { promisify } = await import("node:util");
       const execAsync = promisify(exec);
@@ -465,61 +685,93 @@ export const webServerRouter = router({
       } catch (error: any) {
         throw new Error(error?.message || "Failed to clean stopped containers");
       }
-    },
-  ),
+    }),
 
-  cleanDockerBuilder: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-    try {
-      await execAsync("docker builder prune --all --force");
-      await queueDockerCleanupNotification(
-        ctx.scope.resolve(PublishNotificationUseCaseToken),
+  cleanDockerBuilder: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        confirm: z.literal("CLEANUP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:delete",
       );
-      return { success: true };
-    } catch (error: any) {
-      throw new Error(error?.message || "Failed to clean docker builder");
-    }
-  }),
+      const { exec } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execAsync = promisify(exec);
+      try {
+        await execAsync("docker builder prune --all --force");
+        await queueDockerCleanupNotification(
+          ctx.scope.resolve(PublishNotificationUseCaseToken),
+        );
+        return { success: true };
+      } catch (error: any) {
+        throw new Error(error?.message || "Failed to clean docker builder");
+      }
+    }),
 
-  cleanDockerPrune: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-    try {
-      await execAsync("docker system prune --all --force");
-      await queueDockerCleanupNotification(
-        ctx.scope.resolve(PublishNotificationUseCaseToken),
+  cleanDockerPrune: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        confirm: z.literal("CLEANUP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:delete",
       );
-      return { success: true };
-    } catch (error: any) {
-      throw new Error(error?.message || "Failed to prune docker system");
-    }
-  }),
+      const { exec } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execAsync = promisify(exec);
+      try {
+        await execAsync("docker system prune --all --force");
+        await queueDockerCleanupNotification(
+          ctx.scope.resolve(PublishNotificationUseCaseToken),
+        );
+        return { success: true };
+      } catch (error: any) {
+        throw new Error(error?.message || "Failed to prune docker system");
+      }
+    }),
 
-  cleanAll: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-    try {
-      await execAsync(
-        "docker container prune --force && docker image prune --all --force && docker volume prune --all --force && docker builder prune --all --force && docker system prune --all --force",
+  cleanAll: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        confirm: z.literal("CLEANUP"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:delete",
       );
-      await queueDockerCleanupNotification(
-        ctx.scope.resolve(PublishNotificationUseCaseToken),
-      );
-      return { success: true };
-    } catch (error: any) {
-      throw new Error(error?.message || "Failed to run all prunes");
-    }
-  }),
+      const { exec } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execAsync = promisify(exec);
+      try {
+        await execAsync(
+          "docker container prune --force && docker image prune --all --force && docker volume prune --all --force && docker builder prune --all --force && docker system prune --all --force",
+        );
+        await queueDockerCleanupNotification(
+          ctx.scope.resolve(PublishNotificationUseCaseToken),
+        );
+        return { success: true };
+      } catch (error: any) {
+        throw new Error(error?.message || "Failed to run all prunes");
+      }
+    }),
 
-  cleanPatchCaches: twoFactorVerifiedProcedure.mutation(async () => {
-    return { success: true };
-  }),
-
-  checkGpuStatus: twoFactorVerifiedProcedure.query(async () => {
+  checkGpuStatus: twoFactorVerifiedProcedure.query(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:view");
     try {
       return await checkGpuStatus();
     } catch (_err: any) {
@@ -539,7 +791,8 @@ export const webServerRouter = router({
     }
   }),
 
-  setupGpuSupport: twoFactorVerifiedProcedure.mutation(async () => {
+  setupGpuSupport: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:update");
     try {
       await setupGpuSupport();
       return { success: true };
@@ -549,6 +802,7 @@ export const webServerRouter = router({
   }),
 
   updateServerIp: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:update");
     const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
     try {
       const res = await fetch("https://api.ipify.org?format=json");
@@ -567,6 +821,7 @@ export const webServerRouter = router({
   }),
 
   getUpdateData: twoFactorVerifiedProcedure.query(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:view");
     const useCase = ctx.scope.resolve(GetUpdateStatusUseCaseToken);
     try {
       return await useCase.execute();
@@ -576,6 +831,7 @@ export const webServerRouter = router({
   }),
 
   checkForUpdates: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:view");
     const useCase = ctx.scope.resolve(GetUpdateStatusUseCaseToken);
     try {
       return await useCase.execute({ forceRefresh: true });
@@ -587,6 +843,7 @@ export const webServerRouter = router({
   triggerUpdate: twoFactorVerifiedProcedure
     .input(TriggerUpdateInputSchema)
     .mutation(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:update");
       const useCase = ctx.scope.resolve(TriggerUpdateUseCaseToken);
       try {
         return await useCase.execute(input);

@@ -26,9 +26,12 @@ class MockProjectRepository {
 }
 
 class MockUnitOfWork implements IUnitOfWork {
+  public readonly tagRepository = {} as any;
+  public readonly templateRepository = {} as any;
   public readonly auditLogRepository = {} as any;
   public readonly backupScheduleRepository = {} as any;
   public readonly backupRunRepository = {} as any;
+  public readonly certificateRepository = {} as any;
   public readonly environmentRepository =
     new MockEnvironmentRepository() as any;
   public readonly projectRepository = new MockProjectRepository() as any;

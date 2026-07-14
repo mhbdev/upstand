@@ -4,6 +4,7 @@ import {
   DeleteSshKeyInputSchema,
   GenerateSshKeyInputSchema,
   GetSshKeysInputSchema,
+  UpdateSshKeyInputSchema,
 } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
@@ -11,6 +12,7 @@ import {
   DeleteSshKeyUseCaseToken,
   GenerateSshKeyUseCaseToken,
   GetSshKeysUseCaseToken,
+  UpdateSshKeyUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
@@ -90,6 +92,22 @@ export const sshKeyRouter = router({
       const deleteUseCase = ctx.scope.resolve(DeleteSshKeyUseCaseToken);
       try {
         return await deleteUseCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  update: twoFactorVerifiedProcedure
+    .input(UpdateSshKeyInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ssh_key:create",
+      );
+      const useCase = ctx.scope.resolve(UpdateSshKeyUseCaseToken);
+      try {
+        return await useCase.execute(input);
       } catch (error) {
         handleUseCaseError(error);
       }

@@ -37,6 +37,18 @@ export class DrizzleBackupRunRepository implements IBackupRunRepository {
       .limit(limit)) as BackupRun[];
   }
 
+  async findByOrganizationId(
+    organizationId: string,
+    limit = 50,
+  ): Promise<BackupRun[]> {
+    return (await this.executor
+      .select()
+      .from(backupRun)
+      .where(eq(backupRun.organizationId, organizationId))
+      .orderBy(desc(backupRun.createdAt))
+      .limit(limit)) as BackupRun[];
+  }
+
   async findByStatus(status: string, limit = 500): Promise<BackupRun[]> {
     return (await this.executor
       .select()

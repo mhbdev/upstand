@@ -70,6 +70,33 @@ export function useSecuritySettings(onVerifySuccess?: () => void) {
     }
   };
 
+  const handleRegenerateBackupCodes = async () => {
+    if (
+      !confirm(
+        "Generate new recovery codes? All existing recovery codes will stop working.",
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await authClient.twoFactor.generateBackupCodes(
+        {},
+      );
+      if (error) {
+        toast.error(error.message || "Failed to generate recovery codes");
+      } else if (data) {
+        setBackupCodes(data.backupCodes);
+        setShowBackupCodes(true);
+        toast.success("New recovery codes generated");
+      }
+    } catch {
+      toast.error("Failed to generate recovery codes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const cancelSetup = () => {
     setTotpURI(null);
   };
@@ -83,6 +110,7 @@ export function useSecuritySettings(onVerifySuccess?: () => void) {
     handleEnable,
     handleConfirm,
     handleDisable,
+    handleRegenerateBackupCodes,
     cancelSetup,
   };
 }

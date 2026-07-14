@@ -212,6 +212,181 @@ describe("Caddy domain configuration", () => {
     expect(caddyfile).toContain("tls internal");
   });
 
+  test("provisions and references a selected custom certificate", () => {
+    const caddyfile = generateCaddyfileContent(
+      {},
+      [
+        {
+          id: "resource-custom-cert",
+          name: "Custom TLS app",
+          type: "application",
+          appName: "custom-tls-app",
+          domains: JSON.stringify([
+            {
+              host: "secure.example.com",
+              port: 3000,
+              https: true,
+              certificateType: "custom",
+              certificateId: "cert-1",
+            },
+          ]),
+        },
+      ],
+      [
+        {
+          id: "cert-1",
+          certificatePem: "CERTIFICATE",
+          privateKeyPem: "PRIVATE KEY",
+        },
+      ],
+    );
+
+    expect(caddyfile).toContain(
+      "tls /etc/caddy/certificates/cert-1.crt /etc/caddy/certificates/cert-1.key",
+    );
+  });
+
+  test("rejects a custom route whose certificate is not available", () => {
+    expect(() =>
+      generateCaddyfileContent({}, [
+        {
+          id: "resource-custom-cert",
+          name: "Custom TLS app",
+          type: "application",
+          appName: "custom-tls-app",
+          domains: JSON.stringify([
+            {
+              host: "secure.example.com",
+              port: 3000,
+              https: true,
+              certificateType: "custom",
+              certificateId: "missing",
+            },
+          ]),
+        },
+      ]),
+    ).toThrow("was not found");
+  });
+
+  test("emits validated redirects and security headers for a route", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "resource-redirect",
+        name: "redirect",
+        type: "application",
+        appName: "redirect",
+        composeType: null,
+        domains: JSON.stringify([
+          {
+            host: "legacy.example.com",
+            path: "/old",
+            port: 80,
+            https: true,
+            certificateType: "letsencrypt",
+            middlewares: [],
+            redirectTo: "https://example.com{uri}",
+            redirectStatus: "308",
+            securityHeaders: {
+              hsts: true,
+              nosniff: true,
+              frameDeny: true,
+              referrerPolicy: "strict-origin",
+            },
+          },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).toContain('redir "https://example.com{uri}" 308');
+    expect(caddyfile).toContain("Strict-Transport-Security");
+    expect(caddyfile).toContain('X-Frame-Options "DENY"');
+  });
+
+  test("emits forward-auth middleware with only validated header names", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "resource-auth",
+        name: "protected",
+        type: "application",
+        appName: "protected",
+        domains: JSON.stringify([
+          {
+            host: "protected.example.com",
+            forwardAuth: {
+              address: "https://auth.example.com",
+              uri: "/verify",
+              copyHeaders: ["X-User", "X-Email"],
+            },
+          },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).toContain('forward_auth "https://auth.example.com" {');
+    expect(caddyfile).toContain('uri "/verify"');
+    expect(caddyfile).toContain("copy_headers X-User");
+    expect(caddyfile).toContain("copy_headers X-Email");
+  });
+
+  test("renders typed managed middlewares before resource routes", () => {
+    const caddyfile = generateCaddyfileContent(
+      {
+        caddyMiddlewares: JSON.stringify([
+          { name: "security-headers", body: "header -Server" },
+          { name: "compression", body: "encode zstd gzip" },
+        ]),
+      },
+      [
+        {
+          id: "resource-managed-middleware",
+          name: "managed middleware",
+          type: "application",
+          appName: "managed-middleware",
+          domains: JSON.stringify([
+            {
+              host: "managed.example.com",
+              middlewares: ["security-headers", "compression"],
+            },
+          ]),
+        },
+      ],
+    );
+
+    expect(caddyfile).toContain("(security-headers) {");
+    expect(caddyfile).toContain("(compression) {");
+    expect(caddyfile).toContain("import security-headers");
+    expect(caddyfile).toContain("import compression");
+    expect(caddyfile.indexOf("(security-headers) {")).toBeLessThan(
+      caddyfile.indexOf("managed.example.com {"),
+    );
+  });
+
+  test("emits hashed basic authentication without accepting plaintext", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "resource-basic-auth",
+        name: "basic protected",
+        type: "application",
+        appName: "basic-protected",
+        domains: JSON.stringify([
+          {
+            host: "basic.example.com",
+            basicAuth: {
+              username: "admin",
+              passwordHash:
+                "$2a$14$abcdefghijklmnopqrstuuabcdefghijklmnopqrstuu",
+            },
+          },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).toContain("basic_auth {");
+    expect(caddyfile).toContain(
+      "admin $2a$14$abcdefghijklmnopqrstuuabcdefghijklmnopqrstuu",
+    );
+  });
+
   test("does not allow custom configuration to expose Caddy's admin API", () => {
     expect(() =>
       generateCaddyfileContent({ globalCaddyfile: "admin :2019" }),

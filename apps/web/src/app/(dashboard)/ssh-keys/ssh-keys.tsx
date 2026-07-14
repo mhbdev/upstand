@@ -5,6 +5,7 @@ import {
   CheckmarkCircle02Icon,
   Copy01Icon,
   Delete02Icon,
+  Edit02Icon,
   Key01Icon,
   PlusSignIcon,
   ShieldKeyIcon,
@@ -55,6 +56,11 @@ export default function SSHKeys(_props: {
   const [addKeyOpen, setAddKeyOpen] = useState(false);
   const [addKeyMode, setAddKeyMode] = useState<AddKeyMode>("generate");
   const [deleteKeyOpen, setDeleteKeyOpen] = useState(false);
+  const [editKeyOpen, setEditKeyOpen] = useState(false);
+  const [editingKey, setEditingKey] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [selectedKey, setSelectedKey] = useState<{
     id: string;
     name: string;
@@ -67,6 +73,10 @@ export default function SSHKeys(_props: {
   const [description, setDescription] = useState("");
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [rotationPrivateKey, setRotationPrivateKey] = useState("");
+  const [rotationPublicKey, setRotationPublicKey] = useState("");
 
   const orgId = activeOrg?.id;
 
@@ -75,6 +85,14 @@ export default function SSHKeys(_props: {
     setDescription("");
     setPrivateKey("");
     setPublicKey("");
+  };
+
+  const resetEditForm = () => {
+    setEditingKey(null);
+    setEditName("");
+    setEditDescription("");
+    setRotationPrivateKey("");
+    setRotationPublicKey("");
   };
 
   // List SSH Keys
@@ -130,6 +148,19 @@ export default function SSHKeys(_props: {
     },
   });
 
+  const updateMutation = useMutation({
+    ...trpc.sshKey.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("SSH Key updated successfully");
+      setEditKeyOpen(false);
+      resetEditForm();
+      refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update SSH Key");
+    },
+  });
+
   const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!orgId) {
@@ -178,6 +209,29 @@ export default function SSHKeys(_props: {
         "Couldn't copy automatically — please select and copy manually",
       );
     }
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orgId || !editingKey) return;
+    const hasPrivate = Boolean(rotationPrivateKey.trim());
+    const hasPublic = Boolean(rotationPublicKey.trim());
+    if (hasPrivate !== hasPublic) {
+      toast.error("Provide both private and public keys to rotate the key");
+      return;
+    }
+    updateMutation.mutate({
+      id: editingKey.id,
+      organizationId: orgId,
+      name: editName.trim(),
+      description: editDescription.trim() || null,
+      ...(hasPrivate && hasPublic
+        ? {
+            privateKey: rotationPrivateKey.trim(),
+            publicKey: rotationPublicKey.trim(),
+          }
+        : {}),
+    });
   };
 
   const isSubmitting = generateMutation.isPending || createMutation.isPending;
@@ -249,6 +303,19 @@ export default function SSHKeys(_props: {
                   <button
                     type="button"
                     onClick={() => {
+                      setEditingKey({ id: key.id, name: key.name });
+                      setEditName(key.name);
+                      setEditDescription(key.description ?? "");
+                      setEditKeyOpen(true);
+                    }}
+                    className="p-1.5 text-muted-foreground transition-all hover:bg-muted/50 hover:text-foreground"
+                    aria-label={`Edit ${key.name}`}
+                  >
+                    <HugeiconsIcon icon={Edit02Icon} className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setSelectedKey({ id: key.id, name: key.name });
                       setDeleteKeyOpen(true);
                     }}
@@ -296,6 +363,88 @@ export default function SSHKeys(_props: {
           </Button>
         </div>
       )}
+
+      <Dialog
+        open={editKeyOpen}
+        onOpenChange={(open) => {
+          setEditKeyOpen(open);
+          if (!open) resetEditForm();
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-bold text-xl">
+              <HugeiconsIcon
+                icon={Edit02Icon}
+                className="size-5 text-primary"
+              />
+              Edit SSH Key
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Update metadata or rotate the key pair for {editingKey?.name}.
+              Rotation replaces the stored encrypted private key.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-key-name">Name</Label>
+              <Input
+                id="edit-key-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-key-description">Description</Label>
+              <Input
+                id="edit-key-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+              />
+            </div>
+            <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-muted-foreground text-xs">
+              Leave the rotation fields empty to keep the current key. If you
+              rotate, both key halves are required and will be verified.
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rotate-private-key">
+                Replacement private key
+              </Label>
+              <Textarea
+                id="rotate-private-key"
+                value={rotationPrivateKey}
+                onChange={(e) => setRotationPrivateKey(e.target.value)}
+                rows={4}
+                className="resize-none break-all font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rotate-public-key">Replacement public key</Label>
+              <Textarea
+                id="rotate-public-key"
+                value={rotationPublicKey}
+                onChange={(e) => setRotationPublicKey(e.target.value)}
+                rows={2}
+                className="resize-none break-all font-mono text-xs"
+              />
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setEditKeyOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending && <Spinner className="size-4" />}
+                {updateMutation.isPending ? "Saving..." : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Add SSH Key Dialog */}
       <Dialog

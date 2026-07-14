@@ -2,12 +2,14 @@ import { TRPCError } from "@trpc/server";
 import {
   CreateProjectInputSchema,
   DeleteProjectInputSchema,
+  DuplicateProjectInputSchema,
   GetProjectInputSchema,
   GetProjectsInputSchema,
 } from "@upstand/usecases";
 import {
   CreateProjectUseCaseToken,
   DeleteProjectUseCaseToken,
+  DuplicateProjectUseCaseToken,
   GetProjectsUseCaseToken,
   GetProjectUseCaseToken,
 } from "../di";
@@ -85,6 +87,22 @@ export const projectRouter = router({
       );
 
       const useCase = ctx.scope.resolve(DeleteProjectUseCaseToken);
+      try {
+        return await useCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  duplicate: twoFactorVerifiedProcedure
+    .input(DuplicateProjectInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "project:create",
+      );
+      const useCase = ctx.scope.resolve(DuplicateProjectUseCaseToken);
       try {
         return await useCase.execute(input);
       } catch (error) {

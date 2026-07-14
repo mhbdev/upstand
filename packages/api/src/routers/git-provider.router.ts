@@ -1,24 +1,99 @@
 import { TRPCError } from "@trpc/server";
+import { redis } from "@upstand/redis";
 import {
   CreateGitProviderInputSchema,
+  createGitProviderOAuthState,
   DeleteGitProviderInputSchema,
   GetGitProvidersInputSchema,
+  GIT_PROVIDER_OAUTH_STATE_TTL_SECONDS,
+  gitProviderOAuthStateKey,
   ListGitBranchesInputSchema,
   ListGitRepositoriesInputSchema,
+  redactGitProvider,
+  UpdateGitProviderInputSchema,
 } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
+import { z } from "zod";
 import {
   CreateGitProviderUseCaseToken,
   DeleteGitProviderUseCaseToken,
   GetGitProvidersUseCaseToken,
   ListGitBranchesUseCaseToken,
   ListGitRepositoriesUseCaseToken,
+  UpdateGitProviderUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
 export const gitProviderRouter = router({
+  createOAuthState: twoFactorVerifiedProcedure
+    .input(
+      GetGitProvidersInputSchema.pick({ organizationId: true }).extend({
+        providerId: GetGitProvidersInputSchema.shape.organizationId,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
+      const provider = await uow.gitProviderRepository.findById(
+        input.providerId,
+      );
+      if (!provider || provider.organizationId !== input.organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Git Provider not found",
+        });
+      }
+      if (
+        provider.provider !== "github" &&
+        provider.provider !== "gitlab" &&
+        provider.provider !== "gitea"
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This Git provider does not use an OAuth authorization flow",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        provider.organizationId,
+        "git_provider:view",
+      );
+
+      const state = createGitProviderOAuthState(
+        provider.id,
+        provider.provider === "github" ? "github-install" : "provider-oauth",
+      );
+      await redis.set(
+        gitProviderOAuthStateKey(state.state),
+        provider.id,
+        "EX",
+        GIT_PROVIDER_OAUTH_STATE_TTL_SECONDS,
+        "NX",
+      );
+      return state;
+    }),
+
+  createGithubManifestState: twoFactorVerifiedProcedure
+    .input(z.object({ organizationId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "git_provider:create",
+      );
+      const subject = `github-init:${input.organizationId}:${ctx.session.user.id}`;
+      const state = createGitProviderOAuthState(subject, "github-init");
+      await redis.set(
+        gitProviderOAuthStateKey(state.state),
+        subject,
+        "EX",
+        GIT_PROVIDER_OAUTH_STATE_TTL_SECONDS,
+        "NX",
+      );
+      return state;
+    }),
+
   create: twoFactorVerifiedProcedure
     .input(CreateGitProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -30,7 +105,8 @@ export const gitProviderRouter = router({
 
       const useCase = ctx.scope.resolve(CreateGitProviderUseCaseToken);
       try {
-        return await useCase.execute(input);
+        const provider = await useCase.execute(input);
+        return redactGitProvider(provider);
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -48,6 +124,37 @@ export const gitProviderRouter = router({
       const useCase = ctx.scope.resolve(GetGitProvidersUseCaseToken);
       try {
         return await useCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  update: twoFactorVerifiedProcedure
+    .input(UpdateGitProviderInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
+      const provider = await uow.gitProviderRepository.findById(input.id);
+      if (!provider) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Git Provider not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        provider.organizationId,
+        "git_provider:create",
+      );
+      const useCase = ctx.scope.resolve(UpdateGitProviderUseCaseToken);
+      try {
+        const updated = await useCase.execute(input);
+        if (!updated) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Git Provider not found",
+          });
+        }
+        return redactGitProvider(updated);
       } catch (error) {
         handleUseCaseError(error);
       }

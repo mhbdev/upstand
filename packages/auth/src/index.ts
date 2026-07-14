@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { apiKey } from "@better-auth/api-key";
+import { sso } from "@better-auth/sso";
 import { createDb } from "@upstand/db";
 import * as schema from "@upstand/db/schema/auth";
 import { notificationChannel } from "@upstand/db/schema/notification";
@@ -16,7 +17,7 @@ import { createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { twoFactor } from "better-auth/plugins/two-factor";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 const memberPermissionField = {
   type: "string",
@@ -174,7 +175,10 @@ export function createAuth() {
     },
     hooks: {
       after: createAuthMiddleware(async (ctx) => {
-        if (ctx.path.endsWith("/two-factor/verify-totp")) {
+        if (
+          ctx.path.endsWith("/two-factor/verify-totp") ||
+          ctx.path.endsWith("/two-factor/verify-backup-code")
+        ) {
           if (!ctx.request) return;
           const res = ctx.context.returned;
           const hasReturnedError =
@@ -260,6 +264,63 @@ export function createAuth() {
             } catch (_) {}
           }
         }
+
+        // Password sign-in must not become a bypass for an organization that
+        // explicitly requires its verified enterprise identity provider. The
+        // SSO endpoint is intentionally not blocked, and organizations with
+        // no registered provider are ignored to prevent accidental lockout.
+        if (ctx.path.endsWith("/sign-in/email")) {
+          if (!ctx.request) return;
+          const body = (await ctx.request
+            .clone()
+            .json()
+            .catch(() => ({}))) as {
+            email?: unknown;
+          };
+          const email = typeof body.email === "string" ? body.email.trim() : "";
+          if (!email) return;
+
+          const enforced = await db
+            .select({ metadata: schema.organization.metadata })
+            .from(schema.user)
+            .innerJoin(schema.member, eq(schema.member.userId, schema.user.id))
+            .innerJoin(
+              schema.organization,
+              eq(schema.organization.id, schema.member.organizationId),
+            )
+            .innerJoin(
+              schema.ssoProvider,
+              and(
+                eq(schema.ssoProvider.organizationId, schema.organization.id),
+                eq(schema.ssoProvider.domainVerified, true),
+              ),
+            )
+            .where(eq(schema.user.email, email.toLowerCase()))
+            .limit(20);
+
+          const isEnforced = enforced.some((row) => {
+            try {
+              const metadata = row.metadata ? JSON.parse(row.metadata) : {};
+              return metadata.ssoEnforced === true;
+            } catch {
+              return false;
+            }
+          });
+          if (isEnforced) {
+            return {
+              response: new Response(
+                JSON.stringify({
+                  error:
+                    "This organization requires sign-in through its verified SSO provider.",
+                }),
+                {
+                  status: 403,
+                  headers: { "content-type": "application/json" },
+                },
+              ),
+            };
+          }
+        }
       }),
     },
     plugins: [
@@ -269,7 +330,15 @@ export function createAuth() {
         roles: organizationRoles,
         schema: {
           member: {
-            additionalFields: { permissions: memberPermissionField },
+            additionalFields: {
+              permissions: memberPermissionField,
+              scimActive: {
+                type: "boolean",
+                required: false,
+                defaultValue: true,
+              },
+              scimExternalId: { type: "string", required: false },
+            },
           },
           invitation: {
             additionalFields: {
@@ -367,6 +436,24 @@ export function createAuth() {
       twoFactor({
         issuer: "Upstand",
         allowPasswordless: true,
+      }),
+      sso({
+        domainVerification: {
+          enabled: true,
+          tokenPrefix: "upstand-sso",
+        },
+        organizationProvisioning: {
+          defaultRole: "member",
+        },
+        provisionUserOnEveryLogin: true,
+        redirectURI: "/api/auth/sso/callback",
+        saml: {
+          enableInResponseToValidation: true,
+          allowIdpInitiated: true,
+          requireTimestamps: true,
+          algorithms: { onDeprecated: "reject" },
+        },
+        providersLimit: 10,
       }),
     ],
   });

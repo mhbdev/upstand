@@ -21,11 +21,103 @@ Build concurrency is configured per server so expensive builds do not overwhelm 
 
 ## Storage, backups & notifications
 
-S3 Destinations store backup targets and testable credentials. Backup schedules and runs are managed per resource, with restore operations requiring an explicit confirmation. Notifications can deliver deployment, backup, and cleanup events through configured channels.
+S3 Destinations store backup targets and testable credentials. Resource backup schedules and runs remain resource-scoped, while the Web Server page also supports organization-scoped control-plane backups. A web-server backup streams an Upstand PostgreSQL dump plus the three Caddy runtime/config/data volumes to an organization-owned destination; restore stops Caddy, terminates active database sessions, restores the database and volumes, and starts Caddy again. Restore operations require 2FA, the appropriate backup permission, and an explicit `RESTORE_WEB_SERVER` confirmation. The `SSH_KEY_ENCRYPTION_KEY_V1` installation secret is intentionally not copied into the backup artifact and must be retained separately with the deployment secrets; losing it prevents decryption of stored credentials. For resources assigned to a registered remote server, Docker inspection, dumps, volume archives, and restores run against that server over the configured SSH transport while the S3 stream remains on the control plane. Notifications can deliver deployment, database, volume, web-server backup, and cleanup events through configured channels.
 
 ## Monitoring & maintenance
 
 Monitoring exposes server/runtime metrics, active containers, Docker storage usage, and network totals. The Web Server page also provides Caddy/server logs, configuration reload/restart controls, and safe Docker cleanup actions. Use the deployment queue and resource locks to diagnose overlapping builds before restarting workers.
+
+## Docker volume uploads
+
+The Docker Inventory page can upload an uncompressed `.tar` archive into a
+named Docker volume on the selected local or registered remote server. The
+operation requires organization access, server permission, and a verified
+second factor when 2FA is enabled. Upstand limits archives to 50 MB, rejects
+absolute or traversal entries, validates the destination as an absolute path,
+and extracts through a short-lived helper container. Uploads never accept a
+host filesystem path or arbitrary shell command.
+
+For tracked resource containers, the Containers tab also accepts a safe
+uncompressed `.tar` archive and extracts it into a prompted absolute directory
+inside the container. The same 50 MB, traversal, link, organization, server
+permission, and 2FA checks apply. Remote targets transfer the archive over the
+configured SSH connection and do not expose the host path to the container.
+
+The same Docker Inventory explorer can force-remove unused images and remove
+volumes or networks. These actions are destructive, require the server update
+permission and verified 2FA, and always display a browser confirmation before
+the request is sent. Image references are validated server-side for both local
+and SSH-backed remote Docker targets.
+
+## White-label branding
+
+Organization owners can configure the application name, description,
+logo/favicon URLs, support and documentation links, metadata, footer text,
+and custom CSS from **Settings → Branding**. Branding is presentation-only:
+deployment secrets are never exposed, and the public branding response contains
+only the configured presentation fields. The dashboard applies the name,
+document title, and custom CSS on the next session load.
+
+## SCIM provisioning
+
+Organization owners and admins can create a SCIM provider token from the
+SCIM settings API. The raw `upscim_…` token is shown only when created or
+rotated; Upstand stores only its SHA-256 digest. Use the organization-scoped
+endpoint `/api/scim/v2.0/<organizationId>` with a bearer token. User create,
+lookup, update, deactivate, delete, and group membership discovery are
+supported. Deactivated members are denied normal organization authorization,
+and deleting a SCIM user removes only that organization membership, preserving
+the global identity for future provisioning.
+
+## Enterprise SSO
+
+Organization owners and admins can open **Settings → Single Sign-On** to
+register an OIDC or SAML provider. Provider configuration is stored through
+the official Better Auth SSO integration, with client secrets and IdP
+certificates kept out of list responses. Upstand issues a DNS TXT challenge
+under `_upstand-sso.<domain>`; complete that challenge and select **Verify DNS**
+before enabling enforcement.
+
+OIDC uses discovery, PKCE, and the `openid`, `email`, and `profile` scopes.
+SAML enables response correlation, timestamp requirements, and rejection of
+deprecated signature algorithms. A verified provider can provision users into
+the organization as members. When **Require SSO** is enabled, email/password
+sign-in is rejected for existing members of that organization and the login
+page's SSO flow routes them through the provider selected by their email
+domain. SSO callback URLs must be reachable from the identity provider and the
+Upstand API's configured trusted origins.
+
+## Enterprise licensing
+
+Self-hosted installations can activate an organization-bound enterprise
+license from **Settings → Enterprise License**. Configure
+`UPSTAND_LICENSE_PUBLIC_KEY` with the issuer's Ed25519 public key before
+activation. Upstand verifies the issuer, audience, organization binding,
+signature, issue time, and expiry locally, then stores the signed token
+encrypted with the platform Secret Box. The dashboard exposes only the
+license fingerprint, plan, seats, features, status, and expiry—not the token.
+
+Set `UPSTAND_LICENSE_VALIDATION_URL` when the licensing service should also
+validate activations and periodic checks remotely. Owners can validate or
+deactivate the current license from the same page; the licensing issuer,
+checkout, and Stripe/cloud provisioning are intentionally separate services.
+
+## Stripe billing
+
+For installations that sell hosted or enterprise plans, configure
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and
+`UPSTAND_BILLING_PLANS`. The plan variable is a JSON array such as
+`[{"id":"pro","name":"Pro","priceId":"price_...","features":["advanced-operations"]}]`.
+Owners and admins can start Stripe Checkout or open the Stripe customer
+portal from **Settings → Billing**. Configure the optional success and cancel
+URLs with `STRIPE_SUCCESS_URL` and `STRIPE_CANCEL_URL`.
+
+Register `POST /api/billing/stripe/webhook` in Stripe. Upstand verifies the
+raw request body and `Stripe-Signature`, stores event IDs for idempotent retry
+handling, and synchronizes checkout completion, subscription changes, paid or
+failed invoices, and cancellation state. Stripe remains the source of truth
+for payment methods and invoices; cloud server provisioning is deliberately a
+separate operational concern.
 
 ## AI and MCP operations
 

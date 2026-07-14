@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form";
+import { useQuery } from "@tanstack/react-query";
 import type { PermissionAction } from "@upstand/api/permissions";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
@@ -23,6 +24,7 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/utils/trpc";
 import { useMembersSettings } from "../hooks/use-members-settings";
 
 const MEMBER_CAPABILITIES: Array<[PermissionAction, string]> = [
@@ -45,6 +47,8 @@ const MEMBER_CAPABILITIES: Array<[PermissionAction, string]> = [
   ["s3_destination:view", "View backup destinations"],
   ["s3_destination:create", "Create backup destinations"],
   ["s3_destination:delete", "Delete backup destinations"],
+  ["backup:view", "View backup schedules and runs"],
+  ["backup:manage", "Manage backups and restores"],
   ["docker_registry:view", "View registries"],
   ["docker_registry:create", "Create registries"],
   ["docker_registry:delete", "Delete registries"],
@@ -65,6 +69,7 @@ const DEFAULT_MEMBER_CAPABILITIES: PermissionAction[] = [
   "ssh_key:view",
   "git_provider:view",
   "s3_destination:view",
+  "backup:view",
   "docker_registry:view",
   "server:view",
   "notification:view",
@@ -73,6 +78,10 @@ const DEFAULT_MEMBER_CAPABILITIES: PermissionAction[] = [
 export function MembersPanel() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const organizationId = activeOrg?.id ?? "";
+  const customRolesQuery = useQuery({
+    ...trpc.customRole.list.queryOptions({ organizationId }),
+    enabled: Boolean(organizationId),
+  });
 
   const {
     members,
@@ -91,7 +100,11 @@ export function MembersPanel() {
   const [drafts, setDrafts] = useState<
     Record<
       string,
-      { role: "member" | "admin"; permissions: PermissionAction[] }
+      {
+        role: "member" | "admin";
+        permissions: PermissionAction[];
+        customRoleId?: string | null;
+      }
     >
   >({});
 
@@ -402,6 +415,9 @@ export function MembersPanel() {
             const draft = drafts[member.id] ?? {
               role: member.role === "admin" ? "admin" : "member",
               permissions: member.permissions ?? DEFAULT_MEMBER_CAPABILITIES,
+              customRoleId: member.role.startsWith("custom:")
+                ? member.role.slice("custom:".length)
+                : null,
             };
             return (
               <div
@@ -425,16 +441,30 @@ export function MembersPanel() {
                   <>
                     <div className="flex flex-wrap gap-2">
                       <Select
-                        value={draft.role}
-                        onValueChange={(value) =>
+                        value={
+                          draft.customRoleId
+                            ? `custom:${draft.customRoleId}`
+                            : draft.role
+                        }
+                        onValueChange={(value) => {
+                          if (!value) return;
                           setDrafts((current) => ({
                             ...current,
                             [member.id]: {
                               ...draft,
-                              role: value as "member" | "admin",
+                              role: value === "admin" ? "admin" : "member",
+                              customRoleId: value.startsWith("custom:")
+                                ? value.slice("custom:".length)
+                                : null,
+                              permissions: value.startsWith("custom:")
+                                ? (customRolesQuery.data?.find(
+                                    (role) =>
+                                      role.id === value.slice("custom:".length),
+                                  )?.permissions ?? draft.permissions)
+                                : draft.permissions,
                             },
-                          }))
-                        }
+                          }));
+                        }}
                       >
                         <SelectTrigger className="w-32">
                           <SelectValue />
@@ -442,6 +472,14 @@ export function MembersPanel() {
                         <SelectContent>
                           <SelectItem value="member">Member</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
+                          {(customRolesQuery.data ?? []).map((role) => (
+                            <SelectItem
+                              key={role.id}
+                              value={`custom:${role.id}`}
+                            >
+                              {role.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <Button
@@ -452,6 +490,7 @@ export function MembersPanel() {
                             memberId: member.id,
                             role: draft.role,
                             permissions: draft.permissions,
+                            customRoleId: draft.customRoleId,
                           })
                         }
                       >

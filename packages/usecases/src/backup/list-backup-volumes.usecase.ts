@@ -1,6 +1,9 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { z } from "zod";
-import { BackupRuntimeService } from "./backup-runtime.service";
+import {
+  BackupRuntimeService,
+  withBackupRuntime,
+} from "./backup-runtime.service";
 
 export const ListBackupVolumesInputSchema = z.object({
   resourceId: z.string().min(1),
@@ -20,6 +23,8 @@ export class ListBackupVolumesUseCase {
       input.resourceId,
     );
     if (!resource) throw new ValidationError("Resource not found");
-    return this.runtime.listVolumes(resource);
+    return withBackupRuntime(this.uow, resource, this.runtime, (runtime) =>
+      runtime.listVolumes(resource),
+    );
   }
 }

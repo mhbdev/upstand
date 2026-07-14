@@ -1,9 +1,11 @@
 import { TRPCError } from "@trpc/server";
+import type { DockerRegistry } from "@upstand/domain";
 import {
   CreateDockerRegistryInputSchema,
   DeleteDockerRegistryInputSchema,
   GetDockerRegistriesInputSchema,
   TestDockerRegistryConnectionInputSchema,
+  UpdateDockerRegistryInputSchema,
 } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
@@ -11,10 +13,16 @@ import {
   DeleteDockerRegistryUseCaseToken,
   GetDockerRegistriesUseCaseToken,
   TestDockerRegistryConnectionUseCaseToken,
+  UpdateDockerRegistryUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
+
+function publicRegistry(registry: DockerRegistry) {
+  const { password: _password, ...safe } = registry;
+  return { ...safe, password: null };
+}
 
 export const dockerRegistryRouter = router({
   create: twoFactorVerifiedProcedure
@@ -28,7 +36,7 @@ export const dockerRegistryRouter = router({
 
       const useCase = ctx.scope.resolve(CreateDockerRegistryUseCaseToken);
       try {
-        return await useCase.execute(input);
+        return publicRegistry(await useCase.execute(input));
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -45,7 +53,7 @@ export const dockerRegistryRouter = router({
 
       const useCase = ctx.scope.resolve(GetDockerRegistriesUseCaseToken);
       try {
-        return await useCase.execute(input);
+        return (await useCase.execute(input)).map(publicRegistry);
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -77,9 +85,31 @@ export const dockerRegistryRouter = router({
       }
     }),
 
+  update: twoFactorVerifiedProcedure
+    .input(UpdateDockerRegistryInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "docker_registry:create",
+      );
+
+      const useCase = ctx.scope.resolve(UpdateDockerRegistryUseCaseToken);
+      try {
+        return publicRegistry(await useCase.execute(input));
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
   testConnection: twoFactorVerifiedProcedure
     .input(TestDockerRegistryConnectionInputSchema)
     .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "docker_registry:view",
+      );
       const useCase = ctx.scope.resolve(
         TestDockerRegistryConnectionUseCaseToken,
       );

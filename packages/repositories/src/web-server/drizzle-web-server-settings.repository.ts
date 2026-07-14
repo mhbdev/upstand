@@ -32,6 +32,7 @@ export class DrizzleWebServerSettingsRepository
     enableHttp3?: boolean;
     globalCaddyfile?: string | null;
     caddySnippets?: string;
+    caddyMiddlewares?: string;
     serverIp?: string | null;
     dailyDockerCleanup?: boolean;
     caddyEnvironment?: string;
@@ -46,6 +47,7 @@ export class DrizzleWebServerSettingsRepository
       enableHttp3: data.enableHttp3 ?? true,
       globalCaddyfile: data.globalCaddyfile ?? null,
       caddySnippets: data.caddySnippets ?? "",
+      caddyMiddlewares: data.caddyMiddlewares ?? "[]",
       serverIp: data.serverIp ?? null,
       dailyDockerCleanup: data.dailyDockerCleanup ?? false,
       caddyEnvironment: data.caddyEnvironment ?? "{}",

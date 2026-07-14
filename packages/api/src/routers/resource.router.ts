@@ -1,38 +1,71 @@
 import { TRPCError } from "@trpc/server";
+import type { Resource } from "@upstand/domain";
 import {
   ControlContainerInputSchema,
   ControlResourceInputSchema,
   CreateResourceInputSchema,
+  DatabaseCommandInputSchema,
   DeleteResourceInputSchema,
   DeployResourceInputSchema,
   GetResourceContainersInputSchema,
   GetResourceInputSchema,
   GetResourceLogsInputSchema,
+  GetResourcePreviewsInputSchema,
   GetResourceRoutingTargetsInputSchema,
   GetResourceStatsInputSchema,
   GetResourcesInputSchema,
+  parseResourceEnvironmentVariables,
+  QueueDeploymentUseCase,
+  RandomizeComposeInputSchema,
+  RebuildDatabaseInputSchema,
+  RollbackResourceInputSchema,
+  RotateResourceWebhookTokenInputSchema,
+  resourceCredentialsJson,
   UpdateResourceInputSchema,
 } from "@upstand/usecases";
-import { log } from "evlog";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
   CreateResourceUseCaseToken,
+  DatabaseCommandUseCaseToken,
   DeleteResourceUseCaseToken,
   DeployResourceUseCaseToken,
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
   GetResourceContainersUseCaseToken,
   GetResourceLogsUseCaseToken,
+  GetResourcePreviewsUseCaseToken,
   GetResourceRoutingTargetsUseCaseToken,
   GetResourceStatsUseCaseToken,
   GetResourcesUseCaseToken,
   GetResourceUseCaseToken,
+  RandomizeComposeUseCaseToken,
+  RebuildDatabaseUseCaseToken,
+  RollbackResourceUseCaseToken,
+  RotateResourceWebhookTokenUseCaseToken,
   UpdateResourceUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
+
+function publicResource(
+  resource: Resource,
+): Omit<Resource, "webhookTokenHash" | "buildSecrets"> {
+  const {
+    webhookTokenHash: _webhookTokenHash,
+    buildSecrets: _buildSecrets,
+    ...safeResource
+  } = resource;
+  return {
+    ...safeResource,
+    credentials: resourceCredentialsJson(resource),
+    envVars: JSON.stringify(
+      parseResourceEnvironmentVariables(resource.envVars),
+    ),
+  };
+}
 
 export const resourceRouter = router({
   create: twoFactorVerifiedProcedure
@@ -66,7 +99,7 @@ export const resourceRouter = router({
 
       const useCase = ctx.scope.resolve(CreateResourceUseCaseToken);
       try {
-        return await useCase.execute(input);
+        return publicResource(await useCase.execute(input));
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -103,7 +136,7 @@ export const resourceRouter = router({
 
       const useCase = ctx.scope.resolve(GetResourcesUseCaseToken);
       try {
-        return await useCase.execute(input);
+        return (await useCase.execute(input)).map(publicResource);
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -149,28 +182,7 @@ export const resourceRouter = router({
         "resource:view",
       );
 
-      if (resource.type === "database" && resource.credentials) {
-        try {
-          const payload = JSON.parse(resource.credentials);
-          if (payload.ciphertext && payload.iv && payload.authTag) {
-            const { decryptSecret } = await import(
-              "@upstand/platform/crypto/secret-box"
-            );
-            const decrypted = decryptSecret(payload);
-            return {
-              ...resource,
-              credentials: decrypted,
-            };
-          }
-        } catch (e: any) {
-          log.error({
-            message: "Failed to decrypt database credentials in router",
-            err: e.message || e,
-          });
-        }
-      }
-
-      return resource;
+      return publicResource(resource);
     }),
 
   update: twoFactorVerifiedProcedure
@@ -215,7 +227,8 @@ export const resourceRouter = router({
 
       const updateUseCase = ctx.scope.resolve(UpdateResourceUseCaseToken);
       try {
-        return await updateUseCase.execute(input);
+        const updated = await updateUseCase.execute(input);
+        return updated ? publicResource(updated) : updated;
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -311,7 +324,7 @@ export const resourceRouter = router({
 
       const deployUseCase = ctx.scope.resolve(DeployResourceUseCaseToken);
       try {
-        return await deployUseCase.execute(input);
+        return publicResource(await deployUseCase.execute(input));
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -359,10 +372,277 @@ export const resourceRouter = router({
 
       const controlUseCase = ctx.scope.resolve(ControlResourceUseCaseToken);
       try {
-        return await controlUseCase.execute(input);
+        return publicResource(await controlUseCase.execute(input));
       } catch (error) {
         handleUseCaseError(error);
       }
+    }),
+
+  rollback: twoFactorVerifiedProcedure
+    .input(RollbackResourceInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const resource = await ctx.scope
+        .resolve(GetResourceUseCaseToken)
+        .execute({ id: input.id });
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+      const environment = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: resource.environmentId });
+      const project = environment
+        ? await ctx.scope.resolve(GetProjectUseCaseToken).execute({
+            id: environment.projectId,
+          })
+        : null;
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:update",
+      );
+      try {
+        if (resource.type === "compose") {
+          if (resource.provider === "raw" || !input.deploymentId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Select a successful Git-backed Compose deployment to roll back",
+            });
+          }
+          const uow = ctx.scope.resolve(UnitOfWorkToken);
+          const historical = await uow.deploymentRepository.findById(
+            input.deploymentId,
+          );
+          if (
+            !historical ||
+            historical.resourceId !== resource.id ||
+            historical.status !== "success" ||
+            !historical.sourceRevision
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "The selected deployment has no verified Git source revision",
+            });
+          }
+          return publicResource(
+            await new QueueDeploymentUseCase(uow).execute({
+              resourceId: resource.id,
+              title: `Compose rollback to ${historical.sourceRevision.slice(0, 12)}`,
+              sourceRevision: historical.sourceRevision,
+            }),
+          );
+        }
+        if (input.deploymentId) {
+          const gitBacked = [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "gitea",
+            "git",
+          ].includes(resource.provider);
+          if (resource.type !== "application" || !gitBacked) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Historical rollback is available only for Git-backed application resources",
+            });
+          }
+          const uow = ctx.scope.resolve(UnitOfWorkToken);
+          const historical = await uow.deploymentRepository.findById(
+            input.deploymentId,
+          );
+          if (
+            !historical ||
+            historical.resourceId !== resource.id ||
+            historical.status !== "success" ||
+            !historical.sourceRevision
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "The selected deployment has no verified Git source revision",
+            });
+          }
+          return publicResource(
+            await new QueueDeploymentUseCase(uow).execute({
+              resourceId: resource.id,
+              title: `Application rollback to ${historical.sourceRevision.slice(0, 12)}`,
+              sourceRevision: historical.sourceRevision,
+            }),
+          );
+        }
+        return publicResource(
+          await ctx.scope.resolve(RollbackResourceUseCaseToken).execute(input),
+        );
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  rebuildDatabase: twoFactorVerifiedProcedure
+    .input(RebuildDatabaseInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const resource = await ctx.scope
+        .resolve(GetResourceUseCaseToken)
+        .execute({ id: input.id });
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+      const environment = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: resource.environmentId });
+      const project = environment
+        ? await ctx.scope.resolve(GetProjectUseCaseToken).execute({
+            id: environment.projectId,
+          })
+        : null;
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:update",
+      );
+      try {
+        return publicResource(
+          await ctx.scope.resolve(RebuildDatabaseUseCaseToken).execute(input),
+        );
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  databaseCommand: twoFactorVerifiedProcedure
+    .input(DatabaseCommandInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const resource = await ctx.scope
+        .resolve(GetResourceUseCaseToken)
+        .execute({ id: input.id });
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+      const environment = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: resource.environmentId });
+      const project = environment
+        ? await ctx.scope.resolve(GetProjectUseCaseToken).execute({
+            id: environment.projectId,
+          })
+        : null;
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:update",
+      );
+      try {
+        return await ctx.scope
+          .resolve(DatabaseCommandUseCaseToken)
+          .execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  randomizeCompose: twoFactorVerifiedProcedure
+    .input(RandomizeComposeInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const resource = await ctx.scope
+        .resolve(GetResourceUseCaseToken)
+        .execute({ id: input.id });
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+      const environment = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: resource.environmentId });
+      const project = environment
+        ? await ctx.scope
+            .resolve(GetProjectUseCaseToken)
+            .execute({ id: environment.projectId })
+        : null;
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:update",
+      );
+      try {
+        return publicResource(
+          await ctx.scope.resolve(RandomizeComposeUseCaseToken).execute(input),
+        );
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  rotateWebhookToken: twoFactorVerifiedProcedure
+    .input(RotateResourceWebhookTokenInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const resource = await ctx.scope
+        .resolve(GetResourceUseCaseToken)
+        .execute({ id: input.id });
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+      const environment = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: resource.environmentId });
+      const project = environment
+        ? await ctx.scope.resolve(GetProjectUseCaseToken).execute({
+            id: environment.projectId,
+          })
+        : null;
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:update",
+      );
+      return ctx.scope
+        .resolve(RotateResourceWebhookTokenUseCaseToken)
+        .execute(input);
     }),
 
   controlContainer: twoFactorVerifiedProcedure
@@ -554,6 +834,46 @@ export const resourceRouter = router({
       const getLogsUseCase = ctx.scope.resolve(GetResourceLogsUseCaseToken);
       try {
         return await getLogsUseCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  getPreviews: twoFactorVerifiedProcedure
+    .input(GetResourcePreviewsInputSchema)
+    .query(async ({ ctx, input }) => {
+      const resource = await ctx.scope
+        .resolve(GetResourceUseCaseToken)
+        .execute({ id: input.id });
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+      const environment = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: resource.environmentId });
+      const project = environment
+        ? await ctx.scope
+            .resolve(GetProjectUseCaseToken)
+            .execute({ id: environment.projectId })
+        : null;
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:view",
+      );
+      try {
+        return await ctx.scope
+          .resolve(GetResourcePreviewsUseCaseToken)
+          .execute(input);
       } catch (error) {
         handleUseCaseError(error);
       }

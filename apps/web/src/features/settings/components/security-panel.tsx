@@ -45,6 +45,7 @@ export function SecurityPanel() {
     handleEnable,
     handleConfirm,
     handleDisable,
+    handleRegenerateBackupCodes,
     cancelSetup,
   } = useSecuritySettings(() => {
     codeForm.reset();
@@ -96,15 +97,26 @@ export function SecurityPanel() {
                 your authenticator app on each sign-in.
               </p>
               <div className="flex justify-end">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={loading}
-                  onClick={handleDisable}
-                >
-                  {loading && <Spinner data-icon="inline-start" />}
-                  Disable 2FA
-                </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                    onClick={handleRegenerateBackupCodes}
+                  >
+                    {loading && <Spinner data-icon="inline-start" />}
+                    Regenerate recovery codes
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={loading}
+                    onClick={handleDisable}
+                  >
+                    {loading && <Spinner data-icon="inline-start" />}
+                    Disable 2FA
+                  </Button>
+                </div>
               </div>
             </div>
           ) : totpURI ? (

@@ -3,6 +3,7 @@
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
+import { useMutation } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -43,10 +44,11 @@ import {
   TableHeader,
   TableRow,
 } from "@upstand/ui/components/table";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, WandSparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
+import { trpc } from "@/utils/trpc";
 
 type DomainMapping = {
   host: string;
@@ -56,15 +58,41 @@ type DomainMapping = {
   port: number;
   serviceName?: string;
   https: boolean;
-  certificateType: "letsencrypt" | "internal";
+  certificateType: "letsencrypt" | "internal" | "custom";
+  certificateId?: string;
   middlewares: string[];
+  redirectTo?: string;
+  redirectStatus: "301" | "302" | "307" | "308";
+  forwardAuth?: {
+    address: string;
+    uri: string;
+    copyHeaders: string[];
+  };
+  basicAuth?: {
+    username: string;
+    passwordHash: string;
+  };
+  securityHeaders: {
+    hsts: boolean;
+    nosniff: boolean;
+    frameDeny: boolean;
+    referrerPolicy:
+      | "no-referrer"
+      | "same-origin"
+      | "strict-origin"
+      | "strict-origin-when-cross-origin"
+      | null;
+  };
 };
 
 interface DomainsTabProps {
+  organizationId: string;
   resource: any;
   updateResource: any;
   isUpdatingResource: boolean;
   routingTargets: string[];
+  certificates: Array<{ id: string; name: string }>;
+  servers: Array<{ id: string; ipAddress?: string | null }>;
 }
 
 const emptyDomainMapping = (): DomainMapping => ({
@@ -76,6 +104,23 @@ const emptyDomainMapping = (): DomainMapping => ({
   https: true,
   certificateType: "letsencrypt",
   middlewares: [],
+  redirectTo: "",
+  redirectStatus: "302",
+  forwardAuth: {
+    address: "",
+    uri: "/verify",
+    copyHeaders: [],
+  },
+  basicAuth: {
+    username: "",
+    passwordHash: "",
+  },
+  securityHeaders: {
+    hsts: false,
+    nosniff: true,
+    frameDeny: false,
+    referrerPolicy: "strict-origin-when-cross-origin",
+  },
 });
 
 const parseDomainMappings = (
@@ -105,10 +150,67 @@ const parseDomainMappings = (
               : undefined,
           https: typeof mapping.https === "boolean" ? mapping.https : true,
           certificateType:
-            mapping.certificateType === "internal" ? "internal" : "letsencrypt",
+            mapping.certificateType === "internal"
+              ? "internal"
+              : mapping.certificateType === "custom"
+                ? "custom"
+                : "letsencrypt",
+          certificateId:
+            typeof mapping.certificateId === "string"
+              ? mapping.certificateId
+              : undefined,
           middlewares: Array.isArray(mapping.middlewares)
             ? mapping.middlewares
             : [],
+          redirectTo:
+            typeof mapping.redirectTo === "string" ? mapping.redirectTo : "",
+          redirectStatus:
+            mapping.redirectStatus === "301" ||
+            mapping.redirectStatus === "307" ||
+            mapping.redirectStatus === "308"
+              ? mapping.redirectStatus
+              : "302",
+          forwardAuth:
+            typeof mapping.forwardAuth === "object" &&
+            mapping.forwardAuth !== null
+              ? {
+                  address:
+                    typeof mapping.forwardAuth.address === "string"
+                      ? mapping.forwardAuth.address
+                      : "",
+                  uri:
+                    typeof mapping.forwardAuth.uri === "string"
+                      ? mapping.forwardAuth.uri
+                      : "/verify",
+                  copyHeaders: Array.isArray(mapping.forwardAuth.copyHeaders)
+                    ? mapping.forwardAuth.copyHeaders.filter(
+                        (header): header is string =>
+                          typeof header === "string",
+                      )
+                    : [],
+                }
+              : { address: "", uri: "/verify", copyHeaders: [] },
+          basicAuth:
+            typeof mapping.basicAuth === "object" && mapping.basicAuth !== null
+              ? {
+                  username:
+                    typeof mapping.basicAuth.username === "string"
+                      ? mapping.basicAuth.username
+                      : "",
+                  passwordHash:
+                    typeof mapping.basicAuth.passwordHash === "string"
+                      ? mapping.basicAuth.passwordHash
+                      : "",
+                }
+              : { username: "", passwordHash: "" },
+          securityHeaders: {
+            hsts: Boolean(mapping.securityHeaders?.hsts),
+            nosniff: mapping.securityHeaders?.nosniff !== false,
+            frameDeny: Boolean(mapping.securityHeaders?.frameDeny),
+            referrerPolicy:
+              mapping.securityHeaders?.referrerPolicy ??
+              "strict-origin-when-cross-origin",
+          },
         },
       ];
     });
@@ -118,16 +220,36 @@ const parseDomainMappings = (
 };
 
 export function DomainsTab({
+  organizationId,
   resource,
   updateResource,
   isUpdatingResource,
   routingTargets,
+  certificates,
+  servers,
 }: DomainsTabProps) {
   const [domainList, setDomainList] = useState<DomainMapping[]>([]);
   const [domainDialogOpen, setDomainDialogOpen] = useState(false);
   const [editingDomainIndex, setEditingDomainIndex] = useState<number | null>(
     null,
   );
+  const validateDomain = useMutation({
+    ...trpc.domain.validate.mutationOptions(),
+    onSuccess: (result) => {
+      toast.success(
+        result.cdnProvider
+          ? `${result.host} is behind ${result.cdnProvider}`
+          : result.isValid
+            ? `${result.host} resolves successfully`
+            : `${result.host} did not resolve to the expected target`,
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const validateHost = (host: string) => {
+    validateDomain.mutate({ organizationId, host });
+  };
 
   useEffect(() => {
     if (resource) {
@@ -148,7 +270,27 @@ export function DomainsTab({
           resource.type === "compose" ? value.serviceName : undefined,
         https: value.https,
         certificateType: value.certificateType,
+        certificateId:
+          value.certificateType === "custom" ? value.certificateId : undefined,
         middlewares: value.middlewares,
+        redirectTo: value.redirectTo?.trim() || undefined,
+        redirectStatus: value.redirectStatus,
+        forwardAuth: value.forwardAuth?.address.trim()
+          ? {
+              address: value.forwardAuth.address.trim(),
+              uri: value.forwardAuth.uri.trim() || "/verify",
+              copyHeaders: value.forwardAuth.copyHeaders,
+            }
+          : undefined,
+        basicAuth:
+          value.basicAuth?.username.trim() &&
+          value.basicAuth.passwordHash.trim()
+            ? {
+                username: value.basicAuth.username.trim(),
+                passwordHash: value.basicAuth.passwordHash.trim(),
+              }
+            : undefined,
+        securityHeaders: value.securityHeaders,
       };
 
       const updated = [...domainList];
@@ -187,8 +329,71 @@ export function DomainsTab({
           .startsWith("/", "Internal path must start with '/'"),
         stripPath: z.boolean(),
         https: z.boolean(),
-        certificateType: z.enum(["letsencrypt", "internal"]),
+        certificateType: z.enum(["letsencrypt", "internal", "custom"]),
+        certificateId: z.string().optional(),
         middlewares: z.array(z.string()),
+        redirectTo: z
+          .string()
+          .refine(
+            (value) =>
+              !value || /^(?:https?:\/\/[^\r\n]+|\/[^\r\n]*)$/i.test(value),
+            "Use a relative path or HTTP(S) URL",
+          ),
+        redirectStatus: z.enum(["301", "302", "307", "308"]),
+        forwardAuth: z.object({
+          address: z.string().refine((value) => {
+            if (!value.trim()) return true;
+            try {
+              const url = new URL(value);
+              return (
+                (url.protocol === "http:" || url.protocol === "https:") &&
+                !url.username &&
+                !url.password &&
+                !url.hash
+              );
+            } catch {
+              return false;
+            }
+          }, "Use an HTTP(S) auth endpoint without credentials or fragments"),
+          uri: z
+            .string()
+            .regex(
+              /^\/[A-Za-z0-9._~!$&'()+,;=:@%/?-]*$/,
+              "Use a safe auth path",
+            ),
+          copyHeaders: z.array(z.string()).max(32),
+        }),
+        basicAuth: z.object({
+          username: z
+            .string()
+            .refine(
+              (value) => !value.trim() || /^[A-Za-z0-9._-]{1,128}$/.test(value),
+              "Use letters, numbers, dots, underscores, or dashes",
+            ),
+          passwordHash: z
+            .string()
+            .refine(
+              (value) =>
+                !value.trim() ||
+                (value.trim().startsWith("$") &&
+                  value.trim().length >= 20 &&
+                  !/[\s\r\n]/.test(value)),
+              "Use a Caddy-compatible password hash, not plaintext",
+            ),
+        }),
+        securityHeaders: z.object({
+          hsts: z.boolean(),
+          nosniff: z.boolean(),
+          frameDeny: z.boolean(),
+          referrerPolicy: z
+            .enum([
+              "no-referrer",
+              "same-origin",
+              "strict-origin",
+              "strict-origin-when-cross-origin",
+            ])
+            .nullable(),
+        }),
         serviceName: z.string().optional(),
       }),
     },
@@ -224,6 +429,45 @@ export function DomainsTab({
     setDomainDialogOpen(true);
   };
 
+  const generateSslipDomain = () => {
+    const resourceServer = servers.find(
+      (server) => server.id === resource.serverId,
+    );
+    const defaultIp = resourceServer?.ipAddress?.match(
+      /^(?:\d{1,3}\.){3}\d{1,3}$/,
+    )?.[0];
+    const ip = window.prompt(
+      "Public IPv4 address that points to this resource's Docker host",
+      defaultIp ?? "",
+    );
+    if (!ip || !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+      if (ip) toast.error("Enter a valid public IPv4 address");
+      return;
+    }
+    const name =
+      String(resource.appName || resource.name || "app")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 32) || "app";
+    const host = `${name}-${String(resource.id).slice(0, 8)}.${ip}.sslip.io`;
+    if (domainList.some((domain) => domain.host === host)) {
+      toast.info("This generated domain is already linked");
+      return;
+    }
+    const mapping: DomainMapping = {
+      ...emptyDomainMapping(),
+      host,
+      port: 80,
+    };
+    updateResource(
+      { id: resource.id, domains: JSON.stringify([...domainList, mapping]) },
+      {
+        onSuccess: () => toast.success(`Generated ${host}`),
+      },
+    );
+  };
+
   return (
     <Card className="border border-border/40 bg-card/20">
       <CardHeader>
@@ -241,10 +485,21 @@ export function DomainsTab({
               Add hostnames and route them to this resource's internal service.
             </p>
           </div>
-          <Button type="button" onClick={openAddDomain}>
-            <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
-            Add domain
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={generateSslipDomain}
+              disabled={isUpdatingResource}
+            >
+              <WandSparkles className="mr-2 size-4" />
+              Generate sslip.io
+            </Button>
+            <Button type="button" onClick={openAddDomain}>
+              <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+              Add domain
+            </Button>
+          </div>
         </div>
 
         {domainList.length > 0 ? (
@@ -256,7 +511,7 @@ export function DomainsTab({
                   <TableHead>Route</TableHead>
                   <TableHead>Service</TableHead>
                   <TableHead>Security</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead className="w-40 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -297,6 +552,15 @@ export function DomainsTab({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        onClick={() => validateHost(item.host)}
+                        variant="ghost"
+                        size="sm"
+                        disabled={validateDomain.isPending}
+                      >
+                        DNS check
+                      </Button>
                       <Button
                         type="button"
                         onClick={() => editDomain(idx)}
@@ -497,7 +761,8 @@ export function DomainsTab({
                               field.handleChange(
                                 (val || "letsencrypt") as
                                   | "letsencrypt"
-                                  | "internal",
+                                  | "internal"
+                                  | "custom",
                               )
                             }
                           >
@@ -511,14 +776,225 @@ export function DomainsTab({
                               <SelectItem value="internal">
                                 Internal CA Self-Signed Certificate
                               </SelectItem>
+                              <SelectItem value="custom">
+                                Uploaded Custom Certificate
+                              </SelectItem>
                             </SelectContent>
                           </Select>
+                          {field.state.value === "custom" && (
+                            <form.Field name="certificateId">
+                              {(certificateField) => (
+                                <Select
+                                  value={certificateField.state.value}
+                                  onValueChange={(value) =>
+                                    certificateField.handleChange(value || "")
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a certificate" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {certificates.map((certificate) => (
+                                      <SelectItem
+                                        key={certificate.id}
+                                        value={certificate.id}
+                                      >
+                                        {certificate.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </form.Field>
+                          )}
                         </Field>
                       )}
                     </form.Field>
                   ) : null
                 }
               </form.Subscribe>
+
+              <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+                <p className="font-medium text-sm">
+                  Redirect & security policy
+                </p>
+                <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                  <form.Field name="redirectTo">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Redirect target (optional)
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          placeholder="https://www.example.com{uri} or /new-path"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                  <form.Field name="redirectStatus">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Redirect status</FieldLabel>
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(value) =>
+                            field.handleChange(
+                              value as "301" | "302" | "307" | "308",
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(["301", "302", "307", "308"] as const).map(
+                              (status) => (
+                                <SelectItem key={status} value={status}>
+                                  {status}
+                                </SelectItem>
+                              ),
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="forwardAuth.address">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Forward-auth endpoint (optional)
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          placeholder="https://auth.example.com/verify"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                  <form.Field name="forwardAuth.uri">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>Auth URI</FieldLabel>
+                        <Input
+                          id={field.name}
+                          placeholder="/verify"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+                <form.Field name="forwardAuth.copyHeaders">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor={field.name}>
+                        Forwarded auth headers (comma separated)
+                      </FieldLabel>
+                      <Input
+                        id={field.name}
+                        placeholder="X-User, X-Email"
+                        value={(field.state.value ?? []).join(", ")}
+                        onBlur={field.handleBlur}
+                        onChange={(e) =>
+                          field.handleChange(
+                            e.target.value
+                              .split(",")
+                              .map((header) => header.trim())
+                              .filter(Boolean),
+                          )
+                        }
+                      />
+                      <FieldError errors={field.state.meta.errors} />
+                    </Field>
+                  )}
+                </form.Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="basicAuth.username">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Basic-auth username (optional)
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          placeholder="admin"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                  <form.Field name="basicAuth.passwordHash">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Caddy password hash (optional)
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          placeholder="$2a$14$..."
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <form.Field name="securityHeaders.hsts">
+                    {(field) => (
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                        HSTS
+                      </label>
+                    )}
+                  </form.Field>
+                  <form.Field name="securityHeaders.nosniff">
+                    {(field) => (
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                        No sniff
+                      </label>
+                    )}
+                  </form.Field>
+                  <form.Field name="securityHeaders.frameDeny">
+                    {(field) => (
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                        Frame deny
+                      </label>
+                    )}
+                  </form.Field>
+                </div>
+              </div>
             </FieldGroup>
 
             <DialogFooter className="mt-4">

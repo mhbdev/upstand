@@ -87,6 +87,38 @@ export function createRemoteDockerCliEnvironment(
   };
 }
 
+export async function resolveDockerCliEnvironmentForServer(
+  serverId: string | null | undefined,
+  uow: IUnitOfWork,
+): Promise<{
+  environment: Record<string, string | undefined>;
+  cleanup: () => void;
+}> {
+  if (!serverId || serverId === "local" || serverId === "manager") {
+    return { environment: {}, cleanup: () => {} };
+  }
+
+  const server = await uow.serverRepository.findById(serverId);
+  if (!server) throw new Error(`Deployment server not found: ${serverId}`);
+  if (!server.sshKeyId) {
+    throw new Error("Target deployment server has no SSH key configured");
+  }
+  const sshKey = await uow.sshKeyRepository.findById(server.sshKeyId);
+  if (!sshKey) throw new Error("Target deployment server SSH key not found");
+  const privateKey = decryptSecret({
+    ciphertext: sshKey.privateKeyCiphertext,
+    iv: sshKey.privateKeyIv,
+    authTag: sshKey.privateKeyAuthTag,
+    keyVersion: sshKey.privateKeyVersion,
+  });
+  return createRemoteDockerCliEnvironment({
+    host: server.ipAddress,
+    port: server.port,
+    username: server.username,
+    privateKey,
+  });
+}
+
 export async function resolveDockerServiceForServer(
   serverId: string | null | undefined,
   uow: IUnitOfWork,

@@ -14,9 +14,10 @@ export const backupSchedule = pgTable(
   "backup_schedule",
   {
     id: text("id").primaryKey(),
-    resourceId: text("resource_id")
-      .notNull()
-      .references(() => resource.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id").references(() => resource.id, {
+      onDelete: "cascade",
+    }),
+    organizationId: text("organization_id").notNull(),
     destinationId: text("destination_id")
       .notNull()
       .references(() => s3Destination.id, { onDelete: "restrict" }),
@@ -52,9 +53,10 @@ export const backupRun = pgTable(
     scheduleId: text("schedule_id")
       .notNull()
       .references(() => backupSchedule.id, { onDelete: "cascade" }),
-    resourceId: text("resource_id")
-      .notNull()
-      .references(() => resource.id, { onDelete: "cascade" }),
+    resourceId: text("resource_id").references(() => resource.id, {
+      onDelete: "cascade",
+    }),
+    organizationId: text("organization_id").notNull(),
     destinationId: text("destination_id")
       .notNull()
       .references(() => s3Destination.id, { onDelete: "restrict" }),

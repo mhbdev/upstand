@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const BackupKindSchema = z.enum(["database", "volume"]);
+export const BackupKindSchema = z.enum(["database", "volume", "web-server"]);
 export type BackupKind = z.infer<typeof BackupKindSchema>;
 
 export const BackupDatabaseEngineSchema = z.enum([
@@ -8,6 +8,8 @@ export const BackupDatabaseEngineSchema = z.enum([
   "mysql",
   "mariadb",
   "mongodb",
+  "libsql",
+  "redis",
 ]);
 export type BackupDatabaseEngine = z.infer<typeof BackupDatabaseEngineSchema>;
 
@@ -21,7 +23,8 @@ export type BackupRunStatus = z.infer<typeof BackupRunStatusSchema>;
 
 export const BackupScheduleSchema = z.object({
   id: z.string(),
-  resourceId: z.string(),
+  resourceId: z.string().nullable(),
+  organizationId: z.string(),
   destinationId: z.string(),
   name: z.string(),
   kind: BackupKindSchema,
@@ -44,7 +47,8 @@ export type BackupSchedule = z.infer<typeof BackupScheduleSchema>;
 export const BackupRunSchema = z.object({
   id: z.string(),
   scheduleId: z.string(),
-  resourceId: z.string(),
+  resourceId: z.string().nullable(),
+  organizationId: z.string(),
   destinationId: z.string(),
   kind: BackupKindSchema,
   status: BackupRunStatusSchema,
@@ -98,7 +102,11 @@ export const CreateBackupScheduleInputObjectSchema = z.object({
 export const CreateBackupScheduleInputSchema =
   CreateBackupScheduleInputObjectSchema.superRefine((input, ctx) => {
     if (input.kind === "database") {
-      if (!input.databaseName) {
+      if (
+        !input.databaseName &&
+        input.databaseEngine !== "redis" &&
+        input.databaseEngine !== "libsql"
+      ) {
         ctx.addIssue({
           code: "custom",
           path: ["databaseName"],
@@ -125,6 +133,27 @@ export type CreateBackupScheduleInput = z.infer<
   typeof CreateBackupScheduleInputSchema
 >;
 
+export const CreateWebServerBackupScheduleInputSchema = z.object({
+  organizationId: z.string().min(1),
+  destinationId: z.string().min(1),
+  name: z.string().trim().min(1).max(120),
+  cronExpression: z.string().trim().min(1).max(120),
+  timezone: z.string().trim().min(1).max(120).default("UTC"),
+  prefix: z
+    .string()
+    .trim()
+    .max(512)
+    .refine(
+      (value) => !value.split("/").includes(".."),
+      "Prefix cannot contain '..'",
+    ),
+  retentionCount: z.number().int().positive().max(3650).nullable().optional(),
+  enabled: z.boolean().default(true),
+});
+export type CreateWebServerBackupScheduleInput = z.infer<
+  typeof CreateWebServerBackupScheduleInputSchema
+>;
+
 export const UpdateBackupScheduleInputSchema =
   CreateBackupScheduleInputObjectSchema.partial().extend({
     id: z.string().min(1),
@@ -135,7 +164,8 @@ export type UpdateBackupScheduleInput = z.infer<
 
 export interface CreateBackupScheduleDTO {
   id: string;
-  resourceId: string;
+  resourceId: string | null;
+  organizationId: string;
   destinationId: string;
   name: string;
   kind: BackupKind;
@@ -155,7 +185,8 @@ export interface CreateBackupScheduleDTO {
 export interface CreateBackupRunDTO {
   id: string;
   scheduleId: string;
-  resourceId: string;
+  resourceId: string | null;
+  organizationId: string;
   destinationId: string;
   kind: BackupKind;
   status?: BackupRunStatus;

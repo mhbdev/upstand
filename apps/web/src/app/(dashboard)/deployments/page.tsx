@@ -53,9 +53,12 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
 export default function DeploymentsPage() {
+  const { data: organization } = authClient.useActiveOrganization();
+  const organizationId = organization?.id ?? "";
   const [activeTab, setActiveTab] = useState("history");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
@@ -73,7 +76,8 @@ export default function DeploymentsPage() {
     isPending: loadingDeployments,
     refetch: refetchDeployments,
   } = useQuery({
-    ...trpc.deployment.getDeployments.queryOptions(),
+    ...trpc.deployment.getDeployments.queryOptions({ organizationId }),
+    enabled: Boolean(organizationId),
     refetchInterval: activeTab === "history" ? 5000 : false,
   });
 
@@ -82,7 +86,8 @@ export default function DeploymentsPage() {
     isPending: loadingQueue,
     refetch: refetchQueue,
   } = useQuery({
-    ...trpc.deployment.getQueue.queryOptions(),
+    ...trpc.deployment.getQueue.queryOptions({ organizationId }),
+    enabled: Boolean(organizationId),
     refetchInterval: activeTab === "queue" ? 3000 : false,
   });
 
@@ -91,7 +96,8 @@ export default function DeploymentsPage() {
     isPending: loadingServers,
     refetch: refetchServers,
   } = useQuery({
-    ...trpc.deployment.getServerSettings.queryOptions(),
+    ...trpc.deployment.getServerSettings.queryOptions({ organizationId }),
+    enabled: Boolean(organizationId),
   });
 
   // Sync concurrency inputs from DB settings
@@ -171,6 +177,7 @@ export default function DeploymentsPage() {
     }
     const serverObj = servers.find((s) => s.id === serverId);
     updateConcurrencyMutation.mutate({
+      organizationId,
       serverId,
       concurrency: val,
       hostname: serverObj?.hostname,

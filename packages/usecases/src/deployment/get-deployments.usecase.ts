@@ -18,23 +18,38 @@ export interface DeploymentHistoryResult {
 export class GetDeploymentsUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
-  async execute(): Promise<DeploymentHistoryResult[]> {
-    // 1. Fetch all deployments from repository
-    const deployments = await this.uow.deploymentRepository.findRecent(500);
+  async execute(
+    resourceIds?: readonly string[],
+  ): Promise<DeploymentHistoryResult[]> {
+    // Deployment history is always scoped to known resource IDs. The optional
+    // argument is used by organization-aware callers; the unscoped form is
+    // retained for internal maintenance tooling only.
+    const resources = resourceIds
+      ? await Promise.all(
+          resourceIds.map((resourceId) =>
+            this.uow.resourceRepository.findById(resourceId),
+          ),
+        ).then((items) => items.filter((resource) => resource !== null))
+      : await this.uow.resourceRepository.findMany();
+    const deployments = resourceIds
+      ? await this.uow.deploymentRepository.findRecentByResourceIds(
+          resourceIds,
+          500,
+        )
+      : await this.uow.deploymentRepository.findRecent(500);
 
-    // 2. Fetch resources, environments, projects to enrich data
-    const resources = await this.uow.resourceRepository.findMany();
+    // Fetch environments and projects to enrich data
     const environments = await this.uow.environmentRepository.findMany();
     const projects = await this.uow.projectRepository.findMany();
 
-    const resourceMap = new Map<string, any>(
-      resources.map((r: any) => [r.id, r]),
+    const resourceMap = new Map(
+      resources.map((resource) => [resource.id, resource]),
     );
-    const envMap = new Map<string, any>(
-      environments.map((e: any) => [e.id, e]),
+    const envMap = new Map(
+      environments.map((environment) => [environment.id, environment]),
     );
-    const projectMap = new Map<string, any>(
-      projects.map((p: any) => [p.id, p]),
+    const projectMap = new Map(
+      projects.map((project) => [project.id, project]),
     );
 
     return deployments.map((dep) => {

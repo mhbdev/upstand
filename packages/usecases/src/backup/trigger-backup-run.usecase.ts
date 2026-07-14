@@ -63,6 +63,7 @@ export class TriggerBackupRunUseCase {
           id: runId,
           scheduleId: schedule.id,
           resourceId: schedule.resourceId,
+          organizationId: schedule.organizationId,
           destinationId: schedule.destinationId,
           kind: schedule.kind,
           status: "queued",

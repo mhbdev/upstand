@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import type { DomainMapping, Resource } from "@upstand/domain";
 import {
+  parseCaddyMiddlewares,
   parseDomainMappings,
   parseResourceAdvancedConfig,
 } from "@upstand/domain";
@@ -29,6 +30,7 @@ export type CaddySettings = {
   enableHttp3?: boolean;
   globalCaddyfile?: string | null;
   caddySnippets?: string;
+  caddyMiddlewares?: string;
   caddyEnvironment?: string;
   caddyPorts?: string;
   caddyDashboardEnabled?: boolean;
@@ -43,6 +45,13 @@ type CaddyRoute = DomainMapping & {
   resourceId: string;
   resourceName: string;
   upstream: string;
+  customCertificate?: CaddyCertificate;
+};
+
+export type CaddyCertificate = {
+  id: string;
+  certificatePem: string;
+  privateKeyPem: string;
 };
 
 type PortMapping = {
@@ -66,6 +75,7 @@ function caddySettingsWithDefaults(settings: CaddySettings = {}) {
     enableHttp3: settings.enableHttp3 ?? true,
     globalCaddyfile: settings.globalCaddyfile ?? null,
     caddySnippets: settings.caddySnippets ?? "",
+    caddyMiddlewares: settings.caddyMiddlewares ?? "[]",
   };
 
   if (effectiveSettings.httpPort === effectiveSettings.httpsPort) {
@@ -198,8 +208,14 @@ function createTarArchive(fileName: string, content: string): Readable {
   return Readable.from([header, body, padding, Buffer.alloc(1024, 0)]);
 }
 
-function getRoutes(resources: CaddyResource[]): CaddyRoute[] {
+function getRoutes(
+  resources: CaddyResource[],
+  certificates: CaddyCertificate[] = [],
+): CaddyRoute[] {
   const routes: CaddyRoute[] = [];
+  const certificateById = new Map(
+    certificates.map((certificate) => [certificate.id, certificate]),
+  );
   const routeOwners = new Map<string, string>();
   const hostHttps = new Map<string, boolean>();
   const hostCertificate = new Map<string, string>();
@@ -233,15 +249,23 @@ function getRoutes(resources: CaddyResource[]): CaddyRoute[] {
       hostHttps.set(mapping.host, mapping.https);
 
       const certificateType = hostCertificate.get(mapping.host);
-      if (
-        certificateType !== undefined &&
-        certificateType !== mapping.certificateType
-      ) {
+      const certificateKey = `${mapping.certificateType}:${mapping.certificateId ?? ""}`;
+      if (certificateType !== undefined && certificateType !== certificateKey) {
         throw new Error(
           `All HTTPS routes for ${mapping.host} must use the same certificate strategy`,
         );
       }
-      hostCertificate.set(mapping.host, mapping.certificateType);
+      hostCertificate.set(mapping.host, certificateKey);
+
+      const customCertificate =
+        mapping.certificateType === "custom"
+          ? certificateById.get(mapping.certificateId ?? "")
+          : undefined;
+      if (mapping.certificateType === "custom" && !customCertificate) {
+        throw new Error(
+          `Custom certificate '${mapping.certificateId ?? ""}' for ${mapping.host} was not found`,
+        );
+      }
 
       if (resource.type === "compose" && !mapping.serviceName) {
         throw new Error(
@@ -263,6 +287,7 @@ function getRoutes(resources: CaddyResource[]): CaddyRoute[] {
         resourceId: resource.id,
         resourceName: resource.name,
         upstream: `${upstreamServiceName}:${mapping.port}`,
+        customCertificate,
       });
     }
   }
@@ -283,6 +308,63 @@ function routeBlock(route: CaddyRoute, index: number): string[] {
   lines.push("\t\troute {");
   for (const middleware of route.middlewares) {
     lines.push(`\t\t\timport ${middleware}`);
+  }
+
+  if (route.forwardAuth) {
+    lines.push(
+      `\t\t\tforward_auth ${JSON.stringify(route.forwardAuth.address)} {`,
+    );
+    lines.push(`\t\t\t\turi ${JSON.stringify(route.forwardAuth.uri)}`);
+    for (const header of route.forwardAuth.copyHeaders) {
+      lines.push(`\t\t\t\tcopy_headers ${header}`);
+    }
+    lines.push("\t\t\t}");
+  }
+  if (route.basicAuth) {
+    lines.push("\t\t\tbasic_auth {");
+    lines.push(
+      `\t\t\t\t${route.basicAuth.username} ${route.basicAuth.passwordHash}`,
+    );
+    lines.push("\t\t\t}");
+  }
+
+  const securityHeaders = route.securityHeaders ?? {
+    hsts: false,
+    nosniff: false,
+    frameDeny: false,
+    referrerPolicy: null,
+  };
+  if (
+    securityHeaders.hsts ||
+    securityHeaders.nosniff ||
+    securityHeaders.frameDeny ||
+    securityHeaders.referrerPolicy
+  ) {
+    lines.push("\t\t\theader {");
+    if (securityHeaders.hsts && route.https) {
+      lines.push(
+        '\t\t\t\tStrict-Transport-Security "max-age=31536000; includeSubDomains"',
+      );
+    }
+    if (securityHeaders.nosniff) {
+      lines.push('\t\t\t\tX-Content-Type-Options "nosniff"');
+    }
+    if (securityHeaders.frameDeny) {
+      lines.push('\t\t\t\tX-Frame-Options "DENY"');
+    }
+    if (securityHeaders.referrerPolicy) {
+      lines.push(`\t\t\t\tReferrer-Policy "${securityHeaders.referrerPolicy}"`);
+    }
+    lines.push("\t\t\t}");
+  }
+
+  if (route.redirectTo) {
+    lines.push(
+      `\t\t\tredir ${JSON.stringify(route.redirectTo)} ${route.redirectStatus ?? "302"}`,
+    );
+    lines.push("\t\t}");
+    lines.push("\t}");
+    return lines;
   }
 
   if (route.stripPath && !isRoot) {
@@ -311,10 +393,11 @@ function routeBlock(route: CaddyRoute, index: number): string[] {
 export function generateCaddyfileContent(
   settings: CaddySettings = {},
   resources: CaddyResource[] = [],
+  certificates: CaddyCertificate[] = [],
 ): string {
   const effectiveSettings = caddySettingsWithDefaults(settings);
   validateGlobalOptions(effectiveSettings.globalCaddyfile);
-  const routes = getRoutes(resources);
+  const routes = getRoutes(resources, certificates);
   const groupedRoutes = new Map<string, CaddyRoute[]>();
 
   for (const route of routes) {
@@ -340,6 +423,11 @@ export function generateCaddyfileContent(
     .join("\n");
 
   const sites: string[] = [];
+  const managedMiddlewares = parseCaddyMiddlewares(
+    effectiveSettings.caddyMiddlewares,
+  )
+    .map((middleware) => `(${middleware.name}) {\n${middleware.body}\n}`)
+    .join("\n\n");
   for (const [key, routesForHost] of groupedRoutes) {
     const [protocol, host] = key.split(":", 2);
     const address = protocol === "https" ? host : `http://${host}`;
@@ -353,6 +441,14 @@ export function generateCaddyfileContent(
     const certificateType = routesForHost[0]?.certificateType;
     if (protocol === "https" && certificateType === "internal") {
       sites.push("\ttls internal");
+    } else if (protocol === "https" && certificateType === "custom") {
+      const certificate = routesForHost[0]?.customCertificate;
+      if (!certificate) {
+        throw new Error(`Custom certificate for ${host} is not available`);
+      }
+      sites.push(
+        `\ttls /etc/caddy/certificates/${certificate.id}.crt /etc/caddy/certificates/${certificate.id}.key`,
+      );
     }
     orderedRoutes.forEach((route, index) => {
       sites.push(`# Resource: ${route.resourceName} (${route.resourceId})`);
@@ -372,6 +468,7 @@ export function generateCaddyfileContent(
     "}",
     "",
     effectiveSettings.caddySnippets.trim(),
+    managedMiddlewares,
     "",
     "# Managed by Upstand. Do not edit this file directly.",
     "",
@@ -422,8 +519,9 @@ export class CaddyService {
 
   private async reconcileResourceNetworks(
     resources: CaddyResource[],
+    certificates: CaddyCertificate[] = [],
   ): Promise<Set<string>> {
-    const routes = getRoutes(resources);
+    const routes = getRoutes(resources, certificates);
     if (routes.length === 0) return new Set();
 
     const sharedNetwork = await ensureUpstandOverlayNetwork(this.docker);
@@ -743,19 +841,52 @@ export class CaddyService {
     });
   }
 
+  private async writeCertificates(
+    container: ReturnType<Docker["getContainer"]>,
+    certificates: CaddyCertificate[],
+  ): Promise<void> {
+    for (const certificate of certificates) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(certificate.id)) {
+        throw new Error("Certificate id contains unsafe path characters");
+      }
+      await this.writeFile(
+        container,
+        `certificates/${certificate.id}.crt`,
+        certificate.certificatePem,
+      );
+      await this.writeFile(
+        container,
+        `certificates/${certificate.id}.key`,
+        certificate.privateKeyPem,
+      );
+    }
+  }
+
   async syncResourceConfigs(
     resources: CaddyResource[],
     settings: CaddySettings = {},
+    certificates: CaddyCertificate[] = [],
   ): Promise<{ success: true; domains: string[]; changed: boolean }> {
-    const caddyfile = generateCaddyfileContent(settings, resources);
-    const domains = getRoutes(resources).map((route) => route.host);
+    const caddyfile = generateCaddyfileContent(
+      settings,
+      resources,
+      certificates,
+    );
+    const domains = getRoutes(resources, certificates).map(
+      (route) => route.host,
+    );
     let changed = false;
 
     await this.initializeCaddy(settings);
-    const desiredNetworkNames = await this.reconcileResourceNetworks(resources);
+    const desiredNetworkNames = await this.reconcileResourceNetworks(
+      resources,
+      certificates,
+    );
     await this.serializeConfiguration(async () => {
       const container = await this.findContainer();
       if (!container) throw new Error("Caddy container is not available");
+
+      await this.writeCertificates(container, certificates);
 
       await this.writeFile(container, "Caddyfile.next", caddyfile);
 

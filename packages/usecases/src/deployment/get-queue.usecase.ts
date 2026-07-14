@@ -21,7 +21,7 @@ export interface QueueJobResult {
 export class GetQueueUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
-  async execute(): Promise<QueueJobResult[]> {
+  async execute(resourceIds?: readonly string[]): Promise<QueueJobResult[]> {
     // 1. Determine all active queues (servers)
     const servers = await this.uow.serverBuildSettingsRepository.findMany();
     const serverIds = servers.map((s) => s.id);
@@ -31,7 +31,13 @@ export class GetQueueUseCase {
       serverIds.push("local");
     }
 
-    const resources = await this.uow.resourceRepository.findMany();
+    const resources = resourceIds
+      ? await Promise.all(
+          resourceIds.map((resourceId) =>
+            this.uow.resourceRepository.findById(resourceId),
+          ),
+        ).then((items) => items.filter((resource) => resource !== null))
+      : await this.uow.resourceRepository.findMany();
     const resourceMap = new Map(resources.map((r) => [r.id, r]));
 
     const serverMap = new Map(servers.map((s) => [s.id, s]));
@@ -55,6 +61,7 @@ export class GetQueueUseCase {
         );
         for (const job of jobs) {
           const resourceId = job.data?.resourceId || "";
+          if (resourceIds && !resourceIds.includes(resourceId)) continue;
           const resource = resourceMap.get(resourceId);
           const state = await job.getState();
 

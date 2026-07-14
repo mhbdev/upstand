@@ -3,6 +3,7 @@
 import {
   Database01Icon,
   Delete02Icon,
+  Edit02Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -35,6 +36,7 @@ export default function DockerRegistryPage() {
   const organizationId = activeOrg?.id || "";
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -71,6 +73,18 @@ export default function DockerRegistryPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    ...trpc.dockerRegistry.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Docker Registry updated successfully!");
+      setDialogOpen(false);
+      resetForm();
+      refetch();
+    },
+    onError: (err: any) =>
+      toast.error(err.message || "Failed to update registry"),
+  });
+
   const testConnectionMutation = useMutation({
     ...trpc.dockerRegistry.testConnection.mutationOptions(),
     onSuccess: (res: any) => {
@@ -96,6 +110,7 @@ export default function DockerRegistryPage() {
 
   const handleTestConnection = () => {
     testConnectionMutation.mutate({
+      organizationId,
       username,
       password,
       registryUrl,
@@ -108,15 +123,40 @@ export default function DockerRegistryPage() {
       toast.error("Name is required");
       return;
     }
-    createMutation.mutate({
+    const payload = {
       organizationId,
       name,
       username: username || null,
-      password: password || null,
       imagePrefix: imagePrefix || null,
       registryUrl: registryUrl || null,
       serverId: serverId || null,
-    });
+    };
+    if (editingId) {
+      updateMutation.mutate({
+        id: editingId,
+        ...payload,
+        ...(password ? { password } : {}),
+      });
+    } else {
+      createMutation.mutate({ ...payload, password: password || null });
+    }
+  };
+
+  const openCreate = () => {
+    setEditingId(null);
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const openEdit = (reg: any) => {
+    setEditingId(reg.id);
+    setName(reg.name);
+    setUsername(reg.username || "");
+    setPassword("");
+    setImagePrefix(reg.imagePrefix || "");
+    setRegistryUrl(reg.registryUrl || "");
+    setServerId(reg.serverId || "");
+    setDialogOpen(true);
   };
 
   const handleDelete = (id: string) => {
@@ -135,10 +175,7 @@ export default function DockerRegistryPage() {
             during deployments.
           </p>
         </div>
-        <Button
-          onClick={() => setDialogOpen(true)}
-          className="gap-2 self-start sm:self-auto"
-        >
+        <Button onClick={openCreate} className="gap-2 self-start sm:self-auto">
           <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
           Add External Registry
         </Button>
@@ -160,14 +197,24 @@ export default function DockerRegistryPage() {
                     {reg.registryUrl || "Docker Hub"}
                   </CardDescription>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(reg.id)}
-                  className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openEdit(reg)}
+                    className="size-8"
+                  >
+                    <HugeiconsIcon icon={Edit02Icon} className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(reg.id)}
+                    className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="pt-2 text-muted-foreground text-xs">
                 <div className="flex flex-col gap-1">
@@ -201,7 +248,7 @@ export default function DockerRegistryPage() {
             Add custom Docker registries (such as GHCR, Amazon ECR, self-hosted
             registries, etc.) to configure deployment pipelines.
           </p>
-          <Button onClick={() => setDialogOpen(true)} className="mt-6 gap-2">
+          <Button onClick={openCreate} className="mt-6 gap-2">
             <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
             Add Registry
           </Button>
@@ -211,7 +258,9 @@ export default function DockerRegistryPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Add External Registry</DialogTitle>
+            <DialogTitle>
+              {editingId ? "Edit External Registry" : "Add External Registry"}
+            </DialogTitle>
             <DialogDescription>
               Provide connection details to link and authenticate with your
               custom Docker registry.
@@ -292,8 +341,15 @@ export default function DockerRegistryPage() {
                   ? "Testing..."
                   : "Test Registry"}
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Creating..." : "Create"}
+              <Button
+                type="submit"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {createMutation.isPending || updateMutation.isPending
+                  ? "Saving..."
+                  : editingId
+                    ? "Save"
+                    : "Create"}
               </Button>
             </div>
           </form>

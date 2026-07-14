@@ -53,10 +53,17 @@ export default function RemoteServersPage() {
   const [port, setPort] = useState(22);
   const [username, setUsername] = useState("root");
   const [enableDockerCleanup, setEnableDockerCleanup] = useState(false);
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
   const [setupServerId, setSetupServerId] = useState<string | null>(null);
+  const [inspectServerId, setInspectServerId] = useState<string | null>(null);
 
   const { data: servers, refetch } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
+    enabled: !!organizationId,
+  });
+
+  const { data: serverCount } = useQuery({
+    ...trpc.server.count.queryOptions({ organizationId }),
     enabled: !!organizationId,
   });
 
@@ -89,6 +96,19 @@ export default function RemoteServersPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    ...trpc.server.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Server updated successfully!");
+      setDialogOpen(false);
+      resetForm();
+      refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update remote server");
+    },
+  });
+
   const setupMutation = useMutation({
     ...trpc.server.setup.mutationOptions(),
     onSuccess: () => {
@@ -100,6 +120,7 @@ export default function RemoteServersPage() {
   });
 
   const resetForm = () => {
+    setEditingServerId(null);
     setName("");
     setDescription("");
     setServerType("deploy");
@@ -116,7 +137,7 @@ export default function RemoteServersPage() {
       toast.error("Name, IP Address, and SSH Key are required");
       return;
     }
-    createMutation.mutate({
+    const input = {
       organizationId,
       name,
       description: description || null,
@@ -126,7 +147,35 @@ export default function RemoteServersPage() {
       port,
       username,
       enableDockerCleanup,
-    });
+    };
+    if (editingServerId) {
+      updateMutation.mutate({ ...input, id: editingServerId });
+    } else {
+      createMutation.mutate(input);
+    }
+  };
+
+  const handleEdit = (server: {
+    id: string;
+    name: string;
+    description?: string | null;
+    serverType: string;
+    sshKeyId?: string | null;
+    ipAddress: string;
+    port: number;
+    username: string;
+    enableDockerCleanup: boolean;
+  }) => {
+    setEditingServerId(server.id);
+    setName(server.name);
+    setDescription(server.description ?? "");
+    setServerType(server.serverType);
+    setSshKeyId(server.sshKeyId ?? "");
+    setIpAddress(server.ipAddress);
+    setPort(server.port);
+    setUsername(server.username);
+    setEnableDockerCleanup(server.enableDockerCleanup);
+    setDialogOpen(true);
   };
 
   const handleDelete = (id: string) => {
@@ -142,6 +191,36 @@ export default function RemoteServersPage() {
   };
 
   const setupServer = servers?.find((server) => server.id === setupServerId);
+  const validationQuery = useQuery({
+    ...trpc.server.validate.queryOptions({
+      organizationId,
+      serverId: inspectServerId || "",
+    }),
+    enabled: Boolean(organizationId && inspectServerId),
+  });
+  const hostTimeQuery = useQuery({
+    ...trpc.server.time.queryOptions({
+      organizationId,
+      serverId: inspectServerId || "",
+    }),
+    enabled: Boolean(organizationId && inspectServerId),
+  });
+  const runtimeStatsQuery = useQuery({
+    ...trpc.server.runtimeStats.queryOptions({
+      organizationId,
+      serverId: inspectServerId || "",
+    }),
+    enabled: Boolean(organizationId && inspectServerId),
+  });
+  const validationInfo =
+    validationQuery.data &&
+    typeof validationQuery.data === "object" &&
+    !Array.isArray(validationQuery.data)
+      ? (validationQuery.data as {
+          serverVersion?: string;
+          swarmState?: string;
+        })
+      : undefined;
   const closeSetupDialog = () => {
     if (setupMutation.isPending) return;
     setSetupServerId(null);
@@ -165,14 +244,20 @@ export default function RemoteServersPage() {
     <DashboardPage>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-bold text-3xl tracking-tight">Remote Servers</h1>
+          <h1 className="font-bold text-3xl tracking-tight">
+            Remote Servers
+            {typeof serverCount === "number" ? ` (${serverCount})` : ""}
+          </h1>
           <p className="text-muted-foreground text-sm">
             Add isolated deployment servers for applications, databases, and
             Compose workloads.
           </p>
         </div>
         <Button
-          onClick={() => setDialogOpen(true)}
+          onClick={() => {
+            resetForm();
+            setDialogOpen(true);
+          }}
           className="gap-2 self-start sm:self-auto"
         >
           <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
@@ -211,6 +296,14 @@ export default function RemoteServersPage() {
                       {srv.description || "Deploy server"}
                     </CardDescription>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(srv)}
+                    className="mr-1 h-8 text-xs"
+                  >
+                    Edit
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -264,6 +357,14 @@ export default function RemoteServersPage() {
                         ? "Setting up..."
                         : "Setup Server"}
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="font-semibold text-xs"
+                      onClick={() => setInspectServerId(srv.id)}
+                    >
+                      Validate
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -283,20 +384,82 @@ export default function RemoteServersPage() {
             Provision independent Docker environments through secure SSH. Each
             server owns its Swarm, network, workloads, and routing.
           </p>
-          <Button onClick={() => setDialogOpen(true)} className="mt-6 gap-2">
+          <Button
+            onClick={() => {
+              resetForm();
+              setDialogOpen(true);
+            }}
+            className="mt-6 gap-2"
+          >
             <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
             Add Server
           </Button>
         </div>
       )}
 
+      {inspectServerId && (
+        <Card className="border-border/40 bg-card/30">
+          <CardHeader>
+            <CardTitle className="text-base">Remote validation</CardTitle>
+            <CardDescription>
+              Docker info and UTC host time from the selected remote server.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm md:grid-cols-2">
+            <div className="rounded-md border p-3">
+              <p className="font-medium">Docker validation</p>
+              <p className="mt-1 text-muted-foreground text-xs">
+                {validationQuery.isPending
+                  ? "Checking Docker…"
+                  : validationQuery.isError
+                    ? validationQuery.error.message
+                    : `${validationInfo?.serverVersion ?? "unknown"} · Swarm ${validationInfo?.swarmState ?? "unknown"}`}
+              </p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="font-medium">Host time</p>
+              <p className="mt-1 text-muted-foreground text-xs">
+                {hostTimeQuery.isPending
+                  ? "Reading host clock…"
+                  : hostTimeQuery.isError
+                    ? hostTimeQuery.error.message
+                    : hostTimeQuery.data?.iso}
+              </p>
+            </div>
+            <div className="rounded-md border p-3 md:col-span-2">
+              <p className="font-medium">Runtime metrics</p>
+              <p className="mt-1 text-muted-foreground text-xs">
+                {runtimeStatsQuery.isPending
+                  ? "Reading Docker runtime…"
+                  : runtimeStatsQuery.isError
+                    ? runtimeStatsQuery.error.message
+                    : runtimeStatsQuery.data
+                      ? `${runtimeStatsQuery.data.dockerVersion || "Docker unknown"} · ${runtimeStatsQuery.data.activeContainers} active containers · ${runtimeStatsQuery.data.cpu}% CPU · ${runtimeStatsQuery.data.memoryPercent}% memory`
+                      : "No runtime metrics available"}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-fit"
+              onClick={() => setInspectServerId(null)}
+            >
+              Close validation
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Create Server</DialogTitle>
+            <DialogTitle>
+              {editingServerId ? "Update Server" : "Create Server"}
+            </DialogTitle>
             <DialogDescription>
-              Link a remote virtual private server (VPS) by configuring its
-              network and auth credentials.
+              {editingServerId
+                ? "Update the server role, connection, or cleanup policy. Connection changes require setup again."
+                : "Link a remote virtual private server (VPS) by configuring its network and auth credentials."}
             </DialogDescription>
           </DialogHeader>
 
@@ -333,6 +496,7 @@ export default function RemoteServersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="deploy">Deploy Server</SelectItem>
+                  <SelectItem value="build">Build Server</SelectItem>
                   <SelectItem value="database">DB Server</SelectItem>
                 </SelectContent>
               </Select>
@@ -417,8 +581,15 @@ export default function RemoteServersPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Creating..." : "Create"}
+              <Button
+                type="submit"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {createMutation.isPending || updateMutation.isPending
+                  ? "Saving..."
+                  : editingServerId
+                    ? "Update"
+                    : "Create"}
               </Button>
             </div>
           </form>

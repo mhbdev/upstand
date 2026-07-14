@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -19,11 +19,17 @@ import {
 } from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { cn } from "@upstand/ui/lib/utils";
-import { Eye, RefreshCw, Trash2 } from "lucide-react";
+import { Eye, History, Play, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 type DeploymentItem = {
@@ -32,11 +38,11 @@ type DeploymentItem = {
   title: string;
   logs: string;
   createdAt: string;
+  sourceRevision?: string;
 };
 
 interface DeploymentsTabProps {
   resource: any;
-  updateResource: any;
   deployResource: any;
   isDeployingResource: boolean;
 }
@@ -62,6 +68,10 @@ const parseDeploymentItems = (
             typeof item.createdAt === "string"
               ? item.createdAt
               : new Date(0).toISOString(),
+          sourceRevision:
+            typeof item.sourceRevision === "string"
+              ? item.sourceRevision
+              : undefined,
         },
       ];
     });
@@ -72,7 +82,6 @@ const parseDeploymentItems = (
 
 export function DeploymentsTab({
   resource,
-  updateResource,
   deployResource,
   isDeployingResource,
 }: DeploymentsTabProps) {
@@ -80,6 +89,55 @@ export function DeploymentsTab({
   const [selectedDeployment, setSelectedDeployment] =
     useState<DeploymentItem | null>(null);
   const [viewDeploymentLogsOpen, setViewDeploymentLogsOpen] = useState(false);
+  const [scheduleName, setScheduleName] = useState("");
+  const [scheduleCron, setScheduleCron] = useState("0 2 * * *");
+  const [scheduleCommand, setScheduleCommand] = useState("");
+  const [scheduleJobType, setScheduleJobType] = useState<
+    "command" | "deployment" | "backup"
+  >("command");
+  const [backupScheduleId, setBackupScheduleId] = useState("");
+
+  const schedulesQuery = useQuery({
+    ...trpc.schedule.list.queryOptions({ resourceId: resource.id }),
+    enabled: Boolean(resource?.id),
+  });
+  const backupSchedulesQuery = useQuery({
+    ...trpc.backup.listSchedules.queryOptions({ resourceId: resource.id }),
+    enabled: Boolean(resource?.id),
+  });
+  const createScheduleMutation = useMutation({
+    ...trpc.schedule.create.mutationOptions(),
+    onSuccess: () => {
+      setScheduleName("");
+      setScheduleCommand("");
+      setScheduleJobType("command");
+      setBackupScheduleId("");
+      void schedulesQuery.refetch();
+      toast.success("Deployment schedule created");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const updateScheduleMutation = useMutation({
+    ...trpc.schedule.update.mutationOptions(),
+    onSuccess: () => {
+      void schedulesQuery.refetch();
+      toast.success("Schedule updated");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const deleteScheduleMutation = useMutation({
+    ...trpc.schedule.delete.mutationOptions(),
+    onSuccess: () => {
+      void schedulesQuery.refetch();
+      toast.success("Schedule deleted");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const runScheduleMutation = useMutation({
+    ...trpc.schedule.runNow.mutationOptions(),
+    onSuccess: () => toast.success("Schedule started"),
+    onError: (error) => toast.error(error.message),
+  });
 
   useEffect(() => {
     if (resource) {
@@ -88,6 +146,16 @@ export function DeploymentsTab({
   }, [resource]);
 
   const isBuilding = deployList.some((d) => d.status === "running");
+  const isGitBackedApplication =
+    resource.type === "application" &&
+    ["github", "gitlab", "bitbucket", "gitea", "git"].includes(
+      resource.provider,
+    );
+  const supportsHistoricalRollback =
+    (resource.type === "compose" && resource.provider !== "raw") ||
+    isGitBackedApplication;
+  const canRollback =
+    resource.type !== "compose" || resource.provider !== "raw";
   const queuedDeployment = deployList.find((deployment) =>
     ["queued", "waiting"].includes(deployment.status),
   );
@@ -110,6 +178,50 @@ export function DeploymentsTab({
     },
     onError: (error) => toast.error(error.message),
   });
+  const killBuildMutation = useMutation({
+    ...trpc.deployment.killBuild.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Build cancellation requested");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const removeDeploymentMutation = useMutation({
+    ...trpc.deployment.removeDeployment.mutationOptions(),
+    onSuccess: (_, variables) => {
+      setDeployList((current) =>
+        current.filter(
+          (deployment) => deployment.id !== variables.deploymentId,
+        ),
+      );
+      toast.success("Deployment removed from history");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const clearHistoryMutation = useMutation({
+    ...trpc.deployment.clearHistory.mutationOptions(),
+    onSuccess: () => {
+      setDeployList((current) =>
+        current.filter(
+          (deployment) => !["success", "failed"].includes(deployment.status),
+        ),
+      );
+      toast.success("Completed deployment history cleared");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const rollbackMutation = useMutation({
+    ...trpc.resource.rollback.mutationOptions(),
+    onSuccess: (updated) => {
+      setDeployList(parseDeploymentItems(updated.deployments));
+      toast.success(
+        supportsHistoricalRollback
+          ? "Historical revision queued for redeployment"
+          : "Swarm service rolled back",
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const triggerDeployment = () => {
     toast.info("Building and deploying resource...");
@@ -117,30 +229,7 @@ export function DeploymentsTab({
   };
 
   const clearDeployments = () => {
-    updateResource(
-      { id: resource.id, deployments: "[]" },
-      {
-        onSuccess: () => {
-          setDeployList([]);
-          toast.success("Deployment history cleared");
-        },
-      },
-    );
-  };
-
-  const getWebhookUrl = () => {
-    if (typeof window !== "undefined") {
-      return `${getServerUrl()}/api/deploy/rc-${resource.id}`;
-    }
-    return "";
-  };
-
-  const handleCopyWebhook = () => {
-    const url = getWebhookUrl();
-    if (url) {
-      navigator.clipboard.writeText(url);
-      toast.success("Webhook URL copied to clipboard");
-    }
+    clearHistoryMutation.mutate({ resourceId: resource.id });
   };
 
   return (
@@ -148,29 +237,18 @@ export function DeploymentsTab({
       <Card className="border border-border/40 bg-card/20">
         <CardHeader>
           <CardTitle className="font-semibold text-lg">
-            Deployment Webhook & Trigger
+            Deployment Triggers
           </CardTitle>
           <CardDescription className="text-muted-foreground text-sm">
             Manually build or setup external CI trigger pipelines.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 border-border/20 border-t pt-4">
-          <div className="space-y-2">
-            <Label>Auto Deploy Webhook Endpoint URL</Label>
-            <div className="flex gap-2">
-              <Input
-                readOnly
-                value={getWebhookUrl()}
-                className="select-all border-border/40 bg-muted/20 font-mono text-foreground text-xs"
-              />
-              <Button
-                onClick={handleCopyWebhook}
-                variant="outline"
-                className="border-border/40"
-              >
-                Copy
-              </Button>
-            </div>
+          <div className="rounded-lg border border-border/30 bg-muted/10 p-3 text-muted-foreground text-xs">
+            External webhook tokens are managed in the General tab. Rotate a
+            token there and copy its one-time URL; the stored token prefix (
+            {resource.webhookTokenPrefix ?? "not configured"}) is not itself
+            accepted for deployments.
           </div>
 
           <div className="flex flex-wrap gap-2 pt-2">
@@ -210,7 +288,205 @@ export function DeploymentsTab({
                 ? "Cancelling..."
                 : "Cancel Queued Deployment"}
             </Button>
+            <Button
+              onClick={() => {
+                const active = deployList.find(
+                  (deployment) => deployment.status === "running",
+                );
+                if (
+                  active &&
+                  window.confirm("Stop the active build and deployment?")
+                ) {
+                  killBuildMutation.mutate({ deploymentId: active.id });
+                }
+              }}
+              variant="outline"
+              className="gap-2 border-destructive/40 text-destructive"
+              disabled={!isBuilding || killBuildMutation.isPending}
+            >
+              {killBuildMutation.isPending
+                ? "Stopping build..."
+                : "Kill Active Build"}
+            </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-border/40 bg-card/20">
+        <CardHeader>
+          <CardTitle className="font-semibold text-lg">
+            Scheduled resource jobs
+          </CardTitle>
+          <CardDescription className="text-muted-foreground text-sm">
+            Run commands, deployments, or existing backup schedules on a cron.
+            Jobs refresh automatically when they are changed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 border-border/20 border-t pt-4">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="space-y-1">
+              <Label htmlFor="schedule-name">Name</Label>
+              <Input
+                id="schedule-name"
+                value={scheduleName}
+                onChange={(event) => setScheduleName(event.target.value)}
+                placeholder="Nightly maintenance"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="schedule-cron">Cron expression</Label>
+              <Input
+                id="schedule-cron"
+                value={scheduleCron}
+                onChange={(event) => setScheduleCron(event.target.value)}
+                placeholder="0 2 * * *"
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="schedule-job-type">Job type</Label>
+              <Select
+                value={scheduleJobType}
+                onValueChange={(value) => {
+                  if (
+                    value === "command" ||
+                    value === "deployment" ||
+                    value === "backup"
+                  ) {
+                    setScheduleJobType(value);
+                  }
+                }}
+              >
+                <SelectTrigger id="schedule-job-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="command">Container command</SelectItem>
+                  <SelectItem value="deployment">Deployment</SelectItem>
+                  <SelectItem value="backup">Backup schedule</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {scheduleJobType === "backup" ? (
+              <div className="space-y-1">
+                <Label htmlFor="schedule-backup">Backup schedule</Label>
+                <Select
+                  value={backupScheduleId}
+                  onValueChange={(value) => setBackupScheduleId(value ?? "")}
+                >
+                  <SelectTrigger id="schedule-backup">
+                    <SelectValue placeholder="Choose backup" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(backupSchedulesQuery.data ?? []).map((backup) => (
+                      <SelectItem key={backup.id} value={backup.id}>
+                        {backup.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label htmlFor="schedule-command">Container command</Label>
+                <Input
+                  id="schedule-command"
+                  value={scheduleCommand}
+                  onChange={(event) => setScheduleCommand(event.target.value)}
+                  placeholder="php artisan schedule:run"
+                  className="font-mono"
+                  disabled={scheduleJobType !== "command"}
+                />
+              </div>
+            )}
+          </div>
+          <Button
+            onClick={() =>
+              createScheduleMutation.mutate({
+                resourceId: resource.id,
+                name: scheduleName,
+                cronExpression: scheduleCron,
+                jobType: scheduleJobType,
+                backupScheduleId:
+                  scheduleJobType === "backup" ? backupScheduleId : null,
+                command: scheduleJobType === "command" ? scheduleCommand : "",
+                enabled: true,
+              })
+            }
+            disabled={
+              createScheduleMutation.isPending ||
+              !scheduleName.trim() ||
+              (scheduleJobType === "command" && !scheduleCommand.trim()) ||
+              (scheduleJobType === "backup" && !backupScheduleId)
+            }
+            className="gap-2"
+          >
+            <RefreshCw className="size-4" /> Add schedule
+          </Button>
+          {schedulesQuery.data && schedulesQuery.data.length > 0 ? (
+            <div className="divide-y divide-border/20 rounded-lg border border-border/30">
+              {schedulesQuery.data.map((schedule) => (
+                <div
+                  key={schedule.id}
+                  className="flex flex-col gap-3 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium">{schedule.name}</div>
+                    <div className="truncate font-mono text-muted-foreground text-xs">
+                      {schedule.cronExpression} ·{" "}
+                      {schedule.jobType ?? "command"}
+                      {schedule.command ? ` · ${schedule.command}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() =>
+                        runScheduleMutation.mutate({ id: schedule.id })
+                      }
+                      disabled={runScheduleMutation.isPending}
+                    >
+                      <Play className="size-3" /> Run now
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        updateScheduleMutation.mutate({
+                          id: schedule.id,
+                          enabled: !schedule.enabled,
+                        })
+                      }
+                      disabled={updateScheduleMutation.isPending}
+                    >
+                      {schedule.enabled ? "Disable" : "Enable"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => {
+                        if (
+                          window.confirm(`Delete schedule '${schedule.name}'?`)
+                        ) {
+                          deleteScheduleMutation.mutate({ id: schedule.id });
+                        }
+                      }}
+                      disabled={deleteScheduleMutation.isPending}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              No resource schedules configured.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -230,8 +506,10 @@ export function DeploymentsTab({
                 <thead>
                   <tr className="border-border/20 border-b bg-muted/10 text-muted-foreground text-xs uppercase">
                     <th className="p-3">Deployment ID</th>
+                    <th className="p-3">Source revision</th>
                     <th className="p-3">Pipeline Status</th>
                     <th className="p-3">Trigger Time</th>
+                    <th className="p-3 text-center">Action</th>
                     <th className="p-3 text-center">Logs</th>
                   </tr>
                 </thead>
@@ -243,6 +521,9 @@ export function DeploymentsTab({
                     >
                       <td className="p-3 font-mono font-semibold text-foreground text-xs">
                         {dep.id}
+                      </td>
+                      <td className="p-3 font-mono text-muted-foreground text-xs">
+                        {dep.sourceRevision?.slice(0, 12) || "—"}
                       </td>
                       <td className="p-3">
                         <span
@@ -258,6 +539,58 @@ export function DeploymentsTab({
                       </td>
                       <td className="p-3 text-muted-foreground text-xs">
                         {new Date(dep.createdAt).toLocaleString()}
+                      </td>
+                      <td className="p-3 text-center">
+                        {dep.status === "success" && canRollback ? (
+                          <Button
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  supportsHistoricalRollback
+                                    ? `Redeploy this Git-backed ${resource.type === "compose" ? "Compose resource" : "application"} from the selected historical commit?`
+                                    : "Roll back this Swarm service to its previous service specification?",
+                                )
+                              ) {
+                                rollbackMutation.mutate({
+                                  id: resource.id,
+                                  deploymentId: dep.id,
+                                });
+                              }
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1 text-xs"
+                            disabled={rollbackMutation.isPending}
+                          >
+                            <History className="size-3.5" />
+                            {supportsHistoricalRollback
+                              ? "Redeploy revision"
+                              : "Rollback"}
+                          </Button>
+                        ) : dep.status === "failed" ||
+                          dep.status === "success" ? (
+                          <Button
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  "Remove this deployment from history?",
+                                )
+                              ) {
+                                removeDeploymentMutation.mutate({
+                                  deploymentId: dep.id,
+                                });
+                              }
+                            }}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1 text-destructive text-xs"
+                            disabled={removeDeploymentMutation.isPending}
+                          >
+                            <Trash2 className="size-3.5" /> Remove
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="p-3 text-center">
                         <Button

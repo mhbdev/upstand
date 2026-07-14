@@ -51,6 +51,7 @@ import { DomainsTab } from "./components/domains-tab";
 import { EnvironmentTab } from "./components/environment-tab";
 import { GeneralTab } from "./components/general-tab";
 import { MonitoringTab } from "./components/monitoring-tab";
+import { TagsTab } from "./components/tags-tab";
 import { useResourceDetail } from "./hooks/use-resource-detail";
 
 const TYPE_ICONS: Record<string, IconSvgElement> = {
@@ -87,7 +88,9 @@ export default function ResourceDetail({
   const {
     project,
     sshKeys,
+    servers,
     gitProviders,
+    certificates,
     resource,
     loadingResource,
     routingTargets,
@@ -101,6 +104,8 @@ export default function ResourceDetail({
     isDeployingResource,
     controlResource,
     isControllingResource,
+    rebuildDatabase,
+    isRebuildingDatabase,
     controlContainer,
     isControllingContainer,
     deleteResource,
@@ -222,12 +227,16 @@ export default function ResourceDetail({
           <TabsTrigger value="monitoring" className="shrink-0 gap-2">
             <Activity className="size-4" /> Monitoring
           </TabsTrigger>
+          <TabsTrigger value="tags" className="shrink-0 gap-2">
+            Tags
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="min-w-0 outline-none">
           <GeneralTab
             resource={resource}
             sshKeys={sshKeys}
+            servers={servers}
             gitProviders={gitProviders}
             updateResource={updateResource}
             isUpdatingResource={isUpdatingResource}
@@ -235,6 +244,8 @@ export default function ResourceDetail({
             isDeployingResource={isDeployingResource}
             controlResource={controlResource}
             isControllingResource={isControllingResource}
+            rebuildDatabase={rebuildDatabase}
+            isRebuildingDatabase={isRebuildingDatabase}
             deleteResource={deleteResource}
             isDeletingResource={isDeletingResource}
           />
@@ -259,10 +270,13 @@ export default function ResourceDetail({
         {resource.type !== "database" && (
           <TabsContent value="domains" className="min-w-0 outline-none">
             <DomainsTab
+              organizationId={project?.organizationId ?? ""}
               resource={resource}
               updateResource={updateResource}
               isUpdatingResource={isUpdatingResource}
               routingTargets={routingTargets}
+              certificates={certificates}
+              servers={servers}
             />
           </TabsContent>
         )}
@@ -270,7 +284,6 @@ export default function ResourceDetail({
         <TabsContent value="deployments" className="min-w-0 outline-none">
           <DeploymentsTab
             resource={resource}
-            updateResource={updateResource}
             deployResource={deployResource}
             isDeployingResource={isDeployingResource}
           />
@@ -355,6 +368,14 @@ export default function ResourceDetail({
 
         <TabsContent value="monitoring" className="min-w-0 outline-none">
           <MonitoringTab statsData={statsData} />
+        </TabsContent>
+        <TabsContent value="tags" className="min-w-0 outline-none">
+          {project?.organizationId && (
+            <TagsTab
+              resourceId={resourceId}
+              organizationId={project.organizationId}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

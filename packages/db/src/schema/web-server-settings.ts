@@ -14,6 +14,7 @@ export const webServerSettings = pgTable("web_server_settings", {
   enableHttp3: boolean("enable_http3").default(true).notNull(),
   globalCaddyfile: text("global_caddyfile"),
   caddySnippets: text("caddy_snippets").default("").notNull(),
+  caddyMiddlewares: text("caddy_middlewares").default("[]").notNull(),
   serverIp: text("server_ip"),
   dailyDockerCleanup: boolean("daily_docker_cleanup").default(false).notNull(),
   caddyEnvironment: text("caddy_environment").default("{}").notNull(),
@@ -21,6 +22,16 @@ export const webServerSettings = pgTable("web_server_settings", {
   caddyDashboardEnabled: boolean("caddy_dashboard_enabled")
     .default(false)
     .notNull(),
+  appName: text("app_name"),
+  appDescription: text("app_description"),
+  logoUrl: text("logo_url"),
+  faviconUrl: text("favicon_url"),
+  customCss: text("custom_css"),
+  loginLogoUrl: text("login_logo_url"),
+  supportUrl: text("support_url"),
+  docsUrl: text("docs_url"),
+  metaTitle: text("meta_title"),
+  footerText: text("footer_text"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

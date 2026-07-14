@@ -6,6 +6,7 @@ import type {
 export interface IBackupScheduleRepository {
   findById(id: string): Promise<BackupSchedule | null>;
   findByResourceId(resourceId: string): Promise<BackupSchedule[]>;
+  findByOrganizationId(organizationId: string): Promise<BackupSchedule[]>;
   findEnabled(): Promise<BackupSchedule[]>;
   create(data: CreateBackupScheduleDTO): Promise<BackupSchedule>;
   updateById(

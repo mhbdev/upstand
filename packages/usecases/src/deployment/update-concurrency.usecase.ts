@@ -6,6 +6,7 @@ import {
 import { redis } from "@upstand/redis";
 
 export interface UpdateConcurrencyInput {
+  organizationId: string;
   serverId: string;
   concurrency: number;
   hostname?: string;
@@ -24,6 +25,18 @@ export class UpdateConcurrencyUseCase {
       throw new ValidationError(
         "Concurrency must be an integer between 1 and 100",
       );
+    }
+
+    if (!input.organizationId.trim()) {
+      throw new ValidationError("Organization is required");
+    }
+    if (!["local", "manager"].includes(input.serverId)) {
+      const server = await this.uow.serverRepository.findById(input.serverId);
+      if (!server || server.organizationId !== input.organizationId) {
+        throw new ValidationError(
+          "Build server is not part of the active organization",
+        );
+      }
     }
 
     const settings = await this.uow.transaction(async (tx) => {

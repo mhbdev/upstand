@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { auth } from "@upstand/auth";
 import { createDb } from "@upstand/db";
 import { member, organization, user } from "@upstand/db/schema/auth";
+import { customRole } from "@upstand/db/schema/custom-role";
 import { notificationChannel } from "@upstand/db/schema/notification";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -9,20 +10,56 @@ import { ensureOrganizationAccess } from "../access-control";
 import { protectedProcedure, router } from "../index";
 import { type PermissionAction, ROLE_PERMISSIONS } from "../permissions";
 
-const permissionActions = Object.keys(ROLE_PERMISSIONS.owner ?? []) as [
-  PermissionAction,
-  ...PermissionAction[],
-];
+const permissionActions = [
+  ...new Set(Object.values(ROLE_PERMISSIONS).flat()),
+] as [PermissionAction, ...PermissionAction[]];
 const permissionsSchema = z.array(z.enum(permissionActions)).max(100);
 const baseInput = z.object({ organizationId: z.string().min(1) });
 
 function assertManager(actorRole: string, targetRole?: string) {
   if (actorRole === "owner") return;
-  if (actorRole === "admin" && (!targetRole || targetRole === "member")) return;
+  if (
+    actorRole === "admin" &&
+    (!targetRole || targetRole === "member" || targetRole.startsWith("custom:"))
+  )
+    return;
   throw new TRPCError({
     code: "FORBIDDEN",
     message: "Only workspace owners and admins can manage members",
   });
+}
+
+async function resolveRoleAssignment(
+  db: ReturnType<typeof createDb>,
+  organizationId: string,
+  role: "member" | "admin",
+  permissions: PermissionAction[],
+  customRoleId?: string | null,
+) {
+  if (!customRoleId) {
+    validatePermissions(role, permissions);
+    return { role, permissions };
+  }
+  const selected = await db
+    .select()
+    .from(customRole)
+    .where(
+      and(
+        eq(customRole.id, customRoleId),
+        eq(customRole.organizationId, organizationId),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (!selected)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Custom role not found",
+    });
+  return {
+    role: `custom:${selected.id}`,
+    permissions: JSON.parse(selected.permissions) as PermissionAction[],
+  };
 }
 
 function validatePermissions(role: string, permissions: PermissionAction[]) {
@@ -63,6 +100,7 @@ export const memberRouter = router({
         password: z.string().min(8).max(200),
         role: z.enum(["member", "admin"]),
         permissions: permissionsSchema,
+        customRoleId: z.string().min(1).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -77,8 +115,14 @@ export const memberRouter = router({
           message: "Admins can only create members",
         });
       }
-      validatePermissions(input.role, input.permissions);
       const db = createDb();
+      const assignment = await resolveRoleAssignment(
+        db,
+        input.organizationId,
+        input.role,
+        input.permissions,
+        input.customRoleId,
+      );
       const existing = await db
         .select({ id: member.id })
         .from(member)
@@ -108,8 +152,8 @@ export const memberRouter = router({
         id: crypto.randomUUID(),
         organizationId: input.organizationId,
         userId: created.user.id,
-        role: input.role,
-        permissions: JSON.stringify(input.permissions),
+        role: assignment.role,
+        permissions: JSON.stringify(assignment.permissions),
         createdAt: new Date(),
       });
       // Better Auth's user-create hook provisions a personal workspace for a
@@ -136,6 +180,7 @@ export const memberRouter = router({
         email: z.string().email(),
         role: z.enum(["member", "admin"]),
         permissions: permissionsSchema,
+        customRoleId: z.string().min(1).optional(),
         emailChannelId: z.string().min(1),
       }),
     )
@@ -150,8 +195,14 @@ export const memberRouter = router({
           code: "FORBIDDEN",
           message: "Admins can only invite members",
         });
-      validatePermissions(input.role, input.permissions);
       const db = createDb();
+      const assignment = await resolveRoleAssignment(
+        db,
+        input.organizationId,
+        input.role,
+        input.permissions,
+        input.customRoleId,
+      );
       const channel = await db
         .select({
           id: notificationChannel.id,
@@ -177,7 +228,7 @@ export const memberRouter = router({
           email: input.email,
           role: input.role,
           organizationId: input.organizationId,
-          permissions: JSON.stringify(input.permissions),
+          permissions: JSON.stringify(assignment.permissions),
           emailChannelId: input.emailChannelId,
         },
         headers: ctx.honoContext.req.raw.headers,
@@ -190,6 +241,7 @@ export const memberRouter = router({
         memberId: z.string().min(1),
         role: z.enum(["member", "admin"]),
         permissions: permissionsSchema,
+        customRoleId: z.string().min(1).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -217,12 +269,18 @@ export const memberRouter = router({
           code: "FORBIDDEN",
           message: "Admins can only manage members",
         });
-      validatePermissions(input.role, input.permissions);
+      const assignment = await resolveRoleAssignment(
+        db,
+        input.organizationId,
+        input.role,
+        input.permissions,
+        input.customRoleId,
+      );
       await db
         .update(member)
         .set({
-          role: input.role,
-          permissions: JSON.stringify(input.permissions),
+          role: assignment.role,
+          permissions: JSON.stringify(assignment.permissions),
         })
         .where(eq(member.id, input.memberId));
       return { success: true };

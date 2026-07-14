@@ -99,9 +99,12 @@ export class GetWebServerSettingsUseCase {
     }
 
     await this.caddyService.initializeCaddy(settings);
+    const certificates =
+      (await this.uow.certificateRepository.findAll?.()) ?? [];
     await this.caddyService.syncResourceConfigs(
       await this.uow.resourceRepository.findMany(),
       settings,
+      certificates,
     );
     const status = await this.caddyService.getStatus();
     return { settings, status };

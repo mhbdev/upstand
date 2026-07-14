@@ -13,7 +13,11 @@ export async function ensureOrganizationAccess(
     .select()
     .from(member)
     .where(
-      and(eq(member.userId, userId), eq(member.organizationId, organizationId)),
+      and(
+        eq(member.userId, userId),
+        eq(member.organizationId, organizationId),
+        eq(member.scimActive, true),
+      ),
     )
     .limit(1)
     .then((rows) => rows[0]);

@@ -66,4 +66,18 @@ describe("backup schedule validation", () => {
       }),
     ).not.toThrow();
   });
+
+  test("accepts Redis RDB schedules without a logical database name", () => {
+    const redisResource = {
+      ...databaseResource,
+      dbType: "redis",
+      provider: "redis",
+    } as Resource;
+    const input = normalizeBackupScheduleInput(
+      { ...baseInput, databaseName: undefined, databaseEngine: "redis" },
+      redisResource,
+    );
+    expect(input.databaseEngine).toBe("redis");
+    expect(() => validateBackupSchedule(input)).not.toThrow();
+  });
 });

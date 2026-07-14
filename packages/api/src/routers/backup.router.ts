@@ -3,25 +3,31 @@ import { TRPCError } from "@trpc/server";
 import type { IUnitOfWork } from "@upstand/domain";
 import {
   CreateBackupScheduleInputSchema,
+  CreateWebServerBackupScheduleInputSchema,
   DeleteBackupScheduleInputSchema,
   GetBackupRunsInputSchema,
   GetBackupSchedulesInputSchema,
   ListBackupVolumesInputSchema,
+  ListComposeServicesInputSchema,
   RestoreBackupRunInputSchema,
   TriggerBackupRunInputSchema,
   UpdateBackupScheduleInputSchema,
 } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
+import { z } from "zod";
 import {
   BackupSchedulerToken,
   CreateBackupScheduleUseCaseToken,
+  CreateWebServerBackupScheduleUseCaseToken,
   DeleteBackupScheduleUseCaseToken,
   GetBackupRunsUseCaseToken,
   GetBackupSchedulesUseCaseToken,
   ListBackupVolumesUseCaseToken,
+  ListComposeServicesUseCaseToken,
   RestoreBackupRunUseCaseToken,
   TriggerBackupRunUseCaseToken,
   UpdateBackupScheduleUseCaseToken,
+  UpdateWebServerBackupScheduleUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
@@ -58,7 +64,186 @@ async function assertResourcePermission(
   return resource;
 }
 
+async function assertOrganizationPermission(
+  ctx: { session: { user: { id: string } } },
+  organizationId: string,
+  permission: PermissionAction,
+): Promise<void> {
+  await checkPermission(ctx.session.user.id, organizationId, permission);
+}
+
+async function assertWebServerSchedulePermission(
+  ctx: { session: { user: { id: string } }; scope: ServiceScope },
+  scheduleId: string,
+  permission: PermissionAction,
+) {
+  const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const schedule = await uow.backupScheduleRepository.findById(scheduleId);
+  if (schedule?.kind !== "web-server") {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Web-server backup schedule not found",
+    });
+  }
+  await assertOrganizationPermission(ctx, schedule.organizationId, permission);
+  return schedule;
+}
+
 export const backupRouter = router({
+  listWebServerSchedules: twoFactorVerifiedProcedure
+    .input(z.object({ organizationId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "backup:view",
+      );
+      const schedules = await (
+        ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork
+      ).backupScheduleRepository.findByOrganizationId(input.organizationId);
+      return schedules
+        .filter((schedule) => schedule.kind === "web-server")
+        .map(
+          ({ encryptedConfiguration: _encryptedConfiguration, ...schedule }) =>
+            schedule,
+        );
+    }),
+
+  listWebServerRuns: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        limit: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "backup:view",
+      );
+      const runs = await (
+        ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork
+      ).backupRunRepository.findByOrganizationId(
+        input.organizationId,
+        input.limit,
+      );
+      return runs.filter((run) => run.kind === "web-server");
+    }),
+
+  createWebServerSchedule: twoFactorVerifiedProcedure
+    .input(CreateWebServerBackupScheduleInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "backup:manage",
+      );
+      try {
+        const result = await ctx.scope
+          .resolve(CreateWebServerBackupScheduleUseCaseToken)
+          .execute(input);
+        await ctx.scope.resolve(BackupSchedulerToken).refresh();
+        return result;
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  updateWebServerSchedule: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        organizationId: z.string().min(1),
+        destinationId: z.string().min(1).optional(),
+        name: z.string().trim().min(1).max(120).optional(),
+        cronExpression: z.string().trim().min(1).max(120).optional(),
+        timezone: z.string().trim().min(1).max(120).optional(),
+        prefix: z.string().trim().max(512).optional(),
+        retentionCount: z
+          .number()
+          .int()
+          .positive()
+          .max(3650)
+          .nullable()
+          .optional(),
+        enabled: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertWebServerSchedulePermission(ctx, input.id, "backup:manage");
+      try {
+        const result = await ctx.scope
+          .resolve(UpdateWebServerBackupScheduleUseCaseToken)
+          .execute(input);
+        await ctx.scope.resolve(BackupSchedulerToken).refresh();
+        return result;
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  deleteWebServerSchedule: twoFactorVerifiedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertWebServerSchedulePermission(ctx, input.id, "backup:manage");
+      try {
+        const result = await ctx.scope
+          .resolve(DeleteBackupScheduleUseCaseToken)
+          .execute(input);
+        await ctx.scope.resolve(BackupSchedulerToken).refresh();
+        return result;
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  runWebServerNow: twoFactorVerifiedProcedure
+    .input(z.object({ scheduleId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertWebServerSchedulePermission(
+        ctx,
+        input.scheduleId,
+        "backup:manage",
+      );
+      try {
+        return await ctx.scope
+          .resolve(TriggerBackupRunUseCaseToken)
+          .execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  restoreWebServer: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        runId: z.string().min(1),
+        confirm: z.literal("RESTORE_WEB_SERVER"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const run = await uow.backupRunRepository.findById(input.runId);
+      if (run?.kind !== "web-server") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Web-server backup run not found",
+        });
+      }
+      await assertOrganizationPermission(
+        ctx,
+        run.organizationId,
+        "backup:manage",
+      );
+      try {
+        await ctx.scope.resolve(RestoreBackupRunUseCaseToken).execute(input);
+        return { restored: true };
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
   listSchedules: twoFactorVerifiedProcedure
     .input(GetBackupSchedulesInputSchema)
     .query(async ({ ctx, input }) => {
@@ -98,6 +283,19 @@ export const backupRouter = router({
       }
     }),
 
+  listComposeServices: twoFactorVerifiedProcedure
+    .input(ListComposeServicesInputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertResourcePermission(ctx, input.resourceId, "resource:view");
+      try {
+        return await ctx.scope
+          .resolve(ListComposeServicesUseCaseToken)
+          .execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
   createSchedule: twoFactorVerifiedProcedure
     .input(CreateBackupScheduleInputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -122,6 +320,18 @@ export const backupRouter = router({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Backup schedule not found",
+        });
+      }
+      if (schedule.kind === "web-server") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Use the web-server backup schedule endpoint",
+        });
+      }
+      if (!schedule.resourceId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Backup schedule has no resource",
         });
       }
       await assertResourcePermission(
@@ -149,6 +359,18 @@ export const backupRouter = router({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Backup schedule not found",
+        });
+      }
+      if (schedule.kind === "web-server") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Use the web-server backup schedule endpoint",
+        });
+      }
+      if (!schedule.resourceId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Backup schedule has no resource",
         });
       }
       await assertResourcePermission(
@@ -180,6 +402,18 @@ export const backupRouter = router({
           message: "Backup schedule not found",
         });
       }
+      if (schedule.kind === "web-server") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Use the web-server backup endpoint",
+        });
+      }
+      if (!schedule.resourceId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Backup schedule has no resource",
+        });
+      }
       await assertResourcePermission(
         ctx,
         schedule.resourceId,
@@ -203,6 +437,18 @@ export const backupRouter = router({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Backup run not found",
+        });
+      }
+      if (run.kind === "web-server") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Use the web-server restore endpoint",
+        });
+      }
+      if (!run.resourceId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Backup run has no resource",
         });
       }
       await assertResourcePermission(ctx, run.resourceId, "resource:update");

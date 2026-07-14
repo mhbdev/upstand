@@ -1,6 +1,8 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { Cron } from "croner";
 import { log } from "evlog";
+import { TriggerBackupRunUseCase } from "../backup/trigger-backup-run.usecase";
+import { QueueDeploymentUseCase } from "../deployment/queue-deployment.usecase";
 import type { DockerService } from "../resource/docker.service";
 import { resolveDockerServiceForServer } from "../resource/docker-client";
 import { UnitOfWorkToken } from "../tokens";
@@ -70,6 +72,11 @@ export class GeneralScheduler {
     }
   }
 
+  /** Execute a persisted schedule immediately, even when it is disabled. */
+  async executeNow(scheduleId: string): Promise<void> {
+    await this.trigger(scheduleId, true);
+  }
+
   private async performRefresh(): Promise<void> {
     const scope = this.getServiceProvider().createScope();
     let schedules: any[] = [];
@@ -89,7 +96,7 @@ export class GeneralScheduler {
     }
 
     for (const schedule of schedules) {
-      const signature = `${schedule.cronExpression}\0${schedule.command}`;
+      const signature = `${schedule.cronExpression}\0${schedule.jobType ?? "command"}\0${schedule.backupScheduleId ?? ""}\0${schedule.command}`;
       const existing = this.jobs.get(schedule.id);
       if (existing?.signature === signature) continue;
       existing?.cron.stop();
@@ -113,17 +120,48 @@ export class GeneralScheduler {
     }
   }
 
-  private async trigger(scheduleId: string): Promise<void> {
+  private async trigger(scheduleId: string, manual = false): Promise<void> {
     const scope = this.getServiceProvider().createScope();
     try {
       const uow = scope.resolve<IUnitOfWork>(UnitOfWorkToken);
       const schedule = await uow.scheduleRepository.findById(scheduleId);
-      if (!schedule?.enabled || !schedule.resourceId) return;
+      if ((!schedule?.enabled && !manual) || !schedule?.resourceId) return;
 
       const resource = await uow.resourceRepository.findById(
         schedule.resourceId,
       );
       if (!resource) return;
+
+      const jobType = schedule.jobType ?? "command";
+      if (jobType === "deployment") {
+        await new QueueDeploymentUseCase(uow).execute({
+          resourceId: resource.id,
+          title: `Scheduled deployment: ${schedule.name}`,
+        });
+        log.info({
+          message: `Scheduled deployment queued for resource ${resource.name}.`,
+          scheduleId,
+        });
+        return;
+      }
+      if (jobType === "backup") {
+        if (!schedule.backupScheduleId) {
+          log.warn({
+            message: "Skipping backup schedule without a backup schedule ID",
+            scheduleId,
+          });
+          return;
+        }
+        await new TriggerBackupRunUseCase(uow).execute({
+          scheduleId: schedule.backupScheduleId,
+        });
+        log.info({
+          message: `Scheduled backup queued for resource ${resource.name}.`,
+          scheduleId,
+          backupScheduleId: schedule.backupScheduleId,
+        });
+        return;
+      }
 
       log.info({
         message: `Executing custom scheduled command inside resource ${resource.name}...`,

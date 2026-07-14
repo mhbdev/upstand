@@ -49,11 +49,14 @@ export class DeleteResourceUseCase {
         this.dockerService,
         this.caddyService,
       );
+    const certificates =
+      (await this.uow.certificateRepository.findAll?.()) ?? [];
 
     try {
       await caddyService.syncResourceConfigs(
         remainingResources,
         settings || {},
+        certificates,
       );
       try {
         await dockerService.removeResource(resource, !!input.deleteVolumes);
@@ -73,6 +76,7 @@ export class DeleteResourceUseCase {
           await caddyService.syncResourceConfigs(
             serverResources,
             settings || {},
+            certificates,
           );
         } catch (rollbackError) {
           log.error({

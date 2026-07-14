@@ -44,6 +44,12 @@ Use real domains in production. `nip.io` is useful only for a temporary validati
 
 Back up `/etc/upstand/.env` and the Postgres volume before upgrades. Configure an S3 destination in the dashboard before relying on scheduled database or volume backups. A restore overwrites its target, so test it in a disposable resource first.
 
+Docker cleanup can be enabled for the control plane in Web Server settings and
+for each registered remote server on the Remote Servers page. The daily job
+runs separate argument-safe Docker prune operations at the control-plane
+local 03:00 hour; remote cleanup uses the server's registered SSH key and does
+not join or expose the remote Docker socket.
+
 ## Security checklist
 
 - Use a unique owner password and enable 2FA.

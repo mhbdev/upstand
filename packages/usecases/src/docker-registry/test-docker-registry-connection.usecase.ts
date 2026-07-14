@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const TestDockerRegistryConnectionInputSchema = z.object({
+  organizationId: z.string().min(1, "Organization ID is required"),
   username: z.string().optional().nullable(),
   password: z.string().optional().nullable(),
   registryUrl: z.string().optional().nullable(),

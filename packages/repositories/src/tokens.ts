@@ -4,6 +4,7 @@ import type {
   IAIRepository,
   IBackupRunRepository,
   IBackupScheduleRepository,
+  ICertificateRepository,
   IEnvironmentRepository,
   IGitProviderRepository,
   IMonitoringSettingsRepository,
@@ -13,6 +14,8 @@ import type {
   IResourceRepository,
   IS3DestinationRepository,
   ISshKeyRepository,
+  ITagRepository,
+  ITemplateRepository,
   IUserRepository,
   IWebServerSettingsRepository,
 } from "@upstand/domain";
@@ -23,11 +26,18 @@ export const UserRepositoryToken =
   createToken<IUserRepository>("IUserRepository");
 export const BackupScheduleRepositoryToken =
   createToken<IBackupScheduleRepository>("IBackupScheduleRepository");
+export const CertificateRepositoryToken = createToken<ICertificateRepository>(
+  "ICertificateRepository",
+);
 export const BackupRunRepositoryToken = createToken<IBackupRunRepository>(
   "IBackupRunRepository",
 );
 export const ProjectRepositoryToken =
   createToken<IProjectRepository>("IProjectRepository");
+export const TagRepositoryToken = createToken<ITagRepository>("ITagRepository");
+export const TemplateRepositoryToken = createToken<ITemplateRepository>(
+  "ITemplateRepository",
+);
 export const EnvironmentRepositoryToken = createToken<IEnvironmentRepository>(
   "IEnvironmentRepository",
 );

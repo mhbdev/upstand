@@ -8,6 +8,7 @@ export const DeploymentSchema = z.object({
   logs: z.string(),
   serverId: z.string().nullable().optional(),
   serverName: z.string().nullable().optional(),
+  sourceRevision: z.string().nullable().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -22,6 +23,7 @@ export interface CreateDeploymentDTO {
   logs?: string;
   serverId?: string | null;
   serverName?: string | null;
+  sourceRevision?: string | null;
 }
 
 export interface UpdateDeploymentDTO {

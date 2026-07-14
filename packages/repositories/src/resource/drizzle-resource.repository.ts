@@ -21,4 +21,8 @@ export class DrizzleResourceRepository
       where: eq(resource.environmentId, environmentId),
     });
   }
+
+  async findByWebhookTokenHash(hash: string): Promise<Resource | null> {
+    return this.findOne(eq(resource.webhookTokenHash, hash));
+  }
 }

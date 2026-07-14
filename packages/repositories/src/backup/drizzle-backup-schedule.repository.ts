@@ -29,6 +29,16 @@ export class DrizzleBackupScheduleRepository
       .orderBy(desc(backupSchedule.createdAt))) as BackupSchedule[];
   }
 
+  async findByOrganizationId(
+    organizationId: string,
+  ): Promise<BackupSchedule[]> {
+    return (await this.executor
+      .select()
+      .from(backupSchedule)
+      .where(eq(backupSchedule.organizationId, organizationId))
+      .orderBy(desc(backupSchedule.createdAt))) as BackupSchedule[];
+  }
+
   async findEnabled(): Promise<BackupSchedule[]> {
     return (await this.executor
       .select()

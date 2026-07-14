@@ -7,6 +7,7 @@ type TerminalSession = {
   port: number;
   username: string;
   privateKey: string;
+  command?: string;
   expiresAt: number;
 };
 
@@ -51,13 +52,15 @@ export class TerminalBroker {
     });
 
     const channel = await new Promise<ClientChannel>((resolve, reject) => {
-      client.shell(
-        { term: "xterm-256color", cols: 120, rows: 32 },
-        (error: Error | undefined, stream: ClientChannel) => {
-          if (error) reject(error);
-          else resolve(stream);
-        },
-      );
+      const callback = (error: Error | undefined, stream: ClientChannel) => {
+        if (error) reject(error);
+        else resolve(stream);
+      };
+      if (session.command) {
+        client.exec(session.command, { pty: true }, callback);
+      } else {
+        client.shell({ term: "xterm-256color", cols: 120, rows: 32 }, callback);
+      }
     });
 
     this.connections.set(token, { client, channel });

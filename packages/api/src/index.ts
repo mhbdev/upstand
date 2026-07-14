@@ -210,10 +210,55 @@ async function resolveAuditOrganizationId(
   }
   if (resource === "server")
     return (await uow.serverRepository.findById(id))?.organizationId;
+  if (resource === "notification") {
+    return (
+      (await uow.notificationChannelRepository.findById(id))?.organizationId ??
+      (await uow.notificationDeliveryRepository.findById(id))?.organizationId
+    );
+  }
+  if (resource === "tag")
+    return (await uow.tagRepository.findById(id))?.organizationId;
+  if (resource === "template")
+    return (await uow.templateRepository.findById(id))?.organizationId;
+  if (resource === "certificate")
+    return (await uow.certificateRepository.findById(id))?.organizationId;
+  if (resource === "gitProvider")
+    return (await uow.gitProviderRepository.findById(id))?.organizationId;
+  if (resource === "dockerRegistry")
+    return (await uow.dockerRegistryRepository.findById(id))?.organizationId;
+  if (resource === "s3Destination")
+    return (await uow.s3DestinationRepository.findById(id))?.organizationId;
+  if (resource === "sshKey")
+    return (await uow.sshKeyRepository.findById(id))?.organizationId;
+  if (resource === "schedule") {
+    const schedule = await uow.scheduleRepository.findById(id);
+    if (!schedule?.resourceId) return undefined;
+    const service = await uow.resourceRepository.findById(schedule.resourceId);
+    if (!service) return undefined;
+    const environment = await uow.environmentRepository.findById(
+      service.environmentId,
+    );
+    return environment
+      ? (await uow.projectRepository.findById(environment.projectId))
+          ?.organizationId
+      : undefined;
+  }
   return undefined;
 }
 
 function resolveAuditAction(operation: string): (typeof AUDIT_ACTIONS)[number] {
+  if (operation.toLowerCase().includes("invite")) return "invite";
+  if (
+    operation.toLowerCase().includes("revoke") ||
+    operation.toLowerCase().includes("remove")
+  )
+    return "revoke";
+  if (operation.toLowerCase().includes("rotate")) return "rotate";
+  if (operation.toLowerCase().includes("test")) return "test";
+  if (operation.toLowerCase().includes("import")) return "import";
+  if (operation.toLowerCase().includes("restore")) return "restore";
+  if (operation.toLowerCase().includes("retry")) return "run";
+  if (operation.toLowerCase().includes("duplicate")) return "duplicate";
   if (operation.toLowerCase().includes("delete")) return "delete";
   if (operation.toLowerCase().includes("create")) return "create";
   if (operation.toLowerCase().includes("update")) return "update";
@@ -223,6 +268,11 @@ function resolveAuditAction(operation: string): (typeof AUDIT_ACTIONS)[number] {
   if (operation.toLowerCase().includes("stop")) return "stop";
   if (operation.toLowerCase().includes("reload")) return "reload";
   if (operation.toLowerCase().includes("run")) return "run";
+  if (
+    operation.toLowerCase().includes("config") ||
+    operation.toLowerCase().includes("save")
+  )
+    return "configure";
   return "read";
 }
 
@@ -232,9 +282,19 @@ function resolveAuditResourceType(
   const aliases: Record<string, (typeof AUDIT_RESOURCE_TYPES)[number]> = {
     ai: "settings",
     apiKey: "settings",
+    application: "application",
+    compose: "compose",
+    customRole: "custom_role",
+    database: "database",
+    domain: "domain",
     dockerRegistry: "registry",
     gitProvider: "git_provider",
+    mount: "mount",
+    port: "port",
+    s3Destination: "backup",
     sshKey: "ssh_key",
+    tag: "tag",
+    template: "template",
     webServer: "settings",
   };
   return (

@@ -27,6 +27,7 @@ export default function TwoFactorVerifyPage() {
   const queryClient = useQueryClient();
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   const { data: session } = authClient.useSession();
 
@@ -36,9 +37,9 @@ export default function TwoFactorVerifyPage() {
 
     setVerifying(true);
     try {
-      const { error } = await authClient.twoFactor.verifyTotp({
-        code: code.trim(),
-      });
+      const { error } = recoveryMode
+        ? await authClient.twoFactor.verifyBackupCode({ code: code.trim() })
+        : await authClient.twoFactor.verifyTotp({ code: code.trim() });
 
       if (error) {
         toast.error(error.message || "Invalid two-factor code");
@@ -88,23 +89,33 @@ export default function TwoFactorVerifyPage() {
           </div>
           <CardTitle className="text-xl">Two-factor verification</CardTitle>
           <CardDescription>
-            Enter the 6-digit code from your authenticator app to continue.
+            {recoveryMode
+              ? "Enter one of your unused recovery codes to continue."
+              : "Enter the 6-digit code from your authenticator app to continue."}
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleVerify} className="flex flex-col gap-4">
             <Field>
-              <FieldLabel htmlFor="mfa-code">Verification Code</FieldLabel>
+              <FieldLabel htmlFor="mfa-code">
+                {recoveryMode ? "Recovery code" : "Verification Code"}
+              </FieldLabel>
               <Input
                 id="mfa-code"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
+                inputMode={recoveryMode ? "text" : "numeric"}
+                pattern={recoveryMode ? undefined : "[0-9]*"}
+                maxLength={recoveryMode ? 64 : 6}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="000000"
+                onChange={(e) =>
+                  setCode(
+                    recoveryMode
+                      ? e.target.value.trim()
+                      : e.target.value.replace(/\D/g, ""),
+                  )
+                }
+                placeholder={recoveryMode ? "recovery-code" : "000000"}
                 autoComplete="one-time-code"
                 className="text-center font-mono text-2xl tracking-[0.5em] placeholder:font-normal placeholder:tracking-normal"
                 required
@@ -115,15 +126,28 @@ export default function TwoFactorVerifyPage() {
             <Button
               type="submit"
               size="lg"
-              disabled={verifying || code.length !== 6}
+              disabled={verifying || (recoveryMode ? !code : code.length !== 6)}
               className="w-full"
             >
               {verifying && <Spinner data-icon="inline-start" />}
-              Verify code
+              {recoveryMode ? "Use recovery code" : "Verify code"}
             </Button>
           </form>
 
           <Separator className="my-4" />
+
+          <button
+            type="button"
+            className="w-full text-center text-muted-foreground text-xs underline-offset-4 hover:text-foreground hover:underline"
+            onClick={() => {
+              setRecoveryMode((value) => !value);
+              setCode("");
+            }}
+          >
+            {recoveryMode
+              ? "Use authenticator code instead"
+              : "Use a recovery code instead"}
+          </button>
 
           <div className="flex items-center justify-between text-muted-foreground text-xs">
             <button

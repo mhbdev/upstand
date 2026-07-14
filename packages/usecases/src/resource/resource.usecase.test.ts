@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { IUnitOfWork } from "@upstand/domain";
+import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { ControlContainerUseCase } from "./control-container.usecase";
 import { ControlResourceUseCase } from "./control-resource.usecase";
 import { CreateResourceUseCase } from "./create-resource.usecase";
@@ -7,6 +8,8 @@ import { DeleteResourceUseCase } from "./delete-resource.usecase";
 import { DeployResourceUseCase } from "./deploy-resource.usecase";
 import { GetResourceContainersUseCase } from "./get-resource-containers.usecase";
 import { GetResourceLogsUseCase } from "./get-resource-logs.usecase";
+import { RebuildDatabaseUseCase } from "./rebuild-database.usecase";
+import { RollbackResourceUseCase } from "./rollback-resource.usecase";
 import { UpdateResourceUseCase } from "./update-resource.usecase";
 
 class MockEnvironmentRepository {
@@ -100,9 +103,12 @@ class MockServerBuildSettingsRepository {
 }
 
 class MockUnitOfWork implements IUnitOfWork {
+  public readonly tagRepository = {} as any;
+  public readonly templateRepository = {} as any;
   public readonly auditLogRepository = {} as any;
   public readonly backupScheduleRepository = {} as any;
   public readonly backupRunRepository = {} as any;
+  public readonly certificateRepository = {} as any;
   public readonly environmentRepository =
     new MockEnvironmentRepository() as any;
   public readonly resourceRepository = new MockResourceRepository() as any;
@@ -140,6 +146,8 @@ const mockDockerService = {
   deployAppGit: async () => {},
   deployComposeStack: async () => {},
   controlService: async () => {},
+  rollbackService: async () => {},
+  removeDatabase: async () => {},
   controlContainer: async () => {},
   getContainers: async () => [
     {
@@ -179,6 +187,39 @@ describe("Resource Usecases", () => {
     expect(uow.environmentRepository.store[0].resourceCount).toBe(1);
   });
 
+  test("accepts an explicitly opted-in safe custom database image", async () => {
+    const uow = new MockUnitOfWork();
+    uow.environmentRepository.store.push({
+      id: "env-custom-image",
+      name: "production",
+      resourceCount: 0,
+    });
+    const useCase = new CreateResourceUseCase(uow as IUnitOfWork);
+
+    const resource = await useCase.execute({
+      environmentId: "env-custom-image",
+      name: "custom-postgres",
+      type: "database",
+      appName: "custom-postgres",
+      dbType: "postgres",
+      dockerImage: "ghcr.io/acme/postgres:17",
+      allowCustomImage: true,
+    });
+
+    expect(resource.dockerImage).toBe("ghcr.io/acme/postgres:17");
+    await expect(
+      useCase.execute({
+        environmentId: "env-custom-image",
+        name: "unsafe-postgres",
+        type: "database",
+        appName: "unsafe-postgres",
+        dbType: "postgres",
+        dockerImage: "ghcr.io/acme/postgres:17;rm-rf",
+        allowCustomImage: true,
+      }),
+    ).rejects.toThrow("supported database image");
+  });
+
   test("deletes a resource and decrements environment resource count", async () => {
     const uow = new MockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
@@ -208,6 +249,46 @@ describe("Resource Usecases", () => {
     expect(success).toBe(true);
     expect(uow.resourceRepository.store).toHaveLength(0);
     expect(uow.environmentRepository.store[0].resourceCount).toBe(0);
+  });
+
+  test("rebuilds a database only through the confirmed destructive path", async () => {
+    const uow = new MockUnitOfWork();
+    const resource = await uow.resourceRepository.create({
+      id: "db-1",
+      environmentId: "env-1",
+      name: "postgres",
+      appName: "postgres",
+      type: "database",
+      dbType: "postgres",
+      provider: "docker",
+      status: "running",
+      credentials: JSON.stringify({
+        dbUser: "app",
+        dbPassword: "secret",
+        dbName: "appdb",
+      }),
+      envVars: "{}",
+      deployments: "[]",
+      containers: "[]",
+      serverId: null,
+    });
+    const calls: string[] = [];
+    const docker = {
+      ...mockDockerService,
+      removeDatabase: async () => calls.push("remove"),
+      deployDatabase: async (_resource: any, env: Record<string, string>) => {
+        calls.push(`deploy:${env.POSTGRES_USER}:${env.POSTGRES_DB}`);
+      },
+      getContainers: async () => [{ id: "new-task", status: "running" }],
+    } as any;
+
+    const useCase = new RebuildDatabaseUseCase(uow as IUnitOfWork, docker);
+    const updated = await useCase.execute({ id: resource.id, confirm: true });
+
+    expect(calls).toEqual(["remove", "deploy:app:appdb"]);
+    expect(updated.status).toBe("running");
+    expect(updated.deployments).toContain("Database rebuild");
+    expect(uow.deploymentRepository.store[0].status).toBe("success");
   });
 
   test("queues a resource deployment for the background worker", async () => {
@@ -313,6 +394,137 @@ describe("Resource Usecases", () => {
       command: "start",
     });
     expect(started.status).toBe("running");
+  });
+
+  test("rolls back a Swarm resource and records the rollback history", async () => {
+    const uow = new MockUnitOfWork();
+    const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
+    const rollbackUseCase = new RollbackResourceUseCase(
+      uow as IUnitOfWork,
+      mockDockerService,
+    );
+    uow.environmentRepository.store.push({
+      id: "env-1",
+      name: "production",
+      resourceCount: 0,
+    });
+
+    const resource = await createUseCase.execute({
+      environmentId: "env-1",
+      name: "rollback-service",
+      type: "application",
+      appName: "rollback-service",
+    });
+
+    const updated = await rollbackUseCase.execute({ id: resource.id });
+
+    expect(updated.status).toBe("running");
+    expect(JSON.parse(updated.deployments)[0].title).toBe(
+      "Swarm service rollback",
+    );
+    expect(uow.deploymentRepository.store[0].status).toBe("success");
+  });
+
+  test("passes the organization-owned rollback registry credentials to Swarm", async () => {
+    process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
+      "base64",
+    );
+    const uow = new MockUnitOfWork();
+    uow.environmentRepository.store.push({
+      id: "env-rollback",
+      projectId: "project-rollback",
+      name: "production",
+      resourceCount: 0,
+    });
+    uow.projectRepository.findById = async (id: string) =>
+      id === "project-rollback" ? { id, organizationId: "org-rollback" } : null;
+    uow.dockerRegistryRepository.findById = async (id: string) =>
+      id === "registry-rollback"
+        ? {
+            id,
+            organizationId: "org-rollback",
+            name: "private",
+            username: "deploy",
+            password: JSON.stringify(encryptSecret("registry-secret")),
+            registryUrl: "https://registry.example.com",
+          }
+        : null;
+
+    const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
+    const resource = await createUseCase.execute({
+      environmentId: "env-rollback",
+      name: "private-app",
+      type: "application",
+      appName: "private-app",
+      rollbackActive: true,
+      rollbackRegistryId: "registry-rollback",
+    });
+    let receivedAuth: unknown;
+    const rollbackUseCase = new RollbackResourceUseCase(
+      uow as IUnitOfWork,
+      {
+        ...mockDockerService,
+        rollbackService: async (_resource: unknown, auth: unknown) => {
+          receivedAuth = auth;
+        },
+      } as any,
+    );
+
+    await rollbackUseCase.execute({ id: resource.id });
+
+    expect(receivedAuth).toEqual({
+      username: "deploy",
+      password: "registry-secret",
+      serveraddress: "registry.example.com",
+    });
+  });
+
+  test("validates a per-resource build registry against the project organization", async () => {
+    const uow = new MockUnitOfWork();
+    uow.environmentRepository.store.push({
+      id: "env-build-registry",
+      projectId: "project-build-registry",
+      name: "production",
+      resourceCount: 0,
+    });
+    uow.projectRepository.findById = async (id: string) =>
+      id === "project-build-registry"
+        ? { id, organizationId: "org-build-registry" }
+        : null;
+    uow.dockerRegistryRepository.findById = async (id: string) =>
+      id === "registry-build"
+        ? {
+            id,
+            organizationId: "org-build-registry",
+            name: "build-images",
+          }
+        : id === "registry-other-org"
+          ? {
+              id,
+              organizationId: "org-other",
+              name: "other-org",
+            }
+          : null;
+
+    const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
+    const resource = await createUseCase.execute({
+      environmentId: "env-build-registry",
+      name: "build-registry-app",
+      type: "application",
+      appName: "build-registry-app",
+      buildRegistryId: "registry-build",
+    });
+    expect(resource.buildRegistryId).toBe("registry-build");
+
+    await expect(
+      createUseCase.execute({
+        environmentId: "env-build-registry",
+        name: "cross-org-build-registry-app",
+        type: "application",
+        appName: "cross-org-build-registry-app",
+        buildRegistryId: "registry-other-org",
+      }),
+    ).rejects.toThrow("Selected build registry is not available");
   });
 
   test("controls only the selected container, including kill", async () => {

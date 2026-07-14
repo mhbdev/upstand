@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -33,10 +34,15 @@ import {
   RotateCw,
   Settings,
   Square,
+  Terminal,
+  Upload,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
+import { authClient } from "@/lib/auth-client";
+import { getServerUrl } from "@/lib/server-url";
+import { trpc } from "@/utils/trpc";
 
 type ContainerItem = {
   id: string;
@@ -120,12 +126,15 @@ export function ContainersTab({
   setContainerModalOpen,
   setSelectedContainerId,
 }: ContainersTabProps) {
+  const { data: organization } = authClient.useActiveOrganization();
   const [containerList, setContainerList] = useState<ContainerItem[]>([]);
   const [selectedContainer, setSelectedContainer] =
     useState<ContainerItem | null>(null);
   const [containerModalType, setContainerModalType] = useState<
     "logs" | "config" | "networks" | "mounts" | null
   >(null);
+  const [terminalContainer, setTerminalContainer] =
+    useState<ContainerItem | null>(null);
 
   useEffect(() => {
     if (liveContainers) {
@@ -145,6 +154,43 @@ export function ContainersTab({
       containerId,
       command,
     });
+  };
+
+  const uploadToContainer = (container: ContainerItem) => {
+    const destination = window.prompt(
+      "Absolute destination directory inside the container",
+      "/tmp",
+    );
+    if (!destination || !organization?.id) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".tar,application/x-tar";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const params = new URLSearchParams({
+          organizationId: organization.id,
+          destination,
+          resourceId: resource.id,
+        });
+        const response = await fetch(
+          `${getServerUrl()}/api/docker/containers/${encodeURIComponent(container.id)}/upload?${params.toString()}`,
+          { method: "POST", body: formData, credentials: "include" },
+        );
+        const result = (await response.json()) as { error?: string };
+        if (!response.ok)
+          throw new Error(result.error || "Container upload failed");
+        toast.success(`Archive uploaded to ${container.name}`);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Container upload failed",
+        );
+      }
+    };
+    input.click();
   };
 
   const containerLogs = containerLogsData
@@ -302,6 +348,17 @@ export function ContainersTab({
                             >
                               <HardDrive className="mr-2 size-4" /> View Mounts
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setTerminalContainer(con)}
+                            >
+                              <Terminal className="mr-2 size-4" /> Open Terminal
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => uploadToContainer(con)}
+                            >
+                              <Upload className="mr-2 size-4" /> Upload .tar
+                              archive
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -422,6 +479,171 @@ export function ContainersTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ContainerTerminalDialog
+        resourceId={resource.id}
+        container={terminalContainer}
+        onClose={() => setTerminalContainer(null)}
+      />
     </>
+  );
+}
+
+function ContainerTerminalDialog({
+  resourceId,
+  container,
+  onClose,
+}: {
+  resourceId: string;
+  container: ContainerItem | null;
+  onClose(): void;
+}) {
+  const { data: organization } = authClient.useActiveOrganization();
+  const { data: keys = [] } = useQuery({
+    ...trpc.sshKey.list.queryOptions({
+      organizationId: organization?.id || "",
+    }),
+    enabled: Boolean(organization?.id && container),
+  });
+  const [keyId, setKeyId] = useState("");
+  const [command, setCommand] = useState("");
+  const [output, setOutput] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const socket = useState<{ current: WebSocket | null }>({ current: null })[0];
+
+  useEffect(() => {
+    if (!container) {
+      socket.current?.close();
+      socket.current = null;
+      setConnected(false);
+      setOutput("");
+    }
+  }, [container, socket]);
+
+  const connect = async () => {
+    if (!organization?.id || !container || !keyId) {
+      toast.error("Choose an SSH key first");
+      return;
+    }
+    setConnecting(true);
+    try {
+      const response = await fetch(
+        new URL("/api/container-terminal/session", getServerUrl()),
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            organizationId: organization.id,
+            resourceId,
+            containerId: container.id,
+            sshKeyId: keyId,
+          }),
+        },
+      );
+      const data = (await response.json()) as {
+        token?: string;
+        error?: string;
+      };
+      if (!response.ok || !data.token)
+        throw new Error(data.error || "Unable to open terminal");
+      const url = new URL(
+        `/api/terminal/connect?token=${encodeURIComponent(data.token)}`,
+        getServerUrl(),
+      );
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(url);
+      socket.current = ws;
+      ws.binaryType = "arraybuffer";
+      ws.onopen = () => {
+        setConnecting(false);
+        setConnected(true);
+        setOutput("Connected to container.\r\n");
+      };
+      ws.onmessage = async (event) => {
+        const text =
+          typeof event.data === "string"
+            ? event.data
+            : new TextDecoder().decode(
+                event.data instanceof Blob
+                  ? await event.data.arrayBuffer()
+                  : event.data,
+              );
+        setOutput((value) => `${value}${text}`);
+      };
+      ws.onerror = () => toast.error("Container terminal connection failed");
+      ws.onclose = () => {
+        setConnected(false);
+        setConnecting(false);
+      };
+    } catch (error) {
+      setConnecting(false);
+      toast.error(
+        error instanceof Error ? error.message : "Unable to open terminal",
+      );
+    }
+  };
+
+  const send = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (command && socket.current?.readyState === WebSocket.OPEN) {
+      socket.current.send(`${command}\n`);
+      setCommand("");
+    }
+  };
+
+  return (
+    <Dialog
+      open={Boolean(container)}
+      onOpenChange={(open) => !open && onClose()}
+    >
+      <DialogContent className="flex h-[min(86svh,760px)] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] flex-col">
+        <DialogHeader>
+          <DialogTitle>Container terminal</DialogTitle>
+          <DialogDescription>
+            Interactive shell for {container?.name}. The selected SSH key stays
+            on the server.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-wrap gap-2">
+          <select
+            aria-label="SSH key"
+            className="h-9 min-w-56 rounded-md border bg-background px-3 text-sm"
+            value={keyId}
+            onChange={(event) => setKeyId(event.target.value)}
+          >
+            <option value="">Select SSH key</option>
+            {keys.map((key) => (
+              <option key={key.id} value={key.id}>
+                {key.name} · {key.fingerprint}
+              </option>
+            ))}
+          </select>
+          <Button onClick={connect} disabled={connecting || connected}>
+            {connecting ? "Connecting…" : "Connect"}
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+        <pre className="min-h-0 flex-1 overflow-auto rounded-md border bg-[#0b0f0d] p-3 font-mono text-foreground text-xs">
+          {output || "Disconnected. Choose an SSH key and connect."}
+        </pre>
+        <DialogFooter>
+          <form onSubmit={send} className="flex w-full gap-2">
+            <input
+              className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 font-mono text-sm"
+              value={command}
+              onChange={(event) => setCommand(event.target.value)}
+              placeholder="Run a command inside the container"
+              disabled={!connected}
+            />
+            <Button type="submit" disabled={!connected || !command}>
+              Run
+            </Button>
+          </form>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

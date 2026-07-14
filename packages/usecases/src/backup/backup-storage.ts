@@ -82,13 +82,23 @@ export function pipeProcesses(
   producerArgs: string[],
   consumerCommand: string,
   consumerArgs: string[],
+  environments?: {
+    producer?: Record<string, string | undefined>;
+    consumer?: Record<string, string | undefined>;
+  },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const producer = spawn(producerCommand, producerArgs, {
       stdio: ["ignore", "pipe", "pipe"],
+      env: environments?.producer
+        ? { ...process.env, ...environments.producer }
+        : undefined,
     });
     const consumer = spawn(consumerCommand, consumerArgs, {
       stdio: ["pipe", "ignore", "pipe"],
+      env: environments?.consumer
+        ? { ...process.env, ...environments.consumer }
+        : undefined,
     });
     let producerError = "";
     let consumerError = "";

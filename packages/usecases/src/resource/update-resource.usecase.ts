@@ -19,6 +19,9 @@ import { log } from "evlog";
 import { z } from "zod";
 import { CaddyService } from "../web-server/caddy.service";
 import { createRemoteDocker } from "./docker-client";
+import { validateLibsqlSettings } from "./libsql-settings";
+import { serializeResourceCredentials } from "./resource-credentials";
+import { serializeResourceEnvironmentVariables } from "./resource-environment";
 
 export const UpdateResourceInputSchema = z.object({
   id: z.string().min(1, "Resource ID is required"),
@@ -29,15 +32,43 @@ export const UpdateResourceInputSchema = z.object({
   provider: z.string().optional(),
   dbType: z.string().optional(),
   dockerImage: z.string().optional(),
+  buildRegistryId: z.string().nullable().optional(),
+  rollbackActive: z.boolean().optional(),
+  rollbackRegistryId: z.string().nullable().optional(),
+  allowCustomImage: z.boolean().optional(),
+  externalPort: z.coerce.number().int().min(1).max(65535).nullable().optional(),
+  libsqlGrpcPort: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(65535)
+    .nullable()
+    .optional(),
+  libsqlAdminPort: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(65535)
+    .nullable()
+    .optional(),
   composeType: ResourceComposeTypeSchema.optional(),
   credentials: z.string().optional(),
+  triggerType: z.enum(["push", "tag"]).optional(),
+  watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
+  buildSecrets: z.string().optional(),
+  isPreviewDeploymentsActive: z.boolean().optional(),
+  previewLimit: z.coerce.number().int().min(1).max(100).optional(),
+  previewWildcard: z.string().trim().min(1).max(253).nullable().optional(),
+  previewHttps: z.boolean().optional(),
+  previewPort: z.coerce.number().int().min(1).max(65535).optional(),
   advancedConfig: z.string().optional(),
   envVars: z.string().optional(),
   domains: z.string().optional(),
   deployments: z.string().optional(),
   containers: z.string().optional(),
   serverId: z.string().nullable().optional(),
+  buildServerId: z.string().nullable().optional(),
 });
 
 export type UpdateResourceInput = z.infer<typeof UpdateResourceInputSchema>;
@@ -62,6 +93,14 @@ export class UpdateResourceUseCase {
     }
 
     const patch: Partial<Resource> = {};
+    validateLibsqlSettings(
+      input.dbType ?? resource.dbType ?? undefined,
+      input.libsqlGrpcPort,
+      input.libsqlAdminPort,
+      (input.dbType ?? resource.dbType)?.toLowerCase() === "libsql"
+        ? (input.externalPort ?? resource.externalPort)
+        : undefined,
+    );
     if (input.name !== undefined) patch.name = input.name;
     if (input.status !== undefined) patch.status = input.status;
     if (input.appName !== undefined) {
@@ -90,14 +129,118 @@ export class UpdateResourceUseCase {
       const dbType = input.dbType ?? resource.dbType ?? undefined;
       const dockerImage =
         input.dockerImage ?? resource.dockerImage ?? undefined;
-      if (!isSupportedDatabaseImage(dbType, dockerImage)) {
+      if (
+        !isSupportedDatabaseImage(
+          dbType,
+          dockerImage,
+          input.allowCustomImage === true,
+        )
+      ) {
         throw new ValidationError(
           "Select a supported database image version for the selected database engine",
         );
       }
       if (input.dbType !== undefined) patch.dbType = input.dbType;
+      if (input.dbType?.toLowerCase() !== "libsql") {
+        patch.libsqlGrpcPort = null;
+        patch.libsqlAdminPort = null;
+      }
       if (input.dockerImage !== undefined)
         patch.dockerImage = input.dockerImage;
+    }
+    if (input.externalPort !== undefined) {
+      if (resource.type !== "database") {
+        throw new ValidationError(
+          "External port can only be changed on database resources",
+        );
+      }
+      patch.externalPort = input.externalPort;
+    }
+    if (
+      input.libsqlGrpcPort !== undefined ||
+      input.libsqlAdminPort !== undefined
+    ) {
+      if (resource.type !== "database") {
+        throw new ValidationError(
+          "libSQL ports can only be changed on database resources",
+        );
+      }
+      if (
+        (input.dbType ?? resource.dbType)?.toLowerCase() !== "libsql" &&
+        [input.libsqlGrpcPort, input.libsqlAdminPort].some(
+          (port) => port !== null && port !== undefined,
+        )
+      ) {
+        throw new ValidationError(
+          "libSQL ports can only be configured for libSQL resources",
+        );
+      }
+      if (input.libsqlGrpcPort !== undefined) {
+        patch.libsqlGrpcPort = input.libsqlGrpcPort;
+      }
+      if (input.libsqlAdminPort !== undefined) {
+        patch.libsqlAdminPort = input.libsqlAdminPort;
+      }
+    }
+    if (input.buildRegistryId !== undefined) {
+      if (resource.type !== "application") {
+        throw new ValidationError(
+          "Build registry settings are only supported on application resources",
+        );
+      }
+      const environment = await this.uow.environmentRepository.findById(
+        resource.environmentId,
+      );
+      const project = environment
+        ? await this.uow.projectRepository.findById(environment.projectId)
+        : null;
+      if (!project) throw new ValidationError("Project not found");
+      if (input.buildRegistryId) {
+        const registry = await this.uow.dockerRegistryRepository.findById(
+          input.buildRegistryId,
+        );
+        if (!registry || registry.organizationId !== project.organizationId) {
+          throw new ValidationError(
+            "Selected build registry is not available to this organization",
+          );
+        }
+      }
+      patch.buildRegistryId = input.buildRegistryId;
+    }
+    if (
+      input.rollbackActive !== undefined ||
+      input.rollbackRegistryId !== undefined
+    ) {
+      if (resource.type !== "application") {
+        throw new ValidationError(
+          "Rollback registry settings are only supported on application resources",
+        );
+      }
+      const environment = await this.uow.environmentRepository.findById(
+        resource.environmentId,
+      );
+      const project = environment
+        ? await this.uow.projectRepository.findById(environment.projectId)
+        : null;
+      if (!project) throw new ValidationError("Project not found");
+
+      const rollbackRegistryId =
+        input.rollbackRegistryId !== undefined
+          ? input.rollbackRegistryId
+          : resource.rollbackRegistryId;
+      if (rollbackRegistryId) {
+        const registry =
+          await this.uow.dockerRegistryRepository.findById(rollbackRegistryId);
+        if (!registry || registry.organizationId !== project.organizationId) {
+          throw new ValidationError(
+            "Selected rollback registry is not available to this organization",
+          );
+        }
+      }
+      if (input.rollbackActive !== undefined)
+        patch.rollbackActive = input.rollbackActive;
+      if (input.rollbackRegistryId !== undefined)
+        patch.rollbackRegistryId = input.rollbackRegistryId;
     }
     if (input.composeType !== undefined) {
       if (resource.type !== "compose") {
@@ -108,23 +251,37 @@ export class UpdateResourceUseCase {
       patch.composeType = input.composeType;
     }
     if (input.credentials !== undefined) {
-      let credentials = input.credentials;
-      if (resource.type === "database" && input.credentials) {
-        try {
-          credentials = JSON.stringify(encryptSecret(input.credentials));
-        } catch (error: unknown) {
-          log.error({
-            message: "Failed to encrypt database credentials",
-            err: error instanceof Error ? error.message : String(error),
-          });
-          throw new ValidationError(
-            "Database credentials could not be encrypted",
-          );
-        }
+      try {
+        patch.credentials = serializeResourceCredentials(input.credentials);
+      } catch (error: unknown) {
+        log.error({
+          message: "Failed to encrypt resource credentials",
+          err: error instanceof Error ? error.message : String(error),
+        });
+        throw new ValidationError(
+          "Resource credentials could not be encrypted",
+        );
       }
-      patch.credentials = credentials;
     }
-    if (input.envVars !== undefined) patch.envVars = input.envVars;
+    if (input.triggerType !== undefined) {
+      if (resource.type !== "application") {
+        throw new ValidationError(
+          "Trigger settings can only be changed on application resources",
+        );
+      }
+      patch.triggerType = input.triggerType;
+    }
+    if (input.watchPaths !== undefined) {
+      if (resource.type !== "application") {
+        throw new ValidationError(
+          "Watch paths can only be changed on application resources",
+        );
+      }
+      patch.watchPaths = JSON.stringify(input.watchPaths);
+    }
+    if (input.envVars !== undefined) {
+      patch.envVars = serializeResourceEnvironmentVariables(input.envVars);
+    }
     if (input.advancedConfig !== undefined) {
       try {
         patch.advancedConfig = serializeResourceAdvancedConfig(
@@ -144,11 +301,78 @@ export class UpdateResourceUseCase {
       }
       patch.buildConfig = serializeApplicationBuildConfig(input.buildConfig);
     }
+    if (input.buildSecrets !== undefined) {
+      if (resource.type !== "application") {
+        throw new ValidationError(
+          "Build secrets can only be changed on application resources",
+        );
+      }
+      try {
+        patch.buildSecrets = input.buildSecrets
+          ? JSON.stringify(encryptSecret(input.buildSecrets))
+          : null;
+      } catch (error) {
+        log.error({
+          message: "Failed to encrypt application build secrets",
+          err: error instanceof Error ? error.message : String(error),
+        });
+        throw new ValidationError(
+          "Application build secrets could not be encrypted",
+        );
+      }
+    }
+    if (
+      input.isPreviewDeploymentsActive !== undefined ||
+      input.previewLimit !== undefined ||
+      input.previewWildcard !== undefined ||
+      input.previewHttps !== undefined ||
+      input.previewPort !== undefined
+    ) {
+      if (resource.type !== "application") {
+        throw new ValidationError(
+          "Preview deployment settings can only be changed on applications",
+        );
+      }
+      if (input.isPreviewDeploymentsActive !== undefined)
+        patch.isPreviewDeploymentsActive = input.isPreviewDeploymentsActive;
+      if (input.previewLimit !== undefined)
+        patch.previewLimit = input.previewLimit;
+      if (input.previewWildcard !== undefined)
+        patch.previewWildcard = input.previewWildcard;
+      if (input.previewHttps !== undefined)
+        patch.previewHttps = input.previewHttps;
+      if (input.previewPort !== undefined)
+        patch.previewPort = input.previewPort;
+    }
     if (input.domains !== undefined) {
       try {
-        patch.domains = serializeDomainMappings(
-          parseDomainMappings(input.domains),
-        );
+        const mappings = parseDomainMappings(input.domains);
+        const customCertificateIds = mappings
+          .filter((mapping) => mapping.certificateType === "custom")
+          .map((mapping) => mapping.certificateId)
+          .filter((id): id is string => Boolean(id));
+        if (customCertificateIds.length > 0) {
+          const environment = await this.uow.environmentRepository.findById(
+            resource.environmentId,
+          );
+          const project = environment
+            ? await this.uow.projectRepository.findById(environment.projectId)
+            : null;
+          if (!project) throw new ValidationError("Project not found");
+          for (const certificateId of new Set(customCertificateIds)) {
+            const certificate =
+              await this.uow.certificateRepository.findById(certificateId);
+            if (
+              !certificate ||
+              certificate.organizationId !== project.organizationId
+            ) {
+              throw new ValidationError(
+                "Selected certificate is not available to this organization",
+              );
+            }
+          }
+        }
+        patch.domains = serializeDomainMappings(mappings);
       } catch (error) {
         throw new ValidationError(
           `Invalid domain configuration: ${error instanceof Error ? error.message : "unknown validation error"}`,
@@ -157,7 +381,28 @@ export class UpdateResourceUseCase {
     }
     if (input.deployments !== undefined) patch.deployments = input.deployments;
     if (input.containers !== undefined) patch.containers = input.containers;
-    if (input.serverId !== undefined) patch.serverId = input.serverId;
+    if (input.serverId !== undefined || input.buildServerId !== undefined) {
+      const environment = await this.uow.environmentRepository.findById(
+        resource.environmentId,
+      );
+      const project = environment
+        ? await this.uow.projectRepository.findById(environment.projectId)
+        : null;
+      if (!project) throw new ValidationError("Project not found");
+
+      for (const serverId of [input.serverId, input.buildServerId]) {
+        if (!serverId || ["local", "manager"].includes(serverId)) continue;
+        const server = await this.uow.serverRepository.findById(serverId);
+        if (!server || server.organizationId !== project.organizationId) {
+          throw new ValidationError(
+            "Selected server is not available to this organization",
+          );
+        }
+      }
+      if (input.serverId !== undefined) patch.serverId = input.serverId;
+      if (input.buildServerId !== undefined)
+        patch.buildServerId = input.buildServerId;
+    }
 
     const routingChanged =
       input.domains !== undefined ||
@@ -170,6 +415,8 @@ export class UpdateResourceUseCase {
       ? await this.uow.resourceRepository.findMany()
       : [];
     const serverId = resource.serverId;
+    const certificates =
+      (await this.uow.certificateRepository.findAll?.()) ?? [];
     const sameServerResources =
       serverId && !["local", "manager"].includes(serverId)
         ? resources.filter((c) => c.serverId === serverId)
@@ -228,6 +475,7 @@ export class UpdateResourceUseCase {
       await caddyService.syncResourceConfigs(
         candidateResources,
         settings || {},
+        certificates,
       );
     }
 
@@ -241,6 +489,7 @@ export class UpdateResourceUseCase {
           await caddyService.syncResourceConfigs(
             existingResources,
             settings || {},
+            certificates,
           );
         } catch (rollbackError) {
           log.error({

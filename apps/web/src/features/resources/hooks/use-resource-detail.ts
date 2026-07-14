@@ -12,6 +12,7 @@ export function useResourceDetail({
   selectedContainerId,
   containerModalOpen,
   statsIntervalEnabled,
+  logsSince,
 }: {
   projectId: string;
   environmentId: string;
@@ -20,6 +21,7 @@ export function useResourceDetail({
   selectedContainerId?: string;
   containerModalOpen?: boolean;
   statsIntervalEnabled?: boolean;
+  logsSince?: number;
 }) {
   const router = useRouter();
 
@@ -38,8 +40,22 @@ export function useResourceDetail({
     enabled: !!projectQuery.data?.organizationId,
   });
 
+  const serversQuery = useQuery({
+    ...trpc.server.list.queryOptions({
+      organizationId: projectQuery.data?.organizationId || "",
+    }),
+    enabled: !!projectQuery.data?.organizationId,
+  });
+
   const gitProvidersQuery = useQuery({
     ...trpc.gitProvider.list.queryOptions({
+      organizationId: projectQuery.data?.organizationId || "",
+    }),
+    enabled: !!projectQuery.data?.organizationId,
+  });
+
+  const certificatesQuery = useQuery({
+    ...trpc.certificate.list.queryOptions({
       organizationId: projectQuery.data?.organizationId || "",
     }),
     enabled: !!projectQuery.data?.organizationId,
@@ -66,6 +82,7 @@ export function useResourceDetail({
       id: resourceId,
       containerId:
         selectedLogContainerId === "all" ? undefined : selectedLogContainerId,
+      since: logsSince,
     }),
     refetchInterval: 4000,
   });
@@ -80,6 +97,7 @@ export function useResourceDetail({
     ...trpc.resource.getLogs.queryOptions({
       id: resourceId,
       containerId: selectedContainerId || undefined,
+      since: logsSince,
     }),
     enabled: containerModalOpen && !!selectedContainerId,
     refetchInterval: containerModalOpen ? 3000 : false,
@@ -116,6 +134,15 @@ export function useResourceDetail({
     },
   });
 
+  const rebuildDatabaseMutation = useMutation({
+    ...trpc.resource.rebuildDatabase.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Database rebuilt successfully");
+      void resourceQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message || "Failed to rebuild database"),
+  });
+
   const controlContainerMutation = useMutation({
     ...trpc.resource.controlContainer.mutationOptions(),
     onSuccess: () => {
@@ -140,7 +167,9 @@ export function useResourceDetail({
     project: projectQuery.data,
     env: envQuery.data,
     sshKeys: sshKeysQuery.data ?? [],
+    servers: serversQuery.data ?? [],
     gitProviders: gitProvidersQuery.data ?? [],
+    certificates: certificatesQuery.data ?? [],
     resource: resourceQuery.data,
     loadingResource: resourceQuery.isPending,
     refetchResource: resourceQuery.refetch,
@@ -155,6 +184,8 @@ export function useResourceDetail({
     isDeployingResource: deployResourceMutation.isPending,
     controlResource: controlResourceMutation.mutate,
     isControllingResource: controlResourceMutation.isPending,
+    rebuildDatabase: rebuildDatabaseMutation.mutate,
+    isRebuildingDatabase: rebuildDatabaseMutation.isPending,
     controlContainer: controlContainerMutation.mutate,
     isControllingContainer: controlContainerMutation.isPending,
     deleteResource: deleteResourceMutation.mutate,

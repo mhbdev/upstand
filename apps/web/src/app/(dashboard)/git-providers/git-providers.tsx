@@ -66,6 +66,7 @@ export default function GitProviders({
   const [isOrganization, setIsOrganization] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [manifest, setManifest] = useState("");
+  const [githubManifestState, setGithubManifestState] = useState("");
 
   // GitLab-specific state
   const [gitlabUrl, setGitlabUrl] = useState("https://gitlab.com");
@@ -82,6 +83,7 @@ export default function GitProviders({
   const [giteaUrl, setGiteaUrl] = useState("");
   const [giteaClientId, setGiteaClientId] = useState("");
   const [giteaClientSecret, setGiteaClientSecret] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
 
   const [deleteProviderOpen, setDeleteProviderOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<{
@@ -90,6 +92,16 @@ export default function GitProviders({
   } | null>(null);
 
   const orgId = activeOrg?.id;
+
+  const oauthStateMutation = useMutation({
+    ...trpc.gitProvider.createOAuthState.mutationOptions(),
+    onError: (error) => toast.error(error.message),
+  });
+  const { mutate: issueGithubManifestState } = useMutation({
+    ...trpc.gitProvider.createGithubManifestState.mutationOptions(),
+    onSuccess: (result) => setGithubManifestState(result.state),
+    onError: (error) => toast.error(error.message),
+  });
 
   const {
     data: providers,
@@ -113,12 +125,20 @@ export default function GitProviders({
         newProvider.provider === "gitlab" ||
         newProvider.provider === "gitea"
       ) {
-        const authorizeUrl = getOAuthAuthorizeUrl(
-          newProvider.id,
-          newProvider.provider,
-          JSON.parse(newProvider.config),
+        oauthStateMutation.mutate(
+          { organizationId: orgId || "", providerId: newProvider.id },
+          {
+            onSuccess: ({ state }) => {
+              const authorizeUrl = getOAuthAuthorizeUrl(
+                newProvider.id,
+                newProvider.provider as ProviderType,
+                JSON.parse(newProvider.config),
+                state,
+              );
+              window.open(authorizeUrl, "_blank");
+            },
+          },
         );
-        window.open(authorizeUrl, "_blank");
       }
     },
     onError: (err) => {
@@ -158,6 +178,7 @@ export default function GitProviders({
     setGiteaUrl("");
     setGiteaClientId("");
     setGiteaClientSecret("");
+    setWebhookSecret("");
   };
 
   useEffect(() => {
@@ -193,6 +214,12 @@ export default function GitProviders({
     setManifest(manifestJSON);
   }, [orgId, session?.user?.id, randomString]);
 
+  useEffect(() => {
+    if (orgId && providerType === "github") {
+      issueGithubManifestState({ organizationId: orgId });
+    }
+  }, [orgId, providerType, issueGithubManifestState]);
+
   const handleCreateNonGithub = (e: React.FormEvent) => {
     e.preventDefault();
     if (!orgId) {
@@ -207,18 +234,21 @@ export default function GitProviders({
         applicationId: gitlabAppId.trim(),
         secret: gitlabSecret.trim(),
         groupName: gitlabGroupName.trim() || undefined,
+        webhookSecret: webhookSecret.trim() || undefined,
       });
     } else if (providerType === "bitbucket") {
       config = JSON.stringify({
         bitbucketUsername: bitbucketUsername.trim(),
         appPassword: bitbucketAppPassword.trim(),
         bitbucketWorkspaceName: bitbucketWorkspace.trim() || undefined,
+        webhookSecret: webhookSecret.trim() || undefined,
       });
     } else if (providerType === "gitea") {
       config = JSON.stringify({
         giteaUrl: giteaUrl.replace(/\/+$/, ""),
         clientId: giteaClientId.trim(),
         clientSecret: giteaClientSecret.trim(),
+        webhookSecret: webhookSecret.trim() || undefined,
       });
     }
 
@@ -239,21 +269,22 @@ export default function GitProviders({
     if (isOrganization && orgName.trim()) {
       return `https://github.com/organizations/${orgName.trim()}/settings/apps/new?state=gh_init:${orgId}:${session?.user?.id}`;
     }
-    return `https://github.com/settings/apps/new?state=gh_init:${orgId}:${session?.user?.id}`;
+    return `https://github.com/settings/apps/new?state=${encodeURIComponent(githubManifestState)}`;
   };
 
   const getOAuthAuthorizeUrl = (
     providerId: string,
     provider: ProviderType,
     config: any,
+    state = providerId,
   ) => {
     if (provider === "gitlab") {
       const redirectUri = `${getServerUrl()}/api/providers/gitlab/setup`;
-      return `${config.gitlabUrl}/oauth/authorize?client_id=${config.applicationId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${providerId}&scope=api%20read_user%20read_repository`;
+      return `${config.gitlabUrl}/oauth/authorize?client_id=${config.applicationId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}&scope=api%20read_user%20read_repository`;
     }
     if (provider === "gitea") {
       const redirectUri = `${getServerUrl()}/api/providers/gitea/setup`;
-      return `${config.giteaUrl}/login/oauth/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${providerId}`;
+      return `${config.giteaUrl}/login/oauth/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}`;
     }
     return "";
   };
@@ -403,7 +434,24 @@ export default function GitProviders({
                     {!isInstalled ? (
                       provider.provider === "github" ? (
                         <a
-                          href={`${config.githubAppName}/installations/new?state=gh_setup:${provider.id}`}
+                          href={`${config.githubAppName}/installations/new`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            if (!orgId) return;
+                            oauthStateMutation.mutate(
+                              {
+                                organizationId: orgId,
+                                providerId: provider.id,
+                              },
+                              {
+                                onSuccess: ({ state }) => {
+                                  window.location.assign(
+                                    `${config.githubAppName}/installations/new?state=${encodeURIComponent(state)}`,
+                                  );
+                                },
+                              },
+                            );
+                          }}
                           className="inline-flex items-center gap-1.5 text-primary text-xs hover:underline"
                         >
                           <HugeiconsIcon
@@ -533,7 +581,9 @@ export default function GitProviders({
             {/* GitHub App Manifest Form */}
             {providerType === "github" && (
               <form
-                action={getGithubAppCreationUrl()}
+                action={
+                  githubManifestState ? getGithubAppCreationUrl() : undefined
+                }
                 method="post"
                 className="space-y-4 pt-2"
               >
@@ -590,7 +640,10 @@ export default function GitProviders({
                   </a>
                   <Button
                     type="submit"
-                    disabled={isOrganization && !orgName.trim()}
+                    disabled={
+                      (isOrganization && !orgName.trim()) ||
+                      !githubManifestState
+                    }
                     className="gap-1.5"
                   >
                     Create GitHub App
@@ -742,6 +795,23 @@ export default function GitProviders({
                     </div>
                   </>
                 )}
+
+                <div className="space-y-2 border-border/30 border-t pt-4">
+                  <Label htmlFor="provider-webhook-secret">
+                    Webhook signing secret (optional)
+                  </Label>
+                  <Input
+                    id="provider-webhook-secret"
+                    type="password"
+                    placeholder="Use the same secret configured in the provider webhook"
+                    value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Required for signed auto-deploy webhooks. It is stored in
+                    the provider configuration.
+                  </p>
+                </div>
 
                 <DialogFooter className="flex gap-2 pt-4 sm:justify-end">
                   <Button

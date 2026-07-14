@@ -7,7 +7,26 @@ description: How resources are built, scheduled, routed, and recovered.
 
 Create a project, environment, and application resource. Connect GitHub, GitLab, Gitea, Bitbucket, or a generic Git URL, select a branch, configure environment variables, and deploy.
 
-Upstand queues every deployment, locks each resource to prevent overlapping builds, records live logs, builds the image, creates or updates the Swarm service, and finally validates/reloads Caddy routing. A failed deployment preserves the error in deployment history.
+Upstand queues every deployment, locks each resource to prevent overlapping builds, records live logs, builds the image, creates or updates the Swarm service, and finally validates/reloads Caddy routing. A failed deployment preserves the error in deployment history. Git webhook deployments also record the provider commit SHA, so historical source remains auditable after the branch advances.
+
+The **Deployments → Scheduled jobs** panel accepts command, deployment, and
+backup-trigger jobs. Command jobs run a cron command inside the resource
+container; deployment jobs enqueue a normal deployment; backup jobs trigger a
+selected resource backup schedule. Schedules are resource-scoped, permission
+checked, enabled or disabled without deleting them, and refreshed by the
+scheduler immediately after a change. Use the resource’s **Rollback** action
+for a Swarm service when Docker has a previous service specification
+available. For Git-backed Compose and Application resources, select a
+successful historical deployment to redeploy that exact verified commit. Raw
+Compose uploads have no immutable Git revision and therefore do not expose
+historical rollback. Application resources can also enable a typed
+organization-owned rollback registry; its encrypted credentials are sent only
+with the Docker Engine rollback request for private images.
+
+Use **Run now** to execute a schedule immediately, including a currently
+disabled schedule. The action is permission checked against the resource;
+command jobs run inside its container, deployment jobs enter the normal
+deployment queue, and backup jobs enter the durable backup queue.
 
 For a private generic Git repository, attach an SSH key to the resource. The private key is decrypted only for the build and the temporary key file is removed after the job.
 
@@ -15,17 +34,52 @@ For a private generic Git repository, attach an SSH key to the resource. The pri
 
 Compose resources can use either `docker compose up --detach` or `docker stack deploy`. Standalone Compose routes resolve the Compose service DNS name directly; Swarm stack routes resolve the `<stack>_<service>` name. When adding a domain route, select the exact service that should receive traffic; Upstand cannot infer it for a multi-service Compose file.
 
+The raw Compose editor can inspect a file before saving it. Inspection reports
+services, build contexts, images, dependencies, ports, named volumes/networks,
+replicas, and healthchecks. The editor can also convert between Compose and
+Stack modes; Stack conversion removes fixed `container_name` values and maps a
+Compose `restart` value to Swarm `deploy.restart_policy`.
+
 Upstand always ensures the managed ingress overlay exists. Non-isolated Compose services are attached to the shared `upstand-network`; isolated resources use a dedicated resource network and Caddy is attached to that network for active routes. Existing user-defined Compose networks and volume definitions remain available.
 
 ## Databases
 
 Supported database resources deploy as Swarm services with persistent named volumes. Save generated credentials immediately; secrets are encrypted at rest. Do not publish a database port publicly unless you understand the network exposure. Prefer connecting application services over the private `upstand-network` overlay.
 
+The database General tab exposes an engine-specific image selector, encrypted
+credentials, optional external port, reload, and a destructive rebuild flow.
+libSQL additionally exposes independent HTTP, gRPC, and admin published ports;
+the container listeners are HTTP 8080, gRPC 5001, and admin 5000, matching the
+upstream `sqld` deployment contract. When a libSQL user and password are saved,
+Upstand derives the `SQLD_HTTP_AUTH` basic-auth setting without returning the
+secret to the dashboard.
+Rebuild deletes only Upstand’s managed database volume after confirmation and
+then creates a fresh service; a failed rebuild is recorded as a failed
+deployment and does not silently claim success.
+
+Health and Version diagnostics are available for each supported engine. They
+run fixed, engine-aware checks inside the managed database container and return
+bounded output for troubleshooting; arbitrary command strings are deliberately
+not accepted.
+
 ## Domains and HTTPS
 
 Assign a hostname, target port, optional path, and (for Compose) service name. Caddy validates the complete generated configuration before reloading it. A bad mapping does not replace the last working configuration.
 
 For automatic HTTPS, DNS must point to the manager and ports 80/443 must reach Caddy. All routes on one hostname must consistently use either HTTPS or HTTP.
+
+Routes can also terminate in a validated 301/302/307/308 redirect and can add
+HSTS, `nosniff`, frame-deny, and referrer-policy headers before proxying.
+
+For protected routes, configure a forward-auth endpoint such as
+`https://auth.example.com` with a safe verification URI. Caddy calls the
+endpoint before proxying and can copy validated identity headers such as
+`X-User` and `X-Email` to the upstream. Credentials and URL fragments are not
+accepted in the endpoint value.
+
+Routes can also require Caddy basic authentication. Enter a username and a
+Caddy-compatible password hash; Upstand intentionally does not accept or
+persist plaintext basic-auth passwords.
 
 ## Deployment troubleshooting
 

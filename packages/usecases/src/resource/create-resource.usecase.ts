@@ -3,17 +3,24 @@ import {
   ApplicationBuildConfigSchema,
   DEFAULT_APPLICATION_BUILD_CONFIG,
   DEFAULT_RESOURCE_ADVANCED_CONFIG,
+  DomainMappingSchema,
   type IUnitOfWork,
   isSupportedDatabaseImage,
   type Resource,
+  ResourceAdvancedConfigSchema,
   ResourceComposeTypeSchema,
   serializeApplicationBuildConfig,
+  serializeDomainMappings,
   serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
+import { validateLibsqlSettings } from "./libsql-settings";
+import { serializeResourceCredentials } from "./resource-credentials";
+import { serializeResourceEnvironmentVariables } from "./resource-environment";
+import { generateWebhookToken } from "./webhook-token";
 
 export const CreateResourceInputSchema = z.object({
   environmentId: z.string().min(1, "Environment ID is required"),
@@ -24,9 +31,40 @@ export const CreateResourceInputSchema = z.object({
   dbType: z.string().optional(),
   composeType: ResourceComposeTypeSchema.optional(),
   dockerImage: z.string().optional(),
+  buildRegistryId: z.string().nullable().optional(),
+  rollbackActive: z.boolean().optional(),
+  rollbackRegistryId: z.string().nullable().optional(),
+  allowCustomImage: z.boolean().optional(),
+  externalPort: z.coerce.number().int().min(1).max(65535).optional(),
+  libsqlGrpcPort: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(65535)
+    .nullable()
+    .optional(),
+  libsqlAdminPort: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(65535)
+    .nullable()
+    .optional(),
   credentials: z.string().optional(),
+  triggerType: z.enum(["push", "tag"]).optional(),
+  watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
+  buildSecrets: z.string().optional(),
+  isPreviewDeploymentsActive: z.boolean().optional(),
+  previewLimit: z.coerce.number().int().min(1).max(100).optional(),
+  previewWildcard: z.string().trim().min(1).max(253).nullable().optional(),
+  previewHttps: z.boolean().optional(),
+  previewPort: z.coerce.number().int().min(1).max(65535).optional(),
   serverId: z.string().optional(),
+  buildServerId: z.string().nullable().optional(),
+  advancedConfig: ResourceAdvancedConfigSchema.optional(),
+  envVars: z.record(z.string(), z.string()).optional(),
+  domains: z.array(DomainMappingSchema).optional(),
 });
 
 export type CreateResourceInput = z.infer<typeof CreateResourceInputSchema>;
@@ -42,9 +80,19 @@ export class CreateResourceUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: CreateResourceInput): Promise<Resource> {
+    validateLibsqlSettings(
+      input.dbType,
+      input.libsqlGrpcPort,
+      input.libsqlAdminPort,
+      input.dbType?.toLowerCase() === "libsql" ? input.externalPort : undefined,
+    );
     if (
       input.type === "database" &&
-      !isSupportedDatabaseImage(input.dbType, input.dockerImage)
+      !isSupportedDatabaseImage(
+        input.dbType,
+        input.dockerImage,
+        input.allowCustomImage === true,
+      )
     ) {
       throw new ValidationError(
         "Select a supported database image version for the selected database engine",
@@ -57,6 +105,93 @@ export class CreateResourceUseCase {
       );
       if (!environment) {
         throw new ValidationError("Environment not found");
+      }
+
+      if (input.rollbackActive || input.rollbackRegistryId) {
+        if (input.type !== "application") {
+          throw new ValidationError(
+            "Rollback registry settings are only supported on application resources",
+          );
+        }
+        if (input.rollbackRegistryId) {
+          const project = await tx.projectRepository.findById(
+            environment.projectId,
+          );
+          if (!project) throw new ValidationError("Project not found");
+          const registry = await tx.dockerRegistryRepository.findById(
+            input.rollbackRegistryId,
+          );
+          if (!registry || registry.organizationId !== project.organizationId) {
+            throw new ValidationError(
+              "Selected rollback registry is not available to this organization",
+            );
+          }
+        }
+      }
+
+      if (input.buildRegistryId) {
+        if (input.type !== "application") {
+          throw new ValidationError(
+            "Build registry settings are only supported on application resources",
+          );
+        }
+        const project = await tx.projectRepository.findById(
+          environment.projectId,
+        );
+        if (!project) throw new ValidationError("Project not found");
+        const registry = await tx.dockerRegistryRepository.findById(
+          input.buildRegistryId,
+        );
+        if (!registry || registry.organizationId !== project.organizationId) {
+          throw new ValidationError(
+            "Selected build registry is not available to this organization",
+          );
+        }
+      }
+
+      const customCertificateIds = (input.domains ?? [])
+        .filter((mapping) => mapping.certificateType === "custom")
+        .map((mapping) => mapping.certificateId)
+        .filter((id): id is string => Boolean(id));
+      if (customCertificateIds.length > 0) {
+        const project = await tx.projectRepository.findById(
+          environment.projectId,
+        );
+        if (!project) throw new ValidationError("Project not found");
+        for (const certificateId of new Set(customCertificateIds)) {
+          const certificate =
+            await tx.certificateRepository.findById(certificateId);
+          if (
+            !certificate ||
+            certificate.organizationId !== project.organizationId
+          ) {
+            throw new ValidationError(
+              "Selected certificate is not available to this organization",
+            );
+          }
+        }
+      }
+
+      if (
+        [input.serverId, input.buildServerId].some(
+          (serverId) => serverId && !["local", "manager"].includes(serverId),
+        )
+      ) {
+        const project = await tx.projectRepository.findById(
+          environment.projectId,
+        );
+        if (!project) {
+          throw new ValidationError("Project not found");
+        }
+        for (const serverId of [input.serverId, input.buildServerId]) {
+          if (!serverId || ["local", "manager"].includes(serverId)) continue;
+          const server = await tx.serverRepository.findById(serverId);
+          if (!server || server.organizationId !== project.organizationId) {
+            throw new ValidationError(
+              "Selected server is not available to this organization",
+            );
+          }
+        }
       }
 
       const serviceKey = dockerServiceKey(input.appName);
@@ -80,21 +215,46 @@ export class CreateResourceUseCase {
       }
 
       let credentials = input.credentials ?? null;
-      if (input.type === "database" && input.credentials) {
+      let sourceConfig: Record<string, unknown> = {};
+      if (input.credentials) {
         try {
-          const encrypted = encryptSecret(input.credentials);
-          credentials = JSON.stringify(encrypted);
+          const parsed = JSON.parse(input.credentials);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            sourceConfig = parsed as Record<string, unknown>;
+          }
+        } catch {
+          sourceConfig = {};
+        }
+      }
+      const triggerType =
+        input.triggerType ??
+        (String(sourceConfig.triggerType ?? "push")
+          .toLowerCase()
+          .includes("tag")
+          ? "tag"
+          : "push");
+      const watchPaths =
+        input.watchPaths ??
+        (Array.isArray(sourceConfig.watchPaths)
+          ? sourceConfig.watchPaths.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : []);
+      if (input.credentials) {
+        try {
+          credentials = serializeResourceCredentials(input.credentials);
         } catch (error: unknown) {
           log.error({
-            message: "Failed to encrypt database credentials",
+            message: "Failed to encrypt resource credentials",
             err: error instanceof Error ? error.message : String(error),
           });
           throw new ValidationError(
-            "Database credentials could not be encrypted",
+            "Resource credentials could not be encrypted",
           );
         }
       }
 
+      const webhookToken = generateWebhookToken();
       const res = await tx.resourceRepository.create({
         id: randomUUID(),
         environmentId: input.environmentId,
@@ -108,18 +268,38 @@ export class CreateResourceUseCase {
         composeType:
           input.type === "compose" ? (input.composeType ?? "stack") : null,
         dockerImage: input.dockerImage ?? null,
+        buildRegistryId: input.buildRegistryId ?? null,
+        rollbackActive:
+          input.rollbackActive ?? Boolean(input.rollbackRegistryId),
+        rollbackRegistryId: input.rollbackRegistryId ?? null,
+        externalPort: input.externalPort ?? null,
+        libsqlGrpcPort: input.libsqlGrpcPort ?? null,
+        libsqlAdminPort: input.libsqlAdminPort ?? null,
         credentials,
+        triggerType,
+        watchPaths: JSON.stringify(watchPaths),
+        webhookTokenHash: webhookToken.hash,
+        webhookTokenPrefix: webhookToken.prefix,
         buildConfig: serializeApplicationBuildConfig(
           input.buildConfig ?? DEFAULT_APPLICATION_BUILD_CONFIG,
         ),
+        buildSecrets: input.buildSecrets
+          ? JSON.stringify(encryptSecret(input.buildSecrets))
+          : null,
+        isPreviewDeploymentsActive: input.isPreviewDeploymentsActive ?? false,
+        previewLimit: input.previewLimit ?? 3,
+        previewWildcard: input.previewWildcard ?? null,
+        previewHttps: input.previewHttps ?? false,
+        previewPort: input.previewPort ?? 3000,
         advancedConfig: serializeResourceAdvancedConfig(
-          DEFAULT_RESOURCE_ADVANCED_CONFIG,
+          input.advancedConfig ?? DEFAULT_RESOURCE_ADVANCED_CONFIG,
         ),
-        envVars: "{}",
-        domains: "[]",
+        envVars: serializeResourceEnvironmentVariables(input.envVars ?? {}),
+        domains: serializeDomainMappings(input.domains ?? []),
         deployments: "[]",
         containers: "[]",
         serverId: input.serverId ?? null,
+        buildServerId: input.buildServerId ?? null,
       });
 
       // Increment resource count

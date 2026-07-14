@@ -1,26 +1,167 @@
 import { TRPCError } from "@trpc/server";
 import {
+  ControlDockerContainerInputSchema,
+  ControlDockerResourceInputSchema,
   CreateServerInputSchema,
   DeleteServerInputSchema,
+  GetDockerInventoryInputSchema,
+  GetServerCountInputSchema,
   GetServerHistoricalMetricsInputSchema,
+  GetServerInputSchema,
   GetServerRuntimeStatsInputSchema,
   GetServersInputSchema,
   SetupServerInputSchema,
+  UpdateServerInputSchema,
 } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateServerUseCaseToken,
   DeleteServerUseCaseToken,
+  GetDockerInventoryUseCaseToken,
+  GetServerCountUseCaseToken,
   GetServerHistoricalMetricsUseCaseToken,
   GetServerRuntimeStatsUseCaseToken,
   GetServersUseCaseToken,
+  GetServerUseCaseToken,
   SetupServerUseCaseToken,
+  UpdateServerUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
 export const serverRouter = router({
+  count: twoFactorVerifiedProcedure
+    .input(GetServerCountInputSchema)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+      try {
+        return await ctx.scope
+          .resolve(GetServerCountUseCaseToken)
+          .execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  one: twoFactorVerifiedProcedure
+    .input(GetServerInputSchema)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+      try {
+        return await ctx.scope.resolve(GetServerUseCaseToken).execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  controlContainer: twoFactorVerifiedProcedure
+    .input(ControlDockerContainerInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:update",
+      );
+      const useCase = ctx.scope.resolve(GetDockerInventoryUseCaseToken);
+      try {
+        return await useCase.controlContainer(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  controlResource: twoFactorVerifiedProcedure
+    .input(ControlDockerResourceInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:update",
+      );
+      const useCase = ctx.scope.resolve(GetDockerInventoryUseCaseToken);
+      try {
+        return await useCase.controlResource(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  validate: twoFactorVerifiedProcedure
+    .input(
+      GetDockerInventoryInputSchema.pick({
+        organizationId: true,
+        serverId: true,
+      }).extend({
+        serverId: GetDockerInventoryInputSchema.shape.serverId.unwrap(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+      const useCase = ctx.scope.resolve(GetDockerInventoryUseCaseToken);
+      try {
+        return await useCase.execute({
+          organizationId: input.organizationId,
+          serverId: input.serverId,
+          kind: "info",
+          tail: 150,
+        });
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  time: twoFactorVerifiedProcedure
+    .input(
+      GetDockerInventoryInputSchema.pick({
+        organizationId: true,
+        serverId: true,
+      }).extend({
+        serverId: GetDockerInventoryInputSchema.shape.serverId.unwrap(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+      const useCase = ctx.scope.resolve(GetDockerInventoryUseCaseToken);
+      try {
+        return await useCase.getHostTime(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  inventory: twoFactorVerifiedProcedure
+    .input(GetDockerInventoryInputSchema)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+      const useCase = ctx.scope.resolve(GetDockerInventoryUseCaseToken);
+      try {
+        return await useCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
   runtimeStats: twoFactorVerifiedProcedure
     .input(GetServerRuntimeStatsInputSchema)
     .query(async ({ ctx, input }) => {
@@ -127,6 +268,21 @@ export const serverRouter = router({
             cause: error,
           });
         }
+        handleUseCaseError(error);
+      }
+    }),
+
+  update: twoFactorVerifiedProcedure
+    .input(UpdateServerInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:update",
+      );
+      try {
+        return await ctx.scope.resolve(UpdateServerUseCaseToken).execute(input);
+      } catch (error) {
         handleUseCaseError(error);
       }
     }),

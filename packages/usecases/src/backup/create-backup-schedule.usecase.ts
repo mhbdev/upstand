@@ -46,6 +46,7 @@ export class CreateBackupScheduleUseCase {
     const schedule = await this.uow.transaction((tx) =>
       tx.backupScheduleRepository.create({
         id: randomUUID(),
+        organizationId,
         ...toScheduleUpdate(normalized, encryptedSourceCredentials(normalized)),
       }),
     );

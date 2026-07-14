@@ -4,10 +4,12 @@ import {
   AIRepositoryToken,
   BackupRunRepositoryToken,
   BackupScheduleRepositoryToken,
+  CertificateRepositoryToken,
   DbToken,
   DrizzleAIRepository,
   DrizzleBackupRunRepository,
   DrizzleBackupScheduleRepository,
+  DrizzleCertificateRepository,
   DrizzleEnvironmentRepository,
   DrizzleGitProviderRepository,
   DrizzleMonitoringSettingsRepository,
@@ -17,6 +19,8 @@ import {
   DrizzleResourceRepository,
   DrizzleS3DestinationRepository,
   DrizzleSshKeyRepository,
+  DrizzleTagRepository,
+  DrizzleTemplateRepository,
   DrizzleUnitOfWork,
   DrizzleUserRepository,
   DrizzleWebServerSettingsRepository,
@@ -29,10 +33,13 @@ import {
   ResourceRepositoryToken,
   S3DestinationRepositoryToken,
   SshKeyRepositoryToken,
+  TagRepositoryToken,
+  TemplateRepositoryToken,
   UserRepositoryToken,
   WebServerSettingsRepositoryToken,
 } from "@upstand/repositories";
 import {
+  AssignResourceTagUseCase,
   BackupScheduler,
   CaddyService,
   CaddyServiceToken,
@@ -40,6 +47,7 @@ import {
   ControlResourceUseCase,
   CreateAuditLogUseCase,
   CreateBackupScheduleUseCase,
+  CreateCertificateUseCase,
   CreateDockerRegistryUseCase,
   CreateEnvironmentUseCase,
   CreateGitProviderUseCase,
@@ -47,10 +55,16 @@ import {
   CreateProjectUseCase,
   CreateResourceUseCase,
   CreateS3DestinationUseCase,
+  CreateScheduleUseCase,
   CreateServerUseCase,
   CreateSshKeyUseCase,
+  CreateTagUseCase,
+  CreateTemplateUseCase,
   CreateUserUseCase,
+  CreateWebServerBackupScheduleUseCase,
+  DatabaseCommandUseCase,
   DeleteBackupScheduleUseCase,
+  DeleteCertificateUseCase,
   DeleteDockerRegistryUseCase,
   DeleteEnvironmentUseCase,
   DeleteGitProviderUseCase,
@@ -58,13 +72,18 @@ import {
   DeleteProjectUseCase,
   DeleteResourceUseCase,
   DeleteS3DestinationUseCase,
+  DeleteScheduleUseCase,
   DeleteServerUseCase,
   DeleteSshKeyUseCase,
+  DeleteTagUseCase,
+  DeleteTemplateUseCase,
   DeliverNotificationUseCase,
   DeployResourceUseCase,
+  DeployTemplateUseCase,
   DockerReadOnlyService,
   DockerService,
   DockerServiceToken,
+  DuplicateProjectUseCase,
   ExecuteBackupRunUseCase,
   GeneralScheduler,
   GetAccountStatusUseCase,
@@ -80,16 +99,21 @@ import {
   GetProjectsUseCase,
   GetProjectUseCase,
   GetQueueUseCase,
+  GetRequestsUseCase,
   GetResourceContainersUseCase,
   GetResourceLogsUseCase,
+  GetResourcePreviewsUseCase,
   GetResourceRoutingTargetsUseCase,
   GetResourceStatsUseCase,
   GetResourcesUseCase,
   GetResourceUseCase,
   GetS3DestinationsUseCase,
+  GetSchedulesUseCase,
+  GetServerCountUseCase,
   GetServerHistoricalMetricsUseCase,
   GetServerRuntimeStatsUseCase,
   GetServersUseCase,
+  GetServerUseCase,
   GetSshKeysUseCase,
   GetSwarmContainersUseCase,
   GetSwarmInfoUseCase,
@@ -98,16 +122,29 @@ import {
   GetUpdateStatusUseCase,
   GetWebServerLogsUseCase,
   GetWebServerSettingsUseCase,
+  GlobalSearchUseCase,
   InitSwarmUseCase,
+  InspectComposeUseCase,
   ListAuditLogsUseCase,
   ListBackupVolumesUseCase,
+  ListCertificatesUseCase,
+  ListComposeServicesUseCase,
   ListGitBranchesUseCase,
   ListGitRepositoriesUseCase,
+  ListResourceTagsUseCase,
+  ListTagsUseCase,
+  ListTemplatesUseCase,
   NotificationTransportRegistry,
   PublishNotificationUseCase,
+  RandomizeComposeUseCase,
+  RebuildDatabaseUseCase,
   ReloadWebServerUseCase,
+  RemoveResourceTagUseCase,
   RemoveSwarmNodeUseCase,
   RestoreBackupRunUseCase,
+  RetryNotificationDeliveryUseCase,
+  RollbackResourceUseCase,
+  RotateResourceWebhookTokenUseCase,
   RotateSwarmJoinTokenUseCase,
   SetupServerUseCase,
   TestDockerRegistryConnectionUseCase,
@@ -116,20 +153,32 @@ import {
   TriggerBackupRunUseCase,
   TriggerUpdateUseCase,
   UpdateBackupScheduleUseCase,
+  UpdateCertificateUseCase,
   UpdateConcurrencyUseCase,
+  UpdateDockerRegistryUseCase,
+  UpdateGitProviderUseCase,
   UpdateNotificationChannelUseCase,
   UpdateResourceUseCase,
   UpdateS3DestinationUseCase,
+  UpdateScheduleUseCase,
+  UpdateServerUseCase,
+  UpdateSshKeyUseCase,
   UpdateSwarmNodeUseCase,
+  UpdateTagUseCase,
+  UpdateTemplateUseCase,
+  UpdateWebServerBackupScheduleUseCase,
   UpdateWebServerSettingsUseCase,
+  ValidateDomainUseCase,
 } from "@upstand/usecases";
 import { GenerateSshKeyUseCase } from "@upstand/usecases/ssh-key/generate-ssh-key.usecase";
 import {
+  AssignResourceTagUseCaseToken,
   BackupSchedulerToken,
   ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
   CreateAuditLogUseCaseToken,
   CreateBackupScheduleUseCaseToken,
+  CreateCertificateUseCaseToken,
   CreateDockerRegistryUseCaseToken,
   CreateEnvironmentUseCaseToken,
   CreateGitProviderUseCaseToken,
@@ -137,10 +186,16 @@ import {
   CreateProjectUseCaseToken,
   CreateResourceUseCaseToken,
   CreateS3DestinationUseCaseToken,
+  CreateScheduleUseCaseToken,
   CreateServerUseCaseToken,
   CreateSshKeyUseCaseToken,
+  CreateTagUseCaseToken,
+  CreateTemplateUseCaseToken,
   CreateUserUseCaseToken,
+  CreateWebServerBackupScheduleUseCaseToken,
+  DatabaseCommandUseCaseToken,
   DeleteBackupScheduleUseCaseToken,
+  DeleteCertificateUseCaseToken,
   DeleteDockerRegistryUseCaseToken,
   DeleteEnvironmentUseCaseToken,
   DeleteGitProviderUseCaseToken,
@@ -148,11 +203,16 @@ import {
   DeleteProjectUseCaseToken,
   DeleteResourceUseCaseToken,
   DeleteS3DestinationUseCaseToken,
+  DeleteScheduleUseCaseToken,
   DeleteServerUseCaseToken,
   DeleteSshKeyUseCaseToken,
+  DeleteTagUseCaseToken,
+  DeleteTemplateUseCaseToken,
   DeliverNotificationUseCaseToken,
   DeployResourceUseCaseToken,
+  DeployTemplateUseCaseToken,
   DockerReadOnlyServiceToken,
+  DuplicateProjectUseCaseToken,
   ExecuteBackupRunUseCaseToken,
   GeneralSchedulerToken,
   GenerateSshKeyUseCaseToken,
@@ -169,16 +229,21 @@ import {
   GetProjectsUseCaseToken,
   GetProjectUseCaseToken,
   GetQueueUseCaseToken,
+  GetRequestsUseCaseToken,
   GetResourceContainersUseCaseToken,
   GetResourceLogsUseCaseToken,
+  GetResourcePreviewsUseCaseToken,
   GetResourceRoutingTargetsUseCaseToken,
   GetResourceStatsUseCaseToken,
   GetResourcesUseCaseToken,
   GetResourceUseCaseToken,
   GetS3DestinationsUseCaseToken,
+  GetSchedulesUseCaseToken,
+  GetServerCountUseCaseToken,
   GetServerHistoricalMetricsUseCaseToken,
   GetServerRuntimeStatsUseCaseToken,
   GetServersUseCaseToken,
+  GetServerUseCaseToken,
   GetSshKeysUseCaseToken,
   GetSwarmContainersUseCaseToken,
   GetSwarmInfoUseCaseToken,
@@ -187,16 +252,29 @@ import {
   GetUpdateStatusUseCaseToken,
   GetWebServerLogsUseCaseToken,
   GetWebServerSettingsUseCaseToken,
+  GlobalSearchUseCaseToken,
   InitSwarmUseCaseToken,
+  InspectComposeUseCaseToken,
   ListAuditLogsUseCaseToken,
   ListBackupVolumesUseCaseToken,
+  ListCertificatesUseCaseToken,
+  ListComposeServicesUseCaseToken,
   ListGitBranchesUseCaseToken,
   ListGitRepositoriesUseCaseToken,
+  ListResourceTagsUseCaseToken,
+  ListTagsUseCaseToken,
+  ListTemplatesUseCaseToken,
   NotificationTransportToken,
   PublishNotificationUseCaseToken,
+  RandomizeComposeUseCaseToken,
+  RebuildDatabaseUseCaseToken,
   ReloadWebServerUseCaseToken,
+  RemoveResourceTagUseCaseToken,
   RemoveSwarmNodeUseCaseToken,
   RestoreBackupRunUseCaseToken,
+  RetryNotificationDeliveryUseCaseToken,
+  RollbackResourceUseCaseToken,
+  RotateResourceWebhookTokenUseCaseToken,
   RotateSwarmJoinTokenUseCaseToken,
   SetupServerUseCaseToken,
   TestDockerRegistryConnectionUseCaseToken,
@@ -206,12 +284,22 @@ import {
   TriggerUpdateUseCaseToken,
   UnitOfWorkToken,
   UpdateBackupScheduleUseCaseToken,
+  UpdateCertificateUseCaseToken,
   UpdateConcurrencyUseCaseToken,
+  UpdateDockerRegistryUseCaseToken,
+  UpdateGitProviderUseCaseToken,
   UpdateNotificationChannelUseCaseToken,
   UpdateResourceUseCaseToken,
   UpdateS3DestinationUseCaseToken,
+  UpdateScheduleUseCaseToken,
+  UpdateServerUseCaseToken,
+  UpdateSshKeyUseCaseToken,
   UpdateSwarmNodeUseCaseToken,
+  UpdateTagUseCaseToken,
+  UpdateTemplateUseCaseToken,
+  UpdateWebServerBackupScheduleUseCaseToken,
   UpdateWebServerSettingsUseCaseToken,
+  ValidateDomainUseCaseToken,
 } from "@upstand/usecases/tokens";
 
 export * from "@upstand/repositories/tokens";
@@ -247,6 +335,14 @@ services.addScoped(
   (c) => new DrizzleProjectRepository(c.resolve(DbToken)),
 );
 services.addScoped(
+  TagRepositoryToken,
+  (c) => new DrizzleTagRepository(c.resolve(DbToken)),
+);
+services.addScoped(
+  TemplateRepositoryToken,
+  (c) => new DrizzleTemplateRepository(c.resolve(DbToken)),
+);
+services.addScoped(
   EnvironmentRepositoryToken,
   (c) => new DrizzleEnvironmentRepository(c.resolve(DbToken)),
 );
@@ -257,6 +353,10 @@ services.addScoped(
 services.addScoped(
   BackupRunRepositoryToken,
   (c) => new DrizzleBackupRunRepository(c.resolve(DbToken)),
+);
+services.addScoped(
+  CertificateRepositoryToken,
+  (c) => new DrizzleCertificateRepository(c.resolve(DbToken)),
 );
 services.addScoped(
   ResourceRepositoryToken,
@@ -327,6 +427,63 @@ services.addTransient(
   DeleteProjectUseCaseToken,
   (c) => new DeleteProjectUseCase(c.resolve(UnitOfWorkToken)),
 );
+services.addTransient(
+  DuplicateProjectUseCaseToken,
+  (c) => new DuplicateProjectUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  ListTagsUseCaseToken,
+  (c) => new ListTagsUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  CreateTagUseCaseToken,
+  (c) => new CreateTagUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  UpdateTagUseCaseToken,
+  (c) => new UpdateTagUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  DeleteTagUseCaseToken,
+  (c) => new DeleteTagUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  ListResourceTagsUseCaseToken,
+  (c) => new ListResourceTagsUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  AssignResourceTagUseCaseToken,
+  (c) => new AssignResourceTagUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  RemoveResourceTagUseCaseToken,
+  (c) => new RemoveResourceTagUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  ListTemplatesUseCaseToken,
+  (c) => new ListTemplatesUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  CreateTemplateUseCaseToken,
+  (c) => new CreateTemplateUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  UpdateTemplateUseCaseToken,
+  (c) => new UpdateTemplateUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  DeleteTemplateUseCaseToken,
+  (c) => new DeleteTemplateUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  DeployTemplateUseCaseToken,
+  (c) =>
+    new DeployTemplateUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(CreateResourceUseCaseToken),
+      c.resolve(DeployResourceUseCaseToken),
+    ),
+);
 
 services.addTransient(
   CreateEnvironmentUseCaseToken,
@@ -366,6 +523,10 @@ services.addTransient(
     ),
 );
 services.addTransient(
+  RotateResourceWebhookTokenUseCaseToken,
+  (c) => new RotateResourceWebhookTokenUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
   DeleteResourceUseCaseToken,
   (c) =>
     new DeleteResourceUseCase(
@@ -373,6 +534,42 @@ services.addTransient(
       c.resolve(CaddyServiceToken),
       c.resolve(DockerServiceToken),
     ),
+);
+services.addTransient(
+  RollbackResourceUseCaseToken,
+  (c) =>
+    new RollbackResourceUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(DockerServiceToken),
+    ),
+);
+services.addTransient(
+  RebuildDatabaseUseCaseToken,
+  (c) =>
+    new RebuildDatabaseUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(DockerServiceToken),
+    ),
+);
+services.addTransient(
+  DatabaseCommandUseCaseToken,
+  (c) =>
+    new DatabaseCommandUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(DockerServiceToken),
+    ),
+);
+services.addTransient(
+  RandomizeComposeUseCaseToken,
+  (c) => new RandomizeComposeUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  InspectComposeUseCaseToken,
+  () => new InspectComposeUseCase(),
+);
+services.addTransient(
+  ValidateDomainUseCaseToken,
+  () => new ValidateDomainUseCase(),
 );
 services.addTransient(
   DeployResourceUseCaseToken,
@@ -409,6 +606,10 @@ services.addTransient(
       c.resolve(UnitOfWorkToken),
       c.resolve(DockerServiceToken),
     ),
+);
+services.addTransient(
+  GetResourcePreviewsUseCaseToken,
+  (c) => new GetResourcePreviewsUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
   GetResourceRoutingTargetsUseCaseToken,
@@ -463,6 +664,10 @@ services.addTransient(
   DeleteSshKeyUseCaseToken,
   (c) => new DeleteSshKeyUseCase(c.resolve(UnitOfWorkToken)),
 );
+services.addTransient(
+  UpdateSshKeyUseCaseToken,
+  (c) => new UpdateSshKeyUseCase(c.resolve(UnitOfWorkToken)),
+);
 
 services.addTransient(
   CreateGitProviderUseCaseToken,
@@ -477,12 +682,33 @@ services.addTransient(
   (c) => new DeleteGitProviderUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
+  UpdateGitProviderUseCaseToken,
+  (c) => new UpdateGitProviderUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
   ListGitRepositoriesUseCaseToken,
   (c) => new ListGitRepositoriesUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
   ListGitBranchesUseCaseToken,
   (c) => new ListGitBranchesUseCase(c.resolve(UnitOfWorkToken)),
+);
+
+services.addTransient(
+  CreateCertificateUseCaseToken,
+  (c) => new CreateCertificateUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  ListCertificatesUseCaseToken,
+  (c) => new ListCertificatesUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  UpdateCertificateUseCaseToken,
+  (c) => new UpdateCertificateUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  DeleteCertificateUseCaseToken,
+  (c) => new DeleteCertificateUseCase(c.resolve(UnitOfWorkToken)),
 );
 
 services.addTransient(
@@ -505,6 +731,14 @@ services.addTransient(
   TestS3DestinationConnectionUseCaseToken,
   () => new TestS3DestinationConnectionUseCase(),
 );
+services.addTransient(
+  ListComposeServicesUseCaseToken,
+  (c) =>
+    new ListComposeServicesUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(InspectComposeUseCaseToken),
+    ),
+);
 
 // Backups
 services.addSingleton(
@@ -517,8 +751,28 @@ services.addSingleton(
     new GeneralScheduler(() => serviceProvider, c.resolve(DockerServiceToken)),
 );
 services.addTransient(
+  GetSchedulesUseCaseToken,
+  (c) => new GetSchedulesUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  CreateScheduleUseCaseToken,
+  (c) => new CreateScheduleUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  UpdateScheduleUseCaseToken,
+  (c) => new UpdateScheduleUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  DeleteScheduleUseCaseToken,
+  (c) => new DeleteScheduleUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
   CreateBackupScheduleUseCaseToken,
   (c) => new CreateBackupScheduleUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  CreateWebServerBackupScheduleUseCaseToken,
+  (c) => new CreateWebServerBackupScheduleUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
   GetBackupSchedulesUseCaseToken,
@@ -527,6 +781,10 @@ services.addTransient(
 services.addTransient(
   UpdateBackupScheduleUseCaseToken,
   (c) => new UpdateBackupScheduleUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  UpdateWebServerBackupScheduleUseCaseToken,
+  (c) => new UpdateWebServerBackupScheduleUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
   DeleteBackupScheduleUseCaseToken,
@@ -627,6 +885,19 @@ services.addTransient(
   (c) => new GetQueueUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
+  GetRequestsUseCaseToken,
+  (c) =>
+    new GetRequestsUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(GetDeploymentsUseCaseToken),
+      c.resolve(GetQueueUseCaseToken),
+    ),
+);
+services.addTransient(
+  GlobalSearchUseCaseToken,
+  (c) => new GlobalSearchUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
   UpdateConcurrencyUseCaseToken,
   (c) => new UpdateConcurrencyUseCase(c.resolve(UnitOfWorkToken)),
 );
@@ -647,6 +918,10 @@ services.addTransient(
 services.addTransient(
   TestDockerRegistryConnectionUseCaseToken,
   () => new TestDockerRegistryConnectionUseCase(),
+);
+services.addTransient(
+  UpdateDockerRegistryUseCaseToken,
+  (c) => new UpdateDockerRegistryUseCase(c.resolve(UnitOfWorkToken)),
 );
 
 // Server registrations
@@ -669,6 +944,18 @@ services.addTransient(
 services.addTransient(
   GetServerHistoricalMetricsUseCaseToken,
   (c) => new GetServerHistoricalMetricsUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  GetServerCountUseCaseToken,
+  (c) => new GetServerCountUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  GetServerUseCaseToken,
+  (c) => new GetServerUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  UpdateServerUseCaseToken,
+  (c) => new UpdateServerUseCase(c.resolve(UnitOfWorkToken)),
 );
 
 // Swarm Containers registration
@@ -713,6 +1000,10 @@ services.addTransient(
       c.resolve(UnitOfWorkToken),
       c.resolve(NotificationTransportToken),
     ),
+);
+services.addTransient(
+  RetryNotificationDeliveryUseCaseToken,
+  (c) => new RetryNotificationDeliveryUseCase(c.resolve(UnitOfWorkToken)),
 );
 
 export const serviceProvider = services.build();

@@ -808,6 +808,20 @@ export function ResourceAdvancedSettings({
                     })
                   }
                 />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Monitor (s)"
+                  value={config.updateConfig.monitorSeconds ?? ""}
+                  onChange={(event) =>
+                    updateConfig("updateConfig", {
+                      ...config.updateConfig,
+                      monitorSeconds: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
                 <Select
                   value={config.updateConfig.failureAction ?? "pause"}
                   onValueChange={(failureAction) =>
@@ -879,6 +893,20 @@ export function ResourceAdvancedSettings({
                     updateConfig("rollbackConfig", {
                       ...config.rollbackConfig,
                       delaySeconds: event.target.value
+                        ? Number(event.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Monitor (s)"
+                  value={config.rollbackConfig.monitorSeconds ?? ""}
+                  onChange={(event) =>
+                    updateConfig("rollbackConfig", {
+                      ...config.rollbackConfig,
+                      monitorSeconds: event.target.value
                         ? Number(event.target.value)
                         : undefined,
                     })

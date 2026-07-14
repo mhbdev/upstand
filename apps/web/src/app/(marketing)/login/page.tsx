@@ -2,6 +2,7 @@
 
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
 import { Card, CardContent } from "@upstand/ui/components/card";
 import { Spinner } from "@upstand/ui/components/spinner";
@@ -12,8 +13,10 @@ import { toast } from "sonner";
 import { PageBackdrop } from "@/components/marketing/page-backdrop";
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
+import { SsoSignInForm } from "@/components/sso-sign-in-form";
 import { authClient } from "@/lib/auth-client";
 import { getServerUrl } from "@/lib/server-url";
+import { trpc } from "@/utils/trpc";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -41,6 +44,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [needsOwnerSetup, setNeedsOwnerSetup] = useState<boolean | null>(null);
   const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { data: branding } = useQuery({
+    ...trpc.webServer.getPublicBranding.queryOptions(),
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     let active = true;
@@ -95,6 +102,25 @@ export default function LoginPage() {
 
       <Card className="relative w-full max-w-md rounded-3xl border-border/70 bg-card/70 p-7 shadow-2xl shadow-primary/5 backdrop-blur-md sm:p-8">
         <CardContent className="space-y-8 p-0">
+          {(branding?.loginLogoUrl ||
+            branding?.logoUrl ||
+            branding?.appName) && (
+            <div className="flex flex-col items-center gap-3 text-center">
+              {(branding.loginLogoUrl || branding.logoUrl) && (
+                // biome-ignore lint/performance/noImgElement: the URL is instance-configurable and may be outside Next's image domain allowlist
+                <img
+                  src={branding.loginLogoUrl || branding.logoUrl || undefined}
+                  alt={branding.appName || "Application logo"}
+                  className="max-h-16 max-w-56 object-contain"
+                />
+              )}
+              {branding.appName && (
+                <span className="font-semibold text-muted-foreground text-sm">
+                  {branding.appName}
+                </span>
+              )}
+            </div>
+          )}
           {sessionPending ? (
             <div className="flex flex-col items-center justify-center space-y-4 py-12">
               <Spinner />
@@ -153,7 +179,9 @@ export default function LoginPage() {
               <div className="space-y-2 text-center">
                 {/* Fixed: added bg-clip-text */}
                 <h1 className="bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text font-extrabold text-3xl text-transparent tracking-tight">
-                  {needsOwnerSetup ? "Set up Upstand" : "Welcome back"}
+                  {needsOwnerSetup
+                    ? `Set up ${branding?.appName || "Upstand"}`
+                    : "Welcome back"}
                 </h1>
                 <p className="text-muted-foreground text-sm">
                   {needsOwnerSetup
@@ -180,6 +208,7 @@ export default function LoginPage() {
                     </>
                   )}
                 </Button>
+                {!needsOwnerSetup && <SsoSignInForm />}
               </div>
             </>
           )}

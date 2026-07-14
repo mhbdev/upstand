@@ -1,6 +1,7 @@
 import type { IAuditLogRepository } from "./audit-log-repository.interface";
 import type { IBackupRunRepository } from "./backup-run-repository.interface";
 import type { IBackupScheduleRepository } from "./backup-schedule-repository.interface";
+import type { ICertificateRepository } from "./certificate-repository.interface";
 import type { IDeploymentRepository } from "./deployment-repository.interface";
 import type { IDockerRegistryRepository } from "./docker-registry-repository.interface";
 import type { IEnvironmentRepository } from "./environment-repository.interface";
@@ -16,15 +17,20 @@ import type { IScheduleRepository } from "./schedule-repository.interface";
 import type { IServerBuildSettingsRepository } from "./server-build-settings-repository.interface";
 import type { IServerRepository } from "./server-repository.interface";
 import type { ISshKeyRepository } from "./ssh-key-repository.interface";
+import type { ITagRepository } from "./tag-repository.interface";
+import type { ITemplateRepository } from "./template-repository.interface";
 import type { IUserRepository } from "./user-repository.interface";
 import type { IWebServerSettingsRepository } from "./web-server-settings-repository.interface";
 
 export interface IUnitOfWork {
   readonly auditLogRepository: IAuditLogRepository;
   readonly backupScheduleRepository: IBackupScheduleRepository;
+  readonly certificateRepository: ICertificateRepository;
   readonly backupRunRepository: IBackupRunRepository;
   readonly userRepository: IUserRepository;
   readonly projectRepository: IProjectRepository;
+  readonly tagRepository: ITagRepository;
+  readonly templateRepository: ITemplateRepository;
   readonly environmentRepository: IEnvironmentRepository;
   readonly resourceRepository: IResourceRepository;
   readonly sshKeyRepository: ISshKeyRepository;

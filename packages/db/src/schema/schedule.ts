@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { backupSchedule } from "./backup";
 import { resource } from "./resource";
 
 export const schedule = pgTable(
@@ -11,6 +12,11 @@ export const schedule = pgTable(
     }),
     name: text("name").notNull(),
     cronExpression: text("cron_expression").notNull(),
+    jobType: text("job_type").notNull().default("command"),
+    backupScheduleId: text("backup_schedule_id").references(
+      () => backupSchedule.id,
+      { onDelete: "set null" },
+    ),
     command: text("command").notNull(),
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -11,6 +11,7 @@ import {
   type Resource,
   type ResourceAdvancedConfig,
 } from "@upstand/domain";
+import { redis } from "@upstand/redis";
 import type Docker from "dockerode";
 import { log } from "evlog";
 import yaml from "yaml";
@@ -21,7 +22,13 @@ import {
   isManager,
   isSwarmActive,
 } from "../swarm/swarm.helpers";
+import { getApplicationBuildSecrets } from "./application-build-secrets";
+import { randomizeComposeFile } from "./compose-randomization";
 import { getDockerInstance } from "./docker-client";
+import { type DockerLogLevel, filterDockerLogs } from "./docker-log-filter";
+import { LIBSQL_CONTAINER_PORTS } from "./libsql-settings";
+import { parseResourceCredentials } from "./resource-credentials";
+import { parseResourceEnvironmentVariables } from "./resource-environment";
 
 export interface ContainerRuntimeStats {
   cpu: number;
@@ -47,6 +54,12 @@ export interface ServerRuntimeStats {
   dockerImageBytes: number;
   dockerContainerBytes: number;
   dockerVolumeBytes: number;
+}
+
+export interface DockerRegistryAuth {
+  username?: string;
+  password?: string;
+  serveraddress?: string;
 }
 
 const isUnknownRecord = (value: unknown): value is Record<string, unknown> =>
@@ -107,14 +120,9 @@ function applyComposeResourceConfig(
     return rawCompose;
   const services = parsed.services;
 
-  const resourceEnvironment = (() => {
-    try {
-      const value = JSON.parse(resource.envVars || "{}");
-      return isUnknownRecord(value) ? composeMap(value) : {};
-    } catch {
-      return {};
-    }
-  })();
+  const resourceEnvironment = composeMap(
+    parseResourceEnvironmentVariables(resource.envVars),
+  );
   const serviceNames = config.serviceName
     ? [config.serviceName]
     : Object.keys(parsed.services);
@@ -334,6 +342,7 @@ export class DockerService {
   private readonly commandEnvironment: Record<string, string | undefined>;
   private readonly networkName =
     process.env.DOCKER_NETWORK || "upstand-network";
+  private cancellationKey: string | null = null;
 
   constructor(
     docker: Docker = getDockerInstance(),
@@ -341,6 +350,10 @@ export class DockerService {
   ) {
     this.docker = docker;
     this.commandEnvironment = commandEnvironment;
+  }
+
+  setCancellationKey(key: string | null): void {
+    this.cancellationKey = key;
   }
 
   private applyAdvancedConfig(
@@ -587,7 +600,7 @@ export class DockerService {
     if (dbType === "postgres") {
       image =
         resource.dockerImage &&
-        isSupportedDatabaseImage(dbType, resource.dockerImage)
+        isSupportedDatabaseImage(dbType, resource.dockerImage, true)
           ? resource.dockerImage
           : "postgres:16-alpine";
       targetPath = "/var/lib/postgresql/data";
@@ -599,7 +612,7 @@ export class DockerService {
     } else if (dbType === "mysql" || dbType === "mariadb") {
       image =
         resource.dockerImage &&
-        isSupportedDatabaseImage(dbType, resource.dockerImage)
+        isSupportedDatabaseImage(dbType, resource.dockerImage, true)
           ? resource.dockerImage
           : dbType === "mysql"
             ? "mysql:8.0"
@@ -614,7 +627,7 @@ export class DockerService {
     } else if (dbType === "mongodb") {
       image =
         resource.dockerImage &&
-        isSupportedDatabaseImage(dbType, resource.dockerImage)
+        isSupportedDatabaseImage(dbType, resource.dockerImage, true)
           ? resource.dockerImage
           : "mongo:7.0";
       targetPath = "/data/db";
@@ -626,11 +639,23 @@ export class DockerService {
     } else if (dbType === "redis") {
       image =
         resource.dockerImage &&
-        isSupportedDatabaseImage(dbType, resource.dockerImage)
+        isSupportedDatabaseImage(dbType, resource.dockerImage, true)
           ? resource.dockerImage
           : "redis:7-alpine";
       targetPath = "/data";
       ports.push(6379);
+    } else if (dbType === "libsql") {
+      image =
+        resource.dockerImage &&
+        isSupportedDatabaseImage(dbType, resource.dockerImage, true)
+          ? resource.dockerImage
+          : "ghcr.io/tursodatabase/libsql-server:latest";
+      targetPath = "/var/lib/sqld";
+      ports.push(
+        LIBSQL_CONTAINER_PORTS.http,
+        LIBSQL_CONTAINER_PORTS.grpc,
+        LIBSQL_CONTAINER_PORTS.admin,
+      );
     } else {
       throw new Error(`Unsupported database type: ${dbType}`);
     }
@@ -670,6 +695,9 @@ export class DockerService {
       if (p === 3306) return 3307;
       if (p === 27017) return 27018;
       if (p === 6379) return 6380;
+      if (p === 5001) return 5002;
+      if (p === 5000) return 5001;
+      if (p === 8080) return 8081;
       return p + 1;
     };
 
@@ -696,6 +724,29 @@ export class DockerService {
       }
     }
 
+    if (dbType === "libsql") {
+      containerSpec.Command = ["/bin/sh"];
+      containerSpec.Args = [
+        "-c",
+        `sqld --db-path /var/lib/sqld/iku.db --http-listen-addr 0.0.0.0:${LIBSQL_CONTAINER_PORTS.http} --grpc-listen-addr 0.0.0.0:${LIBSQL_CONTAINER_PORTS.grpc} --admin-listen-addr 0.0.0.0:${LIBSQL_CONTAINER_PORTS.admin}`,
+      ];
+    }
+
+    const publishedPortForTarget = (targetPort: number): number => {
+      if (dbType === "libsql") {
+        if (targetPort === 8080 && resource.externalPort) {
+          return resource.externalPort;
+        }
+        if (targetPort === 5001 && resource.libsqlGrpcPort) {
+          return resource.libsqlGrpcPort;
+        }
+        if (targetPort === 5000 && resource.libsqlAdminPort) {
+          return resource.libsqlAdminPort;
+        }
+        return getPublishedPort(targetPort);
+      }
+      return resource.externalPort ?? getPublishedPort(targetPort);
+    };
     const spec: Docker.CreateServiceOptions = {
       Name: serviceName,
       TaskTemplate: {
@@ -709,7 +760,7 @@ export class DockerService {
       EndpointSpec: {
         Ports: ports.map((p) => ({
           Protocol: "tcp",
-          PublishedPort: getPublishedPort(p),
+          PublishedPort: publishedPortForTarget(p),
           TargetPort: p,
           PublishMode: "ingress",
         })),
@@ -736,6 +787,11 @@ export class DockerService {
     envVars: Record<string, string>,
     onLog?: (log: string) => void,
     constraints?: string[],
+    registryAuth?: {
+      username?: string;
+      password?: string;
+      serveraddress?: string;
+    },
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     const networkId = (await this.ensureDeploymentNetwork(resource)).id;
@@ -746,7 +802,9 @@ export class DockerService {
 
     if (onLog) onLog(`Pulling application image: ${resource.dockerImage}...\n`);
     try {
-      const stream = await this.docker.pull(resource.dockerImage);
+      const stream = await (this.docker as any).pull(resource.dockerImage, {
+        ...(registryAuth ? { authconfig: registryAuth } : {}),
+      });
       await new Promise<void>((resolve, reject) => {
         this.docker.modem.followProgress(
           stream,
@@ -797,7 +855,7 @@ export class DockerService {
       spec as Record<string, unknown>,
     );
 
-    await this.upsertService(serviceName, spec);
+    await this.upsertService(serviceName, spec, registryAuth);
     await this.ensureServiceNetwork(serviceName, networkId);
   }
 
@@ -815,6 +873,7 @@ export class DockerService {
       imageTag: string;
     },
     destinationDocker?: Docker,
+    sourceRevision?: string,
   ): Promise<void> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     const imageName = `upstand-app-${resource.id}:latest`;
@@ -856,7 +915,9 @@ export class DockerService {
       let submodules = false;
       try {
         if (resource.credentials) {
-          const config: unknown = JSON.parse(resource.credentials);
+          const config: unknown = parseResourceCredentials(
+            resource.credentials,
+          );
           if (isUnknownRecord(config)) {
             const configuredBranch = config.branch;
             branch =
@@ -870,6 +931,12 @@ export class DockerService {
         // Credentials are optional for direct Git providers; defaults remain safe.
       }
 
+      const gitEnvironment = sshKeyPath
+        ? {
+            ...process.env,
+            GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=accept-new`,
+          }
+        : undefined;
       onLog(`Cloning branch ${branch} into ${clonePath}...\n`);
       await this.runCommandAsync(
         "git",
@@ -884,13 +951,17 @@ export class DockerService {
           clonePath,
         ],
         onLog,
-        sshKeyPath
-          ? {
-              ...process.env,
-              GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=accept-new`,
-            }
-          : undefined,
+        gitEnvironment,
       );
+
+      if (sourceRevision) {
+        await this.checkoutSourceRevision(
+          clonePath,
+          sourceRevision,
+          onLog,
+          gitEnvironment,
+        );
+      }
 
       if (submodules) {
         onLog("Initializing submodules...\n");
@@ -898,24 +969,25 @@ export class DockerService {
           "git",
           ["-C", clonePath, "submodule", "update", "--init", "--recursive"],
           onLog,
-          sshKeyPath
-            ? {
-                ...process.env,
-                GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=accept-new`,
-              }
-            : undefined,
+          gitEnvironment,
         );
       }
     }
 
     try {
       const buildConfig = parseApplicationBuildConfig(resource.buildConfig);
-      await this.buildApplicationImage(
+      const buildPath = this.resolveBuildPath(
         clonePath,
+        buildConfig.buildPath,
+        "Build path",
+      );
+      await this.buildApplicationImage(
+        buildPath,
         buildImageName,
         buildConfig,
         envVars,
         onLog,
+        getApplicationBuildSecrets(resource),
       );
 
       if (registryInfo) {
@@ -1007,6 +1079,7 @@ export class DockerService {
     cloneUrl: string,
     onLog: (log: string) => void,
     sshKeyPath?: string,
+    sourceRevision?: string,
   ): Promise<string> {
     const buildDir = path.join(process.cwd(), ".builds");
     const clonePath = path.join(buildDir, `${resource.id}-compose`);
@@ -1017,7 +1090,7 @@ export class DockerService {
     let composePath = "docker-compose.yml";
     let submodules = false;
     try {
-      const config: unknown = JSON.parse(resource.credentials || "{}");
+      const config: unknown = parseResourceCredentials(resource.credentials);
       if (isUnknownRecord(config)) {
         if (typeof config.branch === "string" && config.branch.trim()) {
           branch = config.branch.trim();
@@ -1057,6 +1130,14 @@ export class DockerService {
         onLog,
         sshEnvironment,
       );
+      if (sourceRevision) {
+        await this.checkoutSourceRevision(
+          clonePath,
+          sourceRevision,
+          onLog,
+          sshEnvironment,
+        );
+      }
       if (submodules) {
         await this.runCommandAsync(
           "git",
@@ -1082,16 +1163,47 @@ export class DockerService {
     }
   }
 
+  private async checkoutSourceRevision(
+    clonePath: string,
+    sourceRevision: string,
+    onLog: (log: string) => void,
+    environment?: NodeJS.ProcessEnv,
+  ): Promise<void> {
+    if (!/^[0-9a-f]{7,64}$/i.test(sourceRevision)) {
+      throw new Error("Deployment source revision is not a valid commit SHA");
+    }
+    onLog(`Checking out source revision ${sourceRevision}...\n`);
+    await this.runCommandAsync(
+      "git",
+      ["-C", clonePath, "fetch", "--depth", "1", "origin", sourceRevision],
+      onLog,
+      environment,
+    );
+    await this.runCommandAsync(
+      "git",
+      ["-C", clonePath, "checkout", "--detach", sourceRevision],
+      onLog,
+      environment,
+    );
+  }
+
   private async buildApplicationImage(
     clonePath: string,
     imageName: string,
     config: ApplicationBuildConfig,
     envVars: Record<string, string>,
     onLog: (log: string) => void,
+    buildSecrets: Record<string, string>,
   ): Promise<void> {
     switch (config.type) {
       case "dockerfile":
-        await this.buildDockerfileImage(clonePath, imageName, config, onLog);
+        await this.buildDockerfileImage(
+          clonePath,
+          imageName,
+          config,
+          onLog,
+          buildSecrets,
+        );
         return;
       case "railpack":
         await this.buildRailpackImage(
@@ -1164,6 +1276,7 @@ export class DockerService {
     imageName: string,
     config: Extract<ApplicationBuildConfig, { type: "dockerfile" }>,
     onLog: (log: string) => void,
+    buildSecrets: Record<string, string> = {},
   ): Promise<void> {
     const dockerfilePath = this.resolveBuildPath(
       clonePath,
@@ -1184,16 +1297,42 @@ export class DockerService {
     }
 
     const args = ["build", "--file", dockerfilePath, "--tag", imageName];
+    if (config.dockerNoCache) args.push("--no-cache");
     if (config.dockerBuildStage) {
       args.push("--target", config.dockerBuildStage);
     }
     for (const [key, value] of Object.entries(config.dockerBuildArgs)) {
       args.push("--build-arg", `${key}=${value}`);
     }
+    for (const key of Object.keys(buildSecrets)) {
+      args.push("--secret", `id=${key},env=${key}`);
+    }
     args.push(contextPath);
 
     onLog(`Building Dockerfile image ${imageName}...\n`);
-    await this.runCommandAsync("docker", args, onLog);
+    try {
+      await this.runCommandAsync(
+        "docker",
+        args,
+        onLog,
+        Object.keys(buildSecrets).length
+          ? { ...process.env, DOCKER_BUILDKIT: "1", ...buildSecrets }
+          : undefined,
+      );
+    } finally {
+      if (config.dockerCleanupCache) {
+        onLog("Cleaning unused Docker builder cache...\n");
+        await this.runCommandAsync(
+          "docker",
+          ["builder", "prune", "--force"],
+          onLog,
+        ).catch((error) => {
+          onLog(
+            `Warning: Docker builder cache cleanup failed: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+        });
+      }
+    }
   }
 
   private async buildRailpackImage(
@@ -1567,8 +1706,11 @@ export class DockerService {
     const composePath = path.join(composeDir, "docker-compose.yml");
 
     const advancedConfig = parseResourceAdvancedConfig(resource.advancedConfig);
+    const composeSource = advancedConfig.randomize
+      ? randomizeComposeFile(rawCompose, advancedConfig.randomSuffix)
+      : rawCompose;
     let composeContent = applyComposeResourceConfig(
-      rawCompose,
+      composeSource,
       resource,
       advancedConfig,
     );
@@ -1677,7 +1819,7 @@ export class DockerService {
         let composeFile = "";
         try {
           if (resource.credentials) {
-            const config = JSON.parse(resource.credentials);
+            const config = parseResourceCredentials(resource.credentials);
             composeFile = config.composeFile || "";
           }
         } catch {}
@@ -1696,7 +1838,7 @@ export class DockerService {
       inspect = await service.inspect();
     } catch (err: any) {
       if (err.statusCode === 404 && cmd === "start") {
-        const envVars = JSON.parse(resource.envVars || "{}");
+        const envVars = parseResourceEnvironmentVariables(resource.envVars);
         if (resource.type === "database") {
           log.info({
             message: `Swarm service '${serviceName}' not found. Deploying database service...`,
@@ -1761,6 +1903,51 @@ export class DockerService {
         EndpointSpec: inspect.Spec.EndpointSpec,
       });
     }
+  }
+
+  /**
+   * Ask Swarm to apply the service's configured rollback specification. This
+   * is deliberately a separate operation from restart: restart recreates
+   * tasks from the current spec, while rollback restores the previous
+   * service spec tracked by Swarm.
+   */
+  async rollbackService(
+    resource: Resource,
+    registryAuth?: DockerRegistryAuth,
+  ): Promise<void> {
+    if (resource.type === "compose") {
+      throw new ConflictError(
+        "Compose resources do not have a Swarm service rollback. Redeploy the desired Compose revision instead.",
+      );
+    }
+
+    const serviceName = this.sanitizeName(resource.appName || resource.name);
+    const service = this.docker.getService(serviceName);
+    const inspect = await service.inspect();
+
+    const update = (
+      service as unknown as {
+        update: (
+          auth: DockerRegistryAuth | undefined,
+          options: Record<string, unknown>,
+        ) => Promise<unknown>;
+      }
+    ).update;
+    if (typeof update !== "function") {
+      throw new ConflictError(
+        "The connected Docker client does not support Swarm service updates.",
+      );
+    }
+
+    // Dockerode does not expose `docker service rollback`, but the Engine API
+    // implements it as a service update with rollback=previous. Supplying the
+    // registry auth header is important when the previous image is private.
+    await update.call(service, registryAuth, {
+      ...inspect.Spec,
+      Name: serviceName,
+      version: inspect.Version.Index,
+      rollback: "previous",
+    });
   }
 
   async controlContainer(
@@ -2002,6 +2189,8 @@ export class DockerService {
     resource: Resource,
     containerId?: string,
     tail = 150,
+    since?: number,
+    filter?: { search?: string; levels?: DockerLogLevel[] },
   ): Promise<string> {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     try {
@@ -2021,8 +2210,9 @@ export class DockerService {
               stderr: true,
               tail,
               timestamps: true,
+              ...(since ? { since } : {}),
             });
-            return this.cleanDockerLogs(buffer);
+            return filterDockerLogs(this.cleanDockerLogs(buffer), filter ?? {});
           } catch (err: any) {
             return `No logs found for container task: ${err.message}`;
           }
@@ -2036,9 +2226,10 @@ export class DockerService {
             stderr: true,
             tail,
             timestamps: true,
+            ...(since ? { since } : {}),
           })) as any as Buffer;
           if (buffer) {
-            return this.cleanDockerLogs(buffer);
+            return filterDockerLogs(this.cleanDockerLogs(buffer), filter ?? {});
           }
         } catch (err: any) {
           return `No logs found for container: ${err.message}`;
@@ -2050,7 +2241,13 @@ export class DockerService {
         // Compose Stack combined logs: find services and get logs for first running container
         const containers = await this.getContainers(resource);
         if (containers.length > 0) {
-          return await this.getLogs(resource, containers[0].id, tail);
+          return await this.getLogs(
+            resource,
+            containers[0].id,
+            tail,
+            since,
+            filter,
+          );
         }
         return "No active stack containers found to read logs from.";
       }
@@ -2062,8 +2259,9 @@ export class DockerService {
           stderr: true,
           tail,
           timestamps: true,
+          ...(since ? { since } : {}),
         })) as any as Buffer;
-        return this.cleanDockerLogs(buffer);
+        return filterDockerLogs(this.cleanDockerLogs(buffer), filter ?? {});
       } catch (err: any) {
         if (
           err.statusCode === 404 ||
@@ -2173,6 +2371,8 @@ export class DockerService {
     env?: NodeJS.ProcessEnv,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      let settled = false;
+      let cancelled = false;
       const p = spawn(cmd, args, {
         shell: false,
         env: {
@@ -2181,6 +2381,25 @@ export class DockerService {
           ...(env ?? {}),
         },
       });
+
+      const cancellationTimer = this.cancellationKey
+        ? setInterval(() => {
+            if (!this.cancellationKey) return;
+            void redis.get(this.cancellationKey).then((requested) => {
+              if (requested && !settled) {
+                cancelled = true;
+                p.kill("SIGTERM");
+              }
+            });
+          }, 500)
+        : null;
+
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        if (cancellationTimer) clearInterval(cancellationTimer);
+        callback();
+      };
 
       p.stdout.on("data", (data) => {
         onLog(data.toString());
@@ -2191,19 +2410,25 @@ export class DockerService {
       });
 
       p.on("close", (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(
-            new Error(
-              `Command '${cmd} ${args.join(" ")}' failed with exit code ${code}`,
-            ),
-          );
-        }
+        finish(() => {
+          if (cancelled) {
+            reject(new Error("Deployment cancellation requested"));
+          } else if (code === 0) {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                `Command '${cmd} ${args.join(" ")}' failed with exit code ${code}`,
+              ),
+            );
+          }
+        });
       });
 
       p.on("error", (err) => {
-        reject(err);
+        finish(() => {
+          reject(err);
+        });
       });
     });
   }
@@ -2427,6 +2652,36 @@ export class DockerService {
           err: err.message,
         });
       }
+    }
+
+    await this.removeResourceNetwork(resource);
+  }
+
+  /**
+   * Permanently removes a database service and its managed data volume.
+   *
+   * Database rebuilds use this strict variant instead of removeResource,
+   * whose best-effort cleanup semantics are appropriate for ordinary resource
+   * deletion but could otherwise allow a rebuild to continue after stale data
+   * survived removal.
+   */
+  async removeDatabase(resource: Resource): Promise<void> {
+    if (resource.type !== "database") {
+      throw new Error("Only database resources can be rebuilt");
+    }
+
+    const serviceName = this.sanitizeName(resource.appName || resource.name);
+    try {
+      await this.docker.getService(serviceName).remove();
+    } catch (error: any) {
+      if (error?.statusCode !== 404) throw error;
+    }
+
+    const volumeName = `upstand-db-data-${resource.id}`;
+    try {
+      await this.docker.getVolume(volumeName).remove();
+    } catch (error: any) {
+      if (error?.statusCode !== 404) throw error;
     }
 
     await this.removeResourceNetwork(resource);

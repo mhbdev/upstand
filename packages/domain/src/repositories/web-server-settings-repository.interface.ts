@@ -15,6 +15,7 @@ export interface IWebServerSettingsRepository {
     enableHttp3?: boolean;
     globalCaddyfile?: string | null;
     caddySnippets?: string;
+    caddyMiddlewares?: string;
     serverIp?: string | null;
     dailyDockerCleanup?: boolean;
     caddyEnvironment?: string;

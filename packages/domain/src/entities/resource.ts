@@ -21,9 +21,30 @@ export const DATABASE_IMAGE_OPTIONS = {
   mariadb: ["mariadb:10.11", "mariadb:11"],
   mongodb: ["mongo:6.0", "mongo:7.0"],
   redis: ["redis:7-alpine", "redis:8-alpine"],
+  libsql: ["ghcr.io/tursodatabase/libsql-server:latest"],
 } as const;
 
 export type DatabaseType = keyof typeof DATABASE_IMAGE_OPTIONS;
+
+/** Conservative validation for an explicitly selected custom Docker image. */
+export const DockerImageReferenceSchema = z
+  .string()
+  .trim()
+  .min(1, "Docker image is required")
+  .max(512, "Docker image reference is too long")
+  .regex(
+    /^[a-zA-Z0-9][a-zA-Z0-9._/@:-]*$/,
+    "Docker image reference contains unsupported characters",
+  );
+
+export function isValidDockerImageReference(
+  value: string | null | undefined,
+): boolean {
+  return (
+    typeof value === "string" &&
+    DockerImageReferenceSchema.safeParse(value).success
+  );
+}
 
 export const ResourceComposeTypeSchema = z.enum(["compose", "stack"]);
 export type ResourceComposeType = z.infer<typeof ResourceComposeTypeSchema>;
@@ -31,19 +52,23 @@ export type ResourceComposeType = z.infer<typeof ResourceComposeTypeSchema>;
 export function isSupportedDatabaseImage(
   databaseType: string | undefined,
   image: string | null | undefined,
+  allowCustom = false,
 ): boolean {
   if (!databaseType || !image) return false;
   const options = DATABASE_IMAGE_OPTIONS[databaseType as DatabaseType];
-  return Boolean((options as readonly string[] | undefined)?.includes(image));
+  return Boolean(
+    (options as readonly string[] | undefined)?.includes(image) ||
+      (allowCustom && isValidDockerImageReference(image)),
+  );
 }
 
-const ResourcePortSchema = z.object({
+export const ResourcePortSchema = z.object({
   publishedPort: z.number().int().min(1).max(65535),
   targetPort: z.number().int().min(1).max(65535),
   protocol: z.enum(["tcp", "udp"]).default("tcp"),
 });
 
-const ResourceVolumeSchema = z.object({
+export const ResourceVolumeSchema = z.object({
   source: z.string().trim().min(1).max(512),
   target: z
     .string()
@@ -75,6 +100,15 @@ export const ResourceAdvancedConfigSchema = z.object({
     .boolean()
     .default(false)
     .describe("Prefix Compose named volumes when isolation is enabled."),
+  randomize: z
+    .boolean()
+    .default(false)
+    .describe("Randomize Compose resource names to avoid collisions."),
+  randomSuffix: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9-]{0,31}$/)
+    .optional(),
   command: z.array(z.string().trim().min(1)).max(64).default([]),
   args: z.array(z.string().max(4096)).max(128).default([]),
   ports: z.array(ResourcePortSchema).max(32).default([]),
@@ -166,14 +200,18 @@ export const parseResourceAdvancedConfig = (
 
 export const DockerfileBuildConfigSchema = z.object({
   type: z.literal("dockerfile"),
+  buildPath: RelativeBuildPathSchema.default("."),
   dockerfilePath: RelativeBuildPathSchema.default("Dockerfile"),
   dockerContextPath: RelativeBuildPathSchema.default("."),
   dockerBuildStage: z.string().trim().min(1).max(128).optional(),
   dockerBuildArgs: z.record(z.string(), z.string()).default({}),
+  dockerNoCache: z.boolean().default(false),
+  dockerCleanupCache: z.boolean().default(false),
 });
 
 export const RailpackBuildConfigSchema = z.object({
   type: z.literal("railpack"),
+  buildPath: RelativeBuildPathSchema.default("."),
   railpackVersion: z
     .string()
     .trim()
@@ -181,25 +219,29 @@ export const RailpackBuildConfigSchema = z.object({
       /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/,
       "Use a valid Railpack version",
     )
-    .default("0.23.0"),
+    .default("0.15.4"),
 });
 
 export const NixpacksBuildConfigSchema = z.object({
   type: z.literal("nixpacks"),
+  buildPath: RelativeBuildPathSchema.default("."),
   publishDirectory: RelativeBuildPathSchema.optional(),
 });
 
 export const HerokuBuildpacksBuildConfigSchema = z.object({
   type: z.literal("heroku-buildpacks"),
+  buildPath: RelativeBuildPathSchema.default("."),
   herokuVersion: z.enum(["24", "26"]).default("24"),
 });
 
 export const PaketoBuildpacksBuildConfigSchema = z.object({
   type: z.literal("paketo-buildpacks"),
+  buildPath: RelativeBuildPathSchema.default("."),
 });
 
 export const StaticBuildConfigSchema = z.object({
   type: z.literal("static"),
+  buildPath: RelativeBuildPathSchema.default("."),
   publishDirectory: RelativeBuildPathSchema,
   spa: z.boolean().default(false),
 });
@@ -219,9 +261,12 @@ export type ApplicationBuildConfig = z.infer<
 
 export const DEFAULT_APPLICATION_BUILD_CONFIG: ApplicationBuildConfig = {
   type: "dockerfile",
+  buildPath: ".",
   dockerfilePath: "Dockerfile",
   dockerContextPath: ".",
   dockerBuildArgs: {},
+  dockerNoCache: false,
+  dockerCleanupCache: false,
 };
 
 export const serializeApplicationBuildConfig = (
@@ -254,8 +299,24 @@ export const ResourceSchema = z.object({
   dbType: z.string().nullable().optional(),
   composeType: z.string().nullable().optional(),
   dockerImage: z.string().nullable().optional(),
+  buildRegistryId: z.string().nullable().optional(),
+  rollbackActive: z.boolean().optional(),
+  rollbackRegistryId: z.string().nullable().optional(),
+  externalPort: z.number().int().min(1).max(65535).nullable().optional(),
+  libsqlGrpcPort: z.number().int().min(1).max(65535).nullable().optional(),
+  libsqlAdminPort: z.number().int().min(1).max(65535).nullable().optional(),
   credentials: z.string().nullable().optional(),
+  triggerType: z.enum(["push", "tag"]).optional(),
+  watchPaths: z.string().optional(),
+  webhookTokenHash: z.string().nullable().optional(),
+  webhookTokenPrefix: z.string().nullable().optional(),
   buildConfig: z.string(),
+  buildSecrets: z.string().nullable().optional(),
+  isPreviewDeploymentsActive: z.boolean().optional(),
+  previewLimit: z.number().int().min(1).max(100).optional(),
+  previewWildcard: z.string().nullable().optional(),
+  previewHttps: z.boolean().optional(),
+  previewPort: z.number().int().min(1).max(65535).optional(),
   advancedConfig: z.string().optional(),
   envVars: z.string(),
   domains: z.string(),
@@ -281,8 +342,24 @@ export interface CreateResourceDTO {
   dbType?: string | null;
   composeType?: string | null;
   dockerImage?: string | null;
+  buildRegistryId?: string | null;
+  rollbackActive?: boolean;
+  rollbackRegistryId?: string | null;
+  externalPort?: number | null;
+  libsqlGrpcPort?: number | null;
+  libsqlAdminPort?: number | null;
   credentials?: string | null;
+  triggerType?: "push" | "tag";
+  watchPaths?: string;
+  webhookTokenHash?: string | null;
+  webhookTokenPrefix?: string | null;
   buildConfig?: string;
+  buildSecrets?: string | null;
+  isPreviewDeploymentsActive?: boolean;
+  previewLimit?: number;
+  previewWildcard?: string | null;
+  previewHttps?: boolean;
+  previewPort?: number;
   advancedConfig?: string;
   envVars?: string;
   domains?: string;

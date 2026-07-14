@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   type ApplicationBuildConfig,
   ApplicationBuildConfigSchema,
@@ -45,6 +45,7 @@ import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
 import {
   Code,
+  Copy,
   Globe,
   Play,
   RefreshCw,
@@ -57,23 +58,25 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
+import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
 const RAILPACK_VERSIONS = [
-  "0.23.0",
-  "0.22.0",
-  "0.21.0",
-  "0.20.0",
-  "0.19.0",
-  "0.18.0",
-  "0.17.0",
-  "0.16.0",
   "0.15.4",
+  "0.16.0",
+  "0.17.0",
+  "0.18.0",
+  "0.19.0",
+  "0.20.0",
+  "0.21.0",
+  "0.22.0",
+  "0.23.0",
 ] as const;
 
 interface GeneralTabProps {
   resource: any;
   sshKeys: any[];
+  servers: any[];
   gitProviders: any[];
   updateResource: any;
   isUpdatingResource: boolean;
@@ -81,6 +84,8 @@ interface GeneralTabProps {
   isDeployingResource: boolean;
   controlResource: any;
   isControllingResource: boolean;
+  rebuildDatabase: any;
+  isRebuildingDatabase: boolean;
   deleteResource: any;
   isDeletingResource: boolean;
 }
@@ -103,18 +108,24 @@ const parseApplicationBuildConfig = (
   if (!value)
     return {
       type: "dockerfile",
+      buildPath: ".",
       dockerfilePath: "Dockerfile",
       dockerContextPath: ".",
       dockerBuildArgs: {},
+      dockerNoCache: false,
+      dockerCleanupCache: false,
     };
   try {
-    return JSON.parse(value);
+    return ApplicationBuildConfigSchema.parse(JSON.parse(value));
   } catch {
     return {
       type: "dockerfile",
+      buildPath: ".",
       dockerfilePath: "Dockerfile",
       dockerContextPath: ".",
       dockerBuildArgs: {},
+      dockerNoCache: false,
+      dockerCleanupCache: false,
     };
   }
 };
@@ -145,26 +156,30 @@ const createBuildConfig = (
     case "dockerfile":
       return {
         type,
+        buildPath: ".",
         dockerfilePath: "Dockerfile",
         dockerContextPath: ".",
         dockerBuildArgs: {},
+        dockerNoCache: false,
+        dockerCleanupCache: false,
       };
     case "railpack":
-      return { type, railpackVersion: "0.23.0" };
+      return { type, buildPath: ".", railpackVersion: "0.15.4" };
     case "nixpacks":
-      return { type };
+      return { type, buildPath: "." };
     case "heroku-buildpacks":
-      return { type, herokuVersion: "24" };
+      return { type, buildPath: ".", herokuVersion: "24" };
     case "paketo-buildpacks":
-      return { type };
+      return { type, buildPath: "." };
     case "static":
-      return { type, publishDirectory: "dist", spa: true };
+      return { type, buildPath: ".", publishDirectory: "dist", spa: true };
   }
 };
 
 export function GeneralTab({
   resource,
   sshKeys,
+  servers,
   gitProviders,
   updateResource,
   isUpdatingResource,
@@ -172,10 +187,86 @@ export function GeneralTab({
   isDeployingResource,
   controlResource,
   isControllingResource,
+  rebuildDatabase,
+  isRebuildingDatabase,
   deleteResource,
   isDeletingResource,
 }: GeneralTabProps) {
+  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const dockerRegistriesQuery = useQuery({
+    ...trpc.dockerRegistry.list.queryOptions({
+      organizationId: activeOrganization?.id || "",
+    }),
+    enabled: resource.type === "application" && Boolean(activeOrganization?.id),
+  });
+  const previewsQuery = useQuery({
+    ...trpc.resource.getPreviews.queryOptions({ id: resource.id }),
+    enabled: resource.type === "application",
+    refetchInterval: 5000,
+  });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rebuildDialogOpen, setRebuildDialogOpen] = useState(false);
+  const webhookBaseUrl =
+    typeof window === "undefined" ? "" : window.location.origin;
+  const [webhookToken, setWebhookToken] = useState<string | null>(null);
+  const rotateWebhookToken = useMutation({
+    ...trpc.resource.rotateWebhookToken.mutationOptions(),
+    onSuccess: (result) => {
+      setWebhookToken(result.token);
+      toast.success(
+        "Webhook token rotated. Copy it now; it will not be shown again.",
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const randomizeCompose = useMutation({
+    ...trpc.resource.randomizeCompose.mutationOptions(),
+    onSuccess: (result) => {
+      const config = parseResourceCredentials(result.credentials);
+      if (typeof config?.composeFile === "string") {
+        setRawComposeFile(config.composeFile);
+      }
+      toast.success("Compose service and named-resource identities randomized");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const updateApplication = useMutation({
+    ...trpc.application.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Application provider configuration saved successfully");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const databaseCommand = useMutation({
+    ...trpc.resource.databaseCommand.mutationOptions(),
+    onSuccess: (result) => {
+      setDatabaseCommandOutput(
+        `${result.command}: ${result.output || "(no output)"}`,
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const inspectCompose = useMutation({
+    ...trpc.compose.inspect.mutationOptions(),
+    onSuccess: (result) => {
+      setComposeInspection(result);
+      toast.success(
+        `Found ${result.services.length} Compose service${result.services.length === 1 ? "" : "s"}`,
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const convertCompose = useMutation({
+    ...trpc.compose.convert.mutationOptions(),
+    onSuccess: (result) => {
+      setRawComposeFile(result.composeFile);
+      setComposeType(result.target);
+      toast.success(
+        `Compose file converted to ${result.target === "stack" ? "Docker Stack" : "Docker Compose"}`,
+      );
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   // General Rename State
   const [nameInput, setNameInput] = useState("");
@@ -186,6 +277,13 @@ export function GeneralTab({
   const [buildConfig, setBuildConfig] = useState<ApplicationBuildConfig>(() =>
     parseApplicationBuildConfig(resource.buildConfig),
   );
+  const [previewActive, setPreviewActive] = useState(false);
+  const [previewLimit, setPreviewLimit] = useState("3");
+  const [previewWildcard, setPreviewWildcard] = useState("");
+  const [previewHttps, setPreviewHttps] = useState(false);
+  const [previewPort, setPreviewPort] = useState("3000");
+  const [deploymentServerId, setDeploymentServerId] = useState("default");
+  const [buildServerId, setBuildServerId] = useState("default");
 
   // Provider State
   const [providerType, setProviderType] = useState<ResourceProvider>("github");
@@ -206,15 +304,37 @@ export function GeneralTab({
   const [gitSshKeyId, setGitSshKeyId] = useState("");
   const [gitBranch, setGitBranch] = useState("master");
   const [gitComposePath, setGitComposePath] = useState("./docker-compose.yml");
+  const [gitTriggerType, setGitTriggerType] = useState("push");
   const [gitWatchPaths, setGitWatchPaths] = useState<string[]>([]);
   const [gitSubmodules, setGitSubmodules] = useState(false);
 
   const [rawComposeFile, setRawComposeFile] = useState("");
   const [dockerImage, setDockerImage] = useState("");
+  const [useCustomDatabaseImage, setUseCustomDatabaseImage] = useState(false);
+  const [customDatabaseImage, setCustomDatabaseImage] = useState("");
+  const [dockerRegistryId, setDockerRegistryId] = useState("");
+  const [buildRegistryId, setBuildRegistryId] = useState("");
+  const [rollbackActive, setRollbackActive] = useState(false);
+  const [rollbackRegistryId, setRollbackRegistryId] = useState("");
+  const [dockerBuildSecretsJson, setDockerBuildSecretsJson] = useState("");
   const [databaseType, setDatabaseType] = useState<DatabaseType>("postgres");
+  const [databaseExternalPort, setDatabaseExternalPort] = useState("");
+  const [databaseLibsqlGrpcPort, setDatabaseLibsqlGrpcPort] = useState("");
+  const [databaseLibsqlAdminPort, setDatabaseLibsqlAdminPort] = useState("");
   const [databaseCredentials, setDatabaseCredentials] =
     useState<DatabaseCredentials>({});
+  const [databaseCommandOutput, setDatabaseCommandOutput] = useState("");
   const [composeType, setComposeType] = useState<ResourceComposeType>("stack");
+  const [composeInspection, setComposeInspection] = useState<{
+    services: Array<{
+      name: string;
+      image: string | null;
+      replicas: number;
+      ports: string[];
+      dependsOn: string[];
+    }>;
+    warnings: string[];
+  } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   void isUploading;
 
@@ -262,6 +382,13 @@ export function GeneralTab({
       setAppNameInput(resource.appName ?? "");
       setDescriptionInput(resource.description ?? "");
       setBuildConfig(parseApplicationBuildConfig(resource.buildConfig));
+      setPreviewActive(resource.isPreviewDeploymentsActive === true);
+      setPreviewLimit(String(resource.previewLimit ?? 3));
+      setPreviewWildcard(resource.previewWildcard ?? "");
+      setPreviewHttps(resource.previewHttps === true);
+      setPreviewPort(String(resource.previewPort ?? 3000));
+      setDeploymentServerId(resource.serverId ?? "default");
+      setBuildServerId(resource.buildServerId ?? "default");
       if (resource.provider) {
         setProviderType(
           resource.provider === "docker-registry"
@@ -272,11 +399,35 @@ export function GeneralTab({
       if (resource.dbType && resource.dbType in DATABASE_IMAGE_OPTIONS) {
         setDatabaseType(resource.dbType as DatabaseType);
       }
-      setDockerImage(
+      const hydratedImage =
         resource.dockerImage ??
-          (resource.dbType && resource.dbType in DATABASE_IMAGE_OPTIONS
-            ? DATABASE_IMAGE_OPTIONS[resource.dbType as DatabaseType][0]
-            : ""),
+        (resource.dbType && resource.dbType in DATABASE_IMAGE_OPTIONS
+          ? DATABASE_IMAGE_OPTIONS[resource.dbType as DatabaseType][0]
+          : "");
+      const knownImages: readonly string[] =
+        resource.dbType && resource.dbType in DATABASE_IMAGE_OPTIONS
+          ? DATABASE_IMAGE_OPTIONS[resource.dbType as DatabaseType]
+          : [];
+      setUseCustomDatabaseImage(
+        resource.type === "database" && !knownImages.includes(hydratedImage),
+      );
+      setCustomDatabaseImage(
+        resource.type === "database" && !knownImages.includes(hydratedImage)
+          ? hydratedImage
+          : "",
+      );
+      setDockerImage(hydratedImage);
+      setBuildRegistryId(resource.buildRegistryId ?? "");
+      setRollbackActive(resource.rollbackActive === true);
+      setRollbackRegistryId(resource.rollbackRegistryId ?? "");
+      setDatabaseExternalPort(
+        resource.externalPort ? String(resource.externalPort) : "",
+      );
+      setDatabaseLibsqlGrpcPort(
+        resource.libsqlGrpcPort ? String(resource.libsqlGrpcPort) : "",
+      );
+      setDatabaseLibsqlAdminPort(
+        resource.libsqlAdminPort ? String(resource.libsqlAdminPort) : "",
       );
       if (
         resource.composeType === "compose" ||
@@ -285,10 +436,33 @@ export function GeneralTab({
         setComposeType(resource.composeType);
       }
       const config = parseResourceCredentials(resource.credentials);
+      let typedWatchPaths: string[] = [];
+      if (typeof resource.watchPaths === "string") {
+        try {
+          const parsed = JSON.parse(resource.watchPaths) as unknown;
+          if (Array.isArray(parsed)) {
+            typedWatchPaths = parsed.filter(
+              (value): value is string => typeof value === "string",
+            );
+          }
+        } catch {
+          typedWatchPaths = [];
+        }
+      }
       if (config) {
         if (config.provider) {
           setProviderType(config.provider);
         }
+        setDockerRegistryId(config.registryId ?? "");
+        setBuildRegistryId(
+          resource.buildRegistryId ?? config.buildRegistryId ?? "",
+        );
+        setRollbackActive(
+          resource.rollbackActive === true || config.rollbackActive === true,
+        );
+        setRollbackRegistryId(
+          resource.rollbackRegistryId ?? config.rollbackRegistryId ?? "",
+        );
         setAutoDeploy(config.autoDeploy !== false);
         if (
           config.provider &&
@@ -298,15 +472,30 @@ export function GeneralTab({
           setGithubRepo(config.repository ?? "");
           setGithubBranch(config.branch ?? "");
           setGithubComposePath(config.composePath ?? "./docker-compose.yml");
-          setGithubTriggerType(config.triggerType ?? "On Push");
-          setGithubWatchPaths(config.watchPaths ?? []);
+          setGithubTriggerType(
+            config.triggerType
+              ? config.triggerType === "tag"
+                ? "On Tag"
+                : "On Push"
+              : resource.triggerType === "tag"
+                ? "On Tag"
+                : "On Push",
+          );
+          setGithubWatchPaths(config.watchPaths ?? typedWatchPaths);
           setGithubSubmodules(config.enableSubmodules ?? false);
         } else if (config.provider === "git") {
           setGitUrl(config.repositoryUrl ?? "");
           setGitSshKeyId(config.sshKeyId ?? "");
           setGitBranch(config.branch ?? "master");
           setGitComposePath(config.composePath ?? "./docker-compose.yml");
-          setGitWatchPaths(config.watchPaths ?? []);
+          setGitTriggerType(
+            config.triggerType
+              ? config.triggerType === "tag"
+                ? "tag"
+                : "push"
+              : (resource.triggerType ?? "push"),
+          );
+          setGitWatchPaths(config.watchPaths ?? typedWatchPaths);
           setGitSubmodules(config.enableSubmodules ?? false);
         } else if (config.provider === "raw") {
           setRawComposeFile(config.composeFile ?? "");
@@ -427,7 +616,12 @@ export function GeneralTab({
     let provider: string = providerType;
     if (providerType === "docker") {
       provider = "docker-registry";
-      config = { provider, autoDeploy, dockerImage };
+      config = {
+        provider,
+        autoDeploy,
+        dockerImage,
+        ...(dockerRegistryId ? { registryId: dockerRegistryId } : {}),
+      };
     } else if (
       ["github", "gitlab", "bitbucket", "gitea"].includes(providerType)
     ) {
@@ -448,6 +642,7 @@ export function GeneralTab({
         sshKeyId: gitSshKeyId,
         branch: gitBranch,
         composePath: gitComposePath,
+        triggerType: gitTriggerType,
         watchPaths: gitWatchPaths,
         enableSubmodules: gitSubmodules,
       };
@@ -458,19 +653,44 @@ export function GeneralTab({
       };
     }
 
-    updateResource(
-      {
-        id: resource.id,
-        provider,
-        ...(providerType === "docker" ? { dockerImage } : {}),
-        credentials: JSON.stringify(config),
+    const updatePayload = {
+      id: resource.id,
+      provider,
+      ...(resource.type === "application"
+        ? {
+            triggerType:
+              providerType === "docker" || providerType === "raw"
+                ? ("push" as const)
+                : providerType === "git"
+                  ? (gitTriggerType as "push" | "tag")
+                  : githubTriggerType === "On Tag"
+                    ? ("tag" as const)
+                    : ("push" as const),
+            watchPaths:
+              providerType === "git" ? gitWatchPaths : githubWatchPaths,
+          }
+        : {}),
+      ...(providerType === "docker" ? { dockerImage } : {}),
+      ...(resource.type === "application"
+        ? {
+            buildRegistryId: buildRegistryId || null,
+            rollbackActive,
+            rollbackRegistryId: rollbackRegistryId || null,
+          }
+        : {}),
+      credentials: JSON.stringify(config),
+    };
+
+    if (resource.type === "application") {
+      updateApplication.mutate(updatePayload);
+      return;
+    }
+
+    updateResource(updatePayload, {
+      onSuccess: () => {
+        toast.success("Provider configuration saved successfully");
       },
-      {
-        onSuccess: () => {
-          toast.success("Provider configuration saved successfully");
-        },
-      },
-    );
+    });
   };
 
   const updateDatabaseCredential = (key: string, value: string) => {
@@ -480,15 +700,22 @@ export function GeneralTab({
   const handleSaveDatabase = () => {
     const userRequired = databaseType !== "redis";
     const databaseRequired =
-      databaseType !== "redis" && databaseType !== "mongodb";
+      databaseType !== "redis" &&
+      databaseType !== "mongodb" &&
+      databaseType !== "libsql";
     const rootPasswordRequired =
       databaseType === "mysql" || databaseType === "mariadb";
+
+    if (useCustomDatabaseImage && !customDatabaseImage.trim()) {
+      toast.error("Custom database image is required");
+      return;
+    }
 
     if (userRequired && !databaseCredentials.dbUser?.trim()) {
       toast.error("Database user is required");
       return;
     }
-    if (!databaseCredentials.dbPassword?.trim()) {
+    if (databaseType !== "redis" && !databaseCredentials.dbPassword?.trim()) {
       toast.error("Database password is required");
       return;
     }
@@ -505,7 +732,21 @@ export function GeneralTab({
       {
         id: resource.id,
         dbType: databaseType,
-        dockerImage,
+        dockerImage: useCustomDatabaseImage
+          ? customDatabaseImage.trim()
+          : dockerImage,
+        allowCustomImage: useCustomDatabaseImage,
+        externalPort: databaseExternalPort.trim()
+          ? Number(databaseExternalPort)
+          : null,
+        libsqlGrpcPort:
+          databaseType === "libsql" && databaseLibsqlGrpcPort.trim()
+            ? Number(databaseLibsqlGrpcPort)
+            : null,
+        libsqlAdminPort:
+          databaseType === "libsql" && databaseLibsqlAdminPort.trim()
+            ? Number(databaseLibsqlAdminPort)
+            : null,
         credentials: JSON.stringify(databaseCredentials),
       },
       { onSuccess: () => toast.success("Database configuration saved") },
@@ -598,6 +839,50 @@ export function GeneralTab({
               </div>
             </div>
 
+            <div className="flex flex-col gap-3 border-border/20 border-t pt-4">
+              <div>
+                <span className="block font-semibold text-foreground text-sm">
+                  External webhook URL
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  Use this endpoint for CI systems that cannot install a
+                  provider webhook. Tokens are stored only as hashes.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-lg bg-muted px-3 py-2 text-xs">
+                  {webhookBaseUrl}/api/deploy/
+                  {webhookToken ??
+                    resource.webhookTokenPrefix ??
+                    "not-configured"}
+                </code>
+                {webhookToken && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Copy webhook URL"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(
+                        `${webhookBaseUrl}/api/deploy/${webhookToken}`,
+                      );
+                      toast.success("Webhook URL copied");
+                    }}
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => rotateWebhookToken.mutate({ id: resource.id })}
+                  disabled={rotateWebhookToken.isPending}
+                >
+                  {rotateWebhookToken.isPending ? "Rotating…" : "Rotate token"}
+                </Button>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2 border-border/20 border-t pt-4">
               <Button
                 onClick={() => deployResource({ id: resource.id })}
@@ -631,6 +916,128 @@ export function GeneralTab({
           </CardContent>
         </Card>
 
+        <Card className="border border-border/40 bg-card/20">
+          <CardHeader>
+            <CardTitle className="font-semibold text-lg">
+              Execution Infrastructure
+            </CardTitle>
+            <CardDescription className="text-muted-foreground text-sm">
+              Separate the Docker deployment target from the machine that
+              performs application builds.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5 border-border/20 border-t pt-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="deployment-server">Deployment server</Label>
+              <Select
+                value={deploymentServerId}
+                onValueChange={(value) => {
+                  if (value) setDeploymentServerId(value);
+                }}
+              >
+                <SelectTrigger id="deployment-server" className="bg-background">
+                  <SelectValue placeholder="Use local Swarm manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Local Swarm manager</SelectItem>
+                  {servers.map((server) => (
+                    <SelectItem key={server.id} value={server.id}>
+                      {server.name} ({server.ipAddress})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                Remote targets require a ready server with Docker and SSH access
+                configured.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="build-server">Build server</Label>
+              <Select
+                value={buildServerId}
+                onValueChange={(value) => {
+                  if (value) setBuildServerId(value);
+                }}
+              >
+                <SelectTrigger id="build-server" className="bg-background">
+                  <SelectValue placeholder="Build on deployment server" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">
+                    Same as deployment server
+                  </SelectItem>
+                  {servers.map((server) => (
+                    <SelectItem key={server.id} value={server.id}>
+                      {server.name} ({server.ipAddress})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                Separate build servers use the selected registry to transfer the
+                resulting image to the deployment target.
+              </p>
+            </div>
+            {resource.type === "application" && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="build-registry">Build registry</Label>
+                <Select
+                  value={buildRegistryId || "none"}
+                  onValueChange={(value) =>
+                    setBuildRegistryId(value === "none" ? "" : (value ?? ""))
+                  }
+                >
+                  <SelectTrigger id="build-registry" className="bg-background">
+                    <SelectValue placeholder="Choose a registry for build transfer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      Automatic first organization registry
+                    </SelectItem>
+                    {(dockerRegistriesQuery.data || []).map((registry) => (
+                      <SelectItem key={registry.id} value={registry.id}>
+                        {registry.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  Required when a separate build server is used. The selected
+                  registry is organization-scoped and encrypted at rest.
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end border-border/20 border-t pt-4 sm:col-span-2">
+              <Button
+                disabled={isUpdatingResource}
+                onClick={() =>
+                  updateResource(
+                    {
+                      id: resource.id,
+                      serverId:
+                        deploymentServerId === "default"
+                          ? null
+                          : deploymentServerId,
+                      buildServerId:
+                        buildServerId === "default" ? null : buildServerId,
+                      ...(resource.type === "application"
+                        ? { buildRegistryId: buildRegistryId || null }
+                        : {}),
+                    },
+                    {
+                      onSuccess: () =>
+                        toast.success("Execution infrastructure saved"),
+                    },
+                  )
+                }
+              >
+                Save Infrastructure
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {resource.type === "database" && (
           <Card className="border border-border/40 bg-card/20">
             <CardHeader>
@@ -652,6 +1059,8 @@ export function GeneralTab({
                       const nextType = value as DatabaseType;
                       setDatabaseType(nextType);
                       setDockerImage(DATABASE_IMAGE_OPTIONS[nextType][0]);
+                      setUseCustomDatabaseImage(false);
+                      setCustomDatabaseImage("");
                     }}
                   >
                     <SelectTrigger
@@ -667,6 +1076,7 @@ export function GeneralTab({
                         <SelectItem value="mariadb">MariaDB</SelectItem>
                         <SelectItem value="mongodb">MongoDB</SelectItem>
                         <SelectItem value="redis">Redis</SelectItem>
+                        <SelectItem value="libsql">libSQL</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
@@ -674,9 +1084,18 @@ export function GeneralTab({
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="database-image">Image version</Label>
                   <Select
-                    value={dockerImage}
+                    value={useCustomDatabaseImage ? "__custom__" : dockerImage}
                     onValueChange={(value) => {
-                      if (value) setDockerImage(value);
+                      if (value === "__custom__") {
+                        setUseCustomDatabaseImage(true);
+                        setDockerImage("");
+                        return;
+                      }
+                      if (value) {
+                        setUseCustomDatabaseImage(false);
+                        setCustomDatabaseImage("");
+                        setDockerImage(value);
+                      }
                     }}
                   >
                     <SelectTrigger
@@ -692,9 +1111,19 @@ export function GeneralTab({
                             {image}
                           </SelectItem>
                         ))}
+                        <SelectItem value="__custom__">Custom image</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                  {useCustomDatabaseImage && (
+                    <Input
+                      value={customDatabaseImage}
+                      onChange={(event) =>
+                        setCustomDatabaseImage(event.target.value)
+                      }
+                      placeholder="ghcr.io/acme/postgres:17"
+                    />
+                  )}
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -715,18 +1144,23 @@ export function GeneralTab({
                     />
                   </div>
                 )}
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="database-password">Password</Label>
-                  <Input
-                    id="database-password"
-                    type="password"
-                    value={databaseCredentials.dbPassword ?? ""}
-                    onChange={(event) =>
-                      updateDatabaseCredential("dbPassword", event.target.value)
-                    }
-                    autoComplete="new-password"
-                  />
-                </div>
+                {databaseType !== "redis" && (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="database-password">Password</Label>
+                    <Input
+                      id="database-password"
+                      type="password"
+                      value={databaseCredentials.dbPassword ?? ""}
+                      onChange={(event) =>
+                        updateDatabaseCredential(
+                          "dbPassword",
+                          event.target.value,
+                        )
+                      }
+                      autoComplete="new-password"
+                    />
+                  </div>
+                )}
                 {(databaseType === "mysql" || databaseType === "mariadb") && (
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="database-root-password">
@@ -746,19 +1180,87 @@ export function GeneralTab({
                     />
                   </div>
                 )}
-                {databaseType !== "redis" && databaseType !== "mongodb" && (
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="database-name">Database name</Label>
-                    <Input
-                      id="database-name"
-                      value={databaseCredentials.dbName ?? ""}
-                      onChange={(event) =>
-                        updateDatabaseCredential("dbName", event.target.value)
-                      }
-                    />
-                  </div>
+                {databaseType !== "redis" &&
+                  databaseType !== "mongodb" &&
+                  databaseType !== "libsql" && (
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="database-name">Database name</Label>
+                      <Input
+                        id="database-name"
+                        value={databaseCredentials.dbName ?? ""}
+                        onChange={(event) =>
+                          updateDatabaseCredential("dbName", event.target.value)
+                        }
+                      />
+                    </div>
+                  )}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="database-external-port">
+                    {databaseType === "libsql" ? "HTTP port" : "External port"}{" "}
+                    <span className="text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Input
+                    id="database-external-port"
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={databaseExternalPort}
+                    onChange={(event) =>
+                      setDatabaseExternalPort(event.target.value)
+                    }
+                    placeholder="Use engine default"
+                  />
+                </div>
+                {databaseType === "libsql" && (
+                  <>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="database-libsql-grpc-port">
+                        gRPC port{" "}
+                        <span className="text-muted-foreground">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Input
+                        id="database-libsql-grpc-port"
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={databaseLibsqlGrpcPort}
+                        onChange={(event) =>
+                          setDatabaseLibsqlGrpcPort(event.target.value)
+                        }
+                        placeholder="Use engine default"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="database-libsql-admin-port">
+                        Admin port{" "}
+                        <span className="text-muted-foreground">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Input
+                        id="database-libsql-admin-port"
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={databaseLibsqlAdminPort}
+                        onChange={(event) =>
+                          setDatabaseLibsqlAdminPort(event.target.value)
+                        }
+                        placeholder="Use engine default"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
+              <p className="text-muted-foreground text-xs">
+                {databaseType === "libsql"
+                  ? "libSQL uses HTTP 8080, gRPC 5001, and admin 5000 inside the container; blank fields use those defaults."
+                  : "Published Docker port; blank uses the engine default."}
+              </p>
               <div className="flex justify-end border-border/20 border-t pt-4">
                 <Button
                   onClick={handleSaveDatabase}
@@ -767,6 +1269,64 @@ export function GeneralTab({
                   Save Database Configuration
                 </Button>
               </div>
+              <div className="flex flex-col gap-3 border-border/20 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium text-sm">Lifecycle operations</p>
+                  <p className="text-muted-foreground text-xs">
+                    Reload restarts the service. Rebuild removes the managed
+                    database volume and creates a clean instance.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={databaseCommand.isPending}
+                    onClick={() =>
+                      databaseCommand.mutate({
+                        id: resource.id,
+                        command: "health",
+                      })
+                    }
+                  >
+                    {databaseCommand.isPending ? "Checking..." : "Health"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={databaseCommand.isPending}
+                    onClick={() =>
+                      databaseCommand.mutate({
+                        id: resource.id,
+                        command: "version",
+                      })
+                    }
+                  >
+                    Version
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={isControllingResource || isRebuildingDatabase}
+                    onClick={() => {
+                      toast.info("Reloading database service...");
+                      controlResource({ id: resource.id, command: "restart" });
+                    }}
+                  >
+                    <RefreshCw className="mr-2 size-4" />
+                    Reload
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={isControllingResource || isRebuildingDatabase}
+                    onClick={() => setRebuildDialogOpen(true)}
+                  >
+                    {isRebuildingDatabase ? "Rebuilding..." : "Rebuild"}
+                  </Button>
+                </div>
+              </div>
+              {databaseCommandOutput && (
+                <pre className="overflow-x-auto rounded-md bg-muted/40 p-3 font-mono text-xs">
+                  {databaseCommandOutput}
+                </pre>
+              )}
             </CardContent>
           </Card>
         )}
@@ -836,6 +1396,25 @@ export function GeneralTab({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 border-border/20 border-t pt-4">
+              <div className="max-w-sm space-y-2">
+                <Label htmlFor="build-path">Build path</Label>
+                <Input
+                  id="build-path"
+                  value={buildConfig.buildPath}
+                  onChange={(event) =>
+                    setBuildConfig({
+                      ...buildConfig,
+                      buildPath: event.target.value || ".",
+                    })
+                  }
+                  placeholder=". or apps/web"
+                  className="bg-background"
+                />
+                <p className="text-muted-foreground text-xs">
+                  Repository subdirectory used as the source root for the
+                  selected builder.
+                </p>
+              </div>
               <FieldGroup>
                 <Field>
                   <FieldContent>
@@ -975,6 +1554,64 @@ export function GeneralTab({
                       />
                     </CodeSurface>
                   </Field>
+                  <Field>
+                    <FieldLabel htmlFor="docker-build-secrets">
+                      Docker BuildKit secrets
+                    </FieldLabel>
+                    <FieldDescription>
+                      JSON object of secret environment values. Use them in a
+                      Dockerfile with <code>RUN --mount=type=secret</code>.
+                      values are encrypted and never returned to the UI.
+                    </FieldDescription>
+                    <CodeSurface>
+                      <CodeEditor
+                        id="docker-build-secrets"
+                        language="json"
+                        height="130px"
+                        value={dockerBuildSecretsJson}
+                        onChange={(value) =>
+                          setDockerBuildSecretsJson(value || "")
+                        }
+                        aria-label="Docker BuildKit secrets JSON"
+                      />
+                    </CodeSurface>
+                  </Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldLabel htmlFor="docker-no-cache">
+                          Disable build cache
+                        </FieldLabel>
+                        <FieldDescription>
+                          Force a clean Dockerfile build for the next deploy.
+                        </FieldDescription>
+                      </FieldContent>
+                      <Switch
+                        id="docker-no-cache"
+                        checked={buildConfig.dockerNoCache}
+                        onCheckedChange={(dockerNoCache) =>
+                          setBuildConfig({ ...buildConfig, dockerNoCache })
+                        }
+                      />
+                    </Field>
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldLabel htmlFor="docker-cleanup-cache">
+                          Clean builder cache
+                        </FieldLabel>
+                        <FieldDescription>
+                          Prune unused Docker builder layers after building.
+                        </FieldDescription>
+                      </FieldContent>
+                      <Switch
+                        id="docker-cleanup-cache"
+                        checked={buildConfig.dockerCleanupCache}
+                        onCheckedChange={(dockerCleanupCache) =>
+                          setBuildConfig({ ...buildConfig, dockerCleanupCache })
+                        }
+                      />
+                    </Field>
+                  </div>
                 </>
               )}
 
@@ -1026,7 +1663,7 @@ export function GeneralTab({
                           railpackVersion: event.target.value,
                         })
                       }
-                      placeholder="0.23.0"
+                      placeholder="0.15.4"
                       className="bg-background"
                       aria-label="Custom Railpack version"
                     />
@@ -1142,16 +1779,169 @@ export function GeneralTab({
                       );
                       return;
                     }
-                    updateResource({
+                    const patch: Record<string, unknown> = {
                       id: resource.id,
                       buildConfig: parsed.data,
-                    });
+                    };
+                    if (dockerBuildSecretsJson.trim()) {
+                      try {
+                        const secrets = JSON.parse(
+                          dockerBuildSecretsJson,
+                        ) as unknown;
+                        if (
+                          !secrets ||
+                          typeof secrets !== "object" ||
+                          Array.isArray(secrets) ||
+                          Object.values(secrets).some(
+                            (value) => typeof value !== "string",
+                          )
+                        ) {
+                          throw new Error(
+                            "Build secrets must be a JSON object of strings",
+                          );
+                        }
+                        patch.buildSecrets = dockerBuildSecretsJson;
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Invalid build secrets JSON",
+                        );
+                        return;
+                      }
+                    }
+                    updateResource(patch);
                   }}
                   disabled={isUpdatingResource}
                 >
                   Save Build Configuration
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {resource.type === "application" && (
+          <Card className="border border-border/40 bg-card/20">
+            <CardHeader>
+              <CardTitle className="font-semibold text-lg">
+                Pull request previews
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Deploy GitHub pull requests as temporary services with isolated
+                preview domains.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 border-border/20 border-t pt-4">
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="preview-active">
+                    Enable previews
+                  </FieldLabel>
+                  <FieldDescription>
+                    Requires a signed GitHub pull-request webhook for this
+                    application.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="preview-active"
+                  checked={previewActive}
+                  onCheckedChange={setPreviewActive}
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="preview-limit">Preview limit</Label>
+                  <Input
+                    id="preview-limit"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={previewLimit}
+                    onChange={(event) => setPreviewLimit(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="preview-wildcard">Wildcard domain</Label>
+                  <Input
+                    id="preview-wildcard"
+                    value={previewWildcard}
+                    onChange={(event) => setPreviewWildcard(event.target.value)}
+                    placeholder="sslip.io"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="preview-port">Preview port</Label>
+                  <Input
+                    id="preview-port"
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={previewPort}
+                    onChange={(event) => setPreviewPort(event.target.value)}
+                  />
+                </div>
+              </div>
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="preview-https">
+                    HTTPS previews
+                  </FieldLabel>
+                  <FieldDescription>
+                    Reuse the automatic certificate resolver for preview hosts.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="preview-https"
+                  checked={previewHttps}
+                  onCheckedChange={setPreviewHttps}
+                />
+              </Field>
+              <div className="flex justify-end border-border/20 border-t pt-4">
+                <Button
+                  disabled={isUpdatingResource}
+                  onClick={() =>
+                    updateResource(
+                      {
+                        id: resource.id,
+                        isPreviewDeploymentsActive: previewActive,
+                        previewLimit: Number(previewLimit),
+                        previewWildcard: previewWildcard.trim() || null,
+                        previewHttps,
+                        previewPort: Number(previewPort),
+                      },
+                      {
+                        onSuccess: () =>
+                          toast.success("Preview settings saved"),
+                      },
+                    )
+                  }
+                >
+                  Save Preview Settings
+                </Button>
+              </div>
+              {(previewsQuery.data?.length ?? 0) > 0 && (
+                <div className="space-y-2 border-border/20 border-t pt-4">
+                  <p className="font-medium text-sm">
+                    Active preview deployments
+                  </p>
+                  <div className="space-y-2">
+                    {previewsQuery.data?.map((preview) => (
+                      <div
+                        key={preview.id}
+                        className="flex flex-col gap-1 rounded-md border border-border/40 bg-muted/20 p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <span>
+                          PR #{preview.pullRequestId} · {preview.branchName}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {preview.domain} · {preview.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -1268,6 +2058,84 @@ export function GeneralTab({
                   <p className="text-muted-foreground text-xs">
                     The image is pulled and deployed as a Swarm service.
                   </p>
+                  <Label htmlFor="application-registry">
+                    Private registry (optional)
+                  </Label>
+                  <Select
+                    value={dockerRegistryId || "none"}
+                    onValueChange={(value) =>
+                      setDockerRegistryId(value === "none" ? "" : (value ?? ""))
+                    }
+                  >
+                    <SelectTrigger id="application-registry">
+                      <SelectValue placeholder="Use public image credentials" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        Public image / no registry
+                      </SelectItem>
+                      {(dockerRegistriesQuery.data || []).map((registry) => (
+                        <SelectItem key={registry.id} value={registry.id}>
+                          {registry.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">
+                    Upstand sends the selected registry credentials to Docker
+                    for image pulls and Swarm task authentication.
+                  </p>
+                  <div className="mt-3 flex items-center justify-between rounded-md border border-border/40 bg-muted/10 p-3">
+                    <div className="space-y-1 pr-4">
+                      <Label htmlFor="application-rollback-active">
+                        Enable registry-backed rollback
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        Pass private-registry credentials when Swarm restores
+                        the previous service specification.
+                      </p>
+                    </div>
+                    <Switch
+                      id="application-rollback-active"
+                      checked={rollbackActive}
+                      onCheckedChange={setRollbackActive}
+                    />
+                  </div>
+                  {rollbackActive && (
+                    <>
+                      <Label htmlFor="application-rollback-registry">
+                        Rollback registry (optional)
+                      </Label>
+                      <Select
+                        value={rollbackRegistryId || "none"}
+                        onValueChange={(value) =>
+                          setRollbackRegistryId(
+                            value === "none" ? "" : (value ?? ""),
+                          )
+                        }
+                      >
+                        <SelectTrigger id="application-rollback-registry">
+                          <SelectValue placeholder="Use credentials stored in the service" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            Use service credentials
+                          </SelectItem>
+                          {(dockerRegistriesQuery.data || []).map(
+                            (registry) => (
+                              <SelectItem key={registry.id} value={registry.id}>
+                                {registry.name}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-muted-foreground text-xs">
+                        Credentials are organization-scoped and encrypted at
+                        rest. The registry is used only during rollback.
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1429,6 +2297,7 @@ export function GeneralTab({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="On Push">On Push</SelectItem>
+                        <SelectItem value="On Tag">On Tag</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1586,6 +2455,24 @@ export function GeneralTab({
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label>Trigger Type</Label>
+                    <Select
+                      value={gitTriggerType}
+                      onValueChange={(value) =>
+                        setGitTriggerType(value ?? "push")
+                      }
+                    >
+                      <SelectTrigger className="border-border/40">
+                        <SelectValue placeholder="Select Trigger" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="push">On Push</SelectItem>
+                        <SelectItem value="tag">On Tag</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {/* Watch Paths */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5">
@@ -1675,7 +2562,77 @@ export function GeneralTab({
               {providerType === "raw" && (
                 <div className="space-y-4 pt-2">
                   <div className="space-y-2">
-                    <Label>Compose File</Label>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label>Compose File</Label>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {resource.type === "compose" && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={randomizeCompose.isPending}
+                            onClick={() =>
+                              randomizeCompose.mutate({ id: resource.id })
+                            }
+                          >
+                            {randomizeCompose.isPending
+                              ? "Randomizing..."
+                              : "Randomize names"}
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            !rawComposeFile.trim() || inspectCompose.isPending
+                          }
+                          onClick={() => {
+                            if (!activeOrganization?.id) {
+                              toast.error("Select an organization first");
+                              return;
+                            }
+                            inspectCompose.mutate({
+                              organizationId: activeOrganization.id,
+                              composeFile: rawComposeFile,
+                            });
+                          }}
+                        >
+                          {inspectCompose.isPending
+                            ? "Inspecting…"
+                            : "Inspect services"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            !rawComposeFile.trim() || convertCompose.isPending
+                          }
+                          onClick={() => {
+                            if (!activeOrganization?.id) {
+                              toast.error("Select an organization first");
+                              return;
+                            }
+                            const target =
+                              composeType === "stack" ? "compose" : "stack";
+                            convertCompose.mutate({
+                              organizationId: activeOrganization.id,
+                              composeFile: rawComposeFile,
+                              target,
+                            });
+                          }}
+                        >
+                          {convertCompose.isPending
+                            ? "Converting…"
+                            : `Convert to ${composeType === "stack" ? "Compose" : "Stack"}`}
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Adds a collision-safe suffix to services, networks,
+                      volumes, configs, and secrets while preserving references.
+                    </p>
                     <div className="overflow-hidden rounded-md border border-border/30 bg-muted/20 p-2">
                       <CodeEditor
                         height="350px"
@@ -1684,6 +2641,43 @@ export function GeneralTab({
                         onChange={(value) => setRawComposeFile(value || "")}
                       />
                     </div>
+                    {composeInspection && (
+                      <div className="space-y-2 rounded-md border border-border/30 bg-muted/10 p-3">
+                        <div className="font-medium text-sm">
+                          Service discovery
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {composeInspection.services.map((service) => (
+                            <div
+                              key={service.name}
+                              className="rounded border border-border/20 bg-background/30 p-2 text-xs"
+                            >
+                              <div className="font-medium">{service.name}</div>
+                              <div className="text-muted-foreground">
+                                {service.image ?? "Build context"} ·{" "}
+                                {service.replicas} replica
+                                {service.replicas === 1 ? "" : "s"}
+                              </div>
+                              {service.ports.length > 0 && (
+                                <div className="text-muted-foreground">
+                                  Ports: {service.ports.join(", ")}
+                                </div>
+                              )}
+                              {service.dependsOn.length > 0 && (
+                                <div className="text-muted-foreground">
+                                  Depends on: {service.dependsOn.join(", ")}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {composeInspection.warnings.length > 0 && (
+                          <div className="text-amber-600 text-xs dark:text-amber-400">
+                            {composeInspection.warnings.join(" ")}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1866,6 +2860,40 @@ export function GeneralTab({
               }}
             >
               {isDeletingResource ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rebuildDialogOpen} onOpenChange={setRebuildDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rebuild database service?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes the managed Docker volume for{" "}
+              {resource.name}
+              and all data stored in it, then deploys a clean database with the
+              saved credentials. Export a backup before continuing.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRebuildDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isRebuildingDatabase}
+              onClick={() => {
+                rebuildDatabase({ id: resource.id, confirm: true });
+                setRebuildDialogOpen(false);
+              }}
+            >
+              {isRebuildingDatabase
+                ? "Rebuilding..."
+                : "Delete data and rebuild"}
             </Button>
           </DialogFooter>
         </DialogContent>

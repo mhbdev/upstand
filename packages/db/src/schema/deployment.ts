@@ -14,6 +14,7 @@ export const deployment = pgTable(
     logs: text("logs").default("").notNull(),
     serverId: text("server_id"),
     serverName: text("server_name"),
+    sourceRevision: text("source_revision"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

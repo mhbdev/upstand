@@ -1,6 +1,11 @@
+import { randomUUID } from "node:crypto";
+import { rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
 import type Docker from "dockerode";
 import { Client } from "ssh2";
 import { getDockerInstance } from "./docker-client";
+import { type DockerLogLevel, filterDockerLogs } from "./docker-log-filter";
 
 export type DockerInspectionTarget =
   | { kind: "local"; name: string }
@@ -31,6 +36,9 @@ export type DockerContainer = {
   state: string;
   status: string;
   ports: string;
+  mounts: string[];
+  networks: string[];
+  labels: string[];
   createdAt: string | null;
 };
 
@@ -47,6 +55,15 @@ export type DockerVolume = {
   mountpoint: string;
 };
 
+export type DockerNetwork = {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+  internal: boolean;
+  attachable: boolean;
+};
+
 export type DockerServiceSummary = {
   id: string;
   name: string;
@@ -56,11 +73,34 @@ export type DockerServiceSummary = {
   ports: string;
 };
 
+export type DockerContainerStats = {
+  containerId: string;
+  cpuPercent: number;
+  memoryUsageBytes: number;
+  memoryLimitBytes: number;
+  memoryPercent: number;
+  networkRxBytes: number;
+  networkTxBytes: number;
+  blockReadBytes: number;
+  blockWriteBytes: number;
+  pids: number;
+};
+
 export type DockerLogRequest = {
   containerId?: string;
   serviceName?: string;
   tail: number;
+  since?: number;
+  search?: string;
+  levels?: DockerLogLevel[];
 };
+
+export type DockerContainerCommand = "restart" | "stop" | "start" | "remove";
+export type DockerResourceCommand =
+  | "remove-volume"
+  | "remove-network"
+  | "remove-image";
+const VOLUME_HELPER_IMAGE = "alpine:3.20";
 
 const identifierPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
 
@@ -68,6 +108,10 @@ function assertIdentifier(value: string, label: string): void {
   if (!identifierPattern.test(value)) {
     throw new Error(`${label} contains unsupported characters.`);
   }
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -129,6 +173,63 @@ function dockerInfo(raw: unknown): DockerInfo {
 export class DockerReadOnlyService {
   constructor(private readonly docker: Docker = getDockerInstance()) {}
 
+  async controlContainer(
+    target: DockerInspectionTarget,
+    containerId: string,
+    command: DockerContainerCommand,
+  ): Promise<{ success: true }> {
+    assertIdentifier(containerId, "Container");
+    if (target.kind === "local") {
+      const container = this.docker.getContainer(containerId);
+      if (command === "restart") await container.restart();
+      if (command === "stop") await container.stop();
+      if (command === "start") await container.start();
+      if (command === "remove") await container.remove({ force: true });
+    } else {
+      const action = command === "remove" ? "rm --force" : command;
+      await this.executeRemote(
+        target,
+        `docker container ${action} ${containerId}`,
+      );
+    }
+    return { success: true };
+  }
+
+  async controlResource(
+    target: DockerInspectionTarget,
+    resourceId: string,
+    command: DockerResourceCommand,
+  ): Promise<{ success: true }> {
+    if (command === "remove-image") {
+      if (
+        !/^[a-zA-Z0-9][a-zA-Z0-9_.:/@-]{0,255}$/.test(resourceId) ||
+        resourceId.includes("..")
+      ) {
+        throw new Error("Image reference contains unsupported characters.");
+      }
+    } else {
+      assertIdentifier(resourceId, "Docker resource");
+    }
+    if (target.kind === "local") {
+      if (command === "remove-volume") {
+        await this.docker.getVolume(resourceId).remove();
+      } else if (command === "remove-network") {
+        await this.docker.getNetwork(resourceId).remove();
+      } else {
+        await this.docker.getImage(resourceId).remove({ force: true });
+      }
+    } else {
+      const action =
+        command === "remove-volume"
+          ? "volume rm"
+          : command === "remove-network"
+            ? "network rm"
+            : "image rm --force";
+      await this.executeRemote(target, `docker ${action} ${resourceId}`);
+    }
+    return { success: true };
+  }
+
   async getInfo(target: DockerInspectionTarget): Promise<DockerInfo> {
     if (target.kind === "local") return dockerInfo(await this.docker.info());
     const raw = await this.executeRemote(
@@ -138,36 +239,96 @@ export class DockerReadOnlyService {
     return dockerInfo(JSON.parse(raw));
   }
 
+  async getHostTime(
+    target: DockerInspectionTarget,
+  ): Promise<{ epochSeconds: number; iso: string }> {
+    if (target.kind === "local") {
+      const now = Date.now();
+      return {
+        epochSeconds: Math.floor(now / 1000),
+        iso: new Date(now).toISOString(),
+      };
+    }
+    const raw = await this.executeRemote(target, "date -u +%s");
+    const epochSeconds = Number.parseInt(raw.trim(), 10);
+    if (!Number.isSafeInteger(epochSeconds)) {
+      throw new Error(`Unable to read host time from ${target.name}.`);
+    }
+    return { epochSeconds, iso: new Date(epochSeconds * 1000).toISOString() };
+  }
+
   async listContainers(
     target: DockerInspectionTarget,
+    filter?: { search?: string; state?: string },
   ): Promise<DockerContainer[]> {
     if (target.kind === "local") {
       const containers = await this.docker.listContainers({ all: true });
-      return containers.map((container) => ({
-        id: container.Id,
-        name:
-          container.Names?.[0]?.replace(/^\//, "") || container.Id.slice(0, 12),
-        image: container.Image || "unknown",
-        state: container.State || "unknown",
-        status: container.Status || "unknown",
-        ports: formatPorts(container.Ports),
-        createdAt: container.Created
-          ? new Date(container.Created * 1000).toISOString()
-          : null,
-      }));
+      return containers
+        .map((container) => {
+          const value = container as typeof container & {
+            Mounts?: Array<{
+              Name?: string;
+              Source?: string;
+              Destination?: string;
+            }>;
+            Networks?: Record<string, unknown>;
+            Labels?: Record<string, string>;
+          };
+          return {
+            id: container.Id,
+            name:
+              container.Names?.[0]?.replace(/^\//, "") ||
+              container.Id.slice(0, 12),
+            image: container.Image || "unknown",
+            state: container.State || "unknown",
+            status: container.Status || "unknown",
+            ports: formatPorts(container.Ports),
+            mounts: (value.Mounts || [])
+              .map(
+                (mount) =>
+                  mount.Name ||
+                  (mount.Source && mount.Destination
+                    ? `${mount.Source}:${mount.Destination}`
+                    : mount.Destination),
+              )
+              .filter((mount): mount is string => Boolean(mount)),
+            networks: Object.keys(value.Networks || {}),
+            labels: Object.entries(value.Labels || {}).map(
+              ([key, value]) => `${key}=${value}`,
+            ),
+            createdAt: container.Created
+              ? new Date(container.Created * 1000).toISOString()
+              : null,
+          };
+        })
+        .filter((container) => this.matchesContainer(container, filter));
     }
     const rows = parseJsonLines(
       await this.executeRemote(target, "docker ps --all --format '{{json .}}'"),
     );
-    return rows.map((row) => ({
-      id: asString(row.ID),
-      name: asString(row.Names),
-      image: asString(row.Image),
-      state: asString(row.State),
-      status: asString(row.Status),
-      ports: asString(row.Ports, ""),
-      createdAt: null,
-    }));
+    return rows
+      .map((row) => ({
+        id: asString(row.ID),
+        name: asString(row.Names),
+        image: asString(row.Image),
+        state: asString(row.State),
+        status: asString(row.Status),
+        ports: asString(row.Ports, ""),
+        mounts: asString(row.Mounts, "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        networks: asString(row.Networks, "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        labels: asString(row.Labels, "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        createdAt: null,
+      }))
+      .filter((container) => this.matchesContainer(container, filter));
   }
 
   async listImages(target: DockerInspectionTarget): Promise<DockerImage[]> {
@@ -217,6 +378,34 @@ export class DockerReadOnlyService {
       name: asString(row.Name),
       driver: asString(row.Driver),
       mountpoint: "",
+    }));
+  }
+
+  async listNetworks(target: DockerInspectionTarget): Promise<DockerNetwork[]> {
+    if (target.kind === "local") {
+      const networks = await this.docker.listNetworks();
+      return networks.map((network) => ({
+        id: network.Id,
+        name: network.Name,
+        driver: network.Driver,
+        scope: network.Scope,
+        internal: Boolean(network.Internal),
+        attachable: Boolean(network.Attachable),
+      }));
+    }
+    const rows = parseJsonLines(
+      await this.executeRemote(
+        target,
+        "docker network ls --format '{{json .}}'",
+      ),
+    );
+    return rows.map((row) => ({
+      id: asString(row.ID),
+      name: asString(row.Name),
+      driver: asString(row.Driver),
+      scope: asString(row.Scope),
+      internal: false,
+      attachable: false,
     }));
   }
 
@@ -276,18 +465,263 @@ export class DockerReadOnlyService {
         stderr: true,
         tail: request.tail,
         timestamps: true,
+        ...(request.since ? { since: request.since } : {}),
       };
       const buffer = request.containerId
         ? await this.docker.getContainer(request.containerId).logs(options)
         : await this.docker
             .getService(request.serviceName as string)
             .logs(options);
-      return Buffer.isBuffer(buffer) ? buffer.toString("utf8") : String(buffer);
+      const logs = Buffer.isBuffer(buffer)
+        ? buffer.toString("utf8")
+        : String(buffer);
+      return filterDockerLogs(logs, request);
     }
+    const since = request.since ? ` --since ${request.since}` : "";
     const command = request.containerId
-      ? `docker logs --tail ${request.tail} --timestamps ${request.containerId}`
-      : `docker service logs --tail ${request.tail} --timestamps ${request.serviceName}`;
-    return this.executeRemote(target, command);
+      ? `docker logs --tail ${request.tail} --timestamps${since} ${request.containerId}`
+      : `docker service logs --tail ${request.tail} --timestamps${since} ${request.serviceName}`;
+    return filterDockerLogs(await this.executeRemote(target, command), request);
+  }
+
+  async getContainerStats(
+    target: DockerInspectionTarget,
+    containerId: string,
+  ): Promise<DockerContainerStats> {
+    assertIdentifier(containerId, "Docker container");
+    if (target.kind === "remote") {
+      const [row] = parseJsonLines(
+        await this.executeRemote(
+          target,
+          `docker stats --no-stream --format '{{json .}}' ${containerId}`,
+        ),
+      );
+      if (!row) throw new Error("Docker container stats were not returned.");
+      const percent = (value: unknown) =>
+        Number.parseFloat(String(value ?? "").replace("%", "")) || 0;
+      const bytes = (value: unknown) => {
+        const match = String(value ?? "").match(
+          /^([0-9]+(?:\.[0-9]+)?)\s*([kmgt]?i?b)?$/i,
+        );
+        if (!match) return 0;
+        const units = ["b", "kb", "mb", "gb", "tb"];
+        const unit = (match[2] ?? "b").toLowerCase().replace("i", "");
+        return (
+          (Number(match[1]) || 0) * 1024 ** Math.max(0, units.indexOf(unit))
+        );
+      };
+      const [memoryUsage, memoryLimit] = String(row.MemUsage ?? "")
+        .split("/")
+        .map((value) => bytes(value.trim()));
+      const [networkRxBytes, networkTxBytes] = String(row.NetIO ?? "")
+        .split("/")
+        .map((value) => bytes(value.trim()));
+      const [blockReadBytes, blockWriteBytes] = String(row.BlockIO ?? "")
+        .split("/")
+        .map((value) => bytes(value.trim()));
+      return {
+        containerId,
+        cpuPercent: percent(row.CPUPerc),
+        memoryUsageBytes: memoryUsage || 0,
+        memoryLimitBytes: memoryLimit || 0,
+        memoryPercent: memoryLimit
+          ? ((memoryUsage || 0) / memoryLimit) * 100
+          : 0,
+        networkRxBytes: networkRxBytes || 0,
+        networkTxBytes: networkTxBytes || 0,
+        blockReadBytes: blockReadBytes || 0,
+        blockWriteBytes: blockWriteBytes || 0,
+        pids: Number(row.PIDs) || 0,
+      };
+    }
+
+    const value = (await this.docker
+      .getContainer(containerId)
+      .stats({ stream: false })) as Record<string, any>;
+    const cpu = value.cpu_stats ?? {};
+    const previousCpu = value.precpu_stats ?? {};
+    const cpuDelta =
+      Number(cpu.cpu_usage?.total_usage ?? 0) -
+      Number(previousCpu.cpu_usage?.total_usage ?? 0);
+    const systemDelta =
+      Number(cpu.system_cpu_usage ?? 0) -
+      Number(previousCpu.system_cpu_usage ?? 0);
+    const onlineCpus =
+      Number(cpu.online_cpus) || cpu.cpu_usage?.percpu_usage?.length || 1;
+    const memory = value.memory_stats ?? {};
+    const memoryUsageBytes = Number(memory.usage ?? 0);
+    const memoryLimitBytes = Number(memory.limit ?? 0);
+    const networks = Object.values(value.networks ?? {}) as Array<
+      Record<string, unknown>
+    >;
+    const blockDevices = (value.blkio_stats?.io_service_bytes_recursive ??
+      []) as Array<Record<string, unknown>>;
+    return {
+      containerId,
+      cpuPercent:
+        systemDelta > 0 ? (cpuDelta / systemDelta) * onlineCpus * 100 : 0,
+      memoryUsageBytes,
+      memoryLimitBytes,
+      memoryPercent: memoryLimitBytes
+        ? (memoryUsageBytes / memoryLimitBytes) * 100
+        : 0,
+      networkRxBytes: networks.reduce(
+        (total, item) => total + Number(item.rx_bytes ?? 0),
+        0,
+      ),
+      networkTxBytes: networks.reduce(
+        (total, item) => total + Number(item.tx_bytes ?? 0),
+        0,
+      ),
+      blockReadBytes: blockDevices
+        .filter((item) => item.op === "Read")
+        .reduce((total, item) => total + Number(item.value ?? 0), 0),
+      blockWriteBytes: blockDevices
+        .filter((item) => item.op === "Write")
+        .reduce((total, item) => total + Number(item.value ?? 0), 0),
+      pids: Number(value.pids_stats?.current ?? 0),
+    };
+  }
+
+  async uploadArchiveToVolume(
+    target: DockerInspectionTarget,
+    volumeName: string,
+    archive: Buffer,
+    destination = "/",
+  ): Promise<{ success: true; bytes: number; destination: string }> {
+    assertIdentifier(volumeName, "Docker volume");
+    if (
+      !destination.startsWith("/") ||
+      destination.includes("..") ||
+      !/^\/[a-zA-Z0-9_.\-/]*$/.test(destination)
+    ) {
+      throw new Error("Upload destination must be a safe absolute path.");
+    }
+    if (archive.byteLength > 50 * 1024 * 1024) {
+      throw new Error("Volume archives must not exceed 50 MB.");
+    }
+
+    if (target.kind === "local") {
+      await this.ensureLocalHelperImage();
+      const container = await this.docker.createContainer({
+        Image: VOLUME_HELPER_IMAGE,
+        Cmd: ["sh", "-c", "sleep 120"],
+        HostConfig: {
+          AutoRemove: true,
+          Binds: [`${volumeName}:/upstand-volume`],
+        },
+      });
+      try {
+        await container.start();
+        const destinationPath = `/upstand-volume${destination === "/" ? "" : destination}`;
+        const mkdir = await container.exec({
+          Cmd: ["mkdir", "-p", destinationPath],
+          AttachStdout: false,
+          AttachStderr: true,
+        });
+        const mkdirStream = await mkdir.start({});
+        await new Promise<void>((resolve, reject) => {
+          mkdirStream.on("end", resolve);
+          mkdirStream.on("close", resolve);
+          mkdirStream.on("error", reject);
+        });
+        const mkdirResult = await mkdir.inspect();
+        if (mkdirResult.ExitCode !== 0) {
+          throw new Error("Unable to prepare the volume upload destination.");
+        }
+        await container.putArchive(archive, { path: destinationPath });
+      } finally {
+        await container.remove({ force: true }).catch(() => undefined);
+      }
+    } else {
+      const localArchive = path.join(
+        tmpdir(),
+        `upstand-volume-${randomUUID()}.tar`,
+      );
+      const remoteArchive = `/tmp/upstand-volume-${randomUUID()}.tar`;
+      await writeFile(localArchive, archive);
+      try {
+        await this.uploadRemoteFile(target, localArchive, remoteArchive);
+        const destinationPath = `/upstand-volume${destination === "/" ? "" : destination}`;
+        await this.executeRemote(
+          target,
+          `docker run --rm -v ${shellQuote(volumeName)}:/upstand-volume ${VOLUME_HELPER_IMAGE} sh -c ${shellQuote(`mkdir -p ${shellQuote(destinationPath)} && tar -xf ${shellQuote(remoteArchive)} -C ${shellQuote(destinationPath)}`)}`,
+        );
+      } finally {
+        await rm(localArchive, { force: true });
+        await this.executeRemote(
+          target,
+          `rm -f ${shellQuote(remoteArchive)}`,
+        ).catch(() => undefined);
+      }
+    }
+
+    return { success: true, bytes: archive.byteLength, destination };
+  }
+
+  async uploadArchiveToContainer(
+    target: DockerInspectionTarget,
+    containerId: string,
+    archive: Buffer,
+    destination = "/",
+  ): Promise<{ success: true; bytes: number; destination: string }> {
+    assertIdentifier(containerId, "Docker container");
+    if (
+      !destination.startsWith("/") ||
+      destination.includes("..") ||
+      !/^\/[a-zA-Z0-9_.\-/]*$/.test(destination)
+    ) {
+      throw new Error("Upload destination must be a safe absolute path.");
+    }
+    if (archive.byteLength > 50 * 1024 * 1024) {
+      throw new Error("Container archives must not exceed 50 MB.");
+    }
+
+    if (target.kind === "local") {
+      await this.docker
+        .getContainer(containerId)
+        .putArchive(archive, { path: destination });
+    } else {
+      const localArchive = path.join(
+        tmpdir(),
+        `upstand-container-${randomUUID()}.tar`,
+      );
+      const remoteArchive = `/tmp/upstand-container-${randomUUID()}.tar`;
+      await writeFile(localArchive, archive);
+      try {
+        await this.uploadRemoteFile(target, localArchive, remoteArchive);
+        const destinationPath = destination || "/";
+        await this.executeRemote(
+          target,
+          `docker cp ${shellQuote(remoteArchive)} ${shellQuote(`${containerId}:/tmp/upstand-upload.tar`)} && docker exec ${containerId} sh -c ${shellQuote(`mkdir -p ${shellQuote(destinationPath)} && tar -xf /tmp/upstand-upload.tar -C ${shellQuote(destinationPath)} && rm -f /tmp/upstand-upload.tar`)}`,
+        );
+      } finally {
+        await rm(localArchive, { force: true });
+        await this.executeRemote(
+          target,
+          `rm -f ${shellQuote(remoteArchive)}`,
+        ).catch(() => undefined);
+      }
+    }
+
+    return { success: true, bytes: archive.byteLength, destination };
+  }
+
+  private matchesContainer(
+    container: DockerContainer,
+    filter?: { search?: string; state?: string },
+  ): boolean {
+    if (filter?.state && container.state !== filter.state) return false;
+    if (!filter?.search) return true;
+    const search = filter.search.toLowerCase();
+    return [
+      container.id,
+      container.name,
+      container.image,
+      container.status,
+      ...container.labels,
+      ...container.networks,
+    ].some((value) => value.toLowerCase().includes(search));
   }
 
   private executeRemote(
@@ -331,6 +765,63 @@ export class DockerReadOnlyService {
                 return;
               }
               resolve(stdout.slice(0, 512_000));
+            });
+          });
+        })
+        .on("error", (error) => {
+          clearTimeout(timer);
+          reject(error);
+        })
+        .connect({
+          host: target.host,
+          port: target.port,
+          username: target.username,
+          privateKey: target.privateKey,
+          readyTimeout: 20_000,
+        });
+    });
+  }
+
+  private async ensureLocalHelperImage(): Promise<void> {
+    const image = this.docker.getImage(VOLUME_HELPER_IMAGE);
+    try {
+      await image.inspect();
+      return;
+    } catch {
+      const stream = await this.docker.pull(VOLUME_HELPER_IMAGE);
+      await new Promise<void>((resolve, reject) => {
+        this.docker.modem.followProgress(stream, (error) =>
+          error ? reject(error) : resolve(),
+        );
+      });
+    }
+  }
+
+  private uploadRemoteFile(
+    target: Extract<DockerInspectionTarget, { kind: "remote" }>,
+    localPath: string,
+    remotePath: string,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const connection = new Client();
+      const timer = setTimeout(() => {
+        connection.end();
+        reject(new Error(`Remote Docker upload timed out on ${target.name}.`));
+      }, 60_000);
+      connection
+        .on("ready", () => {
+          connection.sftp((error, sftp) => {
+            if (error) {
+              clearTimeout(timer);
+              connection.end();
+              reject(error);
+              return;
+            }
+            sftp.fastPut(localPath, remotePath, (putError) => {
+              clearTimeout(timer);
+              connection.end();
+              if (putError) reject(putError);
+              else resolve();
             });
           });
         })

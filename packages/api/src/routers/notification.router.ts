@@ -9,6 +9,7 @@ import {
   CreateNotificationChannelUseCaseToken,
   DeleteNotificationChannelUseCaseToken,
   GetNotificationChannelsUseCaseToken,
+  RetryNotificationDeliveryUseCaseToken,
   TestNotificationChannelUseCaseToken,
   UpdateNotificationChannelUseCaseToken,
 } from "../di";
@@ -157,5 +158,31 @@ export const notificationRouter = router({
       return input.status
         ? deliveries.filter((delivery) => delivery.status === input.status)
         : deliveries;
+    }),
+
+  retryDelivery: twoFactorVerifiedProcedure
+    .input(ChannelIdInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const delivery = await ctx.scope
+        .resolve(UnitOfWorkToken)
+        .notificationDeliveryRepository.findById(input.id);
+      if (!delivery) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Notification delivery not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        delivery.organizationId,
+        "notification:update",
+      );
+      try {
+        return await ctx.scope
+          .resolve(RetryNotificationDeliveryUseCaseToken)
+          .execute(input.id);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
     }),
 });

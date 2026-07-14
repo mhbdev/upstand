@@ -1,3 +1,4 @@
+import { ssoClient } from "@better-auth/sso/client";
 import {
   organizationClient,
   twoFactorClient,
@@ -15,5 +16,6 @@ export const authClient = createAuthClient({
         window.location.href = "/2fa-verify";
       },
     }),
+    ssoClient(),
   ],
 });

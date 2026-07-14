@@ -57,7 +57,7 @@ import {
   validateKeyValuePairs,
 } from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
-import type { authClient } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
 interface PortMapping {
@@ -71,10 +71,16 @@ interface EnvVar {
   value: string;
 }
 
+interface CaddyMiddleware {
+  name: string;
+  body: string;
+}
+
 export default function WebServerDashboard(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
   const queryClient = useQueryClient();
+  const { data: activeOrganization } = authClient.useActiveOrganization();
   // Database Web Server settings
   const [email, setEmail] = useState("");
   const [httpPort, setHttpPort] = useState(80);
@@ -82,6 +88,9 @@ export default function WebServerDashboard(_props: {
   const [enableHttp3, setEnableHttp3] = useState(true);
   const [globalCaddyfile, setGlobalCaddyfile] = useState("");
   const [caddySnippets, setCaddySnippets] = useState("");
+  const [caddyMiddlewares, setCaddyMiddlewares] = useState<CaddyMiddleware[]>(
+    [],
+  );
   const [editingSettings, setEditingSettings] = useState(false);
 
   // Dialogue States
@@ -91,6 +100,10 @@ export default function WebServerDashboard(_props: {
   const [portsModalOpen, setPortsModalOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [updateDialogVersion, setUpdateDialogVersion] = useState<string>();
+  const [webBackupDestinationId, setWebBackupDestinationId] = useState("");
+  const [webBackupName, setWebBackupName] = useState("Web server backup");
+  const [webBackupCron, setWebBackupCron] = useState("0 3 * * *");
+  const [webBackupPrefix, setWebBackupPrefix] = useState("web-server");
 
   // Additional settings states
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
@@ -112,6 +125,35 @@ export default function WebServerDashboard(_props: {
   } = useQuery({
     ...trpc.webServer.getSettings.queryOptions(),
     refetchInterval: 15000,
+  });
+
+  const { data: securityAudit, refetch: refetchSecurityAudit } = useQuery({
+    ...trpc.webServer.securityAudit.queryOptions({
+      organizationId: activeOrganization?.id || "",
+    }),
+    enabled: Boolean(activeOrganization?.id),
+    refetchInterval: 30000,
+  });
+
+  const { data: webBackupDestinations = [] } = useQuery({
+    ...trpc.s3Destination.list.queryOptions({
+      organizationId: activeOrganization?.id || "",
+    }),
+    enabled: Boolean(activeOrganization?.id),
+  });
+  const { data: webBackupSchedules = [], refetch: refetchWebBackupSchedules } =
+    useQuery({
+      ...trpc.backup.listWebServerSchedules.queryOptions({
+        organizationId: activeOrganization?.id || "",
+      }),
+      enabled: Boolean(activeOrganization?.id),
+    });
+  const { data: webBackupRuns = [], refetch: refetchWebBackupRuns } = useQuery({
+    ...trpc.backup.listWebServerRuns.queryOptions({
+      organizationId: activeOrganization?.id || "",
+      limit: 10,
+    }),
+    enabled: Boolean(activeOrganization?.id),
   });
 
   // 2. Fetch Caddy logs
@@ -155,6 +197,21 @@ export default function WebServerDashboard(_props: {
       setEnableHttp3(info.settings.enableHttp3);
       setGlobalCaddyfile(info.settings.globalCaddyfile || "");
       setCaddySnippets(info.settings.caddySnippets || "");
+      try {
+        const parsed = JSON.parse(info.settings.caddyMiddlewares || "[]");
+        setCaddyMiddlewares(
+          Array.isArray(parsed)
+            ? parsed.filter(
+                (item): item is CaddyMiddleware =>
+                  Boolean(item) &&
+                  typeof item.name === "string" &&
+                  typeof item.body === "string",
+              )
+            : [],
+        );
+      } catch {
+        setCaddyMiddlewares([]);
+      }
 
       // Sync Environment variables
       try {
@@ -257,6 +314,24 @@ export default function WebServerDashboard(_props: {
       toast.error(err.message || "Failed to clean deployment queue");
     },
   });
+
+  const cleanupInput = () => {
+    if (!activeOrganization?.id) {
+      toast.error("Select an organization before running Docker cleanup.");
+      return null;
+    }
+    if (
+      !window.confirm(
+        "This is destructive and affects unused Docker data on the host. Continue?",
+      )
+    ) {
+      return null;
+    }
+    return {
+      organizationId: activeOrganization.id,
+      confirm: "CLEANUP" as const,
+    };
+  };
 
   const cleanUnusedImagesMutation = useMutation({
     ...trpc.webServer.cleanUnusedImages.mutationOptions(),
@@ -368,6 +443,44 @@ export default function WebServerDashboard(_props: {
     onError: (err) => toast.error(err.message || "Failed to check for updates"),
   });
 
+  const createWebBackupMutation = useMutation({
+    ...trpc.backup.createWebServerSchedule.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Web-server backup schedule created");
+      refetchWebBackupSchedules();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const runWebBackupMutation = useMutation({
+    ...trpc.backup.runWebServerNow.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Web-server backup queued");
+      refetchWebBackupRuns();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const updateWebBackupMutation = useMutation({
+    ...trpc.backup.updateWebServerSchedule.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Web-server backup schedule updated");
+      refetchWebBackupSchedules();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const deleteWebBackupMutation = useMutation({
+    ...trpc.backup.deleteWebServerSchedule.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Web-server backup schedule deleted");
+      refetchWebBackupSchedules();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const restoreWebBackupMutation = useMutation({
+    ...trpc.backup.restoreWebServer.mutationOptions(),
+    onSuccess: () => toast.success("Web-server restore completed"),
+    onError: (error) => toast.error(error.message),
+  });
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettingsMutation.mutate({
@@ -377,6 +490,7 @@ export default function WebServerDashboard(_props: {
       enableHttp3,
       globalCaddyfile: globalCaddyfile.trim() || null,
       caddySnippets,
+      caddyMiddlewares,
     });
   };
 
@@ -493,6 +607,7 @@ export default function WebServerDashboard(_props: {
             onClick={() => {
               refetchInfo();
               refetchCaddyLogs();
+              refetchSecurityAudit();
             }}
             className="text-xs"
           >
@@ -507,6 +622,226 @@ export default function WebServerDashboard(_props: {
         </div>
       ) : (
         <div className="space-y-6">
+          <Card className="border border-border/40 bg-card/20 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between font-semibold text-lg">
+                <span>Security audit</span>
+                {securityAudit && (
+                  <Badge
+                    variant={
+                      securityAudit.score >= 80 ? "default" : "destructive"
+                    }
+                  >
+                    {securityAudit.score}/100
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Read-only checks for Docker reachability, Swarm, ingress
+                networking, and proxy exposure.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 border-border/10 border-t pt-5">
+              {(securityAudit?.checks ?? []).map((check) => (
+                <div
+                  key={check.id}
+                  className="flex items-start justify-between gap-4 rounded-md border p-3 text-sm"
+                >
+                  <div>
+                    <p className="font-medium">{check.title}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {check.detail}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      check.status === "pass"
+                        ? "default"
+                        : check.status === "warn"
+                          ? "secondary"
+                          : "destructive"
+                    }
+                  >
+                    {check.status}
+                  </Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/40 bg-card/20 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-semibold text-lg">
+                Web-server backups
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Back up the Upstand control-plane database and Caddy runtime
+                volumes to an organization-owned S3 destination. Restore is
+                destructive and requires an explicit confirmation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 border-border/10 border-t pt-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-2">
+                  <Label htmlFor="web-backup-destination">Destination</Label>
+                  <Select
+                    value={webBackupDestinationId}
+                    onValueChange={(value) => {
+                      if (value) setWebBackupDestinationId(value);
+                    }}
+                  >
+                    <SelectTrigger id="web-backup-destination">
+                      <SelectValue placeholder="Choose S3 destination" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {webBackupDestinations.map((destination) => (
+                        <SelectItem key={destination.id} value={destination.id}>
+                          {destination.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="web-backup-name">Schedule name</Label>
+                  <Input
+                    id="web-backup-name"
+                    value={webBackupName}
+                    onChange={(event) => setWebBackupName(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="web-backup-cron">Cron</Label>
+                  <Input
+                    id="web-backup-cron"
+                    value={webBackupCron}
+                    onChange={(event) => setWebBackupCron(event.target.value)}
+                    placeholder="0 3 * * *"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="web-backup-prefix">Storage prefix</Label>
+                  <Input
+                    id="web-backup-prefix"
+                    value={webBackupPrefix}
+                    onChange={(event) => setWebBackupPrefix(event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={
+                    createWebBackupMutation.isPending ||
+                    !activeOrganization?.id ||
+                    !webBackupDestinationId
+                  }
+                  onClick={() => {
+                    if (!activeOrganization?.id) return;
+                    createWebBackupMutation.mutate({
+                      organizationId: activeOrganization.id,
+                      destinationId: webBackupDestinationId,
+                      name: webBackupName.trim(),
+                      cronExpression: webBackupCron.trim(),
+                      timezone: "UTC",
+                      prefix: webBackupPrefix.trim(),
+                      enabled: true,
+                    });
+                  }}
+                >
+                  Create schedule
+                </Button>
+                {webBackupSchedules.map((schedule) => (
+                  <div
+                    key={schedule.id}
+                    className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
+                  >
+                    <span className="font-medium">{schedule.name}</span>
+                    <span className="text-muted-foreground">
+                      {schedule.cronExpression}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        runWebBackupMutation.isPending ||
+                        updateWebBackupMutation.isPending
+                      }
+                      onClick={() =>
+                        runWebBackupMutation.mutate({
+                          scheduleId: schedule.id,
+                        })
+                      }
+                    >
+                      Run now
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={updateWebBackupMutation.isPending}
+                      onClick={() => {
+                        if (!activeOrganization?.id) return;
+                        updateWebBackupMutation.mutate({
+                          id: schedule.id,
+                          organizationId: activeOrganization.id,
+                          enabled: !schedule.enabled,
+                        });
+                      }}
+                    >
+                      {schedule.enabled ? "Disable" : "Enable"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={deleteWebBackupMutation.isPending}
+                      onClick={() =>
+                        deleteWebBackupMutation.mutate({ id: schedule.id })
+                      }
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              {webBackupRuns.length > 0 && (
+                <div className="space-y-2 text-xs">
+                  <p className="font-medium">Recent runs</p>
+                  {webBackupRuns.slice(0, 10).map((run) => (
+                    <div
+                      key={run.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
+                    >
+                      <span>
+                        {run.status} · {run.createdAt.toLocaleString()}
+                      </span>
+                      {run.status === "succeeded" && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={restoreWebBackupMutation.isPending}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "This replaces the control-plane database and Caddy volumes. Continue?",
+                              )
+                            ) {
+                              restoreWebBackupMutation.mutate({
+                                runId: run.id,
+                                confirm: "RESTORE_WEB_SERVER",
+                              });
+                            }
+                          }}
+                        >
+                          Restore
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* ─── WEB SERVER OPERATIONS PANEL ────────────────────────────────── */}
           <Card className="border border-border/40 bg-card/20 shadow-sm">
             <CardHeader className="pb-3">
@@ -567,7 +902,11 @@ export default function WebServerDashboard(_props: {
                         Clean Redis
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => cleanAllDeploymentQueueMutation.mutate()}
+                        onClick={() => {
+                          const input = cleanupInput();
+                          if (input)
+                            cleanAllDeploymentQueueMutation.mutate(input);
+                        }}
                       >
                         Clean all deployment queue
                       </DropdownMenuItem>
@@ -641,41 +980,51 @@ export default function WebServerDashboard(_props: {
                   <DropdownMenuPortal>
                     <DropdownMenuContent className="w-56 bg-popover text-popover-foreground">
                       <DropdownMenuItem
-                        onClick={() => cleanUnusedImagesMutation.mutate()}
+                        onClick={() => {
+                          const input = cleanupInput();
+                          if (input) cleanUnusedImagesMutation.mutate(input);
+                        }}
                       >
                         Clean unused images
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => cleanUnusedVolumesMutation.mutate()}
+                        onClick={() => {
+                          const input = cleanupInput();
+                          if (input) cleanUnusedVolumesMutation.mutate(input);
+                        }}
                       >
                         Clean unused volumes
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => cleanStoppedContainersMutation.mutate()}
+                        onClick={() => {
+                          const input = cleanupInput();
+                          if (input)
+                            cleanStoppedContainersMutation.mutate(input);
+                        }}
                       >
                         Clean stopped containers
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() =>
-                          toast.success(
-                            "Build and git repository caches cleaned successfully",
-                          )
-                        }
-                      >
-                        Clean Patch Caches
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => cleanDockerBuilderMutation.mutate()}
+                        onClick={() => {
+                          const input = cleanupInput();
+                          if (input) cleanDockerBuilderMutation.mutate(input);
+                        }}
                       >
                         Clean Docker Builder
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => cleanDockerPruneMutation.mutate()}
+                        onClick={() => {
+                          const input = cleanupInput();
+                          if (input) cleanDockerPruneMutation.mutate(input);
+                        }}
                       >
                         Clean Docker System
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => cleanAllMutation.mutate()}
+                        onClick={() => {
+                          const input = cleanupInput();
+                          if (input) cleanAllMutation.mutate(input);
+                        }}
                       >
                         Clean all
                       </DropdownMenuItem>
@@ -984,6 +1333,102 @@ export default function WebServerDashboard(_props: {
                         names from a resource domain. The generated Caddyfile is
                         validated before it is loaded.
                       </p>
+                    </div>
+
+                    <div className="space-y-3 rounded-lg border border-border/20 bg-muted/5 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <Label className="font-semibold text-xs">
+                            Managed Caddy middlewares
+                          </Label>
+                          <p className="text-[11px] text-muted-foreground">
+                            Define named, reusable route middleware without
+                            editing generated files. Reference names from a
+                            resource domain mapping.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setCaddyMiddlewares((current) => [
+                              ...current,
+                              {
+                                name: "security-headers",
+                                body: "header -Server",
+                              },
+                            ])
+                          }
+                        >
+                          <HugeiconsIcon
+                            icon={PlusSignIcon}
+                            data-icon="inline-start"
+                          />
+                          Add middleware
+                        </Button>
+                      </div>
+                      {caddyMiddlewares.length === 0 ? (
+                        <p className="rounded border border-dashed p-3 text-muted-foreground text-xs">
+                          No managed middlewares configured.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {caddyMiddlewares.map((middleware, index) => (
+                            <div
+                              className="grid gap-2 rounded border border-border/20 p-3 md:grid-cols-[minmax(0,180px)_1fr_auto]"
+                              key={`${middleware.name}-${index}`}
+                            >
+                              <Input
+                                value={middleware.name}
+                                placeholder="middleware-name"
+                                aria-label="Caddy middleware name"
+                                onChange={(event) =>
+                                  setCaddyMiddlewares((current) =>
+                                    current.map((item, itemIndex) =>
+                                      itemIndex === index
+                                        ? { ...item, name: event.target.value }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                              />
+                              <CodeSurface>
+                                <CodeEditor
+                                  height="100px"
+                                  language="caddy"
+                                  value={middleware.body}
+                                  onChange={(body) =>
+                                    setCaddyMiddlewares((current) =>
+                                      current.map((item, itemIndex) =>
+                                        itemIndex === index
+                                          ? { ...item, body }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                  aria-label={`Caddy middleware ${middleware.name}`}
+                                />
+                              </CodeSurface>
+                              <Button
+                                type="button"
+                                size="icon-sm"
+                                variant="ghost"
+                                aria-label={`Remove middleware ${middleware.name}`}
+                                onClick={() =>
+                                  setCaddyMiddlewares((current) =>
+                                    current.filter(
+                                      (_, itemIndex) => itemIndex !== index,
+                                    ),
+                                  )
+                                }
+                              >
+                                <HugeiconsIcon icon={Delete02Icon} />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Save button */}

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import {
+  createHash,
   createHmac,
   randomBytes,
   randomUUID,
@@ -27,10 +28,12 @@ import {
 } from "@upstand/api/api-key-auth";
 import { createContext } from "@upstand/api/context";
 import { serviceProvider } from "@upstand/api/di";
+import { checkPermission } from "@upstand/api/permissions";
 import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
-import { db, monitoringSettings } from "@upstand/db";
+import { db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
+import { scimProvider } from "@upstand/db/schema/scim";
 import { type IUnitOfWork, isJsonObject } from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
@@ -40,28 +43,39 @@ import {
   BackupRunWorker,
   CaddyService,
   DeploymentWorker,
+  DockerCleanupService,
   getDockerInstance,
+  gitProviderOAuthStateKey,
+  hashWebhookToken,
+  matchesDockerImageWebhook,
   NotificationDeliveryWorker,
+  ProcessSourceWebhookUseCase,
+  parseGitProviderOAuthState,
+  parseResourceCredentials,
   QueueDeploymentUseCase,
   reconcileQueuedJobs,
+  resolveDockerCliEnvironmentForServer,
+  UploadDockerContainerInputSchema,
+  UploadDockerVolumeInputSchema,
 } from "@upstand/usecases";
 import {
   BackupSchedulerToken,
   CreateGitProviderUseCaseToken,
   GeneralSchedulerToken,
+  GetDockerInventoryUseCaseToken,
   GetUpdateStatusUseCaseToken,
   GetWebServerSettingsUseCaseToken,
   TriggerUpdateUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { initLogger, log } from "evlog";
 import {
   type BetterAuthInstance,
   createAuthMiddleware,
 } from "evlog/better-auth";
 import { type EvlogVariables, evlog } from "evlog/hono";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { upgradeWebSocket, websocket } from "hono/bun";
 import { cors } from "hono/cors";
 import { z } from "zod";
@@ -80,6 +94,7 @@ const identifyUser = createAuthMiddleware(auth as BetterAuthInstance, {
     "/api/providers/github/setup",
     "/api/providers/gitlab/setup",
     "/api/providers/gitea/setup",
+    "/api/scim/**",
   ],
   maskEmail: true,
 });
@@ -102,6 +117,8 @@ let deploymentWorkerRefresh: Promise<void> | null = null;
 let workerRefreshInterval: ReturnType<typeof setInterval> | null = null;
 let queueReconcileInterval: ReturnType<typeof setInterval> | null = null;
 let dockerCleanupTimer: ReturnType<typeof setInterval> | null = null;
+let lastDockerCleanupDate: string | null = null;
+const dockerCleanupService = new DockerCleanupService();
 let autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
 let autoUpdateInFlight = false;
 let shuttingDown = false;
@@ -128,7 +145,7 @@ app.use(
   "/*",
   cors({
     origin: env.CORS_ORIGIN,
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
     exposeHeaders: [
       "X-RateLimit-Limit",
@@ -154,18 +171,23 @@ app.post("/api/terminal/session", async (c) => {
   if (!body?.organizationId || !body.sshKeyId) {
     return c.json({ error: "Organization and SSH key are required" }, 400);
   }
+  if (
+    body.port !== undefined &&
+    (!Number.isInteger(body.port) || body.port < 1 || body.port > 65535)
+  ) {
+    return c.json({ error: "SSH port must be between 1 and 65535" }, 400);
+  }
 
   const scope = c.get("scope");
   const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-  const membership = await ensureOrganizationAccess(
-    session.user.id,
-    body.organizationId,
-  );
-  if (membership?.role !== "owner") {
-    return c.json(
-      { error: "Only organization owners can open a server terminal" },
-      403,
+  try {
+    await checkPermission(
+      session.user.id,
+      body.organizationId,
+      "server:update",
     );
+  } catch {
+    return c.json({ error: "Server terminal permission is required" }, 403);
   }
 
   const [key, settings] = await Promise.all([
@@ -194,6 +216,260 @@ app.post("/api/terminal/session", async (c) => {
     port: body.port && Number.isInteger(body.port) ? body.port : 22,
     username: body.username?.trim() || "root",
     privateKey,
+  });
+  return c.json({ token, expiresIn: 60 });
+});
+
+app.post("/api/container-terminal/session", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "Authentication required" }, 401);
+
+  const body = (await c.req.json().catch(() => null)) as {
+    organizationId?: string;
+    resourceId?: string;
+    containerId?: string;
+    sshKeyId?: string;
+  } | null;
+  if (!body?.organizationId || !body.resourceId || !body.containerId) {
+    return c.json(
+      { error: "Organization, resource, container, and SSH key are required" },
+      400,
+    );
+  }
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(body.containerId)) {
+    return c.json({ error: "Invalid container identifier" }, 400);
+  }
+
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const resource = await uow.resourceRepository.findById(body.resourceId);
+  if (!resource) return c.json({ error: "Resource not found" }, 404);
+  const environment = await uow.environmentRepository.findById(
+    resource.environmentId,
+  );
+  const project = environment
+    ? await uow.projectRepository.findById(environment.projectId)
+    : null;
+  if (!project || project.organizationId !== body.organizationId) {
+    return c.json({ error: "Resource is not part of this organization" }, 403);
+  }
+  try {
+    await checkPermission(
+      session.user.id,
+      body.organizationId,
+      "resource:update",
+    );
+  } catch {
+    return c.json({ error: "Resource terminal permission is required" }, 403);
+  }
+  let knownContainers: unknown[] = [];
+  try {
+    knownContainers = JSON.parse(resource.containers || "[]");
+  } catch {
+    knownContainers = [];
+  }
+  if (
+    !knownContainers.some(
+      (container) =>
+        typeof container === "object" &&
+        container !== null &&
+        (container as { id?: string }).id === body.containerId,
+    )
+  ) {
+    return c.json({ error: "Container is not owned by this resource" }, 404);
+  }
+
+  let host = "127.0.0.1";
+  let port = 22;
+  let username = "root";
+  let privateKey: string;
+  if (resource.serverId && !["local", "manager"].includes(resource.serverId)) {
+    const server = await uow.serverRepository.findById(resource.serverId);
+    if (!server || server.organizationId !== body.organizationId) {
+      return c.json({ error: "Deployment server not found" }, 404);
+    }
+    host = server.ipAddress;
+    port = server.port;
+    username = server.username;
+    const key = server.sshKeyId
+      ? await uow.sshKeyRepository.findById(server.sshKeyId)
+      : null;
+    if (!key) return c.json({ error: "Deployment server has no SSH key" }, 409);
+    privateKey = decryptSecret({
+      ciphertext: key.privateKeyCiphertext,
+      iv: key.privateKeyIv,
+      authTag: key.privateKeyAuthTag,
+      keyVersion: key.privateKeyVersion,
+    });
+  } else {
+    if (!body.sshKeyId) {
+      return c.json(
+        { error: "An SSH key is required for the control-plane terminal" },
+        400,
+      );
+    }
+    const [key, settings] = await Promise.all([
+      uow.sshKeyRepository.findById(body.sshKeyId),
+      uow.webServerSettingsRepository.findGlobal(),
+    ]);
+    if (!key || key.organizationId !== body.organizationId) {
+      return c.json(
+        { error: "SSH key was not found in this organization" },
+        404,
+      );
+    }
+    if (!settings?.serverIp) {
+      return c.json(
+        { error: "Control-plane server IP is not configured" },
+        409,
+      );
+    }
+    host = settings.serverIp;
+    privateKey = decryptSecret({
+      ciphertext: key.privateKeyCiphertext,
+      iv: key.privateKeyIv,
+      authTag: key.privateKeyAuthTag,
+      keyVersion: key.privateKeyVersion,
+    });
+  }
+
+  const token = terminalBroker.create({
+    userId: session.user.id,
+    host,
+    port,
+    username,
+    privateKey,
+    command: `docker exec -it ${body.containerId} /bin/sh -lc 'exec /bin/sh || exec /bin/bash'`,
+  });
+  return c.json({ token, expiresIn: 60 });
+});
+
+app.post("/api/docker/terminal/session", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "Authentication required" }, 401);
+
+  const body = (await c.req.json().catch(() => null)) as {
+    organizationId?: string;
+    serverId?: string;
+    containerId?: string;
+    sshKeyId?: string;
+  } | null;
+  if (!body?.organizationId || !body.containerId) {
+    return c.json({ error: "Organization and container are required" }, 400);
+  }
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(body.containerId)) {
+    return c.json({ error: "Invalid container identifier" }, 400);
+  }
+
+  try {
+    await checkPermission(
+      session.user.id,
+      body.organizationId,
+      "server:update",
+    );
+  } catch {
+    return c.json({ error: "Docker terminal permission is required" }, 403);
+  }
+  if (session.user.twoFactorEnabled) {
+    const verified = await redis.get(`2fa-verified:${session.session.id}`);
+    if (verified !== "true") {
+      return c.json({ error: "2FA verification required" }, 403);
+    }
+  }
+
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const serverId =
+    body.serverId && body.serverId !== "local" ? body.serverId : undefined;
+  let host: string;
+  let port: number;
+  let username: string;
+  let privateKey: string;
+
+  if (serverId) {
+    const server = await uow.serverRepository.findById(serverId);
+    if (!server || server.organizationId !== body.organizationId) {
+      return c.json(
+        { error: "Docker server is not part of this organization" },
+        403,
+      );
+    }
+    if (!server.sshKeyId) {
+      return c.json({ error: "Docker server has no SSH key configured" }, 409);
+    }
+    const key = await uow.sshKeyRepository.findById(server.sshKeyId);
+    if (!key)
+      return c.json({ error: "Docker server SSH key was not found" }, 404);
+    host = server.ipAddress;
+    port = server.port;
+    username = server.username;
+    privateKey = decryptSecret({
+      ciphertext: key.privateKeyCiphertext,
+      iv: key.privateKeyIv,
+      authTag: key.privateKeyAuthTag,
+      keyVersion: key.privateKeyVersion,
+    });
+  } else {
+    if (!body.sshKeyId) {
+      return c.json({ error: "An SSH key is required for local Docker" }, 400);
+    }
+    const [key, settings] = await Promise.all([
+      uow.sshKeyRepository.findById(body.sshKeyId),
+      uow.webServerSettingsRepository.findGlobal(),
+    ]);
+    if (!key || key.organizationId !== body.organizationId) {
+      return c.json(
+        { error: "SSH key was not found in this organization" },
+        404,
+      );
+    }
+    if (!settings?.serverIp) {
+      return c.json(
+        { error: "Control-plane server IP is not configured" },
+        409,
+      );
+    }
+    host = settings.serverIp;
+    port = 22;
+    username = "root";
+    privateKey = decryptSecret({
+      ciphertext: key.privateKeyCiphertext,
+      iv: key.privateKeyIv,
+      authTag: key.privateKeyAuthTag,
+      keyVersion: key.privateKeyVersion,
+    });
+  }
+
+  const containers = await scope
+    .resolve(GetDockerInventoryUseCaseToken)
+    .execute({
+      organizationId: body.organizationId,
+      serverId: body.serverId || "local",
+      kind: "containers",
+      tail: 150,
+    });
+  if (
+    !Array.isArray(containers) ||
+    !containers.some(
+      (container) =>
+        typeof container === "object" &&
+        container !== null &&
+        (container as { id?: string }).id === body.containerId,
+    )
+  ) {
+    return c.json(
+      { error: "Container was not found on the selected Docker target" },
+      404,
+    );
+  }
+
+  const token = terminalBroker.create({
+    userId: session.user.id,
+    host,
+    port,
+    username,
+    privateKey,
+    command: `docker exec -it ${body.containerId} /bin/sh -lc 'exec /bin/sh || exec /bin/bash'`,
   });
   return c.json({ token, expiresIn: 60 });
 });
@@ -263,9 +539,7 @@ app.post("/api/monitoring/alerts", async (c) => {
   const scope = c.get("scope");
   const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
 
-  const settings = await db.query.monitoringSettings.findFirst({
-    where: eq(monitoringSettings.token, token),
-  });
+  const settings = await uow.monitoringSettingsRepository.findByToken(token);
 
   if (!settings) {
     return c.json({ error: "Unauthorized: Invalid metrics token" }, 401);
@@ -323,22 +597,24 @@ app.post("/api/monitoring/alerts", async (c) => {
 });
 
 // Public, tokenized deployment hook used by GitHub Actions and external CI.
-// The token contains only the resource id; authorization is completed by the
-// resource's persisted autoDeploy setting before anything is queued.
+// Only a SHA-256 digest is persisted; the URL token is never recoverable from
+// the database and must be rotated if it is lost.
 app.post("/api/deploy/:token", async (c) => {
   const token = c.req.param("token");
-  if (!token?.startsWith("rc-") || token.length <= 3) {
+  if (!token?.startsWith("upw_") || token.length <= 12) {
     return c.json({ error: "Invalid deployment webhook" }, 404);
   }
-  const resourceId = token.slice(3);
   const scope = c.get("scope");
   const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-  const resource = await uow.resourceRepository.findById(resourceId);
+  const resource = await uow.resourceRepository.findByWebhookTokenHash(
+    hashWebhookToken(token),
+  );
   if (!resource) return c.json({ error: "Resource not found" }, 404);
+  const resourceId = resource.id;
 
   let autoDeploy = false;
   try {
-    const credentials = JSON.parse(resource.credentials || "{}");
+    const credentials = parseResourceCredentials(resource.credentials);
     autoDeploy = credentials?.autoDeploy === true;
   } catch {
     autoDeploy = false;
@@ -348,6 +624,27 @@ app.post("/api/deploy/:token", async (c) => {
   }
 
   const payload = await c.req.json().catch(() => ({}));
+  if (resource.provider === "docker-registry") {
+    const repository =
+      typeof payload?.repository?.repo_name === "string"
+        ? payload.repository.repo_name
+        : typeof payload?.repository?.name === "string"
+          ? payload.repository.name
+          : undefined;
+    const tag =
+      typeof payload?.push_data?.tag === "string"
+        ? payload.push_data.tag
+        : undefined;
+    if (
+      repository &&
+      !matchesDockerImageWebhook(resource.dockerImage || "", repository, tag)
+    ) {
+      return c.json(
+        { error: "Docker image does not match this resource" },
+        409,
+      );
+    }
+  }
   const branch =
     typeof payload?.ref === "string" ? payload.ref : payload?.branch;
   const title = branch
@@ -396,6 +693,18 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
     return c.json({ error: "Upload payload ('file') is required" }, 400);
   }
 
+  const filename = file.name.toLowerCase();
+  if (
+    !filename.endsWith(".zip") &&
+    !filename.endsWith(".tar.gz") &&
+    !filename.endsWith(".tgz")
+  ) {
+    return c.json(
+      { error: "Only .zip, .tar.gz, and .tgz archives are supported" },
+      400,
+    );
+  }
+
   const tempDir = path.join(process.cwd(), ".builds", "temp");
   fs.mkdirSync(tempDir, { recursive: true });
   const archivePath = path.join(
@@ -404,6 +713,9 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
   );
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.byteLength > 50 * 1024 * 1024) {
+    return c.json({ error: "Archive exceeds the 50MB upload limit" }, 413);
+  }
   fs.writeFileSync(archivePath, buffer);
 
   const dropsDir = path.join(process.cwd(), ".builds", "drops", resourceId);
@@ -412,12 +724,26 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
   }
   fs.mkdirSync(dropsDir, { recursive: true });
 
-  const { exec } = await import("node:child_process");
+  const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
-  const execAsync = promisify(exec);
+  const execFileAsync = promisify(execFile);
 
   try {
-    await execAsync(`tar -xf "${archivePath}" -C "${dropsDir}"`);
+    const listing = await execFileAsync("tar", ["-tf", archivePath]);
+    const unsafeEntry = listing.stdout
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .find((entry) => {
+        if (!entry || path.isAbsolute(entry)) return Boolean(entry);
+        const normalized = path.posix.normalize(entry.replaceAll("\\", "/"));
+        return normalized === ".." || normalized.startsWith("../");
+      });
+    if (unsafeEntry) {
+      throw new Error(
+        `Archive entry escapes the extraction directory: ${unsafeEntry}`,
+      );
+    }
+    await execFileAsync("tar", ["-xf", archivePath, "-C", dropsDir]);
   } catch (err: any) {
     try {
       fs.unlinkSync(archivePath);
@@ -449,6 +775,274 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
   }
 });
 
+app.post("/api/docker/volumes/:volumeName/upload", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "Authentication required" }, 401);
+
+  const organizationId = c.req.query("organizationId");
+  if (!organizationId) {
+    return c.json({ error: "organizationId is required" }, 400);
+  }
+  try {
+    await checkPermission(session.user.id, organizationId, "server:update");
+  } catch {
+    return c.json({ error: "Docker volume upload is not permitted" }, 403);
+  }
+  if (session.user.twoFactorEnabled) {
+    const verified = await redis.get(`2fa-verified:${session.session.id}`);
+    if (!verified) {
+      return c.json({ error: "2FA verification required" }, 403);
+    }
+  }
+
+  const body = await c.req.parseBody();
+  const file = body.file;
+  if (!file || typeof file === "string") {
+    return c.json({ error: "Upload payload ('file') is required" }, 400);
+  }
+  if (!file.name.toLowerCase().endsWith(".tar")) {
+    return c.json(
+      { error: "Only uncompressed .tar archives are supported" },
+      400,
+    );
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.byteLength > 50 * 1024 * 1024) {
+    return c.json({ error: "Volume archives must not exceed 50 MB" }, 413);
+  }
+
+  const tempArchive = path.join(
+    process.cwd(),
+    ".builds",
+    `volume-upload-${randomUUID()}.tar`,
+  );
+  fs.mkdirSync(path.dirname(tempArchive), { recursive: true });
+  fs.writeFileSync(tempArchive, buffer);
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFileAsync = promisify(execFile);
+    const listing = await execFileAsync("tar", ["-tf", tempArchive]);
+    const detailedListing = await execFileAsync("tar", ["-tvf", tempArchive]);
+    if (
+      detailedListing.stdout
+        .split(/\r?\n/)
+        .some((entry) => /^[lh]/i.test(entry))
+    ) {
+      return c.json(
+        { error: "Symbolic and hard links are not allowed in volume uploads" },
+        400,
+      );
+    }
+    const unsafeEntry = listing.stdout
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .find((entry) => {
+        if (!entry || path.isAbsolute(entry)) return Boolean(entry);
+        const normalized = path.posix.normalize(entry.replaceAll("\\", "/"));
+        return normalized === ".." || normalized.startsWith("../");
+      });
+    if (unsafeEntry) {
+      return c.json(
+        { error: `Archive entry escapes the destination: ${unsafeEntry}` },
+        400,
+      );
+    }
+
+    const parsed = UploadDockerVolumeInputSchema.parse({
+      organizationId,
+      serverId: c.req.query("serverId") || undefined,
+      volumeName: c.req.param("volumeName"),
+      destination: c.req.query("destination") || "/",
+    });
+    const result = await c
+      .get("scope")
+      .resolve(GetDockerInventoryUseCaseToken)
+      .uploadVolume(parsed, buffer);
+    return c.json(result, 201);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: message }, 400);
+  } finally {
+    fs.rmSync(tempArchive, { force: true });
+  }
+});
+
+app.post("/api/docker/containers/:containerId/upload", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "Authentication required" }, 401);
+
+  const organizationId = c.req.query("organizationId");
+  let resourceId = c.req.query("resourceId");
+  if (!organizationId) {
+    return c.json({ error: "organizationId is required" }, 400);
+  }
+  try {
+    await checkPermission(session.user.id, organizationId, "server:update");
+  } catch {
+    return c.json({ error: "Docker container upload is not permitted" }, 403);
+  }
+  if (session.user.twoFactorEnabled) {
+    const verified = await redis.get(`2fa-verified:${session.session.id}`);
+    if (!verified) {
+      return c.json({ error: "2FA verification required" }, 403);
+    }
+  }
+
+  const uow = c.get("scope").resolve(UnitOfWorkToken) as IUnitOfWork;
+  if (!resourceId) {
+    const containerId = c.req.param("containerId");
+    for (const candidate of await uow.resourceRepository.findMany()) {
+      let containers: unknown[] = [];
+      try {
+        containers = JSON.parse(candidate.containers || "[]");
+      } catch {
+        containers = [];
+      }
+      if (
+        !containers.some(
+          (container) =>
+            typeof container === "object" &&
+            container !== null &&
+            (container as { id?: string }).id === containerId,
+        )
+      ) {
+        continue;
+      }
+      const environment = await uow.environmentRepository.findById(
+        candidate.environmentId,
+      );
+      const project = environment
+        ? await uow.projectRepository.findById(environment.projectId)
+        : null;
+      if (project?.organizationId === organizationId) {
+        resourceId = candidate.id;
+        break;
+      }
+    }
+  }
+  if (!resourceId) {
+    return c.json(
+      { error: "Container is not tracked by this organization" },
+      404,
+    );
+  }
+  const resource = await uow.resourceRepository.findById(resourceId);
+  const environment = resource
+    ? await uow.environmentRepository.findById(resource.environmentId)
+    : null;
+  const project = environment
+    ? await uow.projectRepository.findById(environment.projectId)
+    : null;
+  if (!resource || !project || project.organizationId !== organizationId) {
+    return c.json({ error: "Resource is not part of this organization" }, 403);
+  }
+  const requestedServerId = c.req.query("serverId") || "local";
+  const resourceServerId = resource.serverId || "local";
+  if (
+    (resourceServerId === "manager" ? "local" : resourceServerId) !==
+    (requestedServerId === "manager" ? "local" : requestedServerId)
+  ) {
+    return c.json(
+      { error: "Container target does not match its resource" },
+      403,
+    );
+  }
+  let knownContainers: unknown[] = [];
+  try {
+    knownContainers = JSON.parse(resource.containers || "[]");
+  } catch {
+    knownContainers = [];
+  }
+  if (
+    !knownContainers.some(
+      (container) =>
+        typeof container === "object" &&
+        container !== null &&
+        (container as { id?: string }).id === c.req.param("containerId"),
+    )
+  ) {
+    return c.json({ error: "Container is not owned by this resource" }, 404);
+  }
+
+  const body = await c.req.parseBody();
+  const file = body.file;
+  if (!file || typeof file === "string") {
+    return c.json({ error: "Upload payload ('file') is required" }, 400);
+  }
+  if (!file.name.toLowerCase().endsWith(".tar")) {
+    return c.json(
+      { error: "Only uncompressed .tar archives are supported" },
+      400,
+    );
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.byteLength > 50 * 1024 * 1024) {
+    return c.json({ error: "Container archives must not exceed 50 MB" }, 413);
+  }
+
+  const tempArchive = path.join(
+    process.cwd(),
+    ".builds",
+    `container-upload-${randomUUID()}.tar`,
+  );
+  fs.mkdirSync(path.dirname(tempArchive), { recursive: true });
+  fs.writeFileSync(tempArchive, buffer);
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFileAsync = promisify(execFile);
+    const listing = await execFileAsync("tar", ["-tf", tempArchive]);
+    const detailedListing = await execFileAsync("tar", ["-tvf", tempArchive]);
+    if (
+      detailedListing.stdout
+        .split(/\r?\n/)
+        .some((entry) => /^[lh]/i.test(entry))
+    ) {
+      return c.json(
+        {
+          error: "Symbolic and hard links are not allowed in container uploads",
+        },
+        400,
+      );
+    }
+    const unsafeEntry = listing.stdout
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .find((entry) => {
+        if (!entry || path.isAbsolute(entry)) return Boolean(entry);
+        const normalized = path.posix.normalize(entry.replaceAll("\\", "/"));
+        return normalized === ".." || normalized.startsWith("../");
+      });
+    if (unsafeEntry) {
+      return c.json(
+        { error: `Archive entry escapes the destination: ${unsafeEntry}` },
+        400,
+      );
+    }
+
+    const parsed = UploadDockerContainerInputSchema.parse({
+      organizationId,
+      resourceId,
+      serverId: c.req.query("serverId") || undefined,
+      containerId: c.req.param("containerId"),
+      destination: c.req.query("destination") || "/",
+    });
+    const result = await c
+      .get("scope")
+      .resolve(GetDockerInventoryUseCaseToken)
+      .uploadContainer(parsed, buffer);
+    return c.json(result, 201);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: message }, 400);
+  } finally {
+    fs.rmSync(tempArchive, { force: true });
+  }
+});
+
 app.post("/api/webhooks/github/:providerId", async (c) => {
   const providerId = c.req.param("providerId");
   const scope = c.get("scope");
@@ -463,6 +1057,9 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
   const bodyText = await c.req.text();
   const signature = c.req.header("x-hub-signature-256");
 
+  if (!webhookSecret || !signature) {
+    return c.json({ error: "Webhook signature is not configured" }, 401);
+  }
   if (webhookSecret && signature) {
     const hmac = createHmac("sha256", webhookSecret);
     const digest = `sha256=${hmac.update(bodyText).digest("hex")}`;
@@ -478,7 +1075,25 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
 
   const event = c.req.header("x-github-event");
   if (event !== "pull_request") {
-    return c.json({ message: "Ignored event" }, 200);
+    try {
+      const result = await new ProcessSourceWebhookUseCase(uow).execute({
+        providerId,
+        provider: "github",
+        bodyText,
+        headers: {
+          "x-github-event": event,
+          "x-hub-signature-256": signature,
+        },
+      });
+      return c.json(result, 202);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === "Invalid webhook signature") {
+        return c.json({ error: message }, 401);
+      }
+      log.error({ message: "GitHub webhook processing failed", err: message });
+      return c.json({ error: "Unable to process webhook" }, 400);
+    }
   }
 
   const payload = JSON.parse(bodyText);
@@ -492,17 +1107,32 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
   }
 
   const allResources = await uow.resourceRepository.findMany();
-  const matchedResources = allResources.filter((r) => {
-    if (r.provider !== "github") return false;
+  const matchedResources = [];
+  for (const resource of allResources) {
+    if (resource.provider !== "github") continue;
     try {
-      const creds = JSON.parse(r.credentials || "{}");
-      return (
-        creds.repository === repoFullName && creds.enablePrPreviews === true
+      const creds = parseResourceCredentials(resource.credentials);
+      if (
+        creds.repository !== repoFullName ||
+        (resource.isPreviewDeploymentsActive !== true &&
+          creds.enablePrPreviews !== true) ||
+        creds.githubAccount !== providerId
+      ) {
+        continue;
+      }
+      const environment = await uow.environmentRepository.findById(
+        resource.environmentId,
       );
+      const project = environment
+        ? await uow.projectRepository.findById(environment.projectId)
+        : null;
+      if (project?.organizationId === provider.organizationId) {
+        matchedResources.push(resource);
+      }
     } catch {
-      return false;
+      // Ignore malformed resource metadata rather than failing the webhook.
     }
-  });
+  }
 
   for (const resource of matchedResources) {
     if (action === "opened" || action === "synchronize") {
@@ -514,12 +1144,26 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
       let domain = preview?.domain;
 
       if (!preview) {
+        const existingPreviews =
+          await uow.previewDeploymentRepository.findByResourceId(resource.id);
+        const previewLimit = resource.previewLimit ?? 3;
+        if (
+          existingPreviews.filter((candidate) => candidate.status !== "failed")
+            .length >= previewLimit
+        ) {
+          log.warn({
+            message: "Preview deployment limit reached",
+            resourceId: resource.id,
+            previewLimit,
+          });
+          continue;
+        }
         const hash = randomBytes(3).toString("hex");
         appName = `pr-${prNumber}-${resource.name}-${hash}`
           .toLowerCase()
           .replace(/[^a-z0-9-_]/g, "-");
 
-        domain = `${appName}.sslip.io`;
+        domain = `${appName}.${resource.previewWildcard || "sslip.io"}`;
 
         preview = await uow.previewDeploymentRepository.create({
           resourceId: resource.id,
@@ -588,8 +1232,10 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
             const parent = resources.find((r) => r.id === prev.resourceId);
             if (parent) {
               const parentDomains = JSON.parse(parent.domains || "[]");
-              const parentPort = parentDomains[0]?.port || 80;
-              const parentHttps = parentDomains[0]?.https ?? false;
+              const parentPort =
+                parent.previewPort || parentDomains[0]?.port || 80;
+              const parentHttps =
+                parent.previewHttps || (parentDomains[0]?.https ?? false);
               const parentCert = parentDomains[0]?.certificateType ?? "none";
               const parentMiddlewares = parentDomains[0]?.middlewares ?? [];
 
@@ -614,9 +1260,12 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
             }
           }
 
+          const certificates =
+            (await uow.certificateRepository.findAll?.()) ?? [];
           await caddyService.syncResourceConfigs(
             [...routingResources, ...routingPreviews],
             settings || {},
+            certificates,
           );
         } catch (err: any) {
           log.error({
@@ -631,12 +1280,542 @@ app.post("/api/webhooks/github/:providerId", async (c) => {
   return c.json({ accepted: true }, 200);
 });
 
+async function processNonGithubWebhook(
+  c: Context<AppEnv>,
+  provider: "gitlab" | "gitea" | "bitbucket" | "dockerhub",
+) {
+  const providerId = c.req.param("providerId");
+  if (!providerId) return c.json({ error: "Provider ID is required" }, 400);
+  const bodyText = await c.req.text();
+  const scope = c.get("scope");
+  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const headers = {
+    "x-gitlab-token": c.req.header("x-gitlab-token"),
+    "x-hub-signature": c.req.header("x-hub-signature"),
+    "x-gitea-signature": c.req.header("x-gitea-signature"),
+  };
+  try {
+    const result = await new ProcessSourceWebhookUseCase(uow).execute({
+      providerId,
+      provider,
+      bodyText,
+      headers,
+    });
+    return c.json(result, 202);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "Invalid webhook signature") {
+      return c.json({ error: message }, 401);
+    }
+    if (message === "Git provider not found") {
+      return c.json({ error: message }, 404);
+    }
+    log.error({
+      message: `${provider} webhook processing failed`,
+      err: message,
+    });
+    return c.json({ error: "Unable to process webhook" }, 400);
+  }
+}
+
+app.post("/api/webhooks/gitlab/:providerId", (c) =>
+  processNonGithubWebhook(c, "gitlab"),
+);
+app.post("/api/webhooks/gitea/:providerId", (c) =>
+  processNonGithubWebhook(c, "gitea"),
+);
+app.post("/api/webhooks/bitbucket/:providerId", (c) =>
+  processNonGithubWebhook(c, "bitbucket"),
+);
+app.post("/api/webhooks/dockerhub/:providerId", (c) =>
+  processNonGithubWebhook(c, "dockerhub"),
+);
+
 // This endpoint deliberately exposes only whether an owner exists. It lets the
 // web app provide a deterministic first-run flow without leaking user details.
 app.get("/api/setup/status", async (c) => {
   const result = await db.select({ value: count() }).from(authSchema.user);
   const userCount = result[0]?.value ?? 0;
   return c.json({ needsOwnerSetup: userCount === 0 });
+});
+
+const SCIM_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0";
+const SCIM_MESSAGES_SCHEMA = `${SCIM_SCHEMA}:messages:2.0`;
+
+function scimError(
+  c: Context<AppEnv>,
+  status: 400 | 401 | 404 | 409 | 500,
+  detail: string,
+) {
+  return c.json(
+    {
+      schemas: [`${SCIM_MESSAGES_SCHEMA}:Error`],
+      status: String(status),
+      detail,
+    },
+    status,
+  );
+}
+
+async function authorizeScim(c: Context<AppEnv>, organizationId: string) {
+  const authorization = c.req.header("authorization") || "";
+  if (!authorization.startsWith("Bearer ")) return null;
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token || token.length > 256) return null;
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  return db
+    .select({ id: scimProvider.id })
+    .from(scimProvider)
+    .where(
+      and(
+        eq(scimProvider.organizationId, organizationId),
+        eq(scimProvider.tokenHash, tokenHash),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+}
+
+function scimRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+type ScimMembership = {
+  member: typeof authSchema.member.$inferSelect;
+  user: typeof authSchema.user.$inferSelect;
+};
+type ScimUser = typeof authSchema.user.$inferSelect;
+
+function toScimUser(row: ScimMembership, baseUrl: string) {
+  return {
+    schemas: [SCIM_SCHEMA],
+    id: row.user.id,
+    externalId: row.member.scimExternalId ?? undefined,
+    userName: row.user.email,
+    active: row.member.scimActive,
+    displayName: row.user.name,
+    name: { formatted: row.user.name },
+    emails: [{ value: row.user.email, type: "work", primary: true }],
+    meta: {
+      resourceType: "User",
+      created: row.user.createdAt.toISOString(),
+      lastModified: row.user.updatedAt.toISOString(),
+      location: `${baseUrl}/Users/${row.user.id}`,
+    },
+  };
+}
+
+async function findScimMembership(
+  organizationId: string,
+  userId: string,
+): Promise<ScimMembership | null> {
+  const rows = await db
+    .select({ member: authSchema.member, user: authSchema.user })
+    .from(authSchema.member)
+    .innerJoin(
+      authSchema.user,
+      eq(authSchema.member.userId, authSchema.user.id),
+    )
+    .where(
+      and(
+        eq(authSchema.member.organizationId, organizationId),
+        eq(authSchema.user.id, userId),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+async function listScimMemberships(
+  organizationId: string,
+): Promise<ScimMembership[]> {
+  return db
+    .select({ member: authSchema.member, user: authSchema.user })
+    .from(authSchema.member)
+    .innerJoin(
+      authSchema.user,
+      eq(authSchema.member.userId, authSchema.user.id),
+    )
+    .where(eq(authSchema.member.organizationId, organizationId));
+}
+
+async function handleScimCreateUser(c: Context<AppEnv>) {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  const body = scimRecord(await c.req.json().catch(() => null));
+  const email =
+    typeof body.userName === "string"
+      ? body.userName.trim().toLowerCase()
+      : typeof body.emails === "object" && Array.isArray(body.emails)
+        ? String(scimRecord(body.emails[0]).value ?? "")
+            .trim()
+            .toLowerCase()
+        : "";
+  const parsedEmail = z.string().email().safeParse(email);
+  if (!parsedEmail.success)
+    return scimError(c, 400, "SCIM userName must be an email");
+
+  const existingUser = await db
+    .select()
+    .from(authSchema.user)
+    .where(eq(authSchema.user.email, email))
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (existingUser) {
+    const existingMembership = await findScimMembership(
+      organizationId,
+      existingUser.id,
+    );
+    if (existingMembership)
+      return scimError(c, 409, "SCIM user already exists");
+  }
+
+  let user: ScimUser | undefined = existingUser;
+  if (!user) {
+    const displayName =
+      (typeof body.displayName === "string" && body.displayName.trim()) ||
+      (typeof scimRecord(body.name).formatted === "string" &&
+        String(scimRecord(body.name).formatted).trim()) ||
+      email;
+    const created = await auth.api.createUser({
+      body: {
+        email,
+        name: displayName,
+        password: randomBytes(32).toString("base64url"),
+        role: "user",
+      },
+    });
+    user = await db
+      .select()
+      .from(authSchema.user)
+      .where(eq(authSchema.user.id, created.user.id))
+      .limit(1)
+      .then((rows) => rows[0]);
+    if (!user)
+      return scimError(c, 500, "Created SCIM user could not be loaded");
+
+    const personalWorkspaces = await db
+      .select({ id: authSchema.organization.id })
+      .from(authSchema.member)
+      .innerJoin(
+        authSchema.organization,
+        eq(authSchema.member.organizationId, authSchema.organization.id),
+      )
+      .where(
+        and(
+          eq(authSchema.member.userId, user.id),
+          eq(
+            authSchema.organization.metadata,
+            JSON.stringify({ isPersonal: true }),
+          ),
+        ),
+      );
+    for (const workspace of personalWorkspaces) {
+      await db
+        .delete(authSchema.organization)
+        .where(eq(authSchema.organization.id, workspace.id));
+    }
+  }
+
+  const name =
+    (typeof body.displayName === "string" && body.displayName.trim()) ||
+    user.name;
+  const active = body.active !== false;
+  const [membership] = await db
+    .insert(authSchema.member)
+    .values({
+      id: randomUUID(),
+      organizationId,
+      userId: user.id,
+      role: "member",
+      permissions: null,
+      scimActive: active,
+      scimExternalId:
+        typeof body.externalId === "string"
+          ? body.externalId.slice(0, 255)
+          : null,
+      createdAt: new Date(),
+    })
+    .returning();
+  if (!membership) return scimError(c, 500, "Unable to provision SCIM user");
+  if (name !== user.name) {
+    await db
+      .update(authSchema.user)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(authSchema.user.id, user.id));
+  }
+  const row = await findScimMembership(organizationId, user.id);
+  if (!row)
+    return scimError(c, 500, "Provisioned SCIM user could not be loaded");
+  const baseUrl = `${new URL(c.req.url).origin}/api/scim/v2.0/${organizationId}`;
+  return c.json(toScimUser(row, baseUrl), 201);
+}
+
+async function handleScimPatchUser(c: Context<AppEnv>) {
+  const organizationId = c.req.param("organizationId") as string;
+  const userId = c.req.param("userId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  const existing = await findScimMembership(organizationId, userId);
+  if (!existing) return scimError(c, 404, "SCIM user not found");
+  const body = scimRecord(await c.req.json().catch(() => null));
+  const operations = Array.isArray(body.Operations) ? body.Operations : [];
+  let active: boolean | undefined;
+  let displayName: string | undefined;
+  let externalId: string | null | undefined;
+  for (const operation of operations) {
+    const item = scimRecord(operation);
+    const path = String(item.path ?? "").toLowerCase();
+    const value = item.value;
+    if (path === "active") {
+      if (typeof value === "boolean") active = value;
+      else {
+        const record = scimRecord(value);
+        if (typeof record.active === "boolean") active = record.active;
+      }
+    } else if (path === "" && typeof value === "object") {
+      const record = scimRecord(value);
+      if (typeof record.active === "boolean") active = record.active;
+    } else if (path === "displayname" && typeof value === "string") {
+      displayName = value.trim().slice(0, 120);
+    } else if (path === "externalid" && typeof value === "string") {
+      externalId = value.slice(0, 255);
+    }
+  }
+  if (typeof body.active === "boolean") active = body.active;
+  if (typeof body.displayName === "string")
+    displayName = body.displayName.trim().slice(0, 120);
+  if (typeof body.externalId === "string")
+    externalId = body.externalId.slice(0, 255);
+  await db
+    .update(authSchema.member)
+    .set({
+      ...(active === undefined ? {} : { scimActive: active }),
+      ...(externalId === undefined ? {} : { scimExternalId: externalId }),
+    })
+    .where(
+      and(
+        eq(authSchema.member.organizationId, organizationId),
+        eq(authSchema.member.userId, userId),
+      ),
+    );
+  if (displayName !== undefined && displayName.length > 0) {
+    await db
+      .update(authSchema.user)
+      .set({ name: displayName, updatedAt: new Date() })
+      .where(eq(authSchema.user.id, userId));
+  }
+  if (active === false) {
+    await db
+      .delete(authSchema.session)
+      .where(eq(authSchema.session.userId, userId));
+  }
+  const row = await findScimMembership(organizationId, userId);
+  if (!row) return scimError(c, 404, "SCIM user not found");
+  const baseUrl = `${new URL(c.req.url).origin}/api/scim/v2.0/${organizationId}`;
+  return c.json(toScimUser(row, baseUrl));
+}
+
+app.get("/api/scim/v2.0/:organizationId/ServiceProviderConfig", async (c) => {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  return c.json({
+    schemas: [`${SCIM_SCHEMA}:ServiceProviderConfig`],
+    patch: { supported: true },
+    bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
+    filter: { supported: true, maxResults: 1000 },
+    changePassword: { supported: false },
+    sort: { supported: false },
+    etag: { supported: false },
+    authenticationSchemes: [
+      {
+        type: "oauthbearertoken",
+        name: "SCIM bearer token",
+        description: "Organization-scoped Upstand SCIM token",
+        primary: true,
+      },
+    ],
+  });
+});
+
+app.get("/api/scim/v2.0/:organizationId/ResourceTypes", async (c) => {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  const base = `${new URL(c.req.url).origin}/api/scim/v2.0/${organizationId}`;
+  return c.json({
+    schemas: [`${SCIM_MESSAGES_SCHEMA}:ListResponse`],
+    totalResults: 2,
+    startIndex: 1,
+    itemsPerPage: 2,
+    Resources: [
+      {
+        schemas: [`${SCIM_SCHEMA}:ResourceType`],
+        id: "User",
+        name: "User",
+        endpoint: `${base}/Users`,
+        schema: SCIM_SCHEMA,
+        meta: { resourceType: "ResourceType" },
+      },
+      {
+        schemas: [`${SCIM_SCHEMA}:ResourceType`],
+        id: "Group",
+        name: "Group",
+        endpoint: `${base}/Groups`,
+        schema: `${SCIM_SCHEMA}:Group`,
+        meta: { resourceType: "ResourceType" },
+      },
+    ],
+  });
+});
+
+app.get("/api/scim/v2.0/:organizationId/Schemas", async (c) => {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  return c.json({
+    schemas: [`${SCIM_MESSAGES_SCHEMA}:ListResponse`],
+    totalResults: 1,
+    startIndex: 1,
+    itemsPerPage: 1,
+    Resources: [
+      {
+        schemas: [`${SCIM_SCHEMA}:Schema`],
+        id: SCIM_SCHEMA,
+        name: "User",
+        description: "Upstand organization member",
+        attributes: [
+          {
+            name: "userName",
+            type: "string",
+            required: true,
+            multiValued: false,
+          },
+          {
+            name: "displayName",
+            type: "string",
+            required: false,
+            multiValued: false,
+          },
+          {
+            name: "active",
+            type: "boolean",
+            required: false,
+            multiValued: false,
+          },
+          {
+            name: "externalId",
+            type: "string",
+            required: false,
+            multiValued: false,
+          },
+        ],
+      },
+    ],
+  });
+});
+
+app.get("/api/scim/v2.0/:organizationId/Users", async (c) => {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  let rows = await listScimMemberships(organizationId);
+  const filter = c.req.query("filter") || "";
+  const match = filter.match(/^userName\s+eq\s+["']([^"']+)["']$/i);
+  if (match)
+    rows = rows.filter(
+      (row) => row.user.email.toLowerCase() === (match[1] ?? "").toLowerCase(),
+    );
+  const startIndex = Math.max(1, Number(c.req.query("startIndex") || 1));
+  const countLimit = Math.min(
+    1000,
+    Math.max(1, Number(c.req.query("count") || 100)),
+  );
+  const resources = rows
+    .slice(startIndex - 1, startIndex - 1 + countLimit)
+    .map((row) =>
+      toScimUser(
+        row,
+        `${new URL(c.req.url).origin}/api/scim/v2.0/${organizationId}`,
+      ),
+    );
+  return c.json({
+    schemas: [`${SCIM_MESSAGES_SCHEMA}:ListResponse`],
+    totalResults: rows.length,
+    startIndex,
+    itemsPerPage: resources.length,
+    Resources: resources,
+  });
+});
+
+app.get("/api/scim/v2.0/:organizationId/Users/:userId", async (c) => {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  const row = await findScimMembership(
+    organizationId,
+    c.req.param("userId") as string,
+  );
+  if (!row) return scimError(c, 404, "SCIM user not found");
+  return c.json(
+    toScimUser(
+      row,
+      `${new URL(c.req.url).origin}/api/scim/v2.0/${organizationId}`,
+    ),
+  );
+});
+
+app.post("/api/scim/v2.0/:organizationId/Users", handleScimCreateUser);
+app.on(
+  ["PATCH", "PUT"],
+  "/api/scim/v2.0/:organizationId/Users/:userId",
+  handleScimPatchUser,
+);
+app.delete("/api/scim/v2.0/:organizationId/Users/:userId", async (c) => {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  const deleted = await db
+    .delete(authSchema.member)
+    .where(
+      and(
+        eq(authSchema.member.organizationId, organizationId),
+        eq(authSchema.member.userId, c.req.param("userId") as string),
+      ),
+    )
+    .returning({ id: authSchema.member.id });
+  if (!deleted.length) return scimError(c, 404, "SCIM user not found");
+  await db
+    .delete(authSchema.session)
+    .where(eq(authSchema.session.userId, c.req.param("userId") as string));
+  return c.body(null, 204);
+});
+
+app.get("/api/scim/v2.0/:organizationId/Groups", async (c) => {
+  const organizationId = c.req.param("organizationId") as string;
+  const provider = await authorizeScim(c, organizationId);
+  if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
+  const rows = (await listScimMemberships(organizationId)).filter(
+    (row) => row.member.scimActive,
+  );
+  return c.json({
+    schemas: [`${SCIM_MESSAGES_SCHEMA}:ListResponse`],
+    totalResults: 1,
+    startIndex: 1,
+    itemsPerPage: 1,
+    Resources: [
+      {
+        schemas: [`${SCIM_SCHEMA}:Group`],
+        id: organizationId,
+        displayName: "Organization members",
+        members: rows.map((row) => ({ value: row.user.id, type: "User" })),
+      },
+    ],
+  });
 });
 
 app.post("/api/ai/chat", async (c) => {
@@ -840,8 +2019,39 @@ app.get("/api/providers/github/setup", async (c) => {
     return c.json({ error: "Missing code parameter" }, 400);
   }
 
-  const [action, ...rest] = (state || "").split(":");
   const scope = c.get("scope");
+
+  const parsedState = parseGitProviderOAuthState(state || "");
+  if (!parsedState) {
+    return c.json({ error: "Invalid or expired GitHub OAuth state" }, 400);
+  }
+  const storedStateSubject = await redis.eval(
+    "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value",
+    1,
+    gitProviderOAuthStateKey(state || ""),
+  );
+  if (storedStateSubject !== parsedState.providerId) {
+    return c.json(
+      { error: "GitHub OAuth state was already used or is invalid" },
+      400,
+    );
+  }
+
+  let action: "gh_init" | "gh_setup";
+  let rest: string[];
+  if (parsedState.purpose === "github-init") {
+    const [, organizationId, userId] = parsedState.providerId.split(":");
+    if (!organizationId || !userId) {
+      return c.json({ error: "Invalid GitHub manifest state" }, 400);
+    }
+    action = "gh_init";
+    rest = [organizationId, userId];
+  } else if (parsedState.purpose === "github-install") {
+    action = "gh_setup";
+    rest = [parsedState.providerId];
+  } else {
+    return c.json({ error: "Invalid GitHub OAuth state purpose" }, 400);
+  }
 
   if (action === "gh_init") {
     const organizationId = rest[0];
@@ -938,8 +2148,25 @@ app.get("/api/providers/gitlab/setup", async (c) => {
 
   const scope = c.get("scope");
   try {
+    const parsedState = parseGitProviderOAuthState(state);
+    if (!parsedState) {
+      return c.json({ error: "Invalid or expired OAuth state" }, 400);
+    }
+    const storedProviderId = await redis.eval(
+      "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value",
+      1,
+      gitProviderOAuthStateKey(state),
+    );
+    if (storedProviderId !== parsedState.providerId) {
+      return c.json(
+        { error: "OAuth state was already used or is invalid" },
+        400,
+      );
+    }
     const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-    const provider = await uow.gitProviderRepository.findById(state);
+    const provider = await uow.gitProviderRepository.findById(
+      parsedState.providerId,
+    );
     if (!provider) {
       return c.text("Git Provider not found", 404);
     }
@@ -1000,8 +2227,25 @@ app.get("/api/providers/gitea/setup", async (c) => {
 
   const scope = c.get("scope");
   try {
+    const parsedState = parseGitProviderOAuthState(state);
+    if (!parsedState) {
+      return c.json({ error: "Invalid or expired OAuth state" }, 400);
+    }
+    const storedProviderId = await redis.eval(
+      "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value",
+      1,
+      gitProviderOAuthStateKey(state),
+    );
+    if (storedProviderId !== parsedState.providerId) {
+      return c.json(
+        { error: "OAuth state was already used or is invalid" },
+        400,
+      );
+    }
     const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-    const provider = await uow.gitProviderRepository.findById(state);
+    const provider = await uow.gitProviderRepository.findById(
+      parsedState.providerId,
+    );
     if (!provider) {
       return c.text("Git Provider not found", 404);
     }
@@ -1416,64 +2660,107 @@ queueReconcileInterval = setInterval(
 );
 queueReconcileInterval.unref?.();
 
-// Daily Docker Cleanup Scheduler
-dockerCleanupTimer = setInterval(
-  async () => {
-    const scope = serviceProvider.createScope();
-    try {
-      const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-      const settings = await uow.webServerSettingsRepository.findGlobal();
-      if (settings?.dailyDockerCleanup) {
-        const now = new Date();
-        if (now.getHours() === 3) {
-          log.info({ message: "Running scheduled daily Docker cleanup... 🧹" });
-          const { exec } = await import("node:child_process");
-          const { promisify } = await import("node:util");
-          const execAsync = promisify(exec);
-          await execAsync(
-            "docker container prune --force && docker image prune --all --force && docker volume prune --all --force && docker builder prune --all --force && docker system prune --all --force",
-          );
-          const publisher = scope.resolve(
-            Symbol.for("PublishNotificationUseCase"),
-          ) as {
-            execute: (input: {
-              event: "docker_cleanup_completed";
-              idempotencyKey: string;
-              title: string;
-              message: string;
-            }) => Promise<number>;
-          };
-          await publisher
-            .execute({
-              event: "docker_cleanup_completed",
-              idempotencyKey: `docker-cleanup:${now.toISOString().slice(0, 10)}`,
-              title: "Daily Docker cleanup completed",
-              message:
-                "Upstand completed the scheduled cleanup of unused Docker resources.",
-            })
-            .catch((notificationError) => {
-              log.error({
-                message: "Unable to queue Docker cleanup notification",
-                err:
-                  notificationError instanceof Error
-                    ? notificationError.message
-                    : notificationError,
-              });
-            });
-          log.info({
-            message: "Daily Docker cleanup completed successfully. ✅",
+// Daily Docker Cleanup Scheduler. The control plane setting cleans local
+// Docker; each opted-in remote server gets the same safe cleanup over its
+// registered Docker-SSH transport.
+async function runScheduledDockerCleanup(): Promise<void> {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  if (now.getHours() !== 3 || lastDockerCleanupDate === date) return;
+  lastDockerCleanupDate = date;
+
+  const scope = serviceProvider.createScope();
+  try {
+    const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+    const settings = await uow.webServerSettingsRepository.findGlobal();
+    const publisher = scope.resolve(
+      Symbol.for("PublishNotificationUseCase"),
+    ) as {
+      execute: (input: {
+        event: "docker_cleanup_completed";
+        idempotencyKey: string;
+        title: string;
+        message: string;
+      }) => Promise<number>;
+    };
+
+    if (settings?.dailyDockerCleanup) {
+      log.info({ message: "Running scheduled local Docker cleanup... 🧹" });
+      await dockerCleanupService.run("all");
+      await publisher
+        .execute({
+          event: "docker_cleanup_completed",
+          idempotencyKey: `docker-cleanup:local:${date}`,
+          title: "Daily Docker cleanup completed",
+          message:
+            "Upstand completed the scheduled cleanup of unused local Docker resources.",
+        })
+        .catch((notificationError) => {
+          log.error({
+            message: "Unable to queue local Docker cleanup notification",
+            err:
+              notificationError instanceof Error
+                ? notificationError.message
+                : notificationError,
           });
-        }
-      }
-    } catch (err: any) {
-      log.error({
-        message: "Failed to run scheduled daily Docker cleanup",
-        err: err.message || err,
-      });
-    } finally {
-      scope.dispose();
+        });
     }
-  },
+
+    const servers = await uow.serverRepository.findMany();
+    for (const server of servers.filter(
+      (candidate) => candidate.enableDockerCleanup,
+    )) {
+      try {
+        const remote = await resolveDockerCliEnvironmentForServer(
+          server.id,
+          uow,
+        );
+        try {
+          log.info({
+            message: `Running scheduled Docker cleanup on remote server '${server.name}'... 🧹`,
+            serverId: server.id,
+          });
+          await dockerCleanupService.run("all", remote.environment);
+        } finally {
+          remote.cleanup();
+        }
+        await publisher
+          .execute({
+            event: "docker_cleanup_completed",
+            idempotencyKey: `docker-cleanup:${server.id}:${date}`,
+            title: `Docker cleanup completed on ${server.name}`,
+            message: `Upstand completed the scheduled cleanup of unused Docker resources on ${server.name}.`,
+          })
+          .catch((notificationError) => {
+            log.error({
+              message: "Unable to queue remote Docker cleanup notification",
+              serverId: server.id,
+              err:
+                notificationError instanceof Error
+                  ? notificationError.message
+                  : notificationError,
+            });
+          });
+      } catch (error) {
+        log.error({
+          message: "Failed to run scheduled remote Docker cleanup",
+          serverId: server.id,
+          err: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  } catch (error) {
+    log.error({
+      message: "Failed to run scheduled Docker cleanup",
+      err: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    await scope.dispose();
+  }
+}
+
+dockerCleanupTimer = setInterval(
+  () => void runScheduledDockerCleanup(),
   60 * 60 * 1000,
 ); // Check once every hour
 dockerCleanupTimer.unref?.();

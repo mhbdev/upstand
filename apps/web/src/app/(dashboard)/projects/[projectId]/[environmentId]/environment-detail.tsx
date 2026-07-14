@@ -360,6 +360,7 @@ function CreateDbDialog({
   const [dockerImage, setDockerImage] = useState<string>(
     DATABASE_IMAGE_OPTIONS.postgres[0],
   );
+  const [customImage, setCustomImage] = useState("");
   const [description, setDescription] = useState("");
   const [serverId, setServerId] = useState("local");
 
@@ -372,6 +373,9 @@ function CreateDbDialog({
   const [dbPassword, setDbPassword] = useState("");
   const [dbName, setDbName] = useState("upstand_db");
   const [dbRootPassword, setDbRootPassword] = useState("");
+  const [externalPort, setExternalPort] = useState("");
+  const [libsqlGrpcPort, setLibsqlGrpcPort] = useState("");
+  const [libsqlAdminPort, setLibsqlAdminPort] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const handleNameChange = (val: string) => {
@@ -387,6 +391,10 @@ function CreateDbDialog({
     if (!val) return;
     setDbType(val);
     setDockerImage(DATABASE_IMAGE_OPTIONS[val][0]);
+    setCustomImage("");
+    setExternalPort("");
+    setLibsqlGrpcPort("");
+    setLibsqlAdminPort("");
     const pass = generatePassword();
     const rootPass = generatePassword();
     setDbPassword(pass);
@@ -446,6 +454,20 @@ function CreateDbDialog({
     ) {
       errors.dbRootPassword = "Root password is required";
     }
+    if (dbType === "libsql") {
+      const ports = [externalPort, libsqlGrpcPort, libsqlAdminPort]
+        .filter((value) => value.trim().length > 0)
+        .map((value) => Number(value));
+      if (
+        ports.some(
+          (port) => !Number.isInteger(port) || port < 1 || port > 65535,
+        )
+      ) {
+        errors.libsqlPorts = "Published ports must be integers from 1 to 65535";
+      } else if (new Set(ports).size !== ports.length) {
+        errors.libsqlPorts = "libSQL published ports must be distinct";
+      }
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -478,8 +500,20 @@ function CreateDbDialog({
                 appName: appName.trim(),
                 description: description.trim() || undefined,
                 dbType,
-                dockerImage,
+                dockerImage: customImage.trim() || dockerImage,
+                allowCustomImage: Boolean(customImage.trim()),
                 credentials: credsPayload,
+                externalPort: externalPort.trim()
+                  ? Number(externalPort)
+                  : undefined,
+                libsqlGrpcPort:
+                  dbType === "libsql" && libsqlGrpcPort.trim()
+                    ? Number(libsqlGrpcPort)
+                    : undefined,
+                libsqlAdminPort:
+                  dbType === "libsql" && libsqlAdminPort.trim()
+                    ? Number(libsqlAdminPort)
+                    : undefined,
                 serverId: serverId === "local" ? undefined : serverId,
               });
             }
@@ -499,6 +533,7 @@ function CreateDbDialog({
                   <SelectItem value="mariadb">MariaDB</SelectItem>
                   <SelectItem value="mongodb">MongoDB</SelectItem>
                   <SelectItem value="redis">Redis</SelectItem>
+                  <SelectItem value="libsql">libSQL</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -507,7 +542,10 @@ function CreateDbDialog({
               <Select
                 value={dockerImage}
                 onValueChange={(value) => {
-                  if (value) setDockerImage(value);
+                  if (value) {
+                    setCustomImage("");
+                    setDockerImage(value);
+                  }
                 }}
               >
                 <SelectTrigger id="db-image" className="border-border/40">
@@ -524,8 +562,15 @@ function CreateDbDialog({
                 </SelectContent>
               </Select>
               <p className="text-muted-foreground text-xs">
-                Choose a supported official image for this engine.
+                Choose a supported official image or enter a validated custom
+                image below.
               </p>
+              <Input
+                value={customImage}
+                onChange={(event) => setCustomImage(event.target.value)}
+                placeholder="Custom image, e.g. ghcr.io/acme/postgres:17"
+                className="border-border/40"
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -598,6 +643,74 @@ function CreateDbDialog({
               Select which server node in your cluster to deploy this database
               on.
             </p>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-border/30 bg-muted/10 p-4">
+            <div>
+              <h3 className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+                Published Ports
+              </h3>
+              <p className="mt-1 text-muted-foreground text-xs">
+                Leave blank to use the engine default. libSQL publishes HTTP
+                8080, gRPC 5001, and admin 5000 inside the container.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="db-external-port">
+                  {dbType === "libsql" ? "HTTP port" : "External port"}
+                </Label>
+                <Input
+                  id="db-external-port"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={externalPort}
+                  onChange={(event) => setExternalPort(event.target.value)}
+                  placeholder={dbType === "libsql" ? "8080" : "Auto"}
+                  className="border-border/40"
+                />
+              </div>
+              {dbType === "libsql" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="db-libsql-grpc-port">gRPC port</Label>
+                    <Input
+                      id="db-libsql-grpc-port"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={libsqlGrpcPort}
+                      onChange={(event) =>
+                        setLibsqlGrpcPort(event.target.value)
+                      }
+                      placeholder="5001"
+                      className="border-border/40"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="db-libsql-admin-port">Admin port</Label>
+                    <Input
+                      id="db-libsql-admin-port"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={libsqlAdminPort}
+                      onChange={(event) =>
+                        setLibsqlAdminPort(event.target.value)
+                      }
+                      placeholder="5000"
+                      className="border-border/40"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            {formErrors.libsqlPorts && (
+              <span className="text-[10px] text-red-500">
+                {formErrors.libsqlPorts}
+              </span>
+            )}
           </div>
 
           {/* Credentials Fields based on DB Type */}

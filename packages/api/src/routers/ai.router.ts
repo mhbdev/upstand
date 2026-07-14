@@ -5,6 +5,7 @@ import { AIRepositoryToken } from "@upstand/repositories";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
 import {
+  generateComposeTemplate,
   getConversationForUser,
   listConversations,
   listProviderModels,
@@ -15,6 +16,21 @@ import { protectedProcedure, router } from "../index";
 const organizationInput = z.object({ organizationId: z.string().min(1) });
 
 export const aiRouter = router({
+  generateTemplate: protectedProcedure
+    .input(
+      organizationInput.extend({
+        request: z.string().trim().min(8).max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      return generateComposeTemplate(
+        input.organizationId,
+        ctx.scope,
+        input.request,
+      );
+    }),
+
   settings: protectedProcedure
     .input(organizationInput)
     .query(async ({ ctx, input }) => {

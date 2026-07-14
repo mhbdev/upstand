@@ -5,6 +5,7 @@ const MIDDLEWARE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 const HOSTNAME_PATTERN =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 const SAFE_PATH_PATTERN = /^\/(?:[A-Za-z0-9._~!$&'()+,;=:@%-]+\/?)*$/;
+const SAFE_REDIRECT_TARGET_PATTERN = /^(?:https?:\/\/[^\r\n]+|\/[^\r\n]*)$/i;
 
 export function normalizeDomainHost(value: string): string {
   const suppliedHost = value.trim().replace(/\.$/, "");
@@ -64,15 +65,95 @@ const DomainMappingInputSchema = z.object({
   https: z.boolean().optional().default(true),
   /** Certificate strategy used by the edge proxy for HTTPS routes. */
   certificateType: z
-    .enum(["letsencrypt", "internal"])
+    .enum(["letsencrypt", "internal", "custom"])
     .optional()
     .default("letsencrypt"),
+  certificateId: z.string().min(1).optional(),
   /** Names of administrator-defined Caddy snippets to import for this route. */
   middlewares: z
     .array(z.string().regex(MIDDLEWARE_NAME_PATTERN))
     .max(16)
     .optional()
     .default([]),
+  /** Optional terminal redirect instead of proxying to the service. */
+  redirectTo: z
+    .string()
+    .max(2048)
+    .refine((value) => SAFE_REDIRECT_TARGET_PATTERN.test(value), {
+      message: "Redirects must target a relative path or an HTTP(S) URL",
+    })
+    .optional(),
+  redirectStatus: z.enum(["301", "302", "307", "308"]).optional(),
+  forwardAuth: z
+    .object({
+      address: z
+        .string()
+        .url("Forward-auth address must be a valid URL")
+        .refine((value) => {
+          try {
+            const url = new URL(value);
+            return (
+              (url.protocol === "http:" || url.protocol === "https:") &&
+              !url.username &&
+              !url.password &&
+              !url.hash
+            );
+          } catch {
+            return false;
+          }
+        }, "Forward-auth address must use HTTP(S) without credentials or fragments"),
+      uri: z
+        .string()
+        .trim()
+        .regex(
+          /^\/[A-Za-z0-9._~!$&'()+,;=:@%/?-]*$/,
+          "Auth URI must be a safe path",
+        )
+        .default("/verify"),
+      copyHeaders: z
+        .array(
+          z
+            .string()
+            .trim()
+            .regex(/^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,128}$/),
+        )
+        .max(32)
+        .default([]),
+    })
+    .optional(),
+  basicAuth: z
+    .object({
+      username: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9._-]{1,128}$/, "Basic-auth username is invalid"),
+      passwordHash: z
+        .string()
+        .trim()
+        .min(20)
+        .max(512)
+        .refine(
+          (value) => value.startsWith("$") && !/[\s\r\n]/.test(value),
+          "Use a Caddy-compatible password hash, never a plaintext password",
+        ),
+    })
+    .optional(),
+  securityHeaders: z
+    .object({
+      hsts: z.boolean().default(false),
+      nosniff: z.boolean().default(true),
+      frameDeny: z.boolean().default(false),
+      referrerPolicy: z
+        .enum([
+          "no-referrer",
+          "same-origin",
+          "strict-origin",
+          "strict-origin-when-cross-origin",
+        ])
+        .nullable()
+        .default("strict-origin-when-cross-origin"),
+    })
+    .optional(),
 });
 
 export const DomainMappingSchema = DomainMappingInputSchema.transform(
@@ -80,6 +161,15 @@ export const DomainMappingSchema = DomainMappingInputSchema.transform(
     try {
       const path = normalizeDomainPath(mapping.path);
       const internalPath = normalizeDomainPath(mapping.internalPath);
+      if (
+        mapping.https &&
+        mapping.certificateType === "custom" &&
+        !mapping.certificateId
+      ) {
+        throw new Error(
+          "A custom certificate must be selected for HTTPS routes",
+        );
+      }
 
       return {
         ...mapping,
@@ -111,8 +201,31 @@ export type DomainMapping = {
   port: number;
   serviceName?: string;
   https: boolean;
-  certificateType: "letsencrypt" | "internal";
+  certificateType: "letsencrypt" | "internal" | "custom";
+  certificateId?: string;
   middlewares: string[];
+  redirectTo?: string;
+  redirectStatus?: "301" | "302" | "307" | "308";
+  forwardAuth?: {
+    address: string;
+    uri: string;
+    copyHeaders: string[];
+  };
+  basicAuth?: {
+    username: string;
+    passwordHash: string;
+  };
+  securityHeaders?: {
+    hsts: boolean;
+    nosniff: boolean;
+    frameDeny: boolean;
+    referrerPolicy:
+      | "no-referrer"
+      | "same-origin"
+      | "strict-origin"
+      | "strict-origin-when-cross-origin"
+      | null;
+  };
 };
 
 /**

@@ -13,6 +13,7 @@ export interface QueueDeploymentInput {
   resourceId: string;
   title?: string;
   previewDeploymentId?: string;
+  sourceRevision?: string;
 }
 
 export interface DeploymentQueue {
@@ -22,6 +23,7 @@ export interface DeploymentQueue {
       resourceId: string;
       deploymentId: string;
       previewDeploymentId?: string;
+      sourceRevision?: string;
     },
     options: {
       jobId: string;
@@ -49,6 +51,12 @@ export class QueueDeploymentUseCase {
       const resource = await tx.resourceRepository.findById(input.resourceId);
       if (!resource) {
         throw new ValidationError("Resource not found");
+      }
+      if (
+        input.sourceRevision &&
+        !/^[0-9a-f]{7,64}$/i.test(input.sourceRevision)
+      ) {
+        throw new ValidationError("Source revision must be a commit SHA");
       }
 
       // 1. Resolve target serverId
@@ -120,6 +128,7 @@ export class QueueDeploymentUseCase {
         logs: "Added to queue. Waiting for slot...\n",
         serverId,
         serverName,
+        sourceRevision: input.sourceRevision ?? null,
       });
 
       // 3. Update the resource's JSON deployments list (backwards compatibility)
@@ -129,6 +138,9 @@ export class QueueDeploymentUseCase {
         status: "queued" as const,
         createdAt: new Date().toISOString(),
         logs: "Added to queue. Waiting for slot...\n",
+        ...(input.sourceRevision
+          ? { sourceRevision: input.sourceRevision }
+          : {}),
       };
       const updatedDeps = [newDeploymentItem, ...currentDeps].slice(0, 10);
 
@@ -161,6 +173,7 @@ export class QueueDeploymentUseCase {
           resourceId: queued.updatedResource.id,
           deploymentId: queued.deploymentId,
           previewDeploymentId: input.previewDeploymentId,
+          sourceRevision: input.sourceRevision,
         },
         {
           jobId: queued.deploymentId,

@@ -14,6 +14,14 @@ export const AUDIT_ACTIONS = [
   "login",
   "logout",
   "failure",
+  "invite",
+  "revoke",
+  "rotate",
+  "test",
+  "import",
+  "restore",
+  "duplicate",
+  "configure",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -34,6 +42,17 @@ export const AUDIT_RESOURCE_TYPES = [
   "docker",
   "swarm",
   "session",
+  "custom_role",
+  "tag",
+  "template",
+  "certificate",
+  "schedule",
+  "domain",
+  "application",
+  "database",
+  "compose",
+  "port",
+  "mount",
   "system",
 ] as const;
 export type AuditResourceType = (typeof AUDIT_RESOURCE_TYPES)[number];

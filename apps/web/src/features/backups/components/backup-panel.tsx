@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -53,6 +54,7 @@ import {
 import { useState } from "react";
 import z from "zod";
 import { SearchableSelect } from "@/components/shared/searchable-select";
+import { trpc } from "@/utils/trpc";
 import { useBackupSettings } from "../hooks/use-backup-settings";
 
 const TIME_ZONE_OPTIONS =
@@ -61,7 +63,13 @@ const TIME_ZONE_OPTIONS =
     : ["UTC"];
 
 type BackupKind = "database" | "volume";
-type DatabaseEngine = "postgres" | "mysql" | "mariadb" | "mongodb";
+type DatabaseEngine =
+  | "postgres"
+  | "mysql"
+  | "mariadb"
+  | "mongodb"
+  | "libsql"
+  | "redis";
 
 type BackupSchedule = {
   id: string;
@@ -102,7 +110,13 @@ const STATUS_VARIANT: Record<
 };
 
 function defaultEngine(dbType?: string | null): DatabaseEngine {
-  if (dbType === "mysql" || dbType === "mariadb" || dbType === "mongodb") {
+  if (
+    dbType === "mysql" ||
+    dbType === "mariadb" ||
+    dbType === "mongodb" ||
+    dbType === "libsql" ||
+    dbType === "redis"
+  ) {
     return dbType;
   }
   return "postgres";
@@ -173,6 +187,13 @@ export function BackupPanel({
     onSuccessAction: () => setDialogOpen(false),
   });
 
+  const { data: composeServices = [] } = useQuery({
+    ...trpc.backup.listComposeServices.queryOptions({
+      resourceId: resource.id,
+    }),
+    enabled: resource.type === "compose",
+  });
+
   const form = useForm({
     defaultValues: makeForm(resource),
     onSubmit: async ({ value }) => {
@@ -197,7 +218,9 @@ export function BackupPanel({
           : null,
         enabled: true,
         databaseName:
-          value.kind === "database" ? value.databaseName.trim() : undefined,
+          value.kind === "database"
+            ? value.databaseName.trim() || undefined
+            : undefined,
         databaseEngine:
           value.kind === "database" ? value.databaseEngine : undefined,
         serviceName: value.serviceName.trim() || undefined,
@@ -220,7 +243,12 @@ export function BackupPanel({
         if (!value.cronExpression) return "Cron expression is required";
         if (!value.timezone) return "Timezone is required";
         if (value.kind === "database") {
-          if (!value.databaseName) return "Database name is required";
+          if (
+            !value.databaseName &&
+            value.databaseEngine !== "libsql" &&
+            value.databaseEngine !== "redis"
+          )
+            return "Database name is required";
         } else {
           if (!value.volumeName) return "Choose a Docker volume";
         }
@@ -660,6 +688,8 @@ export function BackupPanel({
                                   <SelectItem value="mongodb">
                                     MongoDB
                                   </SelectItem>
+                                  <SelectItem value="libsql">libSQL</SelectItem>
+                                  <SelectItem value="redis">Redis</SelectItem>
                                 </SelectContent>
                               </Select>
                             </Field>
@@ -696,17 +726,46 @@ export function BackupPanel({
                           {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
-                                Compose service (optional)
+                                Compose service
                               </FieldLabel>
-                              <Input
-                                id={field.name}
-                                value={field.state.value}
-                                onBlur={field.handleBlur}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                placeholder="postgres"
-                              />
+                              {composeServices.length > 0 ? (
+                                <Select
+                                  value={
+                                    field.state.value || "__resource_default__"
+                                  }
+                                  onValueChange={(value) =>
+                                    field.handleChange(
+                                      !value || value === "__resource_default__"
+                                        ? ""
+                                        : value,
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger id={field.name}>
+                                    <SelectValue placeholder="Resource default" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__resource_default__">
+                                      Resource default
+                                    </SelectItem>
+                                    {composeServices.map((service) => (
+                                      <SelectItem key={service} value={service}>
+                                        {service}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input
+                                  id={field.name}
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                  placeholder="postgres"
+                                />
+                              )}
                             </Field>
                           )}
                         </form.Field>

@@ -114,6 +114,8 @@ export const member = pgTable(
     role: text("role").default("member").notNull(),
     createdAt: timestamp("created_at").notNull(),
     permissions: text("permissions"),
+    scimActive: boolean("scim_active").default(true),
+    scimExternalId: text("scim_external_id"),
   },
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
@@ -197,12 +199,25 @@ export const twoFactor = pgTable(
   ],
 );
 
+export const ssoProvider = pgTable("sso_provider", {
+  id: text("id").primaryKey(),
+  issuer: text("issuer").notNull(),
+  oidcConfig: text("oidc_config"),
+  samlConfig: text("saml_config"),
+  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+  providerId: text("provider_id").notNull().unique(),
+  organizationId: text("organization_id"),
+  domain: text("domain").notNull(),
+  domainVerified: boolean("domain_verified"),
+});
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   members: many(member),
   invitations: many(invitation),
   twoFactors: many(twoFactor),
+  ssoProviders: many(ssoProvider),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -249,6 +264,13 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
 export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
   user: one(user, {
     fields: [twoFactor.userId],
+    references: [user.id],
+  }),
+}));
+
+export const ssoProviderRelations = relations(ssoProvider, ({ one }) => ({
+  user: one(user, {
+    fields: [ssoProvider.userId],
     references: [user.id],
   }),
 }));

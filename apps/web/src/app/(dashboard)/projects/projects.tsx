@@ -82,9 +82,11 @@ function _StatCard({
 function ProjectCard({
   project,
   onDelete,
+  onDuplicate,
 }: {
   project: { id: string; name: string; createdAt: Date | string };
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   const { data: envs } = useQuery({
     ...trpc.environment.list.queryOptions({ projectId: project.id }),
@@ -139,20 +141,110 @@ function ProjectCard({
             year: "numeric",
           })}
         </span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="relative z-10 p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-          aria-label={`Delete project ${project.name}`}
-        >
-          <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-        </button>
+        <div className="relative z-10 flex items-center gap-1 opacity-0 transition-all group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDuplicate();
+            }}
+          >
+            Duplicate
+          </Button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            aria-label={`Delete project ${project.name}`}
+          >
+            <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+          </button>
+        </div>
       </div>
     </div>
+  );
+}
+
+function DuplicateProjectDialog({
+  open,
+  onOpenChange,
+  project,
+  organizationId,
+  onDuplicated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  project: { id: string; name: string } | null;
+  organizationId: string;
+  onDuplicated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const mutation = useMutation({
+    ...trpc.project.duplicate.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Project duplicated");
+      onOpenChange(false);
+      onDuplicated();
+    },
+    onError: (error) =>
+      toast.error(error.message || "Failed to duplicate project"),
+  });
+  useEffect(() => {
+    if (open && project) setName(`${project.name} Copy`);
+  }, [open, project]);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Duplicate project</DialogTitle>
+          <DialogDescription>
+            Copy environments and resource configuration without copying runtime
+            deployments.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (project && name.trim())
+              mutation.mutate({
+                id: project.id,
+                organizationId,
+                name: name.trim(),
+              });
+          }}
+        >
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="duplicate-project-name">New project name</Label>
+            <Input
+              id="duplicate-project-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending || !name.trim()}>
+              {mutation.isPending && <Spinner data-icon="inline-start" />}
+              Duplicate
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -396,6 +488,7 @@ export default function Projects(_props: {
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
+  const [duplicateProjectOpen, setDuplicateProjectOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<{
     id: string;
     name: string;
@@ -465,6 +558,10 @@ export default function Projects(_props: {
                 setSelectedProject(proj);
                 setDeleteProjectOpen(true);
               }}
+              onDuplicate={() => {
+                setSelectedProject(proj);
+                setDuplicateProjectOpen(true);
+              }}
             />
           ))}
         </div>
@@ -486,6 +583,13 @@ export default function Projects(_props: {
         project={selectedProject}
         organizationId={organizationId}
         onDeleted={refetch}
+      />
+      <DuplicateProjectDialog
+        open={duplicateProjectOpen}
+        onOpenChange={setDuplicateProjectOpen}
+        project={selectedProject}
+        organizationId={organizationId}
+        onDuplicated={refetch}
       />
     </DashboardPage>
   );

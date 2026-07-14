@@ -6,11 +6,14 @@ import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
 import { getInstallationToken } from "../git-provider/github-client";
+import { getDatabaseEnvironment } from "../resource/database-environment";
 import { DockerService } from "../resource/docker.service";
 import {
   createRemoteDocker,
   createRemoteDockerCliEnvironment,
 } from "../resource/docker-client";
+import { parseResourceCredentials } from "../resource/resource-credentials";
+import { parseResourceEnvironmentVariables } from "../resource/resource-environment";
 import {
   CaddyServiceToken,
   DockerServiceToken,
@@ -18,6 +21,7 @@ import {
   UnitOfWorkToken,
 } from "../tokens";
 import { CaddyService } from "../web-server/caddy.service";
+import { buildRegistryImageTag } from "./build-registry";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 import { ResourceLock } from "./resource-lock";
 
@@ -180,10 +184,16 @@ export class DeploymentWorker {
   }
 
   private async processJob(job: Job) {
-    const { resourceId, deploymentId, previewDeploymentId } = job.data as {
+    const {
+      resourceId,
+      deploymentId,
+      previewDeploymentId,
+      sourceRevision: queuedSourceRevision,
+    } = job.data as {
       resourceId: string;
       deploymentId: string;
       previewDeploymentId?: string;
+      sourceRevision?: string;
     };
     if (!resourceId || !deploymentId) {
       throw new Error("Deployment job is missing resourceId or deploymentId");
@@ -378,6 +388,7 @@ export class DeploymentWorker {
       if (!deployment || deployment.resourceId !== resourceId) {
         throw new Error("Deployment record does not match the queued job");
       }
+      const sourceRevision = deployment.sourceRevision ?? queuedSourceRevision;
       if (deployment.status === "success" || deployment.status === "failed") {
         log.info({
           message: "Skipping deployment job whose database state is terminal",
@@ -434,7 +445,7 @@ export class DeploymentWorker {
           deployedResource.name = previewDeploymentRecord.appName;
           deployedResource.appName = previewDeploymentRecord.appName;
 
-          const creds = JSON.parse(deployedResource.credentials || "{}");
+          const creds = parseResourceCredentials(deployedResource.credentials);
           creds.branch = previewDeploymentRecord.branchName;
           deployedResource.credentials = JSON.stringify(creds);
         }
@@ -444,6 +455,8 @@ export class DeploymentWorker {
       buildCliCleanup = null;
       let registryInfo: any;
       let targetDestinationDocker: any;
+      const cancellationKey = `upstand:deployment:cancel:${deploymentId}`;
+      dockerService.setCancellationKey(cancellationKey);
 
       if (
         deployedResource.serverId &&
@@ -475,6 +488,7 @@ export class DeploymentWorker {
         const remoteCli = createRemoteDockerCliEnvironment(connection);
         remoteCliCleanup = remoteCli.cleanup;
         dockerService = new DockerService(remoteDocker, remoteCli.environment);
+        dockerService.setCancellationKey(cancellationKey);
         caddyService = new CaddyService(remoteDocker);
         targetDestinationDocker = remoteDocker;
         appendLog(
@@ -516,6 +530,7 @@ export class DeploymentWorker {
           remoteBuildDocker,
           remoteBuildCli.environment,
         );
+        buildDockerService.setCancellationKey(cancellationKey);
         appendLog(
           `Offloading build compilation tasks to separate build server '${buildServer.name}'.\n`,
         );
@@ -530,19 +545,32 @@ export class DeploymentWorker {
         if (!projectRecord) throw new Error("Project not found");
         const organizationId = projectRecord.organizationId;
 
-        const registries =
-          await uow.dockerRegistryRepository.findByOrganizationId(
-            organizationId,
-          );
-        if (registries.length === 0) {
+        const resourceCredentials = parseResourceCredentials(
+          deployedResource.credentials,
+        );
+        const configuredBuildRegistryId =
+          deployedResource.buildRegistryId ||
+          resourceCredentials.buildRegistryId;
+        const registry = configuredBuildRegistryId
+          ? await uow.dockerRegistryRepository.findById(
+              configuredBuildRegistryId,
+            )
+          : (
+              await uow.dockerRegistryRepository.findByOrganizationId(
+                organizationId,
+              )
+            )[0];
+        if (!registry) {
           throw new Error(
-            "No Docker Registry configured. A shared Docker Registry must be configured under settings to support separate build servers.",
+            configuredBuildRegistryId
+              ? "Selected build registry not found"
+              : "No Docker Registry configured. A shared Docker Registry must be configured under settings to support separate build servers.",
           );
         }
-
-        const registry = registries[0];
-        if (!registry) {
-          throw new Error("No Docker Registry configured.");
+        if (registry.organizationId !== organizationId) {
+          throw new Error(
+            "Selected build registry belongs to another organization",
+          );
         }
         let decryptedPassword = "";
         if (registry.password) {
@@ -550,19 +578,21 @@ export class DeploymentWorker {
             const payload = JSON.parse(registry.password);
             if (payload.ciphertext && payload.iv && payload.authTag) {
               decryptedPassword = decryptSecret(payload);
+            } else {
+              decryptedPassword = registry.password;
             }
-          } catch {}
+          } catch {
+            decryptedPassword = registry.password;
+          }
         }
 
-        const cleanUrl = (registry.registryUrl || "").replace(
-          /https?:\/\//,
-          "",
-        );
+        const cleanUrl = (registry.registryUrl || "")
+          .replace(/https?:\/\//, "")
+          .replace(/\/+$/, "");
         const serviceName = dockerService.sanitizeName(
           deployedResource.appName || deployedResource.name,
         );
-        const imageTag =
-          `${cleanUrl}/${registry.username}/${serviceName}:latest`.toLowerCase();
+        const imageTag = buildRegistryImageTag(registry, serviceName);
 
         registryInfo = {
           url: cleanUrl,
@@ -576,57 +606,15 @@ export class DeploymentWorker {
       // the control-plane Swarm are intentionally not applied.
       const constraints: string[] | undefined = undefined;
 
-      const envVars = JSON.parse(resource.envVars || "{}");
+      const envVars = parseResourceEnvironmentVariables(resource.envVars);
 
       if (resource.type === "database") {
         appendLog("Preparing database deployment...\n");
 
-        const decryptedCredentials: Record<string, string> = {};
-        if (resource.credentials) {
-          try {
-            const payload = JSON.parse(resource.credentials);
-            if (payload.ciphertext && payload.iv && payload.authTag) {
-              const decryptedStr = decryptSecret(payload);
-              const creds = JSON.parse(decryptedStr);
-
-              const dbType = resource.dbType?.toLowerCase() || "";
-              if (dbType === "postgres") {
-                if (creds.dbUser)
-                  decryptedCredentials.POSTGRES_USER = creds.dbUser;
-                if (creds.dbPassword)
-                  decryptedCredentials.POSTGRES_PASSWORD = creds.dbPassword;
-                if (creds.dbName)
-                  decryptedCredentials.POSTGRES_DB = creds.dbName;
-              } else if (dbType === "mysql" || dbType === "mariadb") {
-                if (creds.dbRootPassword)
-                  decryptedCredentials.MYSQL_ROOT_PASSWORD =
-                    creds.dbRootPassword;
-                if (creds.dbUser)
-                  decryptedCredentials.MYSQL_USER = creds.dbUser;
-                if (creds.dbPassword)
-                  decryptedCredentials.MYSQL_PASSWORD = creds.dbPassword;
-                if (creds.dbName)
-                  decryptedCredentials.MYSQL_DATABASE = creds.dbName;
-              } else if (dbType === "mongodb") {
-                if (creds.dbUser)
-                  decryptedCredentials.MONGO_INITDB_ROOT_USERNAME =
-                    creds.dbUser;
-                if (creds.dbPassword)
-                  decryptedCredentials.MONGO_INITDB_ROOT_PASSWORD =
-                    creds.dbPassword;
-              } else if (dbType === "redis") {
-                if (creds.dbPassword)
-                  decryptedCredentials.REDIS_PASSWORD = creds.dbPassword;
-              }
-            }
-          } catch (err: any) {
-            appendLog(
-              `Warning: Failed to decrypt database credentials: ${err.message}\n`,
-            );
-          }
-        }
-
-        const finalEnv = { ...decryptedCredentials, ...envVars };
+        const finalEnv = getDatabaseEnvironment({
+          ...resource,
+          envVars: JSON.stringify(envVars),
+        });
         await dockerService.deployDatabase(
           resource,
           finalEnv,
@@ -652,6 +640,7 @@ export class DeploymentWorker {
             source.cloneUrl,
             appendLog,
             source.sshKeyPath,
+            sourceRevision,
           );
         }
         if (!composeFile) {
@@ -670,11 +659,59 @@ export class DeploymentWorker {
         );
       } else if (resource.type === "application") {
         if (resource.provider === "docker-registry") {
+          let imageRegistryAuth:
+            | { username?: string; password?: string; serveraddress?: string }
+            | undefined;
+          const imageCredentials = parseResourceCredentials(
+            resource.credentials,
+          );
+          if (imageCredentials.registryId) {
+            const registry = await uow.dockerRegistryRepository.findById(
+              imageCredentials.registryId,
+            );
+            if (!registry)
+              throw new Error("Selected Docker registry not found");
+            const environment = await uow.environmentRepository.findById(
+              resource.environmentId,
+            );
+            const project = environment
+              ? await uow.projectRepository.findById(environment.projectId)
+              : null;
+            if (
+              !project ||
+              project.organizationId !== registry.organizationId
+            ) {
+              throw new Error(
+                "Selected Docker registry belongs to another organization",
+              );
+            }
+            let password = "";
+            if (registry.password) {
+              try {
+                const payload = JSON.parse(registry.password);
+                password =
+                  payload.ciphertext && payload.iv && payload.authTag
+                    ? decryptSecret(payload)
+                    : registry.password;
+              } catch {
+                password = registry.password;
+              }
+            }
+            imageRegistryAuth = {
+              username: registry.username || undefined,
+              password,
+              serveraddress: (registry.registryUrl || "").replace(
+                /^https?:\/\//,
+                "",
+              ),
+            };
+          }
           await dockerService.deployAppImage(
             resource,
             envVars,
             appendLog,
             constraints,
+            imageRegistryAuth,
           );
           appendLog("Application image deployed successfully!\n");
         } else {
@@ -684,7 +721,7 @@ export class DeploymentWorker {
           let cloneUrl = "";
           let credentialsObj: any = {};
           try {
-            credentialsObj = JSON.parse(resource.credentials || "{}");
+            credentialsObj = parseResourceCredentials(resource.credentials);
           } catch {}
 
           if (
@@ -790,6 +827,7 @@ export class DeploymentWorker {
             constraints,
             registryInfo,
             targetDestinationDocker,
+            sourceRevision,
           );
           appendLog(
             "Build compiled successfully and Swarm Service registered.\n",
@@ -872,9 +910,12 @@ export class DeploymentWorker {
           }
         }
 
+        const certificates =
+          (await uow.certificateRepository.findAll?.()) ?? [];
         await caddyService.syncResourceConfigs(
           [...routingResources, ...routingPreviews],
           settings || {},
+          certificates,
         );
         appendLog("Caddy routing reloaded successfully.\n");
       }
@@ -889,7 +930,14 @@ export class DeploymentWorker {
         });
       });
     } catch (err: any) {
-      appendLog(`\nDeployment failed! ❌\nError: ${err.message}\n`);
+      const cancelled = Boolean(
+        await redis.get(`upstand:deployment:cancel:${deploymentId}`),
+      );
+      appendLog(
+        cancelled
+          ? `\nDeployment cancelled by user. 🛑\nReason: ${err.message}\n`
+          : `\nDeployment failed! ❌\nError: ${err.message}\n`,
+      );
       log.error({
         message: "Queue worker deploy pipeline error",
         err: err.message || err,
@@ -918,6 +966,7 @@ export class DeploymentWorker {
       await scope.dispose();
       remoteCliCleanup?.();
       buildCliCleanup?.();
+      await redis.del(`upstand:deployment:cancel:${deploymentId}`);
       await resourceLock.release().catch((error) => {
         log.error({
           message: "Failed to release resource deployment lock",
@@ -927,18 +976,6 @@ export class DeploymentWorker {
         });
       });
     }
-  }
-}
-
-function parseResourceCredentials(
-  value: string | null | undefined,
-): Record<string, any> {
-  if (!value) return {};
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
   }
 }
 

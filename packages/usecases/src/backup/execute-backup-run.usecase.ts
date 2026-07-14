@@ -6,7 +6,10 @@ import {
 } from "@upstand/domain";
 import { log } from "evlog";
 import type { PublishNotificationUseCase } from "../notification/publish-notification.usecase";
-import { BackupRuntimeService } from "./backup-runtime.service";
+import {
+  BackupRuntimeService,
+  withBackupRuntime,
+} from "./backup-runtime.service";
 import { resolveBackupOrganizationId } from "./backup-schedule.service";
 
 export class ExecuteBackupRunUseCase {
@@ -25,17 +28,22 @@ export class ExecuteBackupRunUseCase {
       run.scheduleId,
     );
     if (!schedule) throw new ValidationError("Backup schedule not found");
-    const resource = await this.uow.resourceRepository.findById(run.resourceId);
-    if (!resource) throw new ValidationError("Resource not found");
+    const resource = run.resourceId
+      ? await this.uow.resourceRepository.findById(run.resourceId)
+      : null;
+    if (schedule.kind !== "web-server" && !resource) {
+      throw new ValidationError("Resource not found");
+    }
     const destination = await this.uow.s3DestinationRepository.findById(
       run.destinationId,
     );
     if (!destination) throw new ValidationError("Backup destination not found");
 
-    const organizationId = await resolveBackupOrganizationId(
-      this.uow,
-      resource,
-    );
+    const organizationId =
+      schedule.organizationId ??
+      (resource ? await resolveBackupOrganizationId(this.uow, resource) : null);
+    if (!organizationId)
+      throw new ValidationError("Backup organization not found");
     if (destination.organizationId !== organizationId) {
       throw new ValidationError(
         "Backup destination belongs to another organization",
@@ -50,11 +58,20 @@ export class ExecuteBackupRunUseCase {
     });
 
     try {
-      const fileKey = await this.runtime.createBackup(
-        schedule,
-        resource,
-        destination,
-      );
+      const fileKey =
+        schedule.kind === "web-server"
+          ? await this.runtime.createWebServerBackup(schedule, destination)
+          : await withBackupRuntime(
+              this.uow,
+              resource as NonNullable<typeof resource>,
+              this.runtime,
+              (runtime) =>
+                runtime.createBackup(
+                  schedule,
+                  resource as NonNullable<typeof resource>,
+                  destination,
+                ),
+            );
       const completed = await this.uow.backupRunRepository.updateById(run.id, {
         status: "succeeded",
         fileKey,
@@ -72,7 +89,7 @@ export class ExecuteBackupRunUseCase {
       await this.publishOutcome({
         organizationId,
         run: completed,
-        resourceName: resource.name,
+        resourceName: resource?.name ?? "Upstand web server",
         succeeded: true,
       });
       return completed;
@@ -86,7 +103,7 @@ export class ExecuteBackupRunUseCase {
       await this.publishOutcome({
         organizationId,
         run: failed ?? run,
-        resourceName: resource.name,
+        resourceName: resource?.name ?? "Upstand web server",
         succeeded: false,
       });
       throw error;
@@ -111,7 +128,14 @@ export class ExecuteBackupRunUseCase {
 
     for (const stale of staleRuns) {
       try {
-        await this.runtime.deleteBackup(destination, stale.fileKey as string);
+        if (stale.kind === "web-server") {
+          await this.runtime.deleteWebServerBackup(
+            destination,
+            stale.fileKey as string,
+          );
+        } else {
+          await this.runtime.deleteBackup(destination, stale.fileKey as string);
+        }
         await this.uow.backupRunRepository.deleteById(stale.id);
       } catch (error) {
         log.error({
@@ -131,11 +155,18 @@ export class ExecuteBackupRunUseCase {
     resourceName: string;
     succeeded: boolean;
   }): Promise<void> {
-    const label = input.run.kind === "database" ? "Database" : "Volume";
+    const label =
+      input.run.kind === "database"
+        ? "Database"
+        : input.run.kind === "web-server"
+          ? "Web-server"
+          : "Volume";
     const event =
       input.run.kind === "database"
         ? "database_backup_completed"
-        : "volume_backup_completed";
+        : input.run.kind === "web-server"
+          ? "web_server_backup_completed"
+          : "volume_backup_completed";
     await this.publisher
       .execute({
         organizationId: input.organizationId,

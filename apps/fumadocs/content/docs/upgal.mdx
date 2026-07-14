@@ -45,6 +45,12 @@ Read-only tools can run automatically after UpGal verifies that every referenced
 
 Mutation tools always request approval in the chat UI. The tool is not executed when the user rejects the request, and UpGal must not claim success until the approved tool returns successfully. Current mutation tools include project/environment creation, deployment, resource control, and project/resource deletion.
 
+The Templates page also provides an AI draft generator. It returns validated
+Compose YAML only; it does not save a template or deploy a resource. Review
+the generated editor contents, then use the existing 2FA-protected save and
+explicit deployment actions. Generated drafts reject privileged mode, host
+namespaces, host bind mounts, Docker socket mounts, capabilities, and devices.
+
 Approval is enforced at the AI SDK tool boundary. The external MCP surface does not bypass this rule: read-only tools can be exposed through a scoped key, while mutating MCP calls return an approval-required response and must be completed from the dashboard.
 
 ## Conversations and runs

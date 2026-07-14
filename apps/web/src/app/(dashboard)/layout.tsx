@@ -44,6 +44,7 @@ import { useEffect, useState } from "react";
 import { CreateOrganizationDialog } from "@/components/auth/organization/create-organization-dialog";
 import { OrganizationSwitcher } from "@/components/auth/organization/organization-switcher";
 import { UserButton } from "@/components/auth/user/user-button";
+import { GlobalSearch } from "@/components/global-search";
 import { ModeToggle } from "@/components/mode-toggle";
 import { UpGalChat } from "@/components/upgal-chat";
 import { SettingsDialog } from "@/features/settings";
@@ -59,11 +60,20 @@ const NAV_ITEMS = [
   { title: "Git Providers", href: "/git-providers", icon: GitBranchIcon },
   { title: "S3 Storage", href: "/s3-destinations", icon: CloudIcon },
   { title: "Docker Registry", href: "/docker-registry", icon: ContainerIcon },
+  { title: "Docker Inventory", href: "/docker", icon: ContainerIcon },
   { title: "Remote Servers", href: "/remote-servers", icon: CloudServerIcon },
   { title: "Web Server", href: "/web-server", icon: Certificate01Icon },
+  { title: "Certificates", href: "/certificates", icon: Certificate01Icon },
   { title: "Docker Swarm", href: "/docker-swarm", icon: Layers01Icon },
   { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },
+  { title: "Custom Roles", href: "/settings/custom-roles", icon: Key01Icon },
+  { title: "SCIM", href: "/settings/scim", icon: Key01Icon },
+  { title: "Single Sign-On", href: "/settings/sso", icon: Key01Icon },
+  { title: "Branding", href: "/settings/branding", icon: FileSecurityIcon },
   { title: "Audit Logs", href: "/audit-logs", icon: FileSecurityIcon },
+  { title: "Tags", href: "/tags", icon: Folder01Icon },
+  { title: "Templates", href: "/templates", icon: Layers01Icon },
+  { title: "Requests", href: "/requests", icon: Rocket01Icon },
 ];
 
 export default function DashboardLayout({
@@ -78,6 +88,10 @@ export default function DashboardLayout({
     authClient.useActiveOrganization();
   const { data: organizations, isPending: organizationsPending } =
     authClient.useListOrganizations();
+  const { data: branding } = useQuery({
+    ...trpc.webServer.getPublicBranding.queryOptions(),
+    staleTime: 60_000,
+  });
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
 
   useEffect(() => {
@@ -114,6 +128,20 @@ export default function DashboardLayout({
   ]);
 
   useEffect(() => {
+    if (branding?.metaTitle || branding?.appName) {
+      document.title = branding.metaTitle || branding.appName || "Upstand";
+    }
+    if (branding?.faviconUrl) {
+      const existing =
+        document.querySelector<HTMLLinkElement>("link[rel='icon']");
+      const favicon = existing || document.createElement("link");
+      favicon.rel = "icon";
+      favicon.href = branding.faviconUrl;
+      if (!existing) document.head.appendChild(favicon);
+    }
+  }, [branding]);
+
+  useEffect(() => {
     if (sessionPending || mfaPending) return;
     if (!session && pathname !== "/2fa-verify") {
       router.push("/login");
@@ -144,9 +172,17 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
+      {branding?.customCss ? (
+        <style dangerouslySetInnerHTML={{ __html: branding.customCss }} />
+      ) : null}
       <div className="flex h-svh w-full overflow-hidden">
         <Sidebar collapsible="icon">
           <OrganizationSwitcher className="min-h-[55px] w-full border-none p-[11.5px]" />
+          {branding?.appName ? (
+            <div className="truncate px-3 py-2 font-semibold text-muted-foreground text-xs">
+              {branding.appName}
+            </div>
+          ) : null}
 
           <Separator />
 
@@ -198,7 +234,10 @@ export default function DashboardLayout({
                 </BreadcrumbList>
               </Breadcrumb>
             </div>
-            <ModeToggle />
+            <div className="flex items-center gap-2">
+              <GlobalSearch />
+              <ModeToggle />
+            </div>
           </header>
 
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
