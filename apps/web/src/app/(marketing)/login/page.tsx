@@ -17,7 +17,6 @@ import { SsoSignInForm } from "@/components/sso-sign-in-form";
 import { authClient } from "@/lib/auth-client";
 import { getServerUrl } from "@/lib/server-url";
 
-
 const GoogleIcon = () => (
   <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -98,7 +97,6 @@ export default function LoginPage() {
 
       <Card className="relative w-full max-w-md rounded-3xl border-border/70 bg-card/70 p-7 shadow-2xl shadow-primary/5 backdrop-blur-md sm:p-8">
         <CardContent className="space-y-8 p-0">
-
           {sessionPending ? (
             <div className="flex flex-col items-center justify-center space-y-4 py-12">
               <Spinner />
@@ -126,6 +124,7 @@ export default function LoginPage() {
                 <Button
                   size="lg"
                   className="w-full font-semibold"
+                  nativeButton={false}
                   render={<Link href="/dashboard" />}
                 >
                   Go to Dashboard
@@ -157,9 +156,7 @@ export default function LoginPage() {
               <div className="space-y-2 text-center">
                 {/* Fixed: added bg-clip-text */}
                 <h1 className="bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text font-extrabold text-3xl text-transparent tracking-tight">
-                  {needsOwnerSetup
-                    ? "Set up Upstand"
-                    : "Welcome back"}
+                  {needsOwnerSetup ? "Set up Upstand" : "Welcome back"}
                 </h1>
                 <p className="text-muted-foreground text-sm">
                   {needsOwnerSetup

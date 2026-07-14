@@ -367,7 +367,12 @@ export default function ResourceDetail({
         </TabsContent>
 
         <TabsContent value="monitoring" className="min-w-0 outline-none">
-          <MonitoringTab statsData={statsData} />
+          <MonitoringTab
+            appName={resource.appName ?? resource.name}
+            organizationId={project?.organizationId}
+            serverId={resource.serverId ?? undefined}
+            statsData={statsData}
+          />
         </TabsContent>
         <TabsContent value="tags" className="min-w-0 outline-none">
           {project?.organizationId && (

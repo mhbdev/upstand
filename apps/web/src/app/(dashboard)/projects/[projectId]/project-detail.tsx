@@ -378,10 +378,10 @@ export default function ProjectDetail({
     environments?.some((env: any) => env.resourceCount > 0) ?? false;
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-8 overflow-x-hidden px-4 py-8 md:px-8">
+    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-8 overflow-x-hidden px-4 py-8 md:px-8">
       {/* Breadcrumbs / Header */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs">
           <Link
             href={"/projects" as any}
             className="transition-colors hover:text-primary"
@@ -389,21 +389,23 @@ export default function ProjectDetail({
             Projects
           </Link>
           <HugeiconsIcon icon={ArrowRight01Icon} className="size-3" />
-          <span className="font-medium text-foreground">{project.name}</span>
+          <span className="min-w-0 truncate font-medium text-foreground">
+            {project.name}
+          </span>
         </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="font-bold text-2xl text-foreground">
+        <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="truncate font-bold text-2xl text-foreground [text-wrap:balance]">
               {project.name}
             </h1>
             <p className="text-muted-foreground text-sm">
               Project environments and configuration.
             </p>
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <Button
               onClick={() => setCreateEnvOpen(true)}
-              className="gap-2 font-medium"
+              className="w-full gap-2 font-medium sm:w-auto"
             >
               <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
               New Environment

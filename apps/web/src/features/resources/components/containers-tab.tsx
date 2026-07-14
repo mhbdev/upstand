@@ -48,7 +48,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
-import { TerminalEmulator } from "@/components/shared/terminal-emulator";
+import { TerminalDialogShell } from "@/components/shared/terminal-dialog-shell";
 import { authClient } from "@/lib/auth-client";
 import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -565,22 +565,25 @@ function ContainerTerminalDialog({
   };
 
   return (
-    <Dialog
+    <TerminalDialogShell
       open={Boolean(container)}
       onOpenChange={(open) => !open && onClose()}
-    >
-      <DialogContent className="flex h-[min(86svh,760px)] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-border/60 border-b bg-muted/20 px-4 py-5 sm:px-6">
-          <DialogTitle>Container terminal</DialogTitle>
-          <DialogDescription>
-            Interactive shell for container{" "}
-            <span className="font-mono font-semibold text-foreground">
-              {container?.name}
-            </span>
-            . The selected SSH key stays on the server.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-wrap gap-2 border-border/60 border-b bg-background p-4">
+      title="Container terminal"
+      description={
+        <>
+          Interactive shell for container{" "}
+          <span className="font-mono font-semibold text-foreground">
+            {container?.name}
+          </span>
+          . The selected SSH key stays on the server.
+        </>
+      }
+      token={token}
+      connecting={connecting}
+      emptyMessage="Select an SSH key and click Connect to start a terminal session"
+      onTerminalClose={disconnect}
+      controls={
+        <div className="flex w-full flex-wrap gap-2">
           <Select
             items={[
               { value: "_none", label: "Select SSH key" },
@@ -594,7 +597,7 @@ function ContainerTerminalDialog({
               setKeyId(val === "_none" || !val ? "" : val)
             }
           >
-            <SelectTrigger className="min-w-56">
+            <SelectTrigger className="min-w-0 flex-1 sm:min-w-56 sm:flex-none">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -608,29 +611,26 @@ function ContainerTerminalDialog({
               </SelectGroup>
             </SelectContent>
           </Select>
-          <Button onClick={connect} disabled={connecting || token !== null}>
+          <Button
+            className="flex-1 sm:flex-none"
+            onClick={connect}
+            disabled={connecting || token !== null}
+          >
             {connecting
               ? "Connecting…"
               : token !== null
                 ? "Connected"
                 : "Connect"}
           </Button>
-          <Button variant="outline" onClick={onClose}>
+          <Button
+            className="flex-1 sm:flex-none"
+            variant="outline"
+            onClick={onClose}
+          >
             Close
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden bg-[#080c0a] p-1">
-          {token ? (
-            <TerminalEmulator token={token} onClose={disconnect} />
-          ) : (
-            <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-              {connecting
-                ? "Initializing terminal..."
-                : "Select an SSH key and click Connect to start terminal session"}
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      }
+    />
   );
 }

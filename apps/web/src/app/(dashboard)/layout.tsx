@@ -9,7 +9,6 @@ import {
   ContainerIcon,
   FileSecurityIcon,
   Folder01Icon,
-  GitBranchIcon,
   Key01Icon,
   Layers01Icon,
   Notification01Icon,
@@ -28,6 +27,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@upstand/ui/components/breadcrumb";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@upstand/ui/components/collapsible";
 import { Separator } from "@upstand/ui/components/separator";
 import {
   Sidebar,
@@ -35,7 +39,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
@@ -43,11 +46,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@upstand/ui/components/sidebar";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@upstand/ui/components/collapsible";
 import { Spinner } from "@upstand/ui/components/spinner";
 import type { Route } from "next";
 import Link from "next/link";
@@ -76,11 +74,19 @@ const NAVIGATION_GROUPS = [
   {
     title: "Infrastructure",
     items: [
-      { title: "Remote Servers", href: "/remote-servers", icon: CloudServerIcon },
+      {
+        title: "Remote Servers",
+        href: "/remote-servers",
+        icon: CloudServerIcon,
+      },
       { title: "SSH Keys", href: "/ssh-keys", icon: Key01Icon },
       { title: "Docker Swarm", href: "/docker-swarm", icon: Layers01Icon },
       { title: "Docker Inventory", href: "/docker", icon: ContainerIcon },
-      { title: "Docker Registry", href: "/docker-registry", icon: ContainerIcon },
+      {
+        title: "Docker Registry",
+        href: "/docker-registry",
+        icon: ContainerIcon,
+      },
       { title: "Web Server", href: "/web-server", icon: ServerStack01Icon },
       { title: "Certificates", href: "/certificates", icon: Certificate01Icon },
     ],
@@ -98,7 +104,11 @@ const NAVIGATION_GROUPS = [
     title: "Management",
     items: [
       { title: "Monitoring", href: "/monitoring", icon: AnalyticsUpIcon },
-      { title: "Notifications", href: "/notifications", icon: Notification01Icon },
+      {
+        title: "Notifications",
+        href: "/notifications",
+        icon: Notification01Icon,
+      },
       { title: "Audit Logs", href: "/audit-logs", icon: FileSecurityIcon },
       { title: "Tags", href: "/tags", icon: Folder01Icon },
     ],
@@ -152,8 +162,6 @@ export default function DashboardLayout({
     activeOrgPending,
   ]);
 
-
-
   useEffect(() => {
     if (sessionPending || mfaPending) return;
     if (!session && pathname !== "/2fa-verify") {
@@ -192,7 +200,7 @@ export default function DashboardLayout({
 
           <Separator />
 
-          <SidebarContent className="px-2 py-2 space-y-4">
+          <SidebarContent className="space-y-4 px-2 py-2">
             {NAVIGATION_GROUPS.map((group) => (
               <Collapsible
                 key={group.title}
@@ -200,7 +208,7 @@ export default function DashboardLayout({
                 className="group/collapsible"
               >
                 <SidebarGroup className="p-0">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 hover:text-foreground cursor-pointer transition-colors">
+                  <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between px-3 py-1.5 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider transition-colors hover:text-foreground">
                     <span>{group.title}</span>
                     <HugeiconsIcon
                       icon={ArrowRight01Icon}
@@ -240,20 +248,20 @@ export default function DashboardLayout({
         </Sidebar>
 
         <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
-            <div className="flex items-center gap-2">
+          <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 sm:flex-nowrap sm:px-4 sm:py-0">
+            <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger />
               <Separator orientation="vertical" className="my-auto h-6" />
-              <Breadcrumb>
+              <Breadcrumb className="min-w-0">
                 <BreadcrumbList>
-                  <BreadcrumbItem>
+                  <BreadcrumbItem className="hidden sm:inline-flex">
                     <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
                   </BreadcrumbItem>
                   {activeOrg && (
                     <>
                       <BreadcrumbSeparator />
                       <BreadcrumbItem>
-                        <BreadcrumbPage>
+                        <BreadcrumbPage className="max-w-[min(48vw,16rem)] truncate">
                           {currentNav?.title ?? activeOrg.name}
                         </BreadcrumbPage>
                       </BreadcrumbItem>
@@ -262,7 +270,7 @@ export default function DashboardLayout({
                 </BreadcrumbList>
               </Breadcrumb>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
               <GlobalSearch />
               <ModeToggle />
             </div>

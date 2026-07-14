@@ -157,6 +157,7 @@ import {
   UpdateConcurrencyUseCase,
   UpdateDockerRegistryUseCase,
   UpdateGitProviderUseCase,
+  UpdateMonitoringSettingsUseCase,
   UpdateNotificationChannelUseCase,
   UpdateResourceUseCase,
   UpdateS3DestinationUseCase,
@@ -288,6 +289,7 @@ import {
   UpdateConcurrencyUseCaseToken,
   UpdateDockerRegistryUseCaseToken,
   UpdateGitProviderUseCaseToken,
+  UpdateMonitoringSettingsUseCaseToken,
   UpdateNotificationChannelUseCaseToken,
   UpdateResourceUseCaseToken,
   UpdateS3DestinationUseCaseToken,
@@ -944,6 +946,10 @@ services.addTransient(
 services.addTransient(
   GetServerHistoricalMetricsUseCaseToken,
   (c) => new GetServerHistoricalMetricsUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  UpdateMonitoringSettingsUseCaseToken,
+  (c) => new UpdateMonitoringSettingsUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
   GetServerCountUseCaseToken,

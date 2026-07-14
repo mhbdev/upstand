@@ -11,7 +11,7 @@ export function DashboardPage({
   return (
     <main
       className={cn(
-        "mx-auto flex min-h-full w-full min-w-0 max-w-7xl flex-col gap-8 overflow-x-hidden px-4 py-8 md:px-8",
+        "mx-auto flex min-h-full w-full min-w-0 max-w-7xl flex-col gap-6 overflow-x-hidden px-4 py-6 sm:gap-8 sm:py-8 md:px-8",
         className,
       )}
     >
@@ -36,12 +36,12 @@ export function DashboardPageHeader({
   return (
     <header
       className={cn(
-        "flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between",
+        "flex min-w-0 flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between",
         className,
       )}
     >
       <div className="min-w-0">
-        <h1 className="flex items-center gap-2 font-bold text-2xl text-foreground">
+        <h1 className="flex min-w-0 items-center gap-2 font-bold text-2xl text-foreground [text-wrap:balance]">
           {icon}
           <span className="truncate">{title}</span>
         </h1>
@@ -52,7 +52,9 @@ export function DashboardPageHeader({
         )}
       </div>
       {actions && (
-        <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>
+        <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
+          {actions}
+        </div>
       )}
     </header>
   );

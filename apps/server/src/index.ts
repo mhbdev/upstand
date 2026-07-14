@@ -550,10 +550,15 @@ app.post("/api/monitoring/alerts", async (c) => {
     return c.json({ error: "Unauthorized: Invalid metrics token" }, 401);
   }
 
-  const serverRecord = await uow.serverRepository.findById(settings.serverId);
-  if (!serverRecord) {
+  const serverRecord =
+    settings.serverId === "local"
+      ? null
+      : await uow.serverRepository.findById(settings.serverId);
+  if (settings.serverId !== "local" && !serverRecord) {
     return c.json({ error: "Associated server not found" }, 404);
   }
+
+  const serverName = serverRecord?.name ?? "Local control plane";
 
   log.warn({
     message: `Server alert received: ${type} usage exceeded threshold`,
@@ -566,7 +571,7 @@ app.post("/api/monitoring/alerts", async (c) => {
   const publisher = scope.resolve(Symbol.for("PublishNotificationUseCase")) as {
     execute: (input: {
       event: "server_threshold_alert";
-      organizationId: string;
+      organizationId?: string;
       idempotencyKey: string;
       title: string;
       message: string;
@@ -577,15 +582,17 @@ app.post("/api/monitoring/alerts", async (c) => {
   await publisher
     .execute({
       event: "server_threshold_alert",
-      organizationId: serverRecord.organizationId,
+      ...(serverRecord?.organizationId
+        ? { organizationId: serverRecord.organizationId }
+        : {}),
       idempotencyKey: `alert:${settings.serverId}:${type}:${new Date().toISOString().slice(0, 13)}`,
-      title: `[Alert] Server ${serverRecord.name} - High ${type} Usage`,
+      title: `[Alert] Server ${serverName} - High ${type} Usage`,
       message:
         message ||
-        `The ${type} usage on server '${serverRecord.name}' is currently ${value}%, exceeding the set threshold of ${threshold}%.`,
+        `The ${type} usage on server '${serverName}' is currently ${value}%, exceeding the set threshold of ${threshold}%.`,
       metadata: {
         serverId: settings.serverId,
-        serverName: serverRecord.name,
+        serverName,
         alertType: type,
         value,
         threshold,
@@ -2526,6 +2533,8 @@ async function initializeMonitoring() {
 
     const scope = serviceProvider.createScope();
     let token = "";
+    let cpuThreshold = 90;
+    let memoryThreshold = 90;
     try {
       const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
       let settings =
@@ -2539,6 +2548,8 @@ async function initializeMonitoring() {
         });
       }
       token = settings.token;
+      cpuThreshold = settings.cpuThreshold;
+      memoryThreshold = settings.memoryThreshold;
     } finally {
       await scope.dispose();
     }
@@ -2553,8 +2564,8 @@ async function initializeMonitoring() {
         retentionDays: 7,
         cronJob: "0 0 * * *",
         thresholds: {
-          cpu: 90,
-          memory: 90,
+          cpu: cpuThreshold,
+          memory: memoryThreshold,
         },
       },
       containers: {

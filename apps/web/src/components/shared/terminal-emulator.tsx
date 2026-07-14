@@ -10,6 +10,11 @@ interface TerminalEmulatorProps {
 
 export function TerminalEmulator({ token, onClose }: TerminalEmulatorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     let isMounted = true;
@@ -104,7 +109,7 @@ export function TerminalEmulator({ token, onClose }: TerminalEmulatorProps) {
         term.write(
           `\r\n\x1b[1;31m[Disconnected: ${e.reason || "SSH session closed"}]\x1b[0m\r\n`,
         );
-        if (onClose) onClose();
+        onCloseRef.current?.();
       };
 
       term.onData((data) => {
@@ -138,7 +143,7 @@ export function TerminalEmulator({ token, onClose }: TerminalEmulatorProps) {
         resizeObserver.disconnect();
       }
     };
-  }, [token, onClose]);
+  }, [token]);
 
   return (
     <div className="relative h-full w-full select-text bg-[#080c0a] p-2">

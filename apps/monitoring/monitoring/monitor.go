@@ -125,37 +125,65 @@ func GetServerMetrics() database.ServerMetric {
 	distro := getRealOS()
 
 	cpuModel := ""
+	var cpuSpeed float64
+	var physicalCores int32
 	if len(cpuInfo) > 0 {
 		cpuModel = fmt.Sprintf("%s %s", cpuInfo[0].VendorID, cpuInfo[0].ModelName)
+		cpuSpeed = float64(cpuInfo[0].Mhz)
+		physicalCores = int32(len(cpuInfo))
 	}
 
-	memTotalGB := float64(v.Total) / 1024 / 1024 / 1024
-	memAvailableGB := float64(v.Available) / 1024 / 1024 / 1024
+	var memTotalGB, memAvailableGB float64
+	if v != nil {
+		memTotalGB = float64(v.Total) / 1024 / 1024 / 1024
+		memAvailableGB = float64(v.Available) / 1024 / 1024 / 1024
+	}
 	memUsedGB := memTotalGB - memAvailableGB
-	memUsedPercent := (memUsedGB / memTotalGB) * 100
+	memUsedPercent := 0.0
+	if memTotalGB > 0 {
+		memUsedPercent = (memUsedGB / memTotalGB) * 100
+	}
 
 	var networkIn, networkOut float64
 	if len(netInfo) > 0 {
 		networkIn = float64(netInfo[0].BytesRecv) / 1024 / 1024
 		networkOut = float64(netInfo[0].BytesSent) / 1024 / 1024
 	}
+	cpuPercent := 0.0
+	if len(c) > 0 {
+		cpuPercent = c[0]
+	}
+
+	diskUsed, totalDisk := 0.0, 0.0
+	if diskInfo != nil {
+		diskUsed = diskInfo.UsedPercent
+		totalDisk = float64(diskInfo.Total) / 1024 / 1024 / 1024
+	}
+
+	kernel, uptime, arch := "", uint64(0), runtime.GOARCH
+	if hostInfo != nil {
+		kernel = hostInfo.KernelVersion
+		uptime = hostInfo.Uptime
+		arch = hostInfo.KernelArch
+	}
+
 	return database.ServerMetric{
 		Timestamp:        time.Now().UTC().Format(time.RFC3339Nano),
-		CPU:              c[0],
+		CPU:              cpuPercent,
 		CPUModel:         cpuModel,
 		CPUCores:         int32(runtime.NumCPU()),
-		CPUPhysicalCores: int32(len(cpuInfo)),
-		CPUSpeed:         float64(cpuInfo[0].Mhz),
+		CPUPhysicalCores: physicalCores,
+		CPUSpeed:         cpuSpeed,
 		OS:               getRealOS(),
 		Distro:           distro,
-		Kernel:           hostInfo.KernelVersion,
-		Arch:             hostInfo.KernelArch,
+		Kernel:           kernel,
+		Arch:             arch,
 		MemUsed:          memUsedPercent,
 		MemUsedGB:        memUsedGB,
 		MemTotal:         memTotalGB,
-		Uptime:           hostInfo.Uptime,
-		DiskUsed:         float64(diskInfo.UsedPercent),
-		TotalDisk:        float64(diskInfo.Total) / 1024 / 1024 / 1024,
+		Uptime:           uptime,
+		DiskUsed:         diskUsed,
+		TotalDisk:        totalDisk,
 		NetworkIn:        networkIn,
 		NetworkOut:       networkOut,
 	}
@@ -186,8 +214,9 @@ func ConvertToSystemMetrics(metric database.ServerMetric) SystemMetrics {
 
 func CheckThresholds(metrics database.ServerMetric) error {
 	cfg := config.GetMetricsConfig()
-	cpuThreshold := float64(cfg.Server.Thresholds.CPU)
-	memThreshold := float64(cfg.Server.Thresholds.Memory)
+	cpuThresholdValue, memoryThresholdValue := config.GetThresholds()
+	cpuThreshold := float64(cpuThresholdValue)
+	memThreshold := float64(memoryThresholdValue)
 	callbackURL := cfg.Server.UrlCallback
 	metricsToken := cfg.Server.Token
 

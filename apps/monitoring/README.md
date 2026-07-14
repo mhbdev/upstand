@@ -52,8 +52,13 @@ go run main.go
 ## Endpoints
 
 - `GET /health` - Check service health status (no authentication required)
-- `GET /metrics?limit=<number|all>` - Get server metrics (default limit: 50)
-- `GET /metrics/containers?limit=<number|all>&appName=<name>` - Get container metrics for a specific application (default limit: 50)
+- `GET /metrics?limit=<number|all>&from=<RFC3339>&to=<RFC3339>` - Get server metrics (default limit: 50)
+- `GET /metrics/containers?limit=<number|all>&appName=<name>&from=<RFC3339>&to=<RFC3339>` - Get container metrics for an application or all containers (default limit: 50)
+
+Range queries use the persisted SQLite history and return samples in ascending
+time order. `limit` selects the newest samples inside the requested range while
+preserving chronological order in the response. Retention defaults to seven
+days and is enforced by the configured cron job.
 
 ## Features
 
@@ -68,6 +73,8 @@ go run main.go
 - Kernel
 - Architecture
 - Threads
+- Historical ranges with bounded result sizes
+- Container metrics collected for all services when no include list is supplied
 
 Example response:
 

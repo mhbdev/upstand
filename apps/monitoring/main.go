@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -62,11 +63,44 @@ func main() {
 		return middleware.AuthMiddleware()(c)
 	})
 
+	app.Post("/config/thresholds", func(c *fiber.Ctx) error {
+		var payload struct {
+			CPU    int `json:"cpu"`
+			Memory int `json:"memory"`
+		}
+		if err := c.BodyParser(&payload); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid threshold payload",
+			})
+		}
+		if err := config.UpdateThresholds(payload.CPU, payload.Memory); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+
+		cpu, memory := config.GetThresholds()
+		return c.JSON(fiber.Map{"cpu": cpu, "memory": memory})
+	})
+
 	app.Get("/metrics", func(c *fiber.Ctx) error {
 		limit := c.Query("limit", "50")
+		start, end, hasRange, err := parseMetricRange(c)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+		}
 
 		var metrics []monitoring.SystemMetrics
-		if limit == "all" {
+		if hasRange {
+			limitNum := parseLimit(limit)
+			dbMetrics, rangeErr := db.GetMetricsInRangeLimit(start, end, limitNum)
+			if rangeErr != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch metrics"})
+			}
+			for _, m := range dbMetrics {
+				metrics = append(metrics, monitoring.ConvertToSystemMetrics(m))
+			}
+		} else if limit == "all" {
 			dbMetrics, err := db.GetAllMetrics()
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{
@@ -77,10 +111,7 @@ func main() {
 				metrics = append(metrics, monitoring.ConvertToSystemMetrics(m))
 			}
 		} else {
-			n, err := strconv.Atoi(limit)
-			if err != nil {
-				n = 50
-			}
+			n := parseLimit(limit)
 			dbMetrics, err := db.GetLastNMetrics(n)
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{
@@ -107,22 +138,18 @@ func main() {
 	app.Get("/metrics/containers", func(c *fiber.Ctx) error {
 		limit := c.Query("limit", "50")
 		appName := c.Query("appName", "")
-
-		if appName == "" {
-			return c.JSON([]database.ContainerMetric{})
+		start, end, hasRange, err := parseMetricRange(c)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 		}
 
 		var metrics []database.ContainerMetric
-		var err error
-
-		if limit == "all" {
+		if hasRange {
+			metrics, err = db.GetContainerMetricsInRange(appName, start, end, parseLimit(limit))
+		} else if limit == "all" {
 			metrics, err = db.GetAllMetricsContainer(appName)
 		} else {
-			limitNum, parseErr := strconv.Atoi(limit)
-			if parseErr != nil {
-				limitNum = 50
-			}
-			metrics, err = db.GetLastNContainerMetrics(appName, limitNum)
+			metrics, err = db.GetLastNContainerMetrics(appName, parseLimit(limit))
 		}
 
 		if err != nil {
@@ -134,6 +161,18 @@ func main() {
 		return c.JSON(metrics)
 	})
 
+	collectServerMetrics := func() {
+		metrics := monitoring.GetServerMetrics()
+		if err := db.SaveMetric(metrics); err != nil {
+			log.Printf("Error saving metrics: %v", err)
+		}
+
+		if err := monitoring.CheckThresholds(metrics); err != nil {
+			log.Printf("Error checking thresholds: %v", err)
+		}
+	}
+	collectServerMetrics()
+
 	go func() {
 		refreshRate := cfg.Server.RefreshRate
 		duration := time.Duration(refreshRate) * time.Second
@@ -143,14 +182,7 @@ func main() {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			metrics := monitoring.GetServerMetrics()
-			if err := db.SaveMetric(metrics); err != nil {
-				log.Printf("Error saving metrics: %v", err)
-			}
-
-			if err := monitoring.CheckThresholds(metrics); err != nil {
-				log.Printf("Error checking thresholds: %v", err)
-			}
+			collectServerMetrics()
 		}
 	}()
 
@@ -161,4 +193,47 @@ func main() {
 
 	log.Printf("Server starting on port %d", port)
 	log.Fatal(app.Listen(":" + strconv.Itoa(port)))
+}
+
+func parseLimit(value string) int {
+	if value == "all" {
+		return 0
+	}
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit < 1 {
+		return 50
+	}
+	if limit > 5000 {
+		return 5000
+	}
+	return limit
+}
+
+func parseMetricRange(c *fiber.Ctx) (time.Time, time.Time, bool, error) {
+	fromValue := c.Query("from")
+	toValue := c.Query("to")
+	if fromValue == "" && toValue == "" {
+		return time.Time{}, time.Time{}, false, nil
+	}
+
+	now := time.Now().UTC()
+	start := now.AddDate(0, 0, -7)
+	end := now
+	var err error
+	if fromValue != "" {
+		start, err = time.Parse(time.RFC3339, fromValue)
+		if err != nil {
+			return time.Time{}, time.Time{}, true, fmt.Errorf("invalid from timestamp")
+		}
+	}
+	if toValue != "" {
+		end, err = time.Parse(time.RFC3339, toValue)
+		if err != nil {
+			return time.Time{}, time.Time{}, true, fmt.Errorf("invalid to timestamp")
+		}
+	}
+	if end.Before(start) {
+		return time.Time{}, time.Time{}, true, fmt.Errorf("to timestamp must be after from timestamp")
+	}
+	return start.UTC(), end.UTC(), true, nil
 }

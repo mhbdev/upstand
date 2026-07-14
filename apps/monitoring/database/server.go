@@ -40,12 +40,24 @@ func (db *DB) SaveMetric(metric ServerMetric) error {
 }
 
 func (db *DB) GetMetricsInRange(start, end time.Time) ([]ServerMetric, error) {
+	return db.GetMetricsInRangeLimit(start, end, 0)
+}
+
+func (db *DB) GetMetricsInRangeLimit(start, end time.Time, limit int) ([]ServerMetric, error) {
+	limitClause := ""
+	orderClause := "ORDER BY timestamp ASC"
+	args := []interface{}{start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano)}
+	if limit > 0 {
+		orderClause = "ORDER BY timestamp DESC"
+		limitClause = " LIMIT ?"
+		args = append(args, limit)
+	}
 	rows, err := db.Query(`
 		SELECT timestamp, cpu, cpu_model, cpu_cores, cpu_physical_cores, cpu_speed, os, distro, kernel, arch, mem_used, mem_used_gb, mem_total, uptime, disk_used, total_disk, network_in, network_out
 		FROM server_metrics
 		WHERE timestamp BETWEEN ? AND ?
-		ORDER BY timestamp ASC
-	`, start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano))
+		`+orderClause+`
+	`+limitClause, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +71,11 @@ func (db *DB) GetMetricsInRange(start, end time.Time) ([]ServerMetric, error) {
 			return nil, err
 		}
 		metrics = append(metrics, m)
+	}
+	if limit > 0 {
+		for left, right := 0, len(metrics)-1; left < right; left, right = left+1, right-1 {
+			metrics[left], metrics[right] = metrics[right], metrics[left]
+		}
 	}
 	return metrics, nil
 }

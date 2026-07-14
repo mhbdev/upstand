@@ -1,4 +1,4 @@
-import type { IUnitOfWork } from "@upstand/domain";
+import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { z } from "zod";
 import type {
   DockerService,
@@ -24,6 +24,12 @@ export class GetServerRuntimeStatsUseCase {
   async execute(
     input: GetServerRuntimeStatsInput,
   ): Promise<ServerRuntimeStats> {
+    if (input.serverId && input.serverId !== "local") {
+      const server = await this.uow.serverRepository.findById(input.serverId);
+      if (!server || server.organizationId !== input.organizationId) {
+        throw new ValidationError("Server not found");
+      }
+    }
     const { dockerService, cleanup } = await resolveDockerServiceForServer(
       input.serverId,
       this.uow,

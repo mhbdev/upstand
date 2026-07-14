@@ -4,7 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
+
+func escapeLike(value string) string {
+	return strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(value)
+}
 
 func (db *DB) InitContainerMetricsTable() error {
 	_, err := db.Exec(`
@@ -49,18 +54,21 @@ func (db *DB) SaveContainerMetric(metric *ContainerMetric) error {
 
 func (db *DB) GetLastNContainerMetrics(containerName string, limit int) ([]ContainerMetric, error) {
 	containerName = strings.TrimPrefix(containerName, "/")
+	if containerName == "" {
+		return db.GetLastNAllContainerMetrics(limit)
+	}
 
 	query := `
 		WITH recent_metrics AS (
 			SELECT metrics_json
 			FROM container_metrics
-			WHERE container_name = ? OR container_name LIKE ?
+			WHERE container_name = ? OR container_name LIKE ? ESCAPE '\\'
 			ORDER BY timestamp DESC
 			LIMIT ?
 		)
 		SELECT metrics_json FROM recent_metrics ORDER BY json_extract(metrics_json, '$.timestamp') ASC
 	`
-	rows, err := db.Query(query, containerName, containerName+".%", limit)
+	rows, err := db.Query(query, containerName, escapeLike(containerName)+".%", limit)
 	if err != nil {
 		return nil, err
 	}
@@ -85,17 +93,20 @@ func (db *DB) GetLastNContainerMetrics(containerName string, limit int) ([]Conta
 
 func (db *DB) GetAllMetricsContainer(containerName string) ([]ContainerMetric, error) {
 	containerName = strings.TrimPrefix(containerName, "/")
+	if containerName == "" {
+		return db.GetLastNAllContainerMetrics(0)
+	}
 
 	query := `
 		WITH recent_metrics AS (
 			SELECT metrics_json
 			FROM container_metrics
-			WHERE container_name = ? OR container_name LIKE ?
+			WHERE container_name = ? OR container_name LIKE ? ESCAPE '\\'
 			ORDER BY timestamp DESC
 		)
 		SELECT metrics_json FROM recent_metrics ORDER BY json_extract(metrics_json, '$.timestamp') ASC
 	`
-	rows, err := db.Query(query, containerName, containerName+".%")
+	rows, err := db.Query(query, containerName, escapeLike(containerName)+".%")
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +127,96 @@ func (db *DB) GetAllMetricsContainer(containerName string) ([]ContainerMetric, e
 		metrics = append(metrics, metric)
 	}
 	return metrics, nil
+}
+
+func (db *DB) GetContainerMetricsInRange(
+	containerName string,
+	start time.Time,
+	end time.Time,
+	limit int,
+) ([]ContainerMetric, error) {
+	containerName = strings.TrimPrefix(containerName, "/")
+	limitClause := ""
+	whereClause := "timestamp BETWEEN ? AND ?"
+	orderClause := "ORDER BY timestamp ASC"
+	args := []interface{}{
+		start.UTC().Format(time.RFC3339Nano),
+		end.UTC().Format(time.RFC3339Nano),
+	}
+	if containerName != "" {
+		whereClause = "(container_name = ? OR container_name LIKE ? ESCAPE '\\') AND " + whereClause
+		args = append([]interface{}{containerName, escapeLike(containerName) + ".%"}, args...)
+	}
+	if limit > 0 {
+		orderClause = "ORDER BY timestamp DESC"
+		limitClause = " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	rows, err := db.Query(`
+		SELECT metrics_json
+		FROM container_metrics
+		WHERE `+whereClause+`
+		`+orderClause+limitClause, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	metrics := make([]ContainerMetric, 0)
+	for rows.Next() {
+		var metricsJSON string
+		if err := rows.Scan(&metricsJSON); err != nil {
+			return nil, err
+		}
+		var metric ContainerMetric
+		if err := json.Unmarshal([]byte(metricsJSON), &metric); err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, metric)
+	}
+	if limit > 0 {
+		for left, right := 0, len(metrics)-1; left < right; left, right = left+1, right-1 {
+			metrics[left], metrics[right] = metrics[right], metrics[left]
+		}
+	}
+	return metrics, rows.Err()
+}
+
+func (db *DB) GetLastNAllContainerMetrics(limit int) ([]ContainerMetric, error) {
+	limitClause := ""
+	args := []interface{}{}
+	if limit > 0 {
+		limitClause = " LIMIT ?"
+		args = append(args, limit)
+	}
+	rows, err := db.Query(`
+		WITH recent_metrics AS (
+			SELECT metrics_json
+			FROM container_metrics
+			ORDER BY timestamp DESC`+limitClause+`
+		)
+		SELECT metrics_json
+		FROM recent_metrics
+		ORDER BY json_extract(metrics_json, '$.timestamp') ASC`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	metrics := make([]ContainerMetric, 0)
+	for rows.Next() {
+		var metricsJSON string
+		if err := rows.Scan(&metricsJSON); err != nil {
+			return nil, err
+		}
+		var metric ContainerMetric
+		if err := json.Unmarshal([]byte(metricsJSON), &metric); err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, metric)
+	}
+	return metrics, rows.Err()
 }
 
 type ContainerMetric struct {

@@ -11,9 +11,11 @@ import {
   GetServerRuntimeStatsInputSchema,
   GetServersInputSchema,
   SetupServerInputSchema,
+  UpdateMonitoringSettingsInputSchema,
   UpdateServerInputSchema,
 } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
+import { z } from "zod";
 import {
   CreateServerUseCaseToken,
   DeleteServerUseCaseToken,
@@ -24,6 +26,7 @@ import {
   GetServersUseCaseToken,
   GetServerUseCaseToken,
   SetupServerUseCaseToken,
+  UpdateMonitoringSettingsUseCaseToken,
   UpdateServerUseCaseToken,
 } from "../di";
 import { handleUseCaseError } from "../errors";
@@ -179,6 +182,41 @@ export const serverRouter = router({
       }
     }),
 
+  monitoringSettings: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        serverId: z.string().min(1),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
+      if (input.serverId !== "local") {
+        const server = await uow.serverRepository.findById(input.serverId);
+        if (!server || server.organizationId !== input.organizationId) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Server not found",
+          });
+        }
+      }
+
+      const settings = await uow.monitoringSettingsRepository.findByServerId(
+        input.serverId,
+      );
+      return {
+        serverId: input.serverId,
+        cpuThreshold: settings?.cpuThreshold ?? 90,
+        memoryThreshold: settings?.memoryThreshold ?? 90,
+      };
+    }),
+
   create: twoFactorVerifiedProcedure
     .input(CreateServerInputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -282,6 +320,23 @@ export const serverRouter = router({
       );
       try {
         return await ctx.scope.resolve(UpdateServerUseCaseToken).execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  updateMonitoringSettings: twoFactorVerifiedProcedure
+    .input(UpdateMonitoringSettingsInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:update",
+      );
+      try {
+        return await ctx.scope
+          .resolve(UpdateMonitoringSettingsUseCaseToken)
+          .execute(input);
       } catch (error) {
         handleUseCaseError(error);
       }

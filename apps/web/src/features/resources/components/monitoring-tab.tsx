@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -7,7 +8,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import { useEffect, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
+import {
+  Activity,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Cpu,
+  MemoryStick,
+  Network,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -16,197 +32,419 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { trpc } from "@/utils/trpc";
 
-type MetricPoint = {
-  time: string;
+type RangeKey = "1h" | "24h" | "7d";
+type LiveStats = {
+  collectedAt?: string;
+  cpu?: number | null;
+  ram?: number | null;
+  ramUsage?: number | null;
+  cpuPercent?: number | null;
+  memoryPercent?: number | null;
+  memoryUsageBytes?: number | null;
+  containerCount?: number | null;
+  networkRxBytes?: number | null;
+  networkTxBytes?: number | null;
+};
+type ContainerMetric = {
+  timestamp: string;
+  CPU: number;
+  Memory: {
+    percentage: number;
+    used: number;
+    total: number;
+    usedUnit: string;
+    totalUnit: string;
+  };
+  Network: {
+    input: number;
+    output: number;
+    inputUnit: string;
+    outputUnit: string;
+  };
+  ID: string;
+  Name: string;
+};
+type Point = {
+  label: string;
   cpu: number;
-  ram: number;
-  ramUsage: number;
-  networkRxBytes: number;
-  networkTxBytes: number;
+  memory: number;
+  networkIn: number;
+  networkOut: number;
 };
 
-interface MonitoringTabProps {
-  statsData?: {
-    collectedAt?: string;
-    cpu?: number | null;
-    ram?: number | null;
-    ramUsage?: number | null;
-    cpuPercent?: number | null;
-    memoryPercent?: number | null;
-    memoryUsageBytes?: number | null;
-    containerCount?: number | null;
-    networkRxBytes?: number | null;
-    networkTxBytes?: number | null;
-  } | null;
-}
+const RANGE_OPTIONS: Array<{
+  value: RangeKey;
+  label: string;
+  milliseconds: number;
+}> = [
+  { value: "1h", label: "Last hour", milliseconds: 60 * 60_000 },
+  { value: "24h", label: "Last 24 hours", milliseconds: 24 * 60 * 60_000 },
+  { value: "7d", label: "Last 7 days", milliseconds: 7 * 24 * 60 * 60_000 },
+];
 
-function finiteMetric(value: number | null | undefined, fallback = 0) {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
+const finite = (value: number | string | null | undefined) => {
+  const parsed =
+    typeof value === "number" ? value : Number.parseFloat(value ?? "0");
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
-export function MonitoringTab({ statsData }: MonitoringTabProps) {
-  const [metrics, setMetrics] = useState<MetricPoint[]>([]);
+const formatBytes = (bytes: number) => {
+  if (bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(bytes / 1024 ** exponent)} ${units[exponent]}`;
+};
 
-  useEffect(() => {
-    if (!statsData) return;
-    const collectedAt = new Date(statsData.collectedAt ?? Date.now());
-    const cpu = finiteMetric(statsData.cpu ?? statsData.cpuPercent);
-    const ram = finiteMetric(statsData.ram ?? statsData.memoryPercent);
-    const metric: MetricPoint = {
-      time: (Number.isNaN(collectedAt.getTime())
-        ? new Date()
-        : collectedAt
-      ).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-      cpu: Number(cpu.toFixed(1)),
-      ram: Number(ram.toFixed(1)),
-      ramUsage: finiteMetric(statsData.ramUsage ?? statsData.memoryUsageBytes),
-      networkRxBytes: finiteMetric(statsData.networkRxBytes),
-      networkTxBytes: finiteMetric(statsData.networkTxBytes),
-    };
-    setMetrics((current) => [...current.slice(-30), metric]);
-  }, [statsData]);
-
+function MetricChart({
+  data,
+  dataKey,
+  color,
+  title,
+  description,
+  unit = "%",
+}: {
+  data: Point[];
+  dataKey: keyof Point;
+  color: string;
+  title: string;
+  description: string;
+  unit?: string;
+}) {
   return (
-    <Card className="border border-border/40 bg-card/20">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <div>
-          <CardTitle className="font-semibold text-lg">
-            Live Resource Metrics
-          </CardTitle>
-          <CardDescription className="font-normal text-muted-foreground text-sm">
-            Real Docker statistics aggregated across{" "}
-            {statsData?.containerCount ?? 0} active container replicas. History
-            starts when this tab is opened.
-          </CardDescription>
-        </div>
+    <Card className="border-border/40 bg-card/20">
+      <CardHeader>
+        <CardTitle className="font-semibold text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 border-border/20 border-t pt-4">
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* CPU usage */}
-          <Card className="border border-border/40 bg-card p-4">
-            <CardHeader className="p-0 pb-4">
-              <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
-                Workload CPU (%)
-              </CardTitle>
-            </CardHeader>
-            <div className="h-60">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={metrics}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor="var(--color-primary)"
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="var(--color-primary)"
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="time"
-                    stroke="var(--color-muted-foreground)"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="var(--color-muted-foreground)"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--color-card)",
-                      border: "1px solid var(--color-border)",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="cpu"
-                    stroke="var(--color-primary)"
-                    fillOpacity={1}
-                    fill="url(#cpuGrad)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          {/* RAM usage */}
-          <Card className="border border-border/40 bg-card p-4">
-            <CardHeader className="p-0 pb-4">
-              <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
-                Memory Utilization (%)
-              </CardTitle>
-            </CardHeader>
-            <div className="h-60">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={metrics}
-                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor="var(--color-chart-2)"
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="var(--color-chart-2)"
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="time"
-                    stroke="var(--color-muted-foreground)"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    stroke="var(--color-muted-foreground)"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--color-card)",
-                      border: "1px solid var(--color-border)",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="ram"
-                    stroke="var(--color-chart-2)"
-                    fillOpacity={1}
-                    fill="url(#ramGrad)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </div>
+      <CardContent className="h-56 border-border/20 border-t pt-4">
+        {data.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
+            Collecting history…
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={data}
+              margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+            >
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                fontSize={10}
+                minTickGap={28}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                fontSize={10}
+                unit={unit}
+              />
+              <Tooltip />
+              <Area
+                type="monotone"
+                dataKey={dataKey}
+                stroke={color}
+                fill={color}
+                fillOpacity={0.12}
+                strokeWidth={2}
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+export function MonitoringTab({
+  appName,
+  organizationId,
+  serverId,
+  statsData,
+}: {
+  appName?: string | null;
+  organizationId?: string;
+  serverId?: string;
+  statsData?: LiveStats | null;
+}) {
+  const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
+  const range = useMemo(() => {
+    const option =
+      RANGE_OPTIONS.find((item) => item.value === rangeKey) ?? RANGE_OPTIONS[1];
+    return {
+      from: new Date(Date.now() - option.milliseconds).toISOString(),
+      label: option.label,
+    };
+  }, [rangeKey]);
+  const historyQuery = useQuery({
+    ...trpc.server.historicalMetrics.queryOptions({
+      organizationId: organizationId ?? "",
+      serverId: serverId ?? "",
+      appName: appName ?? undefined,
+      containerMetrics: true,
+      from: range.from,
+      limit: rangeKey === "7d" ? "1000" : "500",
+    }),
+    enabled: Boolean(organizationId && serverId && appName),
+    refetchInterval: 30_000,
+  });
+
+  const points = useMemo<Point[]>(() => {
+    if (!Array.isArray(historyQuery.data)) return [];
+    const buckets = new Map<number, Map<string, ContainerMetric>>();
+    for (const metric of historyQuery.data as ContainerMetric[]) {
+      const timestamp = new Date(metric.timestamp).getTime();
+      if (!Number.isFinite(timestamp)) continue;
+      const bucket = Math.floor(timestamp / 60_000);
+      const containers =
+        buckets.get(bucket) ?? new Map<string, ContainerMetric>();
+      const current = containers.get(metric.Name);
+      if (
+        !current ||
+        new Date(metric.timestamp) > new Date(current.timestamp)
+      ) {
+        containers.set(metric.Name, metric);
+      }
+      buckets.set(bucket, containers);
+    }
+    return [...buckets.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([bucket, metrics]) => {
+        const values = [...metrics.values()];
+        return {
+          label: new Date(bucket * 60_000).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          cpu: values.reduce((sum, metric) => sum + finite(metric.CPU), 0),
+          memory:
+            values.length > 0
+              ? values.reduce(
+                  (sum, metric) => sum + finite(metric.Memory?.percentage),
+                  0,
+                ) / values.length
+              : 0,
+          networkIn: values.reduce(
+            (sum, metric) => sum + finite(metric.Network?.input),
+            0,
+          ),
+          networkOut: values.reduce(
+            (sum, metric) => sum + finite(metric.Network?.output),
+            0,
+          ),
+        };
+      });
+  }, [historyQuery.data]);
+
+  const latestContainers = useMemo(() => {
+    const latest = new Map<string, ContainerMetric>();
+    for (const metric of (Array.isArray(historyQuery.data)
+      ? historyQuery.data
+      : []) as ContainerMetric[]) {
+      const current = latest.get(metric.Name);
+      if (!current || new Date(metric.timestamp) > new Date(current.timestamp))
+        latest.set(metric.Name, metric);
+    }
+    return [...latest.values()].sort((a, b) => b.CPU - a.CPU);
+  }, [historyQuery.data]);
+
+  const liveCpu = finite(statsData?.cpu ?? statsData?.cpuPercent);
+  const liveMemory = finite(statsData?.ram ?? statsData?.memoryPercent);
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="font-semibold text-lg">Resource monitoring</h2>
+          <p className="text-muted-foreground text-sm">
+            {appName
+              ? `Persisted Docker metrics for ${appName}.`
+              : "Live Docker metrics for this resource."}
+          </p>
+        </div>
+        <Select
+          value={rangeKey}
+          onValueChange={(value) => value && setRangeKey(value as RangeKey)}
+        >
+          <SelectTrigger
+            className="h-9 w-[160px]"
+            aria-label="Resource monitoring time range"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {RANGE_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-muted-foreground text-xs">Current CPU</p>
+              <p className="mt-1 font-semibold text-xl tabular-nums">
+                {liveCpu.toFixed(1)}%
+              </p>
+            </div>
+            <Cpu className="size-5 text-primary" aria-hidden="true" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-muted-foreground text-xs">Current memory</p>
+              <p className="mt-1 font-semibold text-xl tabular-nums">
+                {liveMemory.toFixed(1)}%
+              </p>
+            </div>
+            <MemoryStick className="size-5 text-primary" aria-hidden="true" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-muted-foreground text-xs">Active containers</p>
+              <p className="mt-1 font-semibold text-xl tabular-nums">
+                {statsData?.containerCount ?? latestContainers.length}
+              </p>
+            </div>
+            <Activity className="size-5 text-primary" aria-hidden="true" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-muted-foreground text-xs">Network traffic</p>
+              <p className="mt-1 font-semibold text-xl tabular-nums">
+                {formatBytes(
+                  finite(statsData?.networkRxBytes) +
+                    finite(statsData?.networkTxBytes),
+                )}
+              </p>
+            </div>
+            <Network className="size-5 text-primary" aria-hidden="true" />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <MetricChart
+          data={points}
+          dataKey="cpu"
+          color="var(--color-primary)"
+          title="CPU utilization"
+          description={`${range.label} of persisted container samples.`}
+        />
+        <MetricChart
+          data={points}
+          dataKey="memory"
+          color="var(--color-chart-2)"
+          title="Memory utilization"
+          description="Aggregated container memory percentage."
+        />
+        <MetricChart
+          data={points}
+          dataKey="networkIn"
+          color="var(--color-chart-3)"
+          title="Network received"
+          description="Latest sampled receive counter."
+          unit=""
+        />
+        <MetricChart
+          data={points}
+          dataKey="networkOut"
+          color="var(--color-chart-4)"
+          title="Network sent"
+          description="Latest sampled transmit counter."
+          unit=""
+        />
+      </div>
+
+      <Card className="border-border/40 bg-card/20">
+        <CardHeader>
+          <CardTitle className="font-semibold text-base">
+            Container breakdown
+          </CardTitle>
+          <CardDescription>
+            Latest persisted sample per container, sorted by CPU usage.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="border-border/20 border-t pt-4">
+          {latestContainers.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground text-sm">
+              No persisted container samples are available yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full min-w-[600px] text-sm">
+                <thead className="bg-muted/30 text-left text-muted-foreground text-xs uppercase">
+                  <tr>
+                    <th className="p-3 font-medium">Container</th>
+                    <th className="p-3 font-medium">CPU</th>
+                    <th className="p-3 font-medium">Memory</th>
+                    <th className="p-3 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <ArrowDownToLine
+                          className="size-3"
+                          aria-hidden="true"
+                        />
+                        In
+                      </span>
+                    </th>
+                    <th className="p-3 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <ArrowUpFromLine
+                          className="size-3"
+                          aria-hidden="true"
+                        />
+                        Out
+                      </span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {latestContainers.map((metric) => (
+                    <tr
+                      key={`${metric.ID}-${metric.timestamp}`}
+                      className="border-t"
+                    >
+                      <td
+                        className="max-w-[240px] truncate p-3 font-medium"
+                        title={metric.Name}
+                      >
+                        {metric.Name}
+                      </td>
+                      <td className="p-3 tabular-nums">
+                        {finite(metric.CPU).toFixed(1)}%
+                      </td>
+                      <td className="p-3 tabular-nums">
+                        {finite(metric.Memory?.percentage).toFixed(1)}%
+                      </td>
+                      <td className="p-3 tabular-nums">
+                        {metric.Network?.input} {metric.Network?.inputUnit}
+                      </td>
+                      <td className="p-3 tabular-nums">
+                        {metric.Network?.output} {metric.Network?.outputUnit}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

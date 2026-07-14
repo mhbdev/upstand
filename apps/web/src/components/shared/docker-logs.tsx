@@ -358,10 +358,10 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-w-0 flex-col gap-4">
       {/* Filters & Control bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-2.5">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-2">
           {/* Limit Filter */}
           <Popover>
             <PopoverTrigger className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border/40 bg-transparent px-3 py-1 font-medium text-foreground text-xs transition-colors hover:bg-muted/10">
@@ -480,14 +480,14 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search logs"
+            placeholder="Search logs…"
             aria-label="Search logs"
-            className="h-8 w-44 bg-background text-xs"
+            className="h-8 min-w-40 flex-1 bg-background text-xs sm:max-w-56"
           />
         </div>
 
         {/* Actions panel */}
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
@@ -499,7 +499,9 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
             ) : (
               <Pause className="size-3.5 text-warning" />
             )}
-            <span>{isPaused ? "Resume" : "Pause"}</span>
+            <span className="hidden sm:inline">
+              {isPaused ? "Resume" : "Pause"}
+            </span>
           </Button>
           <Button
             variant="outline"
@@ -509,7 +511,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
             className="h-8 gap-1.5 border-border/40 text-xs"
           >
             <Copy className="size-3.5 text-muted-foreground" />
-            <span>Copy</span>
+            <span className="hidden sm:inline">Copy</span>
           </Button>
           <Button
             variant="outline"
@@ -519,7 +521,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
             className="h-8 gap-1.5 border-border/40 text-xs"
           >
             <Download className="size-3.5 text-muted-foreground" />
-            <span>Download</span>
+            <span className="hidden sm:inline">Download</span>
           </Button>
         </div>
       </div>
@@ -542,7 +544,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="custom-logs-scrollbar h-96 space-y-0.5 overflow-y-auto bg-muted/30 p-3 font-mono text-[11px]"
+          className="custom-logs-scrollbar h-[min(24rem,55svh)] space-y-0.5 overflow-y-auto bg-muted/30 p-2 font-mono text-[11px] sm:p-3"
         >
           {filteredLogs.length > 0 ? (
             filteredLogs.map((logItem, index) => (

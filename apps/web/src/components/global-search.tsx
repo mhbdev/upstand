@@ -1,12 +1,17 @@
 "use client";
 
-import { Folder01Icon } from "@hugeicons/core-free-icons";
+import {
+  CloudServerIcon,
+  Folder01Icon,
+  Search01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Command,
   CommandDialog,
   CommandEmpty,
+  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
@@ -49,16 +54,35 @@ export function GlobalSearch() {
     enabled: open && Boolean(organization?.id) && query.length > 1,
   });
 
+  const groupedResults = (results.data ?? []).reduce<
+    Record<string, NonNullable<typeof results.data>>
+  >((groups, result) => {
+    const group = groups[result.type] ?? [];
+    group.push(result);
+    groups[result.type] = group;
+    return groups;
+  }, {});
+
+  const resultLabels = {
+    project: "Projects",
+    environment: "Environments",
+    resource: "Resources",
+  } as const;
+
   return (
     <>
       <button
         type="button"
-        className="flex h-9 min-w-40 items-center gap-2 rounded-3xl border bg-input/40 px-3 text-muted-foreground text-sm hover:bg-accent"
+        className="flex size-9 shrink-0 items-center justify-center gap-2 rounded-3xl border bg-input/40 px-0 text-muted-foreground text-sm hover:bg-accent sm:h-9 sm:w-52 sm:justify-start sm:px-3"
         onClick={() => setOpen(true)}
         aria-label="Open global search"
+        aria-keyshortcuts="Control+K Meta+K"
       >
-        <span className="flex-1 text-left">Search projects and resources…</span>
-        <kbd className="rounded border bg-background px-1.5 py-0.5 font-mono text-[10px]">
+        <HugeiconsIcon icon={Search01Icon} className="size-4 shrink-0" />
+        <span className="hidden flex-1 truncate text-left sm:block">
+          Search anything…
+        </span>
+        <kbd className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] sm:block">
           ⌘K
         </kbd>
       </button>
@@ -74,7 +98,7 @@ export function GlobalSearch() {
             onValueChange={setInput}
             placeholder="Search projects, environments, resources…"
           />
-          <CommandList>
+          <CommandList className="max-h-[min(60svh,28rem)] p-1 sm:max-h-96">
             <CommandEmpty>
               {query.length > 1
                 ? results.isLoading
@@ -82,23 +106,39 @@ export function GlobalSearch() {
                   : "No matching resources."
                 : "Type at least two characters."}
             </CommandEmpty>
-            {results.data?.map((result) => (
-              <CommandItem
-                key={`${result.type}-${result.id}`}
-                value={result.id}
-                onSelect={() => {
-                  setOpen(false);
-                  setInput("");
-                  router.push(result.href as Route);
-                }}
-              >
-                <HugeiconsIcon icon={Folder01Icon} />
-                <span className="truncate">{result.name}</span>
-                <span className="ml-auto truncate text-muted-foreground text-xs">
-                  {result.subtitle}
-                </span>
-              </CommandItem>
-            ))}
+            {(
+              Object.keys(resultLabels) as Array<keyof typeof resultLabels>
+            ).map((type) => {
+              const items = groupedResults[type];
+              if (!items?.length) return null;
+              return (
+                <CommandGroup key={type} heading={resultLabels[type]}>
+                  {items.map((result) => (
+                    <CommandItem
+                      key={`${result.type}-${result.id}`}
+                      value={`${result.name} ${result.subtitle}`}
+                      onSelect={() => {
+                        setOpen(false);
+                        setInput("");
+                        router.push(result.href as Route);
+                      }}
+                    >
+                      <HugeiconsIcon
+                        icon={
+                          type === "resource" ? CloudServerIcon : Folder01Icon
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {result.name}
+                      </span>
+                      <span className="max-w-[45%] truncate text-muted-foreground text-xs">
+                        {result.subtitle}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              );
+            })}
           </CommandList>
         </Command>
       </CommandDialog>

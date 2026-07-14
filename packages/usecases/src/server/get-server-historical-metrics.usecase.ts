@@ -1,12 +1,19 @@
-import type { IUnitOfWork } from "@upstand/domain";
+import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { z } from "zod";
-import * as fs from "node:fs";
+import { requestMonitoringAgent } from "./monitoring-agent.client";
 
 export const GetServerHistoricalMetricsInputSchema = z.object({
   organizationId: z.string().min(1),
   serverId: z.string().min(1),
-  limit: z.string().optional().default("50"),
-  appName: z.string().optional(),
+  limit: z
+    .string()
+    .regex(/^(all|[1-9]\d{0,3})$/)
+    .optional()
+    .default("50"),
+  appName: z.string().trim().max(200).optional(),
+  containerMetrics: z.boolean().optional().default(false),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
 });
 
 export type GetServerHistoricalMetricsInput = z.infer<
@@ -19,57 +26,46 @@ export class GetServerHistoricalMetricsUseCase {
   async execute(input: GetServerHistoricalMetricsInput): Promise<unknown> {
     const serverId = input.serverId;
 
-    const settings =
-      await this.uow.monitoringSettingsRepository.findByServerId(serverId);
-    if (!settings) {
-      throw new Error(
-        `Monitoring settings not configured for server ${serverId}`,
-      );
-    }
-
-    let serverIp = "localhost";
-    if (serverId !== "local") {
-      const serverRecord = await this.uow.serverRepository.findById(serverId);
-      if (!serverRecord) {
-        throw new Error(`Server ${serverId} not found`);
-      }
-      serverIp = serverRecord.ipAddress;
-    } else {
-      if (fs.existsSync("/.dockerenv")) {
-        serverIp = "upstand-monitoring-agent";
-      }
+    const serverRecord =
+      serverId === "local"
+        ? null
+        : await this.uow.serverRepository.findById(serverId);
+    if (
+      serverId !== "local" &&
+      (!serverRecord || serverRecord.organizationId !== input.organizationId)
+    ) {
+      throw new ValidationError("Server not found");
     }
 
     const limit = input.limit ?? "50";
-    const port = 3001;
-
-    let url = "";
-    if (input.appName) {
-      url = `http://${serverIp}:${port}/metrics/containers?appName=${encodeURIComponent(input.appName)}&limit=${limit}`;
-    } else {
-      url = `http://${serverIp}:${port}/metrics?limit=${limit}`;
+    const params = new URLSearchParams({ limit });
+    if (input.appName) params.set("appName", input.appName);
+    if (input.from) params.set("from", input.from);
+    if (input.to) params.set("to", input.to);
+    const endpoint =
+      input.containerMetrics || input.appName
+        ? "/metrics/containers"
+        : "/metrics";
+    if (input.from && input.to) {
+      const from = new Date(input.from);
+      const to = new Date(input.to);
+      if (to <= from) {
+        throw new Error("The monitoring end time must be after the start time");
+      }
     }
 
     try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${settings.token}`,
-          Accept: "application/json",
+      return await requestMonitoringAgent<unknown>(
+        this.uow,
+        serverId,
+        endpoint,
+        {
+          query: params,
         },
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(
-          `Agent metrics response failed (${response.status}): ${text}`,
-        );
-      }
-
-      return await response.json();
+      );
     } catch (err) {
       throw new Error(
-        `Failed to contact monitoring agent on ${serverIp}: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to contact monitoring agent for ${serverId}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }

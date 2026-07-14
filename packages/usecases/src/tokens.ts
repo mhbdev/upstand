@@ -304,6 +304,10 @@ export const GetServerHistoricalMetricsUseCaseToken =
   createToken<UseCases.GetServerHistoricalMetricsUseCase>(
     "GetServerHistoricalMetricsUseCase",
   );
+export const UpdateMonitoringSettingsUseCaseToken =
+  createToken<UseCases.UpdateMonitoringSettingsUseCase>(
+    "UpdateMonitoringSettingsUseCase",
+  );
 export const GetSwarmContainersUseCaseToken =
   createToken<UseCases.GetSwarmContainersUseCase>("GetSwarmContainersUseCase");
 export const CreateNotificationChannelUseCaseToken =

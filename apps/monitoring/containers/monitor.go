@@ -37,12 +37,6 @@ func (cm *ContainerMonitor) Start() error {
 		return fmt.Errorf("error loading config: %v", err)
 	}
 
-	// Check if there are services to monitor
-	if len(monitorConfig.IncludeServices) == 0 {
-		log.Printf("No services to monitor. Skipping container metrics collection")
-		return nil
-	}
-
 	metricsConfig := config.GetMetricsConfig()
 	refreshRate := metricsConfig.Containers.RefreshRate
 	if refreshRate == 0 {
@@ -50,7 +44,10 @@ func (cm *ContainerMonitor) Start() error {
 	}
 	duration := time.Duration(refreshRate) * time.Second
 
-	// log.Printf("Container metrics collection will run every %d seconds for services: %v", refreshRate, monitorConfig.IncludeServices)
+	// An empty include list intentionally means all containers, subject to the
+	// exclude list. This keeps the default installation useful without requiring
+	// the control plane to know every generated Swarm service name.
+	cm.collectMetrics()
 
 	ticker := time.NewTicker(duration)
 	go func() {

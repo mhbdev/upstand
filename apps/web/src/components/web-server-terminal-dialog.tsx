@@ -1,16 +1,7 @@
 "use client";
 
-import { TerminalIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import {
   Select,
@@ -21,7 +12,7 @@ import {
 } from "@upstand/ui/components/select";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { TerminalEmulator } from "@/components/shared/terminal-emulator";
+import { TerminalDialogShell } from "@/components/shared/terminal-dialog-shell";
 import { authClient } from "@/lib/auth-client";
 import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -93,22 +84,22 @@ export function WebServerTerminalDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(92svh,820px)] w-[calc(100vw-1rem)] max-w-[min(96vw,1120px)] flex-col gap-0 overflow-hidden border-border/60 bg-background p-0 sm:min-w-[min(42rem,calc(100vw-2rem))]">
-        <DialogHeader className="border-border/60 border-b bg-muted/20 px-4 py-5 sm:px-6">
-          <DialogTitle className="flex items-center gap-2">
-            <HugeiconsIcon
-              icon={TerminalIcon}
-              className="size-5 text-primary"
-            />
-            Control-plane terminal
-          </DialogTitle>
-          <DialogDescription className="flex flex-wrap items-center gap-2">
-            SSH session connected to control-plane server via selected encrypted
-            key.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 border-border/60 border-b bg-background p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_6rem_auto_auto]">
+    <TerminalDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Control-plane terminal"
+      description={
+        <>
+          SSH session connected to control-plane server via selected encrypted
+          key.
+        </>
+      }
+      token={token}
+      connecting={connecting}
+      emptyMessage="Configure a key, port, then click Connect"
+      onTerminalClose={disconnect}
+      controls={
+        <div className="grid w-full min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_9rem_6rem_auto_auto]">
           <Select
             items={keys.map((key) => ({
               value: key.id,
@@ -117,7 +108,7 @@ export function WebServerTerminalDialog({
             value={keyId}
             onValueChange={(value) => setKeyId(value ?? "")}
           >
-            <SelectTrigger>
+            <SelectTrigger className="min-w-0">
               <SelectValue placeholder="SSH key" />
             </SelectTrigger>
             <SelectContent>
@@ -162,18 +153,7 @@ export function WebServerTerminalDialog({
             Disconnect
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden bg-[#080c0a] p-1">
-          {token ? (
-            <TerminalEmulator token={token} onClose={disconnect} />
-          ) : (
-            <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-              {connecting
-                ? "Initializing SSH terminal session..."
-                : "Configure key, port and click Connect"}
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      }
+    />
   );
 }
