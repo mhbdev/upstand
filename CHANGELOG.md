@@ -4,6 +4,18 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.37 - 2026-07-14
+
+### Added
+
+- Add custom roles database integration test suite `custom-role.test.ts` verifying creation, assignment, and role degradation/deletion logic.
+
+### Changed
+
+- Redesign custom roles creation flow: delete legacy "Custom Roles" settings section, and merge creation directly into the Member invite/addition form via the "Create custom role..." option.
+- Restrict capability checklist editing: enforce static/read-only capability assignments for default roles (Member/Admin), making capabilities editable only when creating a new custom role.
+- Implement automatic role degradation: when a custom role is deleted, automatically degrade all assigned members and pending invitations to standard Member permissions and role.
+
 ## 0.1.36 - 2026-07-14
 
 ### Changed
