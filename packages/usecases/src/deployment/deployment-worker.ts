@@ -465,36 +465,46 @@ export class DeploymentWorker {
         const server = await uow.serverRepository.findById(
           deployedResource.serverId,
         );
-        if (!server) throw new Error("Target deployment server not found");
-        if (!server.sshKeyId) {
-          throw new Error("Target deployment server has no SSH key configured");
-        }
-        const sshKey = await uow.sshKeyRepository.findById(server.sshKeyId);
-        if (!sshKey)
-          throw new Error("Target deployment server SSH key not found");
-        const privateKey = decryptSecret({
-          ciphertext: sshKey.privateKeyCiphertext,
-          iv: sshKey.privateKeyIv,
-          authTag: sshKey.privateKeyAuthTag,
-          keyVersion: sshKey.privateKeyVersion,
-        });
-        const connection = {
-          host: server.ipAddress,
-          port: server.port,
-          username: server.username,
-          privateKey,
-        };
-        const remoteDocker = createRemoteDocker(connection);
-        const remoteCli = createRemoteDockerCliEnvironment(connection);
-        remoteCliCleanup = remoteCli.cleanup;
-        dockerService = new DockerService(remoteDocker, remoteCli.environment);
-        dockerService.setCancellationKey(cancellationKey);
-        caddyService = new CaddyService(remoteDocker);
-        targetDestinationDocker = remoteDocker;
-        appendLog(
-          `Using independent Docker environment on '${server.name}'.\n`,
-        );
-      }
+        if (!server) {
+          // serverId not found in server table — likely a stale Swarm node ID
+          // from before the "local" sentinel fix. Log a warning and fall back
+          // to the local Docker socket.
+          appendLog(
+            `Warning: serverId '${deployedResource.serverId}' not found in server registry. ` +
+              `Falling back to local Docker socket.\n`,
+          );
+        } else {
+          if (!server.sshKeyId) {
+            throw new Error("Target deployment server has no SSH key configured");
+          }
+          const sshKey = await uow.sshKeyRepository.findById(server.sshKeyId);
+          if (!sshKey)
+            throw new Error("Target deployment server SSH key not found");
+          const privateKey = decryptSecret({
+            ciphertext: sshKey.privateKeyCiphertext,
+            iv: sshKey.privateKeyIv,
+            authTag: sshKey.privateKeyAuthTag,
+            keyVersion: sshKey.privateKeyVersion,
+          });
+          const connection = {
+            host: server.ipAddress,
+            port: server.port,
+            username: server.username,
+            privateKey,
+          };
+          const remoteDocker = createRemoteDocker(connection);
+          const remoteCli = createRemoteDockerCliEnvironment(connection);
+          remoteCliCleanup = remoteCli.cleanup;
+          dockerService = new DockerService(remoteDocker, remoteCli.environment);
+          dockerService.setCancellationKey(cancellationKey);
+          caddyService = new CaddyService(remoteDocker);
+          targetDestinationDocker = remoteDocker;
+          appendLog(
+            `Using independent Docker environment on '${server.name}'.\n`,
+          );
+        } // end else (server found)
+      } // end if (non-local serverId)
+
 
       if (
         deployedResource.buildServerId &&

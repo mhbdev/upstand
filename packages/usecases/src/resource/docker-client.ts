@@ -101,7 +101,9 @@ export async function resolveDockerCliEnvironmentForServer(
   }
 
   const server = await uow.serverRepository.findById(serverId);
-  if (!server) throw new Error(`Deployment server not found: ${serverId}`);
+  // If the server is not in the registry, fall back to local Docker socket.
+  // This handles stale Swarm node IDs stored before the "local" sentinel fix.
+  if (!server) return { environment: {}, cleanup: () => {} };
   if (!server.sshKeyId) {
     throw new Error("Target deployment server has no SSH key configured");
   }
@@ -132,7 +134,9 @@ export async function resolveDockerServiceForServer(
 
   const server = await uow.serverRepository.findById(serverId);
   if (!server) {
-    throw new Error(`Deployment server not found: ${serverId}`);
+    // If the server is not in the registry, fall back to local Docker socket.
+    // This handles stale Swarm node IDs stored before the "local" sentinel fix.
+    return { dockerService: defaultDockerService, cleanup: () => {} };
   }
 
   if (!server.sshKeyId) {
@@ -189,7 +193,14 @@ export async function resolveServicesForResource(
 
   const server = await uow.serverRepository.findById(serverId);
   if (!server) {
-    throw new Error(`Deployment server not found for resource ${resource.id}`);
+    // The serverId was not found in the server table — this can happen when a
+    // resource was previously assigned the raw Swarm node ID instead of "local".
+    // Fall back to the local Docker socket to avoid a hard crash.
+    return {
+      dockerService: defaultDockerService,
+      caddyService: defaultCaddyService,
+      cleanup: () => {},
+    };
   }
 
   if (!server.sshKeyId) {

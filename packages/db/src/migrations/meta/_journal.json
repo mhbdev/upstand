@@ -197,6 +197,13 @@
       "when": 1784048742199,
       "tag": "0027_wild_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1784056559594,
+      "tag": "0028_harsh_orphan",
+      "breakpoints": true
     }
   ]
 }

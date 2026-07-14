@@ -65,7 +65,9 @@ export class QueueDeploymentUseCase {
       let serverIp = "127.0.0.1";
 
       if (!serverId) {
-        // Find local manager node ID or default to 'local'
+        // For local/swarm-manager nodes, always use the sentinel "local" serverId.
+        // The raw swarm node hex ID is not registered in serverRepository and would
+        // cause the deployment worker to throw "Target deployment server not found".
         const docker = getDockerInstance();
         try {
           const info = await docker.info();
@@ -73,16 +75,16 @@ export class QueueDeploymentUseCase {
             const nodes = await docker.listNodes().catch(() => []);
             const leader = nodes.find((n: any) => n.ManagerStatus?.Leader);
             if (leader) {
-              serverId = leader.ID;
+              // Use "local" as the canonical id for the swarm manager node.
+              // The raw node ID (leader.ID) is kept only for metadata.
               serverName = leader.Description?.Hostname || leader.ID;
               serverIp = leader.Status?.Addr || "127.0.0.1";
             }
           }
         } catch {}
 
-        if (!serverId) {
-          serverId = "local";
-        }
+        // Always keep the sentinel so the deployment worker uses the local Docker socket.
+        serverId = "local";
 
         // Save serverId on resource
         await tx.resourceRepository.updateById(resource.id, {

@@ -2455,10 +2455,17 @@ async function reconcileQueues(): Promise<void> {
 }
 
 async function initializeMonitoring() {
-  const monitoringPath =
+  let monitoringPath =
     process.env.NODE_ENV === "production"
       ? "/app/apps/monitoring"
       : path.join(process.cwd(), "apps", "monitoring");
+
+  if (process.env.NODE_ENV !== "production" && !fs.existsSync(monitoringPath)) {
+    const alternativePath = path.join(process.cwd(), "..", "..", "apps", "monitoring");
+    if (fs.existsSync(alternativePath)) {
+      monitoringPath = alternativePath;
+    }
+  }
 
   if (!fs.existsSync(monitoringPath)) {
     log.error({ message: `Monitoring path not found: ${monitoringPath}` });
