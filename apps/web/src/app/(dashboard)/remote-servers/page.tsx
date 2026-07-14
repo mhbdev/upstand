@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CloudServerIcon,
   Delete02Icon,
   PlusSignIcon,
   ServerStack01Icon,
@@ -36,7 +37,10 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -242,28 +246,23 @@ export default function RemoteServersPage() {
 
   return (
     <DashboardPage>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-bold text-3xl tracking-tight">
-            Remote Servers
-            {typeof serverCount === "number" ? ` (${serverCount})` : ""}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Add isolated deployment servers for applications, databases, and
-            Compose workloads.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            resetForm();
-            setDialogOpen(true);
-          }}
-          className="gap-2 self-start sm:self-auto"
-        >
-          <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-          Create Server
-        </Button>
-      </div>
+      <DashboardPageHeader
+        title={typeof serverCount === "number" ? `Remote Servers (${serverCount})` : "Remote Servers"}
+        description="Add isolated deployment servers for applications, databases, and Compose workloads."
+        icon={<HugeiconsIcon icon={CloudServerIcon} className="size-6 text-primary" />}
+        actions={
+          <Button
+            onClick={() => {
+              resetForm();
+              setDialogOpen(true);
+            }}
+            className="gap-2 self-start sm:self-auto"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+            Create Server
+          </Button>
+        }
+      />
 
       {servers && servers.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

@@ -35,7 +35,10 @@ import { Textarea } from "@upstand/ui/components/textarea";
 import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -239,29 +242,24 @@ export default function SSHKeys(_props: {
   return (
     <DashboardPage>
       {/* Header */}
-      <div className="flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 font-bold text-2xl text-foreground">
-            <HugeiconsIcon icon={Key01Icon} className="size-6 text-primary" />
-            SSH Keys
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Create and manage SSH Keys to securely access your servers and Git
-            repositories.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            resetForm();
-            setAddKeyMode("generate");
-            setAddKeyOpen(true);
-          }}
-          className="gap-2 font-medium"
-        >
-          <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-          Add SSH Key
-        </Button>
-      </div>
+      <DashboardPageHeader
+        title="SSH Keys"
+        description="Create and manage SSH Keys to securely access your servers and Git repositories."
+        icon={<HugeiconsIcon icon={Key01Icon} className="size-6 text-primary" />}
+        actions={
+          <Button
+            onClick={() => {
+              resetForm();
+              setAddKeyMode("generate");
+              setAddKeyOpen(true);
+            }}
+            className="gap-2 font-medium"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+            Add SSH Key
+          </Button>
+        }
+      />
 
       {/* Main List */}
       {loadingKeys ? (

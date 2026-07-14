@@ -48,7 +48,10 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { SelfUpdateDialog } from "@/components/self-update-dialog";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
@@ -586,21 +589,11 @@ export default function WebServerDashboard(_props: {
   return (
     <DashboardPage>
       {/* Page Header */}
-      <div className="flex flex-col gap-4 border-border/40 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 font-bold text-2xl text-foreground">
-            <HugeiconsIcon
-              icon={ServerStack01Icon}
-              className="size-6 text-primary"
-            />
-            Web Server (Caddy)
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Configure dynamic domain routing, global SSL settings, ACME Let's
-            Encrypt certificates, and review live proxy access logs.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <DashboardPageHeader
+        title="Web Server (Caddy)"
+        description="Configure dynamic domain routing, global SSL settings, ACME Let's Encrypt certificates, and review proxy access logs."
+        icon={<HugeiconsIcon icon={ServerStack01Icon} className="size-6 text-primary" />}
+        actions={
           <Button
             variant="outline"
             size="sm"
@@ -613,8 +606,8 @@ export default function WebServerDashboard(_props: {
           >
             Refresh Status
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {loadingInfo ? (
         <div className="flex min-h-60 items-center justify-center">

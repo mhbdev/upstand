@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ContainerIcon,
   Database01Icon,
   Delete02Icon,
   Edit02Icon,
@@ -27,7 +28,10 @@ import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { useState } from "react";
 import { toast } from "sonner";
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -167,19 +171,17 @@ export default function DockerRegistryPage() {
 
   return (
     <DashboardPage>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-bold text-3xl tracking-tight">Docker Registry</h1>
-          <p className="text-muted-foreground text-sm">
-            Configure external Docker registries to publish and pull images
-            during deployments.
-          </p>
-        </div>
-        <Button onClick={openCreate} className="gap-2 self-start sm:self-auto">
-          <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-          Add External Registry
-        </Button>
-      </div>
+      <DashboardPageHeader
+        title="Docker Registry"
+        description="Configure external Docker registries to publish and pull images during deployments."
+        icon={<HugeiconsIcon icon={ContainerIcon} className="size-6 text-primary" />}
+        actions={
+          <Button onClick={openCreate} className="gap-2 font-medium">
+            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+            Add External Registry
+          </Button>
+        }
+      />
 
       {registries && registries.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

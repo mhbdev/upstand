@@ -9,7 +9,7 @@ import {
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
+
 import {
   GetUpdateStatusUseCaseToken,
   GetWebServerLogsUseCaseToken,
@@ -18,9 +18,9 @@ import {
   TriggerUpdateUseCaseToken,
   UpdateWebServerSettingsUseCaseToken,
 } from "../di";
-import { assertEnterpriseFeature } from "../enterprise";
+
 import { handleUseCaseError } from "../errors";
-import { publicProcedure, router, twoFactorVerifiedProcedure } from "../index";
+import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
 async function queueDockerCleanupNotification(publisher: {
@@ -380,23 +380,7 @@ async function getSecurityAudit(uow: IUnitOfWork) {
 }
 
 export const webServerRouter = router({
-  getPublicBranding: publicProcedure.query(async ({ ctx }) => {
-    const settings = await ctx.scope
-      .resolve(UnitOfWorkToken)
-      .webServerSettingsRepository.findGlobal();
-    return {
-      appName: settings?.appName ?? null,
-      appDescription: settings?.appDescription ?? null,
-      logoUrl: settings?.logoUrl ?? null,
-      faviconUrl: settings?.faviconUrl ?? null,
-      loginLogoUrl: settings?.loginLogoUrl ?? null,
-      supportUrl: settings?.supportUrl ?? null,
-      docsUrl: settings?.docsUrl ?? null,
-      metaTitle: settings?.metaTitle ?? null,
-      footerText: settings?.footerText ?? null,
-      customCss: settings?.customCss ?? null,
-    };
-  }),
+
 
   securityAudit: twoFactorVerifiedProcedure
     .input(z.object({ organizationId: z.string().min(1) }))
@@ -435,47 +419,7 @@ export const webServerRouter = router({
       }
     }),
 
-  updateBranding: twoFactorVerifiedProcedure
-    .input(
-      z.object({
-        organizationId: z.string().min(1),
-        appName: z.string().trim().max(128).nullable().optional(),
-        appDescription: z.string().trim().max(512).nullable().optional(),
-        logoUrl: z.string().url().nullable().optional(),
-        faviconUrl: z.string().url().nullable().optional(),
-        customCss: z.string().max(100_000).nullable().optional(),
-        loginLogoUrl: z.string().url().nullable().optional(),
-        supportUrl: z.string().url().nullable().optional(),
-        docsUrl: z.string().url().nullable().optional(),
-        metaTitle: z.string().trim().max(160).nullable().optional(),
-        footerText: z.string().trim().max(512).nullable().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const membership = await ensureOrganizationAccess(
-        ctx.session.user.id,
-        input.organizationId,
-      );
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "whitelabel",
-      );
-      if (membership.role !== "owner") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only the organization owner can update branding",
-        });
-      }
-      const { organizationId: _organizationId, ...branding } = input;
-      try {
-        return await ctx.scope
-          .resolve(UpdateWebServerSettingsUseCaseToken)
-          .execute(branding);
-      } catch (error) {
-        handleUseCaseError(error);
-      }
-    }),
+
 
   getLogs: twoFactorVerifiedProcedure
     .input(z.object({ tail: z.number().optional() }))
