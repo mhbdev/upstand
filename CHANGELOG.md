@@ -4,6 +4,15 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.35 - 2026-07-14
+
+### Changed
+
+- Add local E2E verification test pipeline suite (`e2e-local-test.ts`).
+- Fix local Swarm node auto-resolution behavior by introducing the `"local"` sentinel server ID.
+- Drop foreign key reference in `monitoring_settings.server_id` table to support local manager setup settings initialization.
+- Refactor Docker client with resilient local fallbacks.
+
 ## 0.1.34 - 2026-07-14
 
 ### Changed
