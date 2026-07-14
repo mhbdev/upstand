@@ -38,6 +38,14 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { authClient } from "@/lib/auth-client";
@@ -606,19 +614,31 @@ function ContainerTerminalDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap gap-2">
-          <select
-            aria-label="SSH key"
-            className="h-9 min-w-56 rounded-md border bg-background px-3 text-sm"
-            value={keyId}
-            onChange={(event) => setKeyId(event.target.value)}
+          <Select
+            items={[
+              { value: "_none", label: "Select SSH key" },
+              ...keys.map((key) => ({
+                value: key.id,
+                label: `${key.name} · ${key.fingerprint}`,
+              })),
+            ]}
+            value={keyId || "_none"}
+            onValueChange={(val) => setKeyId(val === "_none" || !val ? "" : val)}
           >
-            <option value="">Select SSH key</option>
-            {keys.map((key) => (
-              <option key={key.id} value={key.id}>
-                {key.name} · {key.fingerprint}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="min-w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="_none">Select SSH key</SelectItem>
+                {keys.map((key) => (
+                  <SelectItem key={key.id} value={key.id}>
+                    {key.name} · {key.fingerprint}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <Button onClick={connect} disabled={connecting || connected}>
             {connecting ? "Connecting…" : "Connect"}
           </Button>

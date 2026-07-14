@@ -22,6 +22,14 @@ import { Textarea } from "@upstand/ui/components/textarea";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
+import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
@@ -426,39 +434,65 @@ export default function TemplatesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm">
-              <span>Project</span>
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3"
-                value={projectId}
-                onChange={(event) => {
-                  setProjectId(event.target.value);
+            <label className="space-y-2 text-sm flex flex-col">
+              <span className="mb-1">Project</span>
+              <Select
+                items={[
+                  { value: "_none", label: "Select project" },
+                  ...(projects.data ?? []).map((project) => ({
+                    value: project.id,
+                    label: project.name,
+                  })),
+                ]}
+                value={projectId || "_none"}
+                onValueChange={(val) => {
+                  setProjectId(val === "_none" || !val ? "" : val);
                   setEnvironmentId("");
                 }}
               >
-                <option value="">Select project</option>
-                {(projects.data ?? []).map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="_none">Select project</SelectItem>
+                    {(projects.data ?? []).map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </label>
-            <label className="space-y-2 text-sm">
-              <span>Environment</span>
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3"
-                value={environmentId}
-                onChange={(event) => setEnvironmentId(event.target.value)}
+            <label className="space-y-2 text-sm flex flex-col">
+              <span className="mb-1">Environment</span>
+              <Select
+                items={[
+                  { value: "_none", label: "Select environment" },
+                  ...(environments.data ?? []).map((environment) => ({
+                    value: environment.id,
+                    label: environment.name,
+                  })),
+                ]}
+                value={environmentId || "_none"}
+                onValueChange={(val) => setEnvironmentId(val === "_none" || !val ? "" : val)}
                 disabled={!projectId}
               >
-                <option value="">Select environment</option>
-                {(environments.data ?? []).map((environment) => (
-                  <option key={environment.id} value={environment.id}>
-                    {environment.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="_none">Select environment</SelectItem>
+                    {(environments.data ?? []).map((environment) => (
+                      <SelectItem key={environment.id} value={environment.id}>
+                        {environment.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </label>
             <div className="space-y-2">
               <Label htmlFor="template-resource-name">Resource name</Label>

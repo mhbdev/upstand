@@ -117,27 +117,33 @@ export function MembersPanel() {
       name: "",
       email: "",
       password: "",
-      role: "member" as "member" | "admin",
+      role: "member" as string,
       emailChannelId: "",
       permissions: DEFAULT_MEMBER_CAPABILITIES,
     },
     onSubmit: async ({ value }) => {
+      const isCustom = value.role.startsWith("custom:");
+      const apiRole = (isCustom ? "member" : value.role) as "member" | "admin";
+      const customRoleId = isCustom ? value.role.slice("custom:".length) : undefined;
+
       if (mode === "create") {
         createMember({
           organizationId,
           email: value.email.trim(),
           name: value.name.trim(),
           password: value.password,
-          role: value.role,
+          role: apiRole,
           permissions: value.permissions,
+          customRoleId,
         });
       } else {
         inviteMember({
           organizationId,
           email: value.email.trim(),
-          role: value.role,
+          role: apiRole,
           permissions: value.permissions,
           emailChannelId: value.emailChannelId,
+          customRoleId,
         });
       }
     },
@@ -159,14 +165,22 @@ export function MembersPanel() {
     },
   });
 
-  const handleRoleChange = (roleVal: "member" | "admin") => {
+  const handleRoleChange = (roleVal: string) => {
     form.setFieldValue("role", roleVal);
-    form.setFieldValue(
-      "permissions",
-      roleVal === "admin"
-        ? MEMBER_CAPABILITIES.map(([key]) => key)
-        : DEFAULT_MEMBER_CAPABILITIES,
-    );
+    if (!roleVal.startsWith("custom:")) {
+      form.setFieldValue(
+        "permissions",
+        roleVal === "admin"
+          ? MEMBER_CAPABILITIES.map(([key]) => key)
+          : DEFAULT_MEMBER_CAPABILITIES,
+      );
+    } else {
+      const customId = roleVal.slice("custom:".length);
+      const selectedRole = customRolesQuery.data?.find((r) => r.id === customId);
+      if (selectedRole) {
+        form.setFieldValue("permissions", selectedRole.permissions as any);
+      }
+    }
   };
 
   if (!activeOrg) {
@@ -304,7 +318,7 @@ export function MembersPanel() {
                   <Select
                     value={field.state.value}
                     onValueChange={(val) =>
-                      handleRoleChange(val as "member" | "admin")
+                      handleRoleChange(val ?? "")
                     }
                   >
                     <SelectTrigger>
@@ -313,6 +327,11 @@ export function MembersPanel() {
                     <SelectContent>
                       <SelectItem value="member">Member</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
+                      {(customRolesQuery.data ?? []).map((role) => (
+                        <SelectItem key={role.id} value={`custom:${role.id}`}>
+                          {role.name} (Custom)
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </Field>

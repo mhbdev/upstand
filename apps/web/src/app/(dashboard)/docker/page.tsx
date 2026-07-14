@@ -14,6 +14,14 @@ import { Database, RefreshCw, Server, Terminal, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
+import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
@@ -203,36 +211,59 @@ export default function DockerInventoryPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-4">
-            <label className="space-y-1 text-sm">
-              <span className="text-muted-foreground">Docker target</span>
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3"
+            <label className="space-y-1 text-sm flex flex-col">
+              <span className="text-muted-foreground mb-1">Docker target</span>
+              <Select
+                items={[
+                  { value: "local", label: "Local Docker" },
+                  ...(serversQuery.data ?? []).map((server) => ({
+                    value: server.id,
+                    label: `${server.name} · ${server.ipAddress}`,
+                  })),
+                ]}
                 value={serverId}
-                onChange={(event) => setServerId(event.target.value)}
+                onValueChange={(val) => setServerId(val ?? "local")}
               >
-                <option value="local">Local Docker</option>
-                {(serversQuery.data ?? []).map((server) => (
-                  <option key={server.id} value={server.id}>
-                    {server.name} · {server.ipAddress}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="local">Local Docker</SelectItem>
+                    {(serversQuery.data ?? []).map((server) => (
+                      <SelectItem key={server.id} value={server.id}>
+                        {server.name} · {server.ipAddress}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </label>
-            <label className="space-y-1 text-sm">
-              <span className="text-muted-foreground">Resource</span>
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3"
+            <label className="space-y-1 text-sm flex flex-col">
+              <span className="text-muted-foreground mb-1">Resource</span>
+              <Select
+                items={kinds.map((item) => ({
+                  value: item,
+                  label: item,
+                }))}
                 value={kind}
-                onChange={(event) =>
-                  setKind(event.target.value as (typeof kinds)[number])
+                onValueChange={(val) =>
+                  setKind((val ?? "containers") as (typeof kinds)[number])
                 }
               >
-                {kinds.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {kinds.map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </label>
             {kind === "containers" ? (
               <Input
@@ -249,27 +280,47 @@ export default function DockerInventoryPage() {
               />
             )}
             {kind === "containers" ? (
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                value={state}
-                onChange={(event) => setState(event.target.value)}
-                aria-label="Container state"
-              >
-                <option value="">All states</option>
-                {[
-                  "created",
-                  "running",
-                  "paused",
-                  "restarting",
-                  "removing",
-                  "exited",
-                  "dead",
-                ].map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
+              <label className="space-y-1 text-sm flex flex-col">
+                <span className="text-muted-foreground mb-1">Container state</span>
+                <Select
+                  items={[
+                    { value: "_all", label: "All states" },
+                    ...[
+                      "created",
+                      "running",
+                      "paused",
+                      "restarting",
+                      "removing",
+                      "exited",
+                      "dead",
+                    ].map((s) => ({ value: s, label: s })),
+                  ]}
+                  value={state || "_all"}
+                  onValueChange={(val) => setState(val === "_all" || !val ? "" : val)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="_all">All states</SelectItem>
+                      {[
+                        "created",
+                        "running",
+                        "paused",
+                        "restarting",
+                        "removing",
+                        "exited",
+                        "dead",
+                      ].map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </label>
             ) : (
               <Input
                 value={serviceName}

@@ -40,6 +40,7 @@ import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -1548,19 +1549,31 @@ export default function WebServerDashboard(_props: {
                   <label htmlFor="auto-refresh-logs">Auto-refresh (5s)</label>
                 </div>
 
-                <select
-                  value={caddyLogsTail}
-                  onChange={(e) => {
-                    setCaddyLogsTail(Number(e.target.value));
+                <Select
+                  items={[
+                    { value: "50", label: "Last 50 lines" },
+                    { value: "100", label: "Last 100 lines" },
+                    { value: "200", label: "Last 200 lines" },
+                    { value: "500", label: "Last 500 lines" },
+                  ]}
+                  value={String(caddyLogsTail)}
+                  onValueChange={(val) => {
+                    setCaddyLogsTail(Number(val));
                     setTimeout(() => refetchCaddyLogs(), 50);
                   }}
-                  className="rounded-md border border-border/40 bg-card px-2.5 py-1 text-foreground text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <option value={50}>Last 50 lines</option>
-                  <option value={100}>Last 100 lines</option>
-                  <option value={200}>Last 200 lines</option>
-                  <option value={500}>Last 500 lines</option>
-                </select>
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="50">Last 50 lines</SelectItem>
+                      <SelectItem value="100">Last 100 lines</SelectItem>
+                      <SelectItem value="200">Last 200 lines</SelectItem>
+                      <SelectItem value="500">Last 500 lines</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
 
                 <Button
                   variant="outline"
@@ -1614,18 +1627,29 @@ export default function WebServerDashboard(_props: {
                 />
                 <label htmlFor="auto-refresh-server">Auto-refresh (5s)</label>
               </div>
-              <select
-                value={serverLogsTail}
-                onChange={(e) => {
-                  setServerLogsTail(Number(e.target.value));
+              <Select
+                items={[
+                  { value: "50", label: "Last 50 lines" },
+                  { value: "100", label: "Last 100 lines" },
+                  { value: "200", label: "Last 200 lines" },
+                ]}
+                value={String(serverLogsTail)}
+                onValueChange={(val) => {
+                  setServerLogsTail(Number(val));
                   setTimeout(() => refetchServerLogs(), 50);
                 }}
-                className="rounded-md border border-border/40 bg-card px-2 py-0.5 text-foreground text-xs"
               >
-                <option value={50}>Last 50 lines</option>
-                <option value={100}>Last 100 lines</option>
-                <option value={200}>Last 200 lines</option>
-              </select>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="50">Last 50 lines</SelectItem>
+                    <SelectItem value="100">Last 100 lines</SelectItem>
+                    <SelectItem value="200">Last 200 lines</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
               <Button
                 variant="outline"
                 size="sm"
