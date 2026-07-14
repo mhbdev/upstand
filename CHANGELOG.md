@@ -4,6 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.36 - 2026-07-14
+
+### Changed
+
+- Refactor native select dropdowns to use the customized Shadcn/base-ui `Select` component across the application.
+- Fix Custom Roles dropdown selection mapping in the workspace membership panel.
+- Merge the standardized UI layout branch, introducing the unified layout header and structured sidebar navigation.
+
 ## 0.1.35 - 2026-07-14
 
 ### Changed
