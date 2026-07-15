@@ -27,8 +27,6 @@ export const CreateAuditLogUseCaseToken =
 export const ListAuditLogsUseCaseToken =
   createToken<UseCases.ListAuditLogsUseCase>("ListAuditLogsUseCase");
 
-export const CreateUserUseCaseToken =
-  createToken<UseCases.CreateUserUseCase>("CreateUserUseCase");
 export const CreateProjectUseCaseToken =
   createToken<UseCases.CreateProjectUseCase>("CreateProjectUseCase");
 export const GetProjectsUseCaseToken =

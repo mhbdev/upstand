@@ -69,7 +69,6 @@ import {
   CreateSshKeyUseCase,
   CreateTagUseCase,
   CreateTemplateUseCase,
-  CreateUserUseCase,
   CreateWebServerBackupScheduleUseCase,
   configureDockerInfrastructure,
   configureMonitoringAgent,
@@ -200,7 +199,6 @@ import {
   CreateSshKeyUseCaseToken,
   CreateTagUseCaseToken,
   CreateTemplateUseCaseToken,
-  CreateUserUseCaseToken,
   CreateWebServerBackupScheduleUseCaseToken,
   DatabaseCommandUseCaseToken,
   DeleteBackupScheduleUseCaseToken,
@@ -420,10 +418,6 @@ services.addTransient(
 );
 
 // 4. Use Cases (transient)
-services.addTransient(CreateUserUseCaseToken, (c) => {
-  const uow = c.resolve(UnitOfWorkToken);
-  return new CreateUserUseCase(uow);
-});
 services.addTransient(
   CreateProjectUseCaseToken,
   (c) => new CreateProjectUseCase(c.resolve(UnitOfWorkToken)),

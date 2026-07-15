@@ -1,6 +1,3 @@
-import { CreateUserInputSchema } from "@upstand/usecases";
-import { CreateUserUseCaseToken } from "@upstand/usecases/tokens";
-import { handleUseCaseError } from "../errors";
 import { protectedProcedure, publicProcedure, router } from "../index";
 import { aiRouter } from "./ai.router";
 import { apiKeyRouter } from "./api-key.router";
@@ -32,7 +29,6 @@ import { ssoRouter } from "./sso.router";
 import { swarmRouter } from "./swarm.router";
 import { tagRouter } from "./tag.router";
 import { templateRouter } from "./template.router";
-import { userRouter } from "./user.router";
 import { webServerRouter } from "./web-server.router";
 
 export const appRouter = router({
@@ -45,17 +41,6 @@ export const appRouter = router({
       user: ctx.session.user,
     };
   }),
-  createUser: publicProcedure
-    .input(CreateUserInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const useCase = ctx.scope.resolve(CreateUserUseCaseToken);
-      try {
-        return await useCase.execute(input);
-      } catch (error) {
-        handleUseCaseError(error);
-      }
-    }),
-  user: userRouter,
   project: projectRouter,
   environment: environmentRouter,
   resource: resourceRouter,

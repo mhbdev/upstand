@@ -39,8 +39,6 @@ describe("API router contract", () => {
     const expectedRouters = [
       "healthCheck",
       "privateData",
-      "createUser",
-      "user",
       "project",
       "environment",
       "resource",
@@ -92,5 +90,10 @@ describe("API router contract", () => {
     const branches = new Set(paths.map((path) => path.split(".")[0]));
     expect(branches.size).toBe(Object.keys(root).length);
     expect(paths.length).toBeGreaterThan(150);
+  });
+
+  test("does not expose direct user creation procedures", () => {
+    expect(collectProcedurePaths(root)).not.toContain("createUser");
+    expect(collectProcedurePaths(root)).not.toContain("user.create");
   });
 });
