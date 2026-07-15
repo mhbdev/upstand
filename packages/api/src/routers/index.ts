@@ -1,5 +1,5 @@
 import { CreateUserInputSchema } from "@upstand/usecases";
-import { CreateUserUseCaseToken } from "../di";
+import { CreateUserUseCaseToken } from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { protectedProcedure, publicProcedure, router } from "../index";
 import { aiRouter } from "./ai.router";

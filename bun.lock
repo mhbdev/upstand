@@ -169,6 +169,7 @@
         "@upstand/auth": "workspace:*",
         "@upstand/db": "workspace:*",
         "@upstand/domain": "workspace:*",
+        "@upstand/infrastructure": "workspace:*",
         "@upstand/platform": "workspace:*",
         "@upstand/redis": "workspace:*",
         "@upstand/repositories": "workspace:*",
@@ -193,6 +194,7 @@
         "@upstand/db": "workspace:*",
         "@upstand/domain": "workspace:*",
         "@upstand/env": "workspace:*",
+        "@upstand/infrastructure": "workspace:*",
         "@upstand/redis": "workspace:*",
         "@upstand/usecases": "workspace:*",
         "better-auth": "catalog:",
@@ -206,6 +208,10 @@
     "packages/config": {
       "name": "@upstand/config",
       "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
     },
     "packages/db": {
       "name": "@upstand/db",
@@ -245,6 +251,19 @@
       },
       "devDependencies": {
         "@types/bun": "catalog:",
+        "@upstand/config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/infrastructure": {
+      "name": "@upstand/infrastructure",
+      "dependencies": {
+        "@upstand/domain": "workspace:*",
+        "@upstand/usecases": "workspace:*",
+        "nodemailer": "^9.0.3",
+      },
+      "devDependencies": {
+        "@types/nodemailer": "^8.0.1",
         "@upstand/config": "workspace:*",
         "typescript": "catalog:",
       },
@@ -330,14 +349,12 @@
         "croner": "^10.0.1",
         "dockerode": "^5.0.1",
         "evlog": "catalog:",
-        "nodemailer": "^9.0.3",
         "ssh2": "^1.17.0",
         "yaml": "^2.9.0",
         "zod": "catalog:",
       },
       "devDependencies": {
         "@types/dockerode": "^4.0.1",
-        "@types/nodemailer": "^8.0.1",
         "@types/ssh2": "^1.15.5",
         "@upstand/config": "workspace:*",
         "typescript": "catalog:",
@@ -1368,6 +1385,8 @@
     "@upstand/domain": ["@upstand/domain@workspace:packages/domain"],
 
     "@upstand/env": ["@upstand/env@workspace:packages/env"],
+
+    "@upstand/infrastructure": ["@upstand/infrastructure@workspace:packages/infrastructure"],
 
     "@upstand/platform": ["@upstand/platform@workspace:packages/platform"],
 

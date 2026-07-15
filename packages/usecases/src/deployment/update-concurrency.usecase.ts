@@ -37,6 +37,11 @@ export class UpdateConcurrencyUseCase {
           "Build server is not part of the active organization",
         );
       }
+      if (server.serverType === "database") {
+        throw new ValidationError(
+          "Database servers cannot be used for application build concurrency",
+        );
+      }
     }
 
     const settings = await this.uow.transaction(async (tx) => {

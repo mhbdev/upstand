@@ -17,6 +17,11 @@ import {
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
+import {
+  assertBuildServerSupportsResource,
+  assertDeploymentServerSupportsResource,
+  assertResourceCanUseBuildServer,
+} from "../server/server-role";
 import { validateLibsqlSettings } from "./libsql-settings";
 import { serializeResourceCredentials } from "./resource-credentials";
 import { serializeResourceEnvironmentVariables } from "./resource-environment";
@@ -172,6 +177,10 @@ export class CreateResourceUseCase {
         }
       }
 
+      if (input.buildServerId) {
+        assertResourceCanUseBuildServer(input.type);
+      }
+
       if (
         [input.serverId, input.buildServerId].some(
           (serverId) => serverId && !["local", "manager"].includes(serverId),
@@ -183,15 +192,25 @@ export class CreateResourceUseCase {
         if (!project) {
           throw new ValidationError("Project not found");
         }
-        for (const serverId of [input.serverId, input.buildServerId]) {
-          if (!serverId || ["local", "manager"].includes(serverId)) continue;
+        const validateServer = async (
+          serverId: string | null | undefined,
+          assignment: "build" | "deployment",
+        ) => {
+          if (!serverId || ["local", "manager"].includes(serverId)) return;
           const server = await tx.serverRepository.findById(serverId);
           if (!server || server.organizationId !== project.organizationId) {
             throw new ValidationError(
               "Selected server is not available to this organization",
             );
           }
-        }
+          if (assignment === "build") {
+            assertBuildServerSupportsResource(server, input.type);
+          } else {
+            assertDeploymentServerSupportsResource(server, input.type);
+          }
+        };
+        await validateServer(input.serverId, "deployment");
+        await validateServer(input.buildServerId, "build");
       }
 
       const serviceKey = dockerServiceKey(input.appName);

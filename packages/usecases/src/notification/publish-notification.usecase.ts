@@ -81,4 +81,6 @@ export class PublishNotificationUseCase {
   }
 }
 
+export type NotificationPublisher = Pick<PublishNotificationUseCase, "execute">;
+
 export { NOTIFICATION_DELIVERY_QUEUE };

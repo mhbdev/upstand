@@ -5,35 +5,32 @@ import {
   AccessLogQuerySchema,
   aggregateAccessLogStats,
   getDockerInstance,
-  PublishNotificationUseCaseToken,
+  type NotificationPublisher,
   queryAccessLogEntries,
   TriggerUpdateInputSchema,
   UpdateWebServerSettingsInputSchema,
 } from "@upstand/usecases";
-import { CaddyServiceToken, UnitOfWorkToken } from "@upstand/usecases/tokens";
-import { log } from "evlog";
-import { z } from "zod";
-
 import {
+  CaddyServiceToken,
   GetUpdateStatusUseCaseToken,
   GetWebServerLogsUseCaseToken,
   GetWebServerSettingsUseCaseToken,
+  PublishNotificationUseCaseToken,
   ReloadWebServerUseCaseToken,
   TriggerUpdateUseCaseToken,
+  UnitOfWorkToken,
   UpdateWebServerSettingsUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { log } from "evlog";
+import { z } from "zod";
 
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
-async function queueDockerCleanupNotification(publisher: {
-  execute(input: {
-    event: "docker_cleanup_completed";
-    title: string;
-    message: string;
-  }): Promise<number>;
-}): Promise<void> {
+async function queueDockerCleanupNotification(
+  publisher: NotificationPublisher,
+): Promise<void> {
   await publisher
     .execute({
       event: "docker_cleanup_completed",
@@ -584,7 +581,7 @@ export const webServerRouter = router({
         input.organizationId,
         "server:delete",
       );
-      const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
       try {
         await uow.transaction(async (tx) => {
           const resources = await tx.resourceRepository.findMany();
@@ -815,7 +812,7 @@ export const webServerRouter = router({
 
   updateServerIp: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
     await requireActiveOrganizationPermission(ctx, "server:update");
-    const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+    const uow = ctx.scope.resolve(UnitOfWorkToken);
     try {
       const res = await fetch("https://api.ipify.org?format=json");
       const data = (await res.json()) as { ip: string };

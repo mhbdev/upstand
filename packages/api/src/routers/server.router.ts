@@ -14,8 +14,6 @@ import {
   UpdateMonitoringSettingsInputSchema,
   UpdateServerInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
-import { z } from "zod";
 import {
   CreateServerUseCaseToken,
   DeleteServerUseCaseToken,
@@ -26,9 +24,11 @@ import {
   GetServersUseCaseToken,
   GetServerUseCaseToken,
   SetupServerUseCaseToken,
+  UnitOfWorkToken,
   UpdateMonitoringSettingsUseCaseToken,
   UpdateServerUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
@@ -212,6 +212,7 @@ export const serverRouter = router({
       );
       return {
         serverId: input.serverId,
+        isConfigured: Boolean(settings),
         cpuThreshold: settings?.cpuThreshold ?? 90,
         memoryThreshold: settings?.memoryThreshold ?? 90,
       };

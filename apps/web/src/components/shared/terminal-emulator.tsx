@@ -2,22 +2,59 @@
 
 import { useEffect, useRef } from "react";
 import "@xterm/xterm/css/xterm.css";
+import { getServerUrl } from "@/lib/server-url";
 
 interface TerminalEmulatorProps {
   token: string;
-  onClose?: () => void;
+  onReady?: () => void;
+  onClose?: (reason?: string) => void;
 }
 
-export function TerminalEmulator({ token, onClose }: TerminalEmulatorProps) {
+type TerminalControlMessage =
+  | { type: "terminal.ready" }
+  | { type: "terminal.error"; message: string };
+
+function getTerminalSocketUrl(token: string): string {
+  const url = new URL("/api/terminal/connect", getServerUrl());
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("token", token);
+  return url.toString();
+}
+
+function parseControlMessage(data: string): TerminalControlMessage | null {
+  try {
+    const message = JSON.parse(data) as Partial<TerminalControlMessage>;
+    if (message.type === "terminal.ready") return { type: message.type };
+    if (
+      message.type === "terminal.error" &&
+      typeof message.message === "string"
+    ) {
+      return { type: message.type, message: message.message };
+    }
+  } catch {
+    // Regular terminal output is sent as binary, but preserve unexpected text.
+  }
+  return null;
+}
+
+export function TerminalEmulator({
+  token,
+  onReady,
+  onClose,
+}: TerminalEmulatorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onReadyRef = useRef(onReady);
   const onCloseRef = useRef(onClose);
 
   useEffect(() => {
+    onReadyRef.current = onReady;
     onCloseRef.current = onClose;
-  }, [onClose]);
+  }, [onClose, onReady]);
 
   useEffect(() => {
     let isMounted = true;
+    let closingIntentionally = false;
+    let connectionError: string | undefined;
     let ws: WebSocket | null = null;
     let termInstance: any = null;
     let resizeObserver: ResizeObserver | null = null;
@@ -68,28 +105,24 @@ export function TerminalEmulator({ token, onClose }: TerminalEmulatorProps) {
 
       termInstance = term;
 
-      // Connect to WebSocket session
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsHost = window.location.host;
-
-      const apiBase = process.env.NEXT_PUBLIC_SERVER_URL || "";
-      let wsUrlString = "";
-      if (apiBase) {
-        const apiBaseUrl = new URL(apiBase);
-        const wsProtocol = apiBaseUrl.protocol === "https:" ? "wss:" : "ws:";
-        wsUrlString = `${wsProtocol}//${apiBaseUrl.host}/api/terminal/connect?token=${encodeURIComponent(token)}`;
-      } else {
-        wsUrlString = `${protocol}//${wsHost}/api/terminal/connect?token=${encodeURIComponent(token)}`;
-      }
-
-      ws = new WebSocket(wsUrlString);
+      ws = new WebSocket(getTerminalSocketUrl(token));
       ws.binaryType = "arraybuffer";
 
-      ws.onopen = () => {
-        term.write("\x1b[1;32mConnected to interactive session.\x1b[0m\r\n");
-      };
-
       ws.onmessage = async (event) => {
+        if (typeof event.data === "string") {
+          const controlMessage = parseControlMessage(event.data);
+          if (controlMessage?.type === "terminal.ready") {
+            term.focus();
+            onReadyRef.current?.();
+            return;
+          }
+          if (controlMessage?.type === "terminal.error") {
+            connectionError = controlMessage.message;
+            term.write(`\r\n\x1b[1;31m[${controlMessage.message}]\x1b[0m\r\n`);
+            return;
+          }
+        }
+
         const text =
           typeof event.data === "string"
             ? event.data
@@ -106,10 +139,10 @@ export function TerminalEmulator({ token, onClose }: TerminalEmulatorProps) {
       };
 
       ws.onclose = (e) => {
-        term.write(
-          `\r\n\x1b[1;31m[Disconnected: ${e.reason || "SSH session closed"}]\x1b[0m\r\n`,
-        );
-        onCloseRef.current?.();
+        if (closingIntentionally || !isMounted) return;
+        const reason = connectionError || e.reason || "SSH session closed";
+        term.write(`\r\n\x1b[1;31m[Disconnected: ${reason}]\x1b[0m\r\n`);
+        onCloseRef.current?.(reason);
       };
 
       term.onData((data) => {
@@ -129,10 +162,16 @@ export function TerminalEmulator({ token, onClose }: TerminalEmulatorProps) {
       resizeObserver.observe(containerRef.current);
     }
 
-    initTerminal();
+    initTerminal().catch((error) => {
+      if (!isMounted) return;
+      onCloseRef.current?.(
+        error instanceof Error ? error.message : "Unable to start terminal",
+      );
+    });
 
     return () => {
       isMounted = false;
+      closingIntentionally = true;
       if (ws) {
         ws.close();
       }

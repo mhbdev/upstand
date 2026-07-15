@@ -1,17 +1,28 @@
 import { z } from "zod";
 
+export const ServerTypeSchema = z.enum(["deploy", "build", "database"]);
+export type ServerType = z.infer<typeof ServerTypeSchema>;
+
+export const ServerStatusSchema = z.enum([
+  "idle",
+  "setting_up",
+  "ready",
+  "failed",
+]);
+export type ServerStatus = z.infer<typeof ServerStatusSchema>;
+
 export const ServerSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
   name: z.string(),
   description: z.string().nullable().optional(),
-  serverType: z.string(), // 'deploy' | 'database'
+  serverType: ServerTypeSchema,
   sshKeyId: z.string().nullable().optional(),
   ipAddress: z.string(),
   port: z.number(),
   username: z.string(),
   enableDockerCleanup: z.boolean(),
-  status: z.string(), // 'idle' | 'setting_up' | 'ready' | 'failed'
+  status: ServerStatusSchema,
   setupError: z.string().nullable().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -24,12 +35,12 @@ export interface CreateServerDTO {
   organizationId: string;
   name: string;
   description?: string | null;
-  serverType: string;
+  serverType: ServerType;
   sshKeyId?: string | null;
   ipAddress: string;
   port: number;
   username: string;
   enableDockerCleanup?: boolean;
-  status?: string;
+  status?: ServerStatus;
   setupError?: string | null;
 }

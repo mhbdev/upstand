@@ -286,7 +286,7 @@ export default function DashboardLayout({
         onOpenChange={setCreateOrgOpen}
       />
       <SettingsDialog />
-      <UpGalChat organizationId={activeOrg?.id} />
+      <UpGalChat organizationId={activeOrg?.id} pageTitle={currentNav?.title} />
     </SidebarProvider>
   );
 }

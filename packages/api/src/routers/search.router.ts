@@ -1,5 +1,5 @@
 import { GlobalSearchInputSchema } from "@upstand/usecases";
-import { GlobalSearchUseCaseToken } from "../di";
+import { GlobalSearchUseCaseToken } from "@upstand/usecases/tokens";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 

@@ -4,6 +4,40 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.41 - 2026-07-15
+
+### Changed
+
+- Require a complete GitHub release manifest containing verified server, web, and documentation image digests before showing an available update.
+- Publish the release manifest only after all three GHCR images have been pushed successfully.
+
+### Fixed
+
+- Include the infrastructure workspace package in every Docker build context so release image builds resolve all workspace dependencies.
+
+## 0.1.40 - 2026-07-15
+
+### Added
+
+- Add direct parity coverage for shared Git-provider HTTP, Docker Compose transformation, database environment, and remote-server role behavior.
+- Add Caddy synchronization stage and duration diagnostics for production troubleshooting.
+
+### Changed
+
+- Refactor server lifecycle work into monitoring, cleanup, deployment, and self-update runtime modules.
+- Consolidate Git-provider HTTP handling, Docker Compose configuration helpers, Docker value helpers, and use-case test fixtures.
+- Make remote-server roles an explicit contract with role-specific setup: deploy hosts run Swarm, Caddy, and monitoring; build hosts run Docker and monitoring; database hosts run isolated Swarm and monitoring without a public edge.
+- Give UpGal trusted runtime context for the active user and dashboard page, alongside the active organization.
+- Replace all remaining ad-hoc DI `Symbol.for(...)` resolutions with exported composition tokens.
+
+### Fixed
+
+- Prevent duplicate monitoring-agent history requests while local monitoring is still being configured, and show Docker host identity without waiting for historical samples.
+- Serialize Caddy configuration mutations across service instances, retain atomic rollback, and log the failed stage and elapsed time for production diagnosis.
+- Reject invalid remote-server role changes, database build-concurrency settings, and deletion of a server that remains assigned to a resource.
+- Display managed database environment variables alongside editable resource variables without duplicating protected credentials at rest.
+- Remove dead dashboard helpers, a dead loader component, duplicate barrel exports, and stale Knip findings.
+
 ## 0.1.39 - 2026-07-15
 
 ### Added

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AI_PROVIDERS } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
-import { AIRepositoryToken } from "@upstand/repositories";
+import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
 import {
@@ -11,6 +11,7 @@ import {
   listProviderModels,
   testUpGalProvider,
 } from "../ai/upgal";
+import { UpGalPageContextSchema } from "../ai/upgal-page-context";
 import { protectedProcedure, router } from "../index";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
@@ -149,7 +150,11 @@ export const aiRouter = router({
     .input(
       z.object({
         organizationId: z.string().min(1),
-        context: z.record(z.string(), z.json()).optional(),
+        context: z
+          .object({
+            page: UpGalPageContextSchema,
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

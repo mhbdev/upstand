@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type IUnitOfWork, ValidationError } from "@upstand/domain";
+import { ValidationError } from "@upstand/domain";
+import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { CreateEnvironmentUseCase } from "./create-environment.usecase";
 import { DeleteEnvironmentUseCase } from "./delete-environment.usecase";
 
@@ -34,41 +35,12 @@ class MockEnvironmentRepository {
   }
 }
 
-class MockUnitOfWork implements IUnitOfWork {
-  public readonly tagRepository = {} as any;
-  public readonly templateRepository = {} as any;
-  public readonly auditLogRepository = {} as any;
-  public readonly backupScheduleRepository = {} as any;
-  public readonly backupRunRepository = {} as any;
-  public readonly certificateRepository = {} as any;
-  public readonly environmentRepository =
-    new MockEnvironmentRepository() as any;
-  public readonly projectRepository = {} as any;
-  public readonly userRepository = {} as any;
-  public readonly resourceRepository = {} as any;
-  public readonly sshKeyRepository = {} as any;
-  public readonly gitProviderRepository = {} as any;
-  public readonly webServerSettingsRepository = {} as any;
-  public readonly s3DestinationRepository = {} as any;
-  public readonly serverBuildSettingsRepository = {} as any;
-  public readonly deploymentRepository = {} as any;
-  public readonly dockerRegistryRepository = {} as any;
-  public readonly serverRepository = {} as any;
-  public readonly notificationChannelRepository = {} as any;
-  public readonly notificationDeliveryRepository = {} as any;
-  public readonly monitoringSettingsRepository = {} as any;
-  public readonly previewDeploymentRepository = {} as any;
-  public readonly scheduleRepository = {} as any;
-
-  async transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T> {
-    return work(this);
-  }
-}
-
 describe("Environment Usecases", () => {
   test("creates a new environment with a slugified name", async () => {
-    const uow = new MockUnitOfWork();
-    const createUseCase = new CreateEnvironmentUseCase(uow as IUnitOfWork);
+    const uow = mockUnitOfWork({
+      environmentRepository: new MockEnvironmentRepository(),
+    });
+    const createUseCase = new CreateEnvironmentUseCase(uow);
 
     const env = await createUseCase.execute({
       projectId: "project-1",
@@ -83,9 +55,11 @@ describe("Environment Usecases", () => {
   });
 
   test("prevents deletion of default production environment", async () => {
-    const uow = new MockUnitOfWork();
-    const createUseCase = new CreateEnvironmentUseCase(uow as IUnitOfWork);
-    const deleteUseCase = new DeleteEnvironmentUseCase(uow as IUnitOfWork);
+    const uow = mockUnitOfWork({
+      environmentRepository: new MockEnvironmentRepository(),
+    });
+    const createUseCase = new CreateEnvironmentUseCase(uow);
+    const deleteUseCase = new DeleteEnvironmentUseCase(uow);
 
     const env = await createUseCase.execute({
       projectId: "project-1",
@@ -101,9 +75,11 @@ describe("Environment Usecases", () => {
   });
 
   test("prevents deletion when environment contains resources", async () => {
-    const uow = new MockUnitOfWork();
-    const createUseCase = new CreateEnvironmentUseCase(uow as IUnitOfWork);
-    const deleteUseCase = new DeleteEnvironmentUseCase(uow as IUnitOfWork);
+    const uow = mockUnitOfWork({
+      environmentRepository: new MockEnvironmentRepository(),
+    });
+    const createUseCase = new CreateEnvironmentUseCase(uow);
+    const deleteUseCase = new DeleteEnvironmentUseCase(uow);
 
     const env = await createUseCase.execute({
       projectId: "project-1",
@@ -119,9 +95,11 @@ describe("Environment Usecases", () => {
   });
 
   test("deletes empty, non-default environment successfully", async () => {
-    const uow = new MockUnitOfWork();
-    const createUseCase = new CreateEnvironmentUseCase(uow as IUnitOfWork);
-    const deleteUseCase = new DeleteEnvironmentUseCase(uow as IUnitOfWork);
+    const uow = mockUnitOfWork({
+      environmentRepository: new MockEnvironmentRepository(),
+    });
+    const createUseCase = new CreateEnvironmentUseCase(uow);
+    const deleteUseCase = new DeleteEnvironmentUseCase(uow);
 
     const env = await createUseCase.execute({
       projectId: "project-1",

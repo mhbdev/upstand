@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { requestJson } from "./http";
 
 export function signJwtRs256(
   payload: object,
@@ -46,7 +47,7 @@ export async function getInstallationToken(
 ): Promise<string> {
   const jwt = signJwtRs256({}, privateKeyPem, appId);
 
-  const response = await fetch(
+  const data = await requestJson<{ token: string }>(
     `https://api.github.com/app/installations/${installationId}/access_tokens`,
     {
       method: "POST",
@@ -56,14 +57,13 @@ export async function getInstallationToken(
         "User-Agent": "Upstand",
       },
     },
+    (response) =>
+      response
+        .text()
+        .then(
+          (errText) => `Failed to get GitHub installation token: ${errText}`,
+        ),
   );
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Failed to get GitHub installation token: ${errText}`);
-  }
-
-  const data = (await response.json()) as { token: string };
   return data.token;
 }
 
@@ -78,7 +78,14 @@ export async function getRepositories(
     installationId,
   );
 
-  const response = await fetch(
+  const data = await requestJson<{
+    repositories: {
+      id: number;
+      name: string;
+      full_name: string;
+      owner: { login: string };
+    }[];
+  }>(
     "https://api.github.com/installation/repositories?per_page=100",
     {
       headers: {
@@ -87,21 +94,11 @@ export async function getRepositories(
         "User-Agent": "Upstand",
       },
     },
+    (response) =>
+      response
+        .text()
+        .then((errText) => `Failed to fetch GitHub repositories: ${errText}`),
   );
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Failed to fetch GitHub repositories: ${errText}`);
-  }
-
-  const data = (await response.json()) as {
-    repositories: {
-      id: number;
-      name: string;
-      full_name: string;
-      owner: { login: string };
-    }[];
-  };
 
   return data.repositories.map((repo) => ({
     id: repo.id,
@@ -124,7 +121,7 @@ export async function getBranches(
     installationId,
   );
 
-  const response = await fetch(
+  const data = await requestJson<{ name: string }[]>(
     `https://api.github.com/repos/${owner}/${repo}/branches?per_page=100`,
     {
       headers: {
@@ -133,13 +130,10 @@ export async function getBranches(
         "User-Agent": "Upstand",
       },
     },
+    (response) =>
+      response
+        .text()
+        .then((errText) => `Failed to fetch GitHub branches: ${errText}`),
   );
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Failed to fetch GitHub branches: ${errText}`);
-  }
-
-  const data = (await response.json()) as { name: string }[];
   return data.map((b) => b.name);
 }

@@ -1,11 +1,7 @@
 import { ServiceCollection } from "@circulo-ai/di";
 import { db } from "@upstand/db";
+import { NotificationTransportRegistry } from "@upstand/infrastructure";
 import {
-  AIRepositoryToken,
-  BackupRunRepositoryToken,
-  BackupScheduleRepositoryToken,
-  CertificateRepositoryToken,
-  DbToken,
   DrizzleAIRepository,
   DrizzleBackupRunRepository,
   DrizzleBackupScheduleRepository,
@@ -24,6 +20,13 @@ import {
   DrizzleUnitOfWork,
   DrizzleUserRepository,
   DrizzleWebServerSettingsRepository,
+} from "@upstand/repositories";
+import {
+  AIRepositoryToken,
+  BackupRunRepositoryToken,
+  BackupScheduleRepositoryToken,
+  CertificateRepositoryToken,
+  DbToken,
   EnvironmentRepositoryToken,
   GitProviderRepositoryToken,
   MonitoringSettingsRepositoryToken,
@@ -37,12 +40,11 @@ import {
   TemplateRepositoryToken,
   UserRepositoryToken,
   WebServerSettingsRepositoryToken,
-} from "@upstand/repositories";
+} from "@upstand/repositories/tokens";
 import {
   AssignResourceTagUseCase,
   BackupScheduler,
   CaddyService,
-  CaddyServiceToken,
   ControlContainerUseCase,
   ControlResourceUseCase,
   CreateAuditLogUseCase,
@@ -82,7 +84,6 @@ import {
   DeployTemplateUseCase,
   DockerReadOnlyService,
   DockerService,
-  DockerServiceToken,
   DuplicateProjectUseCase,
   ExecuteBackupRunUseCase,
   GeneralScheduler,
@@ -134,7 +135,6 @@ import {
   ListResourceTagsUseCase,
   ListTagsUseCase,
   ListTemplatesUseCase,
-  NotificationTransportRegistry,
   PublishNotificationUseCase,
   RandomizeComposeUseCase,
   RebuildDatabaseUseCase,
@@ -175,6 +175,7 @@ import { GenerateSshKeyUseCase } from "@upstand/usecases/ssh-key/generate-ssh-ke
 import {
   AssignResourceTagUseCaseToken,
   BackupSchedulerToken,
+  CaddyServiceToken,
   ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
   CreateAuditLogUseCaseToken,
@@ -213,6 +214,7 @@ import {
   DeployResourceUseCaseToken,
   DeployTemplateUseCaseToken,
   DockerReadOnlyServiceToken,
+  DockerServiceToken,
   DuplicateProjectUseCaseToken,
   ExecuteBackupRunUseCaseToken,
   GeneralSchedulerToken,
@@ -303,10 +305,6 @@ import {
   UpdateWebServerSettingsUseCaseToken,
   ValidateDomainUseCaseToken,
 } from "@upstand/usecases/tokens";
-
-export * from "@upstand/repositories/tokens";
-export * from "@upstand/usecases/tokens";
-export { UnitOfWorkToken } from "@upstand/usecases/tokens";
 
 export const services = new ServiceCollection();
 

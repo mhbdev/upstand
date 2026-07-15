@@ -1,6 +1,6 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { decryptNotificationConfiguration } from "./notification-configuration";
-import type { NotificationTransport } from "./notification-transport";
+import type { NotificationTransport } from "./notification-transport.port";
 
 export class TestNotificationChannelUseCase {
   constructor(

@@ -1,7 +1,7 @@
 import { AUDIT_ACTIONS, AUDIT_RESOURCE_TYPES } from "@upstand/domain";
+import { ListAuditLogsUseCaseToken } from "@upstand/usecases/tokens";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
-import { ListAuditLogsUseCaseToken } from "../di";
 import { protectedProcedure, router } from "../index";
 
 const inputSchema = z.object({

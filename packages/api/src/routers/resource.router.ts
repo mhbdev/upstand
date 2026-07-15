@@ -14,6 +14,7 @@ import {
   GetResourceRoutingTargetsInputSchema,
   GetResourceStatsInputSchema,
   GetResourcesInputSchema,
+  getManagedDatabaseEnvironment,
   parseResourceEnvironmentVariables,
   QueueDeploymentUseCase,
   RandomizeComposeInputSchema,
@@ -23,7 +24,6 @@ import {
   resourceCredentialsJson,
   UpdateResourceInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   ControlContainerUseCaseToken,
   ControlResourceUseCaseToken,
@@ -44,15 +44,19 @@ import {
   RebuildDatabaseUseCaseToken,
   RollbackResourceUseCaseToken,
   RotateResourceWebhookTokenUseCaseToken,
+  UnitOfWorkToken,
   UpdateResourceUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
-function publicResource(
-  resource: Resource,
-): Omit<Resource, "webhookTokenHash" | "buildSecrets"> {
+function publicResource(resource: Resource): Omit<
+  Resource,
+  "webhookTokenHash" | "buildSecrets"
+> & {
+  managedEnvironment: Record<string, string>;
+} {
   const {
     webhookTokenHash: _webhookTokenHash,
     buildSecrets: _buildSecrets,
@@ -64,6 +68,10 @@ function publicResource(
     envVars: JSON.stringify(
       parseResourceEnvironmentVariables(resource.envVars),
     ),
+    managedEnvironment:
+      resource.type === "database"
+        ? getManagedDatabaseEnvironment(resource)
+        : {},
   };
 }
 

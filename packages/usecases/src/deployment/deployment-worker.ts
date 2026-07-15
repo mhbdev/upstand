@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { ServiceProvider } from "@circulo-ai/di";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
@@ -14,6 +15,10 @@ import {
 } from "../resource/docker-client";
 import { parseResourceCredentials } from "../resource/resource-credentials";
 import { parseResourceEnvironmentVariables } from "../resource/resource-environment";
+import {
+  assertBuildServerSupportsResource,
+  assertDeploymentServerSupportsResource,
+} from "../server/server-role";
 import {
   CaddyServiceToken,
   DockerServiceToken,
@@ -32,7 +37,10 @@ export class DeploymentWorker {
 
   constructor(
     private readonly serverId: string,
-    private readonly getServiceProvider: () => any, // Function to get the DI container
+    private readonly getServiceProvider: () => Pick<
+      ServiceProvider,
+      "createScope"
+    >,
   ) {}
 
   public async start(): Promise<void> {
@@ -49,7 +57,7 @@ export class DeploymentWorker {
     let concurrency = 2; // Default to 2 for manager/leader, 1 for workers
     const scope = this.getServiceProvider().createScope();
     try {
-      const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = scope.resolve(UnitOfWorkToken);
       const settings = await uow.serverBuildSettingsRepository.findById(
         this.serverId,
       );
@@ -231,9 +239,9 @@ export class DeploymentWorker {
     let dockerService: DockerService;
     let caddyService: CaddyService;
     try {
-      uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-      dockerService = scope.resolve(DockerServiceToken) as DockerService;
-      caddyService = scope.resolve(CaddyServiceToken) as CaddyService;
+      uow = scope.resolve(UnitOfWorkToken);
+      dockerService = scope.resolve(DockerServiceToken);
+      caddyService = scope.resolve(CaddyServiceToken);
     } catch (error) {
       await scope.dispose();
       await resourceLock.release();
@@ -252,16 +260,7 @@ export class DeploymentWorker {
       );
       if (!project) return;
 
-      const publisher = scope.resolve(PublishNotificationUseCaseToken) as {
-        execute: (input: {
-          organizationId: string;
-          idempotencyKey: string;
-          event: "deployment_succeeded" | "deployment_failed";
-          title: string;
-          message: string;
-          metadata: Record<string, unknown>;
-        }) => Promise<number>;
-      };
+      const publisher = scope.resolve(PublishNotificationUseCaseToken);
       const succeeded = status === "success";
       await publisher.execute({
         organizationId: project.organizationId,
@@ -474,6 +473,12 @@ export class DeploymentWorker {
               "Falling back to local Docker socket.\n",
           );
         } else {
+          assertDeploymentServerSupportsResource(server, deployedResource.type);
+          if (server.status !== "ready") {
+            throw new Error(
+              `Target deployment server '${server.name}' is not ready. Run server setup before deploying.`,
+            );
+          }
           if (!server.sshKeyId) {
             throw new Error(
               "Target deployment server has no SSH key configured",
@@ -518,6 +523,12 @@ export class DeploymentWorker {
           deployedResource.buildServerId,
         );
         if (!buildServer) throw new Error("Target build server not found");
+        assertBuildServerSupportsResource(buildServer, deployedResource.type);
+        if (buildServer.status !== "ready") {
+          throw new Error(
+            `Target build server '${buildServer.name}' is not ready. Run server setup before deploying.`,
+          );
+        }
         if (!buildServer.sshKeyId) {
           throw new Error("Target build server has no SSH key configured");
         }

@@ -497,19 +497,23 @@ export function generateCaddyfileContent(
 }
 
 export class CaddyService {
+  // Caddy configuration is file-backed. Remote operations construct a fresh
+  // service instance, so an instance lock cannot prevent concurrent writers.
+  // The control plane is the single configuration authority; serialize every
+  // mutation process-wide to retain the last complete, validated configuration.
+  private static configurationTail: Promise<void> = Promise.resolve();
   private readonly docker: Docker;
   private readonly networkName =
     process.env.DOCKER_NETWORK || "upstand-network";
-  private configurationTail: Promise<void> = Promise.resolve();
 
   constructor(docker: Docker = getDockerInstance()) {
     this.docker = docker;
   }
 
   private async serializeConfiguration<T>(work: () => Promise<T>): Promise<T> {
-    const previous = this.configurationTail;
+    const previous = CaddyService.configurationTail;
     let release: () => void = () => undefined;
-    this.configurationTail = new Promise<void>((resolve) => {
+    CaddyService.configurationTail = new Promise<void>((resolve) => {
       release = resolve;
     });
 
@@ -896,98 +900,126 @@ export class CaddyService {
       (route) => route.host,
     );
     let changed = false;
+    let stage = "initialize Caddy";
+    const startedAt = Date.now();
+    let desiredNetworkNames = new Set<string>();
 
-    await this.initializeCaddy(settings);
-    const desiredNetworkNames = await this.reconcileResourceNetworks(
-      resources,
-      certificates,
-    );
-    await this.serializeConfiguration(async () => {
-      const container = await this.findContainer();
-      if (!container) throw new Error("Caddy container is not available");
+    try {
+      await this.initializeCaddy(settings);
+      await this.serializeConfiguration(async () => {
+        stage = "reconcile resource networks";
+        desiredNetworkNames = await this.reconcileResourceNetworks(
+          resources,
+          certificates,
+        );
+        stage = "locate Caddy container";
+        const container = await this.findContainer();
+        if (!container) throw new Error("Caddy container is not available");
 
-      await this.writeCertificates(container, certificates);
+        stage = "write certificates";
+        await this.writeCertificates(container, certificates);
 
-      await this.writeFile(container, "Caddyfile.next", caddyfile);
+        stage = "write candidate Caddyfile";
+        await this.writeFile(container, "Caddyfile.next", caddyfile);
 
-      try {
-        await this.exec(container, [
-          "caddy",
-          "fmt",
-          "--overwrite",
-          CADDYFILE_CANDIDATE_PATH,
-        ]);
-        const [activeConfig, candidateConfig] = await Promise.all([
-          this.exec(container, ["cat", CADDYFILE_PATH]),
-          this.exec(container, ["cat", CADDYFILE_CANDIDATE_PATH]),
-        ]);
-        if (activeConfig === candidateConfig) {
-          await this.exec(container, [
-            "/bin/sh",
-            "-ec",
-            `rm -f ${CADDYFILE_CANDIDATE_PATH}`,
-          ]);
-          return;
-        }
-
-        changed = true;
-        await this.exec(container, [
-          "/bin/sh",
-          "-ec",
-          `cp ${CADDYFILE_PATH} ${CADDYFILE_BACKUP_PATH}`,
-        ]);
-        await this.exec(container, [
-          "caddy",
-          "validate",
-          "--config",
-          CADDYFILE_CANDIDATE_PATH,
-          "--adapter",
-          "caddyfile",
-        ]);
-        await this.exec(container, [
-          "/bin/sh",
-          "-ec",
-          `mv ${CADDYFILE_CANDIDATE_PATH} ${CADDYFILE_PATH}`,
-        ]);
-        await this.exec(container, [
-          "caddy",
-          "reload",
-          "--config",
-          CADDYFILE_PATH,
-          "--adapter",
-          "caddyfile",
-        ]);
-        await this.exec(container, [
-          "/bin/sh",
-          "-ec",
-          `rm -f ${CADDYFILE_BACKUP_PATH}`,
-        ]);
-      } catch (error) {
         try {
+          stage = "format candidate Caddyfile";
+          await this.exec(container, [
+            "caddy",
+            "fmt",
+            "--overwrite",
+            CADDYFILE_CANDIDATE_PATH,
+          ]);
+          stage = "compare active and candidate Caddyfiles";
+          const [activeConfig, candidateConfig] = await Promise.all([
+            this.exec(container, ["cat", CADDYFILE_PATH]),
+            this.exec(container, ["cat", CADDYFILE_CANDIDATE_PATH]),
+          ]);
+          if (activeConfig === candidateConfig) {
+            await this.exec(container, [
+              "/bin/sh",
+              "-ec",
+              `rm -f ${CADDYFILE_CANDIDATE_PATH}`,
+            ]);
+            return;
+          }
+
+          changed = true;
+          stage = "back up active Caddyfile";
           await this.exec(container, [
             "/bin/sh",
             "-ec",
-            `if [ -f ${CADDYFILE_BACKUP_PATH} ]; then mv ${CADDYFILE_BACKUP_PATH} ${CADDYFILE_PATH}; fi; rm -f ${CADDYFILE_CANDIDATE_PATH}`,
+            `cp ${CADDYFILE_PATH} ${CADDYFILE_BACKUP_PATH}`,
           ]);
-        } catch (rollbackError) {
-          log.error({
-            message:
-              "Failed to restore the last valid Caddyfile after an unsuccessful reload",
-            err:
-              rollbackError instanceof Error
-                ? rollbackError.message
-                : rollbackError,
-          });
+          stage = "validate candidate Caddyfile";
+          await this.exec(container, [
+            "caddy",
+            "validate",
+            "--config",
+            CADDYFILE_CANDIDATE_PATH,
+            "--adapter",
+            "caddyfile",
+          ]);
+          stage = "activate candidate Caddyfile";
+          await this.exec(container, [
+            "/bin/sh",
+            "-ec",
+            `mv ${CADDYFILE_CANDIDATE_PATH} ${CADDYFILE_PATH}`,
+          ]);
+          stage = "reload Caddy";
+          await this.exec(container, [
+            "caddy",
+            "reload",
+            "--config",
+            CADDYFILE_PATH,
+            "--adapter",
+            "caddyfile",
+          ]);
+          stage = "remove Caddyfile backup";
+          await this.exec(container, [
+            "/bin/sh",
+            "-ec",
+            `rm -f ${CADDYFILE_BACKUP_PATH}`,
+          ]);
+        } catch (error) {
+          try {
+            await this.exec(container, [
+              "/bin/sh",
+              "-ec",
+              `if [ -f ${CADDYFILE_BACKUP_PATH} ]; then mv ${CADDYFILE_BACKUP_PATH} ${CADDYFILE_PATH}; fi; rm -f ${CADDYFILE_CANDIDATE_PATH}`,
+            ]);
+          } catch (rollbackError) {
+            log.error({
+              message:
+                "Failed to restore the last valid Caddyfile after an unsuccessful reload",
+              err:
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : rollbackError,
+            });
+          }
+          throw error;
         }
-        throw error;
-      }
-    });
-    await this.detachStaleResourceNetworks(desiredNetworkNames);
+      });
+      stage = "detach stale resource networks";
+      await this.detachStaleResourceNetworks(desiredNetworkNames);
+    } catch (error) {
+      log.error({
+        message: "Caddy configuration synchronization failed",
+        stage,
+        durationMs: Date.now() - startedAt,
+        domainCount: new Set(domains).size,
+        resourceCount: resources.length,
+        err: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
 
     log.info({
       message: "Caddy configuration synchronized successfully.",
       domainCount: new Set(domains).size,
       changed,
+      durationMs: Date.now() - startedAt,
     });
     return { success: true, domains: [...new Set(domains)].sort(), changed };
   }

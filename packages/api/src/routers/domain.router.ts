@@ -1,7 +1,5 @@
-import {
-  ValidateDomainInputSchema,
-  ValidateDomainUseCaseToken,
-} from "@upstand/usecases";
+import { ValidateDomainInputSchema } from "@upstand/usecases";
+import { ValidateDomainUseCaseToken } from "@upstand/usecases/tokens";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 

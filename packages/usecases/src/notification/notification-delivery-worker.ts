@@ -1,6 +1,7 @@
 import { closeRedis, createRedis, type Redis } from "@upstand/redis";
 import { Worker } from "bullmq";
 import { log } from "evlog";
+import { DeliverNotificationUseCaseToken } from "../tokens";
 import { NOTIFICATION_DELIVERY_QUEUE } from "./publish-notification.usecase";
 
 export class NotificationDeliveryWorker {
@@ -29,9 +30,7 @@ export class NotificationDeliveryWorker {
 
           const scope = this.getServiceProvider().createScope();
           try {
-            const deliver = scope.resolve(
-              Symbol.for("DeliverNotificationUseCase"),
-            );
+            const deliver = scope.resolve(DeliverNotificationUseCaseToken);
             await deliver.execute(deliveryId);
           } finally {
             await scope.dispose();

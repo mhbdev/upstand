@@ -1,6 +1,5 @@
 import type { ServiceScope } from "@circulo-ai/di";
 import { TRPCError } from "@trpc/server";
-import type { IUnitOfWork } from "@upstand/domain";
 import {
   CreateBackupScheduleInputSchema,
   CreateWebServerBackupScheduleInputSchema,
@@ -13,8 +12,6 @@ import {
   TriggerBackupRunInputSchema,
   UpdateBackupScheduleInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
-import { z } from "zod";
 import {
   BackupSchedulerToken,
   CreateBackupScheduleUseCaseToken,
@@ -26,9 +23,11 @@ import {
   ListComposeServicesUseCaseToken,
   RestoreBackupRunUseCaseToken,
   TriggerBackupRunUseCaseToken,
+  UnitOfWorkToken,
   UpdateBackupScheduleUseCaseToken,
   UpdateWebServerBackupScheduleUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission, type PermissionAction } from "../permissions";
@@ -38,7 +37,7 @@ async function assertResourcePermission(
   resourceId: string,
   permission: PermissionAction,
 ) {
-  const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = ctx.scope.resolve(UnitOfWorkToken);
   const resource = await uow.resourceRepository.findById(resourceId);
   if (!resource) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Resource not found" });
@@ -77,7 +76,7 @@ async function assertWebServerSchedulePermission(
   scheduleId: string,
   permission: PermissionAction,
 ) {
-  const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = ctx.scope.resolve(UnitOfWorkToken);
   const schedule = await uow.backupScheduleRepository.findById(scheduleId);
   if (schedule?.kind !== "web-server") {
     throw new TRPCError({
@@ -98,9 +97,9 @@ export const backupRouter = router({
         input.organizationId,
         "backup:view",
       );
-      const schedules = await (
-        ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork
-      ).backupScheduleRepository.findByOrganizationId(input.organizationId);
+      const schedules = await ctx.scope
+        .resolve(UnitOfWorkToken)
+        .backupScheduleRepository.findByOrganizationId(input.organizationId);
       return schedules
         .filter((schedule) => schedule.kind === "web-server")
         .map(
@@ -122,12 +121,12 @@ export const backupRouter = router({
         input.organizationId,
         "backup:view",
       );
-      const runs = await (
-        ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork
-      ).backupRunRepository.findByOrganizationId(
-        input.organizationId,
-        input.limit,
-      );
+      const runs = await ctx.scope
+        .resolve(UnitOfWorkToken)
+        .backupRunRepository.findByOrganizationId(
+          input.organizationId,
+          input.limit,
+        );
       return runs.filter((run) => run.kind === "web-server");
     }),
 
@@ -223,7 +222,7 @@ export const backupRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
       const run = await uow.backupRunRepository.findById(input.runId);
       if (run?.kind !== "web-server") {
         throw new TRPCError({
@@ -314,7 +313,7 @@ export const backupRouter = router({
   updateSchedule: twoFactorVerifiedProcedure
     .input(UpdateBackupScheduleInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
       const schedule = await uow.backupScheduleRepository.findById(input.id);
       if (!schedule) {
         throw new TRPCError({
@@ -353,7 +352,7 @@ export const backupRouter = router({
   deleteSchedule: twoFactorVerifiedProcedure
     .input(DeleteBackupScheduleInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
       const schedule = await uow.backupScheduleRepository.findById(input.id);
       if (!schedule) {
         throw new TRPCError({
@@ -392,7 +391,7 @@ export const backupRouter = router({
   runNow: twoFactorVerifiedProcedure
     .input(TriggerBackupRunInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
       const schedule = await uow.backupScheduleRepository.findById(
         input.scheduleId,
       );
@@ -431,7 +430,7 @@ export const backupRouter = router({
   restore: twoFactorVerifiedProcedure
     .input(RestoreBackupRunInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
       const run = await uow.backupRunRepository.findById(input.runId);
       if (!run) {
         throw new TRPCError({

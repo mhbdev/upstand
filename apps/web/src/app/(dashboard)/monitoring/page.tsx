@@ -250,6 +250,13 @@ export default function MonitoringPage() {
     }),
     enabled: Boolean(activeOrganization?.id),
   });
+  const monitoringSettingsQuery = useQuery({
+    ...trpc.server.monitoringSettings.queryOptions({
+      organizationId: activeOrganization?.id ?? "",
+      serverId: selectedServerId,
+    }),
+    enabled: Boolean(activeOrganization?.id),
+  });
   const historicalQuery = useQuery({
     ...trpc.server.historicalMetrics.queryOptions({
       organizationId: activeOrganization?.id ?? "",
@@ -257,7 +264,9 @@ export default function MonitoringPage() {
       from: range.from,
       limit: range.limit,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled:
+      Boolean(activeOrganization?.id) &&
+      monitoringSettingsQuery.data?.isConfigured === true,
     refetchInterval: 30_000,
   });
   const containerQuery = useQuery({
@@ -268,7 +277,10 @@ export default function MonitoringPage() {
       from: range.from,
       limit: "1000",
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled:
+      Boolean(activeOrganization?.id) &&
+      monitoringSettingsQuery.data?.isConfigured === true &&
+      historicalQuery.isSuccess,
     refetchInterval: 30_000,
   });
   const runtimeQuery = useQuery({
@@ -278,13 +290,6 @@ export default function MonitoringPage() {
     }),
     enabled: Boolean(activeOrganization?.id),
     refetchInterval: 10_000,
-  });
-  const monitoringSettingsQuery = useQuery({
-    ...trpc.server.monitoringSettings.queryOptions({
-      organizationId: activeOrganization?.id ?? "",
-      serverId: selectedServerId,
-    }),
-    enabled: Boolean(activeOrganization?.id),
   });
   const updateMonitoringSettings = useMutation(
     trpc.server.updateMonitoringSettings.mutationOptions({
@@ -678,22 +683,26 @@ export default function MonitoringPage() {
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="text-muted-foreground text-xs">Operating system</p>
-            <p className="mt-1 font-medium">{latest?.os ?? "Unknown"}</p>
+            <p className="mt-1 font-medium">
+              {stats?.operatingSystem || latest?.os || "Unknown"}
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs">Kernel</p>
             <p className="mt-1 truncate font-medium" title={latest?.kernel}>
-              {latest?.kernel ?? "Unknown"}
+              {stats?.kernelVersion || latest?.kernel || "Unknown"}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs">Architecture</p>
-            <p className="mt-1 font-medium">{latest?.arch ?? "Unknown"}</p>
+            <p className="mt-1 font-medium">
+              {stats?.architecture || latest?.arch || "Unknown"}
+            </p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs">CPU model</p>
-            <p className="mt-1 truncate font-medium" title={latest?.cpuModel}>
-              {latest?.cpuModel ?? "Unknown"}
+            <p className="text-muted-foreground text-xs">Docker engine</p>
+            <p className="mt-1 truncate font-medium" title={stats?.serverName}>
+              {stats?.serverName || latest?.cpuModel || "Unknown"}
             </p>
           </div>
         </CardContent>

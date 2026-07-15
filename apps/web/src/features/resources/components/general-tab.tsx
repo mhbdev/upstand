@@ -61,17 +61,15 @@ import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const RAILPACK_VERSIONS = [
-  "0.15.4",
-  "0.16.0",
-  "0.17.0",
-  "0.18.0",
-  "0.19.0",
-  "0.20.0",
-  "0.21.0",
-  "0.22.0",
-  "0.23.0",
-] as const;
+import {
+  createBuildConfig,
+  type DatabaseCredentials,
+  parseApplicationBuildConfig,
+  parseDeployments,
+  parseResourceCredentials,
+  RAILPACK_VERSIONS,
+  type ResourceProvider,
+} from "./general-tab.helpers";
 
 interface GeneralTabProps {
   resource: any;
@@ -89,92 +87,6 @@ interface GeneralTabProps {
   deleteResource: any;
   isDeletingResource: boolean;
 }
-
-export type ResourceProvider =
-  | "docker"
-  | "github"
-  | "gitlab"
-  | "bitbucket"
-  | "gitea"
-  | "git"
-  | "raw"
-  | "drop";
-
-type DatabaseCredentials = Record<string, string>;
-
-const parseApplicationBuildConfig = (
-  value: string | null | undefined,
-): ApplicationBuildConfig => {
-  if (!value)
-    return {
-      type: "dockerfile",
-      buildPath: ".",
-      dockerfilePath: "Dockerfile",
-      dockerContextPath: ".",
-      dockerBuildArgs: {},
-      dockerNoCache: false,
-      dockerCleanupCache: false,
-    };
-  try {
-    return ApplicationBuildConfigSchema.parse(JSON.parse(value));
-  } catch {
-    return {
-      type: "dockerfile",
-      buildPath: ".",
-      dockerfilePath: "Dockerfile",
-      dockerContextPath: ".",
-      dockerBuildArgs: {},
-      dockerNoCache: false,
-      dockerCleanupCache: false,
-    };
-  }
-};
-
-const parseResourceCredentials = (value: string | null | undefined): any => {
-  if (!value) return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-};
-
-const parseDeployments = (value: string | null | undefined): any[] => {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const createBuildConfig = (
-  type: ApplicationBuildConfig["type"],
-): ApplicationBuildConfig => {
-  switch (type) {
-    case "dockerfile":
-      return {
-        type,
-        buildPath: ".",
-        dockerfilePath: "Dockerfile",
-        dockerContextPath: ".",
-        dockerBuildArgs: {},
-        dockerNoCache: false,
-        dockerCleanupCache: false,
-      };
-    case "railpack":
-      return { type, buildPath: ".", railpackVersion: "0.15.4" };
-    case "nixpacks":
-      return { type, buildPath: "." };
-    case "heroku-buildpacks":
-      return { type, buildPath: ".", herokuVersion: "24" };
-    case "paketo-buildpacks":
-      return { type, buildPath: "." };
-    case "static":
-      return { type, buildPath: ".", publishDirectory: "dist", spa: true };
-  }
-};
 
 export function GeneralTab({
   resource,

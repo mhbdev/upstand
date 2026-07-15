@@ -1,7 +1,14 @@
-import type { IUnitOfWork, Server } from "@upstand/domain";
+import {
+  type IUnitOfWork,
+  type Server,
+  ServerTypeSchema,
+  ValidationError,
+} from "@upstand/domain";
 import { z } from "zod";
-
-const ServerTypeSchema = z.string().trim().min(1).max(32);
+import {
+  assertBuildServerSupportsResource,
+  assertDeploymentServerSupportsResource,
+} from "./server-role";
 
 export const UpdateServerInputSchema = z.object({
   organizationId: z.string().min(1),
@@ -27,16 +34,42 @@ export class UpdateServerUseCase {
       throw new Error("Server not found");
     }
 
+    if (input.serverType && input.serverType !== current.serverType) {
+      const candidate = { ...current, serverType: input.serverType };
+      const resources = await this.uow.resourceRepository.findMany();
+      for (const resource of resources) {
+        if (resource.serverId === current.id) {
+          try {
+            assertDeploymentServerSupportsResource(candidate, resource.type);
+          } catch (error) {
+            throw new ValidationError(
+              `Cannot change this server to '${input.serverType}' while it hosts ${resource.type} resource '${resource.name}': ${error instanceof Error ? error.message : "unsupported assignment"}`,
+            );
+          }
+        }
+        if (resource.buildServerId === current.id) {
+          try {
+            assertBuildServerSupportsResource(candidate, resource.type);
+          } catch (error) {
+            throw new ValidationError(
+              `Cannot change this server to '${input.serverType}' while it builds resource '${resource.name}': ${error instanceof Error ? error.message : "unsupported assignment"}`,
+            );
+          }
+        }
+      }
+    }
+
     const { organizationId: _organizationId, id: _id, ...patch } = input;
-    const connectionChanged = [
+    const provisioningChanged = [
       "sshKeyId",
       "ipAddress",
       "port",
       "username",
+      "serverType",
     ].some((field) => field in input);
     const updated = await this.uow.serverRepository.updateById(
       input.id,
-      connectionChanged
+      provisioningChanged
         ? { ...patch, status: "idle", setupError: null }
         : patch,
     );

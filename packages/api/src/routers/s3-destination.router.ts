@@ -6,14 +6,14 @@ import {
   TestS3DestinationConnectionInputSchema,
   UpdateS3DestinationInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateS3DestinationUseCaseToken,
   DeleteS3DestinationUseCaseToken,
   GetS3DestinationsUseCaseToken,
   TestS3DestinationConnectionUseCaseToken,
+  UnitOfWorkToken,
   UpdateS3DestinationUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";

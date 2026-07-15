@@ -8,6 +8,7 @@ import { Client } from "ssh2";
 import { z } from "zod";
 import { createRemoteDocker } from "../resource/docker-client";
 import { CaddyService } from "../web-server/caddy.service";
+import { getServerProvisioningPlan } from "./server-role";
 
 interface CommandResult {
   code: number | null;
@@ -63,6 +64,7 @@ export class SetupServerUseCase {
     privateKey: string,
   ): Promise<{ success: boolean; message: string }> {
     const conn = new Client();
+    const plan = getServerProvisioningPlan(server.serverType);
 
     const executeCommandResult = (cmd: string): Promise<CommandResult> => {
       return new Promise((resolve, reject) => {
@@ -139,33 +141,6 @@ export class SetupServerUseCase {
         await privileged('usermod -aG docker "$USER"');
       }
 
-      // 2. Remote deployment servers are independent Docker environments.
-      // They must not join the control-plane Swarm. This mirrors Dokploy's
-      // remote-server model and keeps each server's scheduler and networking
-      // isolated from the control plane.
-      log.info({
-        message: `[Server Setup] Checking Swarm status on ${server.ipAddress}`,
-      });
-      const remoteDockerPrefix = sudo ? `${sudo} ` : "";
-      const remoteSwarmStatus = await executeCommand(
-        `${remoteDockerPrefix}docker info --format '{{.Swarm.LocalNodeState}}'`,
-      )
-        .then((status) => status.trim())
-        .catch(() => "inactive");
-
-      if (remoteSwarmStatus !== "active") {
-        log.info({
-          message: `[Server Setup] Initializing an independent Docker Swarm on ${server.ipAddress}...`,
-        });
-        await privileged(
-          `docker swarm init --advertise-addr ${shellQuote(server.ipAddress)}`,
-        );
-      }
-
-      await privileged(
-        "docker network inspect upstand-network >/dev/null 2>&1 || docker network create --driver overlay --attachable upstand-network",
-      );
-
       const remoteDocker = createRemoteDocker({
         host: server.ipAddress,
         port: server.port,
@@ -173,22 +148,55 @@ export class SetupServerUseCase {
         privateKey,
       });
       const remoteInfo = await remoteDocker.info();
-      if (remoteInfo.Swarm?.LocalNodeState !== "active") {
-        throw new Error(
-          `Remote Docker Swarm is not active after initialization (state: ${remoteInfo.Swarm?.LocalNodeState ?? "unknown"}).`,
+      if (plan.requiresSwarm) {
+        // Each deployment/database host owns an independent Swarm. It must
+        // never join the control-plane cluster because its resource network,
+        // scheduling, and failure domain are isolated from that control plane.
+        log.info({
+          message: `[Server Setup] Checking Swarm status on ${server.ipAddress}`,
+          serverType: server.serverType,
+        });
+        const remoteSwarmStatus =
+          remoteInfo.Swarm?.LocalNodeState ?? "inactive";
+        if (remoteSwarmStatus !== "active") {
+          log.info({
+            message: `[Server Setup] Initializing an independent Docker Swarm on ${server.ipAddress}...`,
+            serverType: server.serverType,
+          });
+          await privileged(
+            `docker swarm init --advertise-addr ${shellQuote(server.ipAddress)}`,
+          );
+        }
+
+        await privileged(
+          "docker network inspect upstand-network >/dev/null 2>&1 || docker network create --driver overlay --attachable upstand-network",
+        );
+
+        const initializedInfo = await remoteDocker.info();
+        if (initializedInfo.Swarm?.LocalNodeState !== "active") {
+          throw new Error(
+            `Remote Docker Swarm is not active after initialization (state: ${initializedInfo.Swarm?.LocalNodeState ?? "unknown"}).`,
+          );
+        }
+      } else {
+        log.info({
+          message: `[Server Setup] ${server.name} is a build server; Docker was verified without creating a Swarm or public edge.`,
+        });
+      }
+
+      if (plan.requiresCaddy) {
+        // Only deployment servers expose Caddy. Database servers deliberately
+        // have no edge proxy, so database credentials and ports stay private.
+        const webServerSettings =
+          await this.uow.webServerSettingsRepository.findGlobal();
+        await new CaddyService(remoteDocker).initializeCaddy(
+          webServerSettings ?? {},
         );
       }
 
-      // Caddy is installed on every deployment server, just like Dokploy's
-      // Traefik instance. Resource routing is synchronized during deployment.
-      const webServerSettings =
-        await this.uow.webServerSettingsRepository.findGlobal();
-      await new CaddyService(remoteDocker).initializeCaddy(
-        webServerSettings ?? {},
-      );
-
-      // Setup the Go monitoring agent container on the remote server
-      await this.setupMonitoringAgent(conn, server, privileged);
+      if (plan.requiresMonitoring) {
+        await this.setupMonitoringAgent(conn, server, privileged);
+      }
 
       log.info({
         message: `[Server Setup] Server ${server.name} set up successfully.`,

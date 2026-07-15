@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import {
   createHash,
   createHmac,
@@ -7,7 +6,6 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import type { ServiceScope } from "@circulo-ai/di";
 import { trpcServer } from "@hono/trpc-server";
@@ -23,6 +21,7 @@ import {
   type UpGalUIMessage,
   validateAndRecoverUpGalMessages,
 } from "@upstand/api/ai/upgal";
+import { UpGalPageContextSchema } from "@upstand/api/ai/upgal-page-context";
 import {
   authenticateApiKey,
   setApiKeyRateLimitHeaders,
@@ -35,17 +34,15 @@ import { auth } from "@upstand/auth";
 import { db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
 import { scimProvider } from "@upstand/db/schema/scim";
-import { type IUnitOfWork, isJsonObject } from "@upstand/domain";
+import { isJsonObject } from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";
-import { AIRepositoryToken } from "@upstand/repositories";
+import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import {
   AccessLogCleanupScheduler,
   BackupRunWorker,
   CaddyService,
-  DeploymentWorker,
-  DockerCleanupService,
   getDockerInstance,
   gitProviderOAuthStateKey,
   hashWebhookToken,
@@ -55,8 +52,6 @@ import {
   parseGitProviderOAuthState,
   parseResourceCredentials,
   QueueDeploymentUseCase,
-  reconcileQueuedJobs,
-  resolveDockerCliEnvironmentForServer,
   UploadDockerContainerInputSchema,
   UploadDockerVolumeInputSchema,
 } from "@upstand/usecases";
@@ -65,9 +60,8 @@ import {
   CreateGitProviderUseCaseToken,
   GeneralSchedulerToken,
   GetDockerInventoryUseCaseToken,
-  GetUpdateStatusUseCaseToken,
   GetWebServerSettingsUseCaseToken,
-  TriggerUpdateUseCaseToken,
+  PublishNotificationUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
 import { and, count, eq } from "drizzle-orm";
@@ -81,6 +75,10 @@ import { type Context, Hono } from "hono";
 import { upgradeWebSocket, websocket } from "hono/bun";
 import { cors } from "hono/cors";
 import { z } from "zod";
+import { AutoUpdateRuntime } from "./auto-update-runtime";
+import { DeploymentRuntime } from "./deployment-runtime";
+import { ScheduledDockerCleanup } from "./docker-cleanup-scheduler";
+import { initializeMonitoring } from "./monitoring-agent";
 import { runDatabaseMigrations } from "./startup";
 import { terminalBroker } from "./terminal-broker";
 
@@ -108,7 +106,7 @@ type AppEnv = EvlogVariables & {
 };
 
 const app = new Hono<AppEnv>();
-const deploymentWorkers = new Map<string, DeploymentWorker>();
+const deploymentRuntime = new DeploymentRuntime();
 const notificationWorker = new NotificationDeliveryWorker(
   () => serviceProvider,
 );
@@ -118,14 +116,8 @@ const generalScheduler = serviceProvider.resolve(GeneralSchedulerToken);
 const accessLogCleanupScheduler = new AccessLogCleanupScheduler(
   () => serviceProvider,
 );
-let deploymentWorkerRefresh: Promise<void> | null = null;
-let workerRefreshInterval: ReturnType<typeof setInterval> | null = null;
-let queueReconcileInterval: ReturnType<typeof setInterval> | null = null;
-let dockerCleanupTimer: ReturnType<typeof setInterval> | null = null;
-let lastDockerCleanupDate: string | null = null;
-const dockerCleanupService = new DockerCleanupService();
-let autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
-let autoUpdateInFlight = false;
+const scheduledDockerCleanup = new ScheduledDockerCleanup();
+const autoUpdateRuntime = new AutoUpdateRuntime();
 let shuttingDown = false;
 let caddyReady = false;
 
@@ -184,7 +176,7 @@ app.post("/api/terminal/session", async (c) => {
   }
 
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
   try {
     await checkPermission(
       session.user.id,
@@ -246,7 +238,7 @@ app.post("/api/container-terminal/session", async (c) => {
   }
 
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
   const resource = await uow.resourceRepository.findById(body.resourceId);
   if (!resource) return c.json({ error: "Resource not found" }, 404);
   const environment = await uow.environmentRepository.findById(
@@ -383,7 +375,7 @@ app.post("/api/docker/terminal/session", async (c) => {
   }
 
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
   const serverId =
     body.serverId && body.serverId !== "local" ? body.serverId : undefined;
   let host: string;
@@ -501,13 +493,14 @@ app.get(
               ),
             (message) => ws.close(1000, message),
           );
+          ws.send(JSON.stringify({ type: "terminal.ready" }));
         } catch (error) {
-          ws.close(
-            1011,
+          const message =
             error instanceof Error
               ? error.message
-              : "Terminal connection failed",
-          );
+              : "Terminal connection failed";
+          ws.send(JSON.stringify({ type: "terminal.error", message }));
+          ws.close(1011, "Terminal connection failed");
         }
       },
       onMessage: (event) => {
@@ -542,7 +535,7 @@ app.post("/api/monitoring/alerts", async (c) => {
   const { token, type, value, threshold, message } = body.json;
 
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
 
   const settings = await uow.monitoringSettingsRepository.findByToken(token);
 
@@ -568,16 +561,7 @@ app.post("/api/monitoring/alerts", async (c) => {
     threshold,
   });
 
-  const publisher = scope.resolve(Symbol.for("PublishNotificationUseCase")) as {
-    execute: (input: {
-      event: "server_threshold_alert";
-      organizationId?: string;
-      idempotencyKey: string;
-      title: string;
-      message: string;
-      metadata: Record<string, unknown>;
-    }) => Promise<number>;
-  };
+  const publisher = scope.resolve(PublishNotificationUseCaseToken);
 
   await publisher
     .execute({
@@ -617,7 +601,7 @@ app.post("/api/deploy/:token", async (c) => {
     return c.json({ error: "Invalid deployment webhook" }, 404);
   }
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
   const resource = await uow.resourceRepository.findByWebhookTokenHash(
     hashWebhookToken(token),
   );
@@ -684,7 +668,7 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
 
   const resourceId = c.req.param("resourceId");
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
 
   const resourceRecord = await uow.resourceRepository.findById(resourceId);
   if (!resourceRecord) return c.json({ error: "Resource not found" }, 404);
@@ -902,7 +886,7 @@ app.post("/api/docker/containers/:containerId/upload", async (c) => {
     }
   }
 
-  const uow = c.get("scope").resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = c.get("scope").resolve(UnitOfWorkToken);
   if (!resourceId) {
     const containerId = c.req.param("containerId");
     for (const candidate of await uow.resourceRepository.findMany()) {
@@ -1058,7 +1042,7 @@ app.post("/api/docker/containers/:containerId/upload", async (c) => {
 app.post("/api/webhooks/github/:providerId", async (c) => {
   const providerId = c.req.param("providerId");
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
 
   const provider = await uow.gitProviderRepository.findById(providerId);
   if (!provider) return c.json({ error: "Git provider not found" }, 404);
@@ -1300,7 +1284,7 @@ async function processNonGithubWebhook(
   if (!providerId) return c.json({ error: "Provider ID is required" }, 400);
   const bodyText = await c.req.text();
   const scope = c.get("scope");
-  const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+  const uow = scope.resolve(UnitOfWorkToken);
   const headers = {
     "x-gitlab-token": c.req.header("x-gitlab-token"),
     "x-hub-signature": c.req.header("x-hub-signature"),
@@ -1837,6 +1821,7 @@ app.post("/api/ai/chat", async (c) => {
     .object({
       organizationId: z.string().min(1),
       conversationId: z.string().min(1).optional(),
+      page: UpGalPageContextSchema.optional(),
       messages: z.unknown(),
     })
     .safeParse(await c.req.json().catch(() => null));
@@ -1854,15 +1839,20 @@ app.post("/api/ai/chat", async (c) => {
   if (body.conversationId && !ownedConversation)
     return c.json({ error: "Conversation not found" }, 404);
   if (!ownedConversation)
-    await c.get("scope").resolve(AIRepositoryToken).createConversation({
-      id: conversationId,
-      organizationId: body.organizationId,
-      userId: session.user.id,
-      context: {},
-    });
+    await c
+      .get("scope")
+      .resolve(AIRepositoryToken)
+      .createConversation({
+        id: conversationId,
+        organizationId: body.organizationId,
+        userId: session.user.id,
+        context: body.page ? { page: body.page } : {},
+      });
   const context = {
     organizationId: body.organizationId,
     userId: session.user.id,
+    userName: session.user.name?.trim() || undefined,
+    page: body.page,
     conversationId,
     runId: randomUUID(),
     scope: c.get("scope"),
@@ -2127,7 +2117,7 @@ app.get("/api/providers/github/setup", async (c) => {
     }
 
     try {
-      const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+      const uow = scope.resolve(UnitOfWorkToken);
       const provider = await uow.gitProviderRepository.findById(gitProviderId);
       if (!provider) {
         return c.text("Git Provider not found", 404);
@@ -2175,7 +2165,7 @@ app.get("/api/providers/gitlab/setup", async (c) => {
         400,
       );
     }
-    const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+    const uow = scope.resolve(UnitOfWorkToken);
     const provider = await uow.gitProviderRepository.findById(
       parsedState.providerId,
     );
@@ -2254,7 +2244,7 @@ app.get("/api/providers/gitea/setup", async (c) => {
         400,
       );
     }
-    const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
+    const uow = scope.resolve(UnitOfWorkToken);
     const provider = await uow.gitProviderRepository.findById(
       parsedState.providerId,
     );
@@ -2324,15 +2314,14 @@ app.get("/health/live", (c) => {
 
 app.get("/health/ready", async (c) => {
   const workersReady =
-    deploymentWorkers.size > 0 &&
-    [...deploymentWorkers.values()].every((worker) => worker.isReady()) &&
+    deploymentRuntime.isReady() &&
     notificationWorker.isReady() &&
     backupWorker.isReady() &&
     backupScheduler.isReady();
   const redisReady = await pingRedis(redis);
   let databaseReady = false;
   try {
-    const uow = c.get("scope").resolve(UnitOfWorkToken) as IUnitOfWork;
+    const uow = c.get("scope").resolve(UnitOfWorkToken);
     await uow.resourceRepository.count();
     databaseReady = true;
   } catch (error) {
@@ -2381,255 +2370,13 @@ getCaddySettingsUseCase
   )
   .finally(() => caddyInitScope.dispose());
 
-async function discoverDeploymentServerIds(): Promise<string[]> {
-  if (process.env.SERVER_ID) return [process.env.SERVER_ID];
-
-  const serverIds = new Set<string>();
-  const scope = serviceProvider.createScope();
-  try {
-    const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-    const settings = await uow.serverBuildSettingsRepository.findMany();
-    for (const setting of settings) serverIds.add(setting.id);
-
-    const servers = await uow.serverRepository.findMany();
-    for (const server of servers) {
-      if (server.status === "ready") {
-        serverIds.add(server.id);
-      }
-    }
-  } finally {
-    await scope.dispose();
-  }
-
-  const docker = getDockerInstance();
-  try {
-    const info = await docker.info();
-    if (info.Swarm?.LocalNodeState === "active") {
-      const nodes = await docker.listNodes();
-      for (const node of nodes) {
-        if (node.ID) serverIds.add(node.ID);
-      }
-    }
-  } catch (error) {
-    log.warn({
-      message: "Unable to discover Docker nodes for deployment workers",
-      err: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  if (serverIds.size === 0) serverIds.add("local");
-  return [...serverIds];
-}
-
-async function refreshDeploymentWorkers(): Promise<void> {
-  if (deploymentWorkerRefresh) return deploymentWorkerRefresh;
-
-  deploymentWorkerRefresh = (async () => {
-    const serverIds = await discoverDeploymentServerIds();
-    for (const serverId of serverIds) {
-      if (deploymentWorkers.has(serverId)) continue;
-      const worker = new DeploymentWorker(serverId, () => serviceProvider);
-      await worker.start();
-      deploymentWorkers.set(serverId, worker);
-      log.info({
-        message: "Deployment queue worker started",
-        serverId,
-        queueConsumers: deploymentWorkers.size,
-      });
-    }
-  })();
-
-  try {
-    await deploymentWorkerRefresh;
-  } finally {
-    deploymentWorkerRefresh = null;
-  }
-}
-
-async function reconcileQueues(): Promise<void> {
-  const scope = serviceProvider.createScope();
-  try {
-    const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-    const restored = await reconcileQueuedJobs(uow);
-    if (
-      restored.backups > 0 ||
-      restored.deployments > 0 ||
-      restored.notifications > 0
-    ) {
-      log.info({
-        message: "Queued database records reconciled with BullMQ",
-        restored,
-      });
-    }
-  } finally {
-    await scope.dispose();
-  }
-}
-
-async function initializeMonitoring() {
-  let monitoringPath =
-    process.env.NODE_ENV === "production"
-      ? "/app/apps/monitoring"
-      : path.join(process.cwd(), "apps", "monitoring");
-
-  if (process.env.NODE_ENV !== "production" && !fs.existsSync(monitoringPath)) {
-    const alternativePath = path.join(
-      process.cwd(),
-      "..",
-      "..",
-      "apps",
-      "monitoring",
-    );
-    if (fs.existsSync(alternativePath)) {
-      monitoringPath = alternativePath;
-    }
-  }
-
-  if (!fs.existsSync(monitoringPath)) {
-    log.error({ message: `Monitoring path not found: ${monitoringPath}` });
-    return;
-  }
-
-  try {
-    const docker = getDockerInstance();
-    await new Promise<void>((resolve, reject) => {
-      log.info({
-        message: "Building Upstand Monitoring Agent Docker image...",
-      });
-      const tarProcess = spawn("tar", ["-cf", "-", "-C", monitoringPath, "."]);
-
-      docker.buildImage(
-        tarProcess.stdout,
-        { t: "upstand-monitoring-agent:latest" },
-        (err, stream) => {
-          if (err) return reject(err);
-          if (!stream) return reject(new Error("No build stream returned"));
-          docker.modem.followProgress(stream, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        },
-      );
-      tarProcess.on("error", reject);
-    });
-    log.info({
-      message: "Upstand Monitoring Agent Docker image built successfully! ✅",
-    });
-
-    const containerName = "upstand-monitoring-agent";
-
-    let networkMode: string | undefined;
-    try {
-      const me = docker.getContainer(os.hostname());
-      const info = await me.inspect();
-      const networks = Object.keys(info.NetworkSettings.Networks || {});
-      networkMode = networks.find((n) => n !== "bridge") || networks[0];
-    } catch (e) {
-      log.warn({
-        message: "Could not detect container network",
-        err: e instanceof Error ? e.message : String(e),
-      });
-    }
-
-    const scope = serviceProvider.createScope();
-    let token = "";
-    let cpuThreshold = 90;
-    let memoryThreshold = 90;
-    try {
-      const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-      let settings =
-        await uow.monitoringSettingsRepository.findByServerId("local");
-      if (!settings) {
-        settings = await uow.monitoringSettingsRepository.upsert({
-          serverId: "local",
-          token: randomBytes(24).toString("hex"),
-          cpuThreshold: 90,
-          memoryThreshold: 90,
-        });
-      }
-      token = settings.token;
-      cpuThreshold = settings.cpuThreshold;
-      memoryThreshold = settings.memoryThreshold;
-    } finally {
-      await scope.dispose();
-    }
-
-    const metricsConfig = {
-      server: {
-        refreshRate: 25,
-        port: 3001,
-        serverType: "Dokploy",
-        token: token,
-        urlCallback: `http://localhost:${process.env.PORT || 3000}/api/monitoring/alerts`,
-        retentionDays: 7,
-        cronJob: "0 0 * * *",
-        thresholds: {
-          cpu: cpuThreshold,
-          memory: memoryThreshold,
-        },
-      },
-      containers: {
-        refreshRate: 25,
-        services: {
-          include: [],
-          exclude: [],
-        },
-      },
-    };
-
-    const containerOpts = {
-      name: containerName,
-      Env: [
-        `METRICS_CONFIG=${JSON.stringify(metricsConfig)}`,
-        "DB_PATH=/data/monitoring.db",
-      ],
-      Image: "upstand-monitoring-agent:latest",
-      HostConfig: {
-        RestartPolicy: { Name: "always" },
-        ...(networkMode ? { NetworkMode: networkMode } : {}),
-        PortBindings: {
-          "3001/tcp": [{ HostPort: "3001" }],
-        },
-        Binds: [
-          "/var/run/docker.sock:/var/run/docker.sock:ro",
-          "/proc:/host/proc:ro",
-          "/sys:/host/sys:ro",
-          "/etc/os-release:/etc/os-release:ro",
-          "upstand-monitoring-data:/data",
-        ],
-      },
-      ExposedPorts: {
-        "3001/tcp": {},
-      },
-    };
-
-    const container = docker.getContainer(containerName);
-    try {
-      await container.inspect();
-      await container.remove({ force: true });
-    } catch {}
-
-    await docker.createContainer(containerOpts);
-    const newContainer = docker.getContainer(containerName);
-    await newContainer.start();
-    log.info({
-      message: "Local Monitoring Agent container started on port 3001! 📈",
-    });
-  } catch (error) {
-    log.error({
-      message: "Failed to initialize local monitoring agent",
-      err: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-await refreshDeploymentWorkers();
+await deploymentRuntime.start();
 await notificationWorker.start();
 await backupWorker.start();
 await backupScheduler.start();
 await generalScheduler.start();
 await accessLogCleanupScheduler.start();
-await reconcileQueues();
+await deploymentRuntime.reconcileQueues();
 log.info({ message: "Background job workers and schedulers started" });
 
 initializeMonitoring().catch((err) => {
@@ -2639,194 +2386,28 @@ initializeMonitoring().catch((err) => {
   });
 });
 
-// Opt-in release-channel updates. Source installs and canary builds are never
-// updated silently; operators can still use the explicit UI action for those.
-if (process.env.UPSTAND_AUTO_UPDATE === "true") {
-  const checkAndApplyUpdate = async () => {
-    if (
-      autoUpdateInFlight ||
-      process.env.UPSTAND_SERVER_IMAGE?.includes(":source-")
-    )
-      return;
-    autoUpdateInFlight = true;
-    const scope = serviceProvider.createScope();
-    try {
-      const status = await scope.resolve(GetUpdateStatusUseCaseToken).execute();
-      if (
-        status.channel === "stable" &&
-        status.updateAvailable &&
-        status.canUpdate
-      ) {
-        log.info({
-          message: `Automatic update found ${status.latestVersion}; starting rollout`,
-          currentVersion: status.currentVersion,
-        });
-        await scope
-          .resolve(TriggerUpdateUseCaseToken)
-          .execute({ version: status.latestVersion });
-      }
-    } catch (error) {
-      log.error({
-        message: "Automatic update check failed",
-        err: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      autoUpdateInFlight = false;
-      await scope.dispose();
-    }
-  };
-  autoUpdateTimer = setInterval(() => void checkAndApplyUpdate(), 30 * 60_000);
-  autoUpdateTimer.unref?.();
-  setTimeout(() => void checkAndApplyUpdate(), 120_000).unref?.();
-  log.info({ message: "Opt-in automatic release updates enabled" });
-}
-
-workerRefreshInterval = setInterval(
-  () =>
-    void refreshDeploymentWorkers().catch((error) => {
-      log.error({
-        message: "Failed to refresh deployment queue workers",
-        err: error instanceof Error ? error.message : String(error),
-      });
-    }),
-  60_000,
-);
-workerRefreshInterval.unref?.();
-
-queueReconcileInterval = setInterval(
-  () =>
-    void reconcileQueues().catch((error) => {
-      log.error({
-        message: "Failed to reconcile queued database records",
-        err: error instanceof Error ? error.message : String(error),
-      });
-    }),
-  30_000,
-);
-queueReconcileInterval.unref?.();
-
-// Daily Docker Cleanup Scheduler. The control plane setting cleans local
-// Docker; each opted-in remote server gets the same safe cleanup over its
-// registered Docker-SSH transport.
-async function runScheduledDockerCleanup(): Promise<void> {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10);
-  if (now.getHours() !== 3 || lastDockerCleanupDate === date) return;
-  lastDockerCleanupDate = date;
-
-  const scope = serviceProvider.createScope();
-  try {
-    const uow = scope.resolve(UnitOfWorkToken) as IUnitOfWork;
-    const settings = await uow.webServerSettingsRepository.findGlobal();
-    const publisher = scope.resolve(
-      Symbol.for("PublishNotificationUseCase"),
-    ) as {
-      execute: (input: {
-        event: "docker_cleanup_completed";
-        idempotencyKey: string;
-        title: string;
-        message: string;
-      }) => Promise<number>;
-    };
-
-    if (settings?.dailyDockerCleanup) {
-      log.info({ message: "Running scheduled local Docker cleanup... 🧹" });
-      await dockerCleanupService.run("all");
-      await publisher
-        .execute({
-          event: "docker_cleanup_completed",
-          idempotencyKey: `docker-cleanup:local:${date}`,
-          title: "Daily Docker cleanup completed",
-          message:
-            "Upstand completed the scheduled cleanup of unused local Docker resources.",
-        })
-        .catch((notificationError) => {
-          log.error({
-            message: "Unable to queue local Docker cleanup notification",
-            err:
-              notificationError instanceof Error
-                ? notificationError.message
-                : notificationError,
-          });
-        });
-    }
-
-    const servers = await uow.serverRepository.findMany();
-    for (const server of servers.filter(
-      (candidate) => candidate.enableDockerCleanup,
-    )) {
-      try {
-        const remote = await resolveDockerCliEnvironmentForServer(
-          server.id,
-          uow,
-        );
-        try {
-          log.info({
-            message: `Running scheduled Docker cleanup on remote server '${server.name}'... 🧹`,
-            serverId: server.id,
-          });
-          await dockerCleanupService.run("all", remote.environment);
-        } finally {
-          remote.cleanup();
-        }
-        await publisher
-          .execute({
-            event: "docker_cleanup_completed",
-            idempotencyKey: `docker-cleanup:${server.id}:${date}`,
-            title: `Docker cleanup completed on ${server.name}`,
-            message: `Upstand completed the scheduled cleanup of unused Docker resources on ${server.name}.`,
-          })
-          .catch((notificationError) => {
-            log.error({
-              message: "Unable to queue remote Docker cleanup notification",
-              serverId: server.id,
-              err:
-                notificationError instanceof Error
-                  ? notificationError.message
-                  : notificationError,
-            });
-          });
-      } catch (error) {
-        log.error({
-          message: "Failed to run scheduled remote Docker cleanup",
-          serverId: server.id,
-          err: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  } catch (error) {
-    log.error({
-      message: "Failed to run scheduled Docker cleanup",
-      err: error instanceof Error ? error.message : String(error),
-    });
-  } finally {
-    await scope.dispose();
-  }
-}
-
-dockerCleanupTimer = setInterval(
-  () => void runScheduledDockerCleanup(),
-  60 * 60 * 1000,
-); // Check once every hour
-dockerCleanupTimer.unref?.();
+autoUpdateRuntime.start();
+deploymentRuntime.startMaintenance();
+scheduledDockerCleanup.start();
 
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   log.info({ message: "Graceful shutdown started", signal });
 
-  if (workerRefreshInterval) clearInterval(workerRefreshInterval);
-  if (queueReconcileInterval) clearInterval(queueReconcileInterval);
-  if (dockerCleanupTimer) clearInterval(dockerCleanupTimer);
-  if (autoUpdateTimer) clearInterval(autoUpdateTimer);
+  const deploymentDrain = deploymentRuntime.shutdown();
+  scheduledDockerCleanup.stop();
+  autoUpdateRuntime.stop();
 
-  const drain = Promise.allSettled([
-    ...[...deploymentWorkers.values()].map((worker) => worker.stop()),
-    notificationWorker.stop(),
-    backupWorker.stop(),
-    backupScheduler.stop(),
-    generalScheduler.stop(),
-    accessLogCleanupScheduler.stop(),
+  const drain = Promise.all([
+    deploymentDrain,
+    Promise.allSettled([
+      notificationWorker.stop(),
+      backupWorker.stop(),
+      backupScheduler.stop(),
+      generalScheduler.stop(),
+      accessLogCleanupScheduler.stop(),
+    ]),
   ]);
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<"timeout">((resolve) => {
