@@ -80,8 +80,6 @@ function parseWatchPaths(value: string[] | string | undefined): string[] {
 }
 
 function publicApplication(resource: Resource) {
-  const envVars = parseResourceEnvironmentVariables(resource.envVars);
-
   let domains: ReturnType<typeof parseDomainMappings> = [];
   try {
     domains = parseDomainMappings(resource.domains);
@@ -104,7 +102,9 @@ function publicApplication(resource: Resource) {
     buildConfig: parseApplicationBuildConfig(resource.buildConfig),
     buildSecretsConfigured: Boolean(resource.buildSecrets),
     advancedConfig: parseResourceAdvancedConfig(resource.advancedConfig),
-    envVars,
+    envVarsConfigured:
+      Object.keys(parseResourceEnvironmentVariables(resource.envVars)).length >
+      0,
     domains,
     isPreviewDeploymentsActive: resource.isPreviewDeploymentsActive,
     previewLimit: resource.previewLimit,

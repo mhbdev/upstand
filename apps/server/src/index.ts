@@ -273,23 +273,6 @@ app.post("/api/container-terminal/session", async (c) => {
   } catch {
     return c.json({ error: "Resource terminal permission is required" }, 403);
   }
-  let knownContainers: unknown[] = [];
-  try {
-    knownContainers = JSON.parse(resource.containers || "[]");
-  } catch {
-    knownContainers = [];
-  }
-  if (
-    !knownContainers.some(
-      (container) =>
-        typeof container === "object" &&
-        container !== null &&
-        (container as { id?: string }).id === body.containerId,
-    )
-  ) {
-    return c.json({ error: "Container is not owned by this resource" }, 404);
-  }
-
   let host = "127.0.0.1";
   let port = 22;
   let username = "root";
@@ -881,7 +864,7 @@ app.post("/api/docker/containers/:containerId/upload", async (c) => {
   if (!session) return c.json({ error: "Authentication required" }, 401);
 
   const organizationId = c.req.query("organizationId");
-  let resourceId = c.req.query("resourceId");
+  const resourceId = c.req.query("resourceId");
   if (!organizationId) {
     return c.json({ error: "organizationId is required" }, 400);
   }
@@ -899,40 +882,9 @@ app.post("/api/docker/containers/:containerId/upload", async (c) => {
 
   const uow = c.get("scope").resolve(UnitOfWorkToken);
   if (!resourceId) {
-    const containerId = c.req.param("containerId");
-    for (const candidate of await uow.resourceRepository.findMany()) {
-      let containers: unknown[] = [];
-      try {
-        containers = JSON.parse(candidate.containers || "[]");
-      } catch {
-        containers = [];
-      }
-      if (
-        !containers.some(
-          (container) =>
-            typeof container === "object" &&
-            container !== null &&
-            (container as { id?: string }).id === containerId,
-        )
-      ) {
-        continue;
-      }
-      const environment = await uow.environmentRepository.findById(
-        candidate.environmentId,
-      );
-      const project = environment
-        ? await uow.projectRepository.findById(environment.projectId)
-        : null;
-      if (project?.organizationId === organizationId) {
-        resourceId = candidate.id;
-        break;
-      }
-    }
-  }
-  if (!resourceId) {
     return c.json(
-      { error: "Container is not tracked by this organization" },
-      404,
+      { error: "resourceId is required for container uploads" },
+      400,
     );
   }
   const resource = await uow.resourceRepository.findById(resourceId);
@@ -956,14 +908,18 @@ app.post("/api/docker/containers/:containerId/upload", async (c) => {
       403,
     );
   }
-  let knownContainers: unknown[] = [];
-  try {
-    knownContainers = JSON.parse(resource.containers || "[]");
-  } catch {
-    knownContainers = [];
-  }
+  const liveContainers = await c
+    .get("scope")
+    .resolve(GetDockerInventoryUseCaseToken)
+    .execute({
+      organizationId,
+      serverId: requestedServerId,
+      kind: "containers",
+      tail: 150,
+    });
   if (
-    !knownContainers.some(
+    !Array.isArray(liveContainers) ||
+    !liveContainers.some(
       (container) =>
         typeof container === "object" &&
         container !== null &&

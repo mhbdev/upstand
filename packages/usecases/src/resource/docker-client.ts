@@ -1,11 +1,11 @@
 import type { IUnitOfWork, Resource } from "@upstand/domain";
 import type Docker from "dockerode";
+import type { CaddyServicePort } from "../ports/caddy";
 import type {
   DockerInfrastructureResolverPort,
   DockerServicePort,
   RemoteDockerConnectionPort,
 } from "../ports/docker";
-import type { CaddyServicePort } from "../ports/caddy";
 
 let resolver: DockerInfrastructureResolverPort = {
   async resolveDockerServiceForServer(_serverId, _uow, defaultDockerService) {

@@ -27,8 +27,6 @@ function resource(
     advancedConfig: "{}",
     envVars: "{}",
     domains: "[]",
-    deployments: "[]",
-    containers: "[]",
     serverId: null,
     buildServerId: null,
     webhookTokenHash: null,

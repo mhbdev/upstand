@@ -584,27 +584,19 @@ export const webServerRouter = router({
       const uow = ctx.scope.resolve(UnitOfWorkToken);
       try {
         await uow.transaction(async (tx) => {
+          const runningDeployments =
+            await tx.deploymentRepository.findByStatus("running");
+          for (const deployment of runningDeployments) {
+            await tx.deploymentRepository.updateById(deployment.id, {
+              status: "failed",
+              logs: `${deployment.logs}\nDeployment cancelled by clean deployment queue operation.\n`,
+            });
+          }
           const resources = await tx.resourceRepository.findMany();
           for (const r of resources) {
-            let deploymentsList: any[] = [];
-            try {
-              deploymentsList = JSON.parse(r.deployments || "[]");
-            } catch {}
-
-            let changed = false;
-            for (const dep of deploymentsList) {
-              if (dep.status === "running") {
-                dep.status = "failed";
-                dep.logs +=
-                  "\nDeployment cancelled by clean deployment queue operation.\n";
-                changed = true;
-              }
-            }
-
-            if (changed || r.status === "running") {
+            if (r.status === "running") {
               await tx.resourceRepository.updateById(r.id, {
                 status: "stopped",
-                deployments: JSON.stringify(deploymentsList),
               });
             }
           }

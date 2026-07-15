@@ -44,6 +44,27 @@ async function getDeploymentScope(
 }
 
 export const deploymentRouter = router({
+  getByResource: twoFactorVerifiedProcedure
+    .input(z.object({ resourceId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
+      const resource = await uow.resourceRepository.findById(input.resourceId);
+      if (!resource) throw new ValidationError("Resource not found");
+      const environment = await uow.environmentRepository.findById(
+        resource.environmentId,
+      );
+      const project = environment
+        ? await uow.projectRepository.findById(environment.projectId)
+        : null;
+      if (!project) throw new ValidationError("Project not found");
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:view",
+      );
+      return uow.deploymentRepository.findByResourceId(input.resourceId);
+    }),
+
   getDeployments: twoFactorVerifiedProcedure
     .input(OrganizationInputSchema)
     .query(async ({ ctx, input }) => {
@@ -279,21 +300,10 @@ export const deploymentRouter = router({
                   logs: `${dep.logs}\nDeployment cancelled by user. 🛑\n`,
                 });
 
-                // Update resource status too
                 const r = await tx.resourceRepository.findById(dep.resourceId);
                 if (r && r.status === "queued") {
-                  const depsList = JSON.parse(r.deployments || "[]");
-                  const idx = depsList.findIndex(
-                    (d: any) => d.id === deploymentId,
-                  );
-                  if (idx > -1) {
-                    depsList[idx].status = "failed";
-                    depsList[idx].logs =
-                      `${depsList[idx].logs || ""}\nDeployment cancelled by user. 🛑\n`;
-                  }
                   await tx.resourceRepository.updateById(dep.resourceId, {
                     status: "stopped",
-                    deployments: JSON.stringify(depsList),
                   });
                 }
               }
@@ -359,17 +369,6 @@ export const deploymentRouter = router({
         throw new ValidationError("Only completed deployments can be removed");
       }
       await uow.transaction(async (tx: IUnitOfWork) => {
-        const resource = await tx.resourceRepository.findById(
-          deployment.resourceId,
-        );
-        if (resource) {
-          const history = JSON.parse(resource.deployments || "[]").filter(
-            (item: { id?: string }) => item.id !== deployment.id,
-          );
-          await tx.resourceRepository.updateById(resource.id, {
-            deployments: JSON.stringify(history),
-          });
-        }
         await tx.deploymentRepository.deleteById(deployment.id);
       });
       return { success: true };
@@ -402,14 +401,6 @@ export const deploymentRouter = router({
             await tx.deploymentRepository.deleteById(deployment.id);
           }
         }
-        await tx.resourceRepository.updateById(input.resourceId, {
-          deployments: JSON.stringify(
-            JSON.parse(resource.deployments || "[]").filter(
-              (item: { status?: string }) =>
-                !["success", "failed"].includes(item.status || ""),
-            ),
-          ),
-        });
       });
       return { success: true };
     }),

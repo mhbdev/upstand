@@ -13,6 +13,7 @@ import { DrizzleNotificationDeliveryRepository } from "./notification/drizzle-no
 import { DrizzlePreviewDeploymentRepository } from "./preview-deployment/drizzle-preview-deployment.repository";
 import { DrizzleProjectRepository } from "./project/drizzle-project.repository";
 import { DrizzleResourceRepository } from "./resource/drizzle-resource.repository";
+import { DrizzleResourceRuntimeRepository } from "./resource/drizzle-resource-runtime.repository";
 import { DrizzleS3DestinationRepository } from "./s3-destination/drizzle-s3-destination.repository";
 import { DrizzleScheduleRepository } from "./schedule/drizzle-schedule.repository";
 import { DrizzleServerRepository } from "./server/drizzle-server.repository";
@@ -35,6 +36,7 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly templateRepository: DrizzleTemplateRepository;
   public readonly environmentRepository: DrizzleEnvironmentRepository;
   public readonly resourceRepository: DrizzleResourceRepository;
+  public readonly resourceRuntimeRepository: DrizzleResourceRuntimeRepository;
   public readonly sshKeyRepository: DrizzleSshKeyRepository;
   public readonly gitProviderRepository: DrizzleGitProviderRepository;
   public readonly webServerSettingsRepository: DrizzleWebServerSettingsRepository;
@@ -66,6 +68,9 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
       this.executor,
     );
     this.resourceRepository = new DrizzleResourceRepository(this.executor);
+    this.resourceRuntimeRepository = new DrizzleResourceRuntimeRepository(
+      this.executor,
+    );
     this.sshKeyRepository = new DrizzleSshKeyRepository(this.executor);
     this.gitProviderRepository = new DrizzleGitProviderRepository(
       this.executor,

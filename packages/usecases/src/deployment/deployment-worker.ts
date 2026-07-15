@@ -288,21 +288,6 @@ export class DeploymentWorker {
               await tx.deploymentRepository.updateById(deploymentId, {
                 logs: logsAccumulator,
               });
-
-              // Also update resource deployments JSON list for backwards compatibility
-              const r = await tx.resourceRepository.findById(resourceId);
-              if (r) {
-                const depsList = JSON.parse(r.deployments || "[]");
-                const idx = depsList.findIndex(
-                  (d: any) => d.id === deploymentId,
-                );
-                if (idx > -1) {
-                  depsList[idx].logs = logsAccumulator;
-                  await tx.resourceRepository.updateById(resourceId, {
-                    deployments: JSON.stringify(depsList),
-                  });
-                }
-              }
             })
             .catch((error) => {
               log.error({
@@ -328,21 +313,6 @@ export class DeploymentWorker {
         await flushInFlight;
       }
       resourceLock.assertOwned();
-      let containers: Awaited<
-        ReturnType<DockerService["getContainers"]>
-      > | null = null;
-      if (resource) {
-        try {
-          containers = await dockerService.getContainers(resource);
-        } catch (error) {
-          log.error({
-            message: "Failed to refresh containers after deployment",
-            deploymentId,
-            resourceId,
-            err: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
       await uow.transaction(async (tx) => {
         // Update dedicated deployment record
         await tx.deploymentRepository.updateById(deploymentId, {
@@ -356,25 +326,14 @@ export class DeploymentWorker {
           });
         }
 
-        // Update resource status and history
+        // Update only desired resource status; runtime observations are queried live.
         const r = await tx.resourceRepository.findById(resourceId);
         if (r) {
-          const depsList = JSON.parse(r.deployments || "[]");
-          const idx = depsList.findIndex((d: any) => d.id === deploymentId);
-          if (idx > -1) {
-            depsList[idx].logs = logsAccumulator;
-            depsList[idx].status = status;
-
-            await tx.resourceRepository.updateById(resourceId, {
-              deployments: JSON.stringify(depsList),
-              ...(!previewDeploymentId
-                ? { status: status === "success" ? "running" : "stopped" }
-                : {}),
-              ...(containers && !previewDeploymentId
-                ? { containers: JSON.stringify(containers) }
-                : {}),
-            });
-          }
+          await tx.resourceRepository.updateById(resourceId, {
+            ...(!previewDeploymentId
+              ? { status: status === "success" ? "running" : "stopped" }
+              : {}),
+          });
         }
       });
     };
@@ -402,14 +361,8 @@ export class DeploymentWorker {
         });
         const r = await tx.resourceRepository.findById(resourceId);
         if (r) {
-          const depsList = JSON.parse(r.deployments || "[]");
-          const idx = depsList.findIndex((d: any) => d.id === deploymentId);
-          if (idx > -1) {
-            depsList[idx].status = "running";
-          }
           await tx.resourceRepository.updateById(resourceId, {
             status: "running",
-            deployments: JSON.stringify(depsList),
           });
         }
       });

@@ -72,8 +72,6 @@ export class DuplicateProjectUseCase {
             advancedConfig: resource.advancedConfig,
             envVars: resource.envVars,
             domains: "[]",
-            deployments: "[]",
-            containers: "[]",
             serverId: resource.serverId,
             buildServerId: resource.buildServerId,
           });

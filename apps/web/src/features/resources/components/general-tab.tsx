@@ -65,7 +65,6 @@ import {
   createBuildConfig,
   type DatabaseCredentials,
   parseApplicationBuildConfig,
-  parseDeployments,
   parseResourceCredentials,
   RAILPACK_VERSIONS,
   type ResourceProvider,
@@ -73,6 +72,13 @@ import {
 
 interface GeneralTabProps {
   resource: any;
+  secrets: {
+    credentials: string;
+    envVars: Record<string, string>;
+    buildSecretsConfigured: boolean;
+  };
+  refetchSecrets: () => Promise<unknown>;
+  deployments: Array<{ status: string }>;
   sshKeys: any[];
   servers: any[];
   gitProviders: any[];
@@ -90,6 +96,9 @@ interface GeneralTabProps {
 
 export function GeneralTab({
   resource,
+  secrets,
+  refetchSecrets,
+  deployments,
   sshKeys,
   servers,
   gitProviders,
@@ -133,11 +142,8 @@ export function GeneralTab({
   });
   const randomizeCompose = useMutation({
     ...trpc.resource.randomizeCompose.mutationOptions(),
-    onSuccess: (result) => {
-      const config = parseResourceCredentials(result.credentials);
-      if (typeof config?.composeFile === "string") {
-        setRawComposeFile(config.composeFile);
-      }
+    onSuccess: () => {
+      void refetchSecrets();
       toast.success("Compose service and named-resource identities randomized");
     },
     onError: (error) => toast.error(error.message),
@@ -283,7 +289,7 @@ export function GeneralTab({
   };
 
   const isRunning = resource.status === "running";
-  const isBuilding = parseDeployments(resource.deployments).some(
+  const isBuilding = deployments.some(
     (deployment) => deployment.status === "running",
   );
 
@@ -317,7 +323,7 @@ export function GeneralTab({
       resource.libsqlAdminPort,
     ],
     composeType: resource.composeType,
-    credentials: resource.credentials,
+    credentials: secrets.credentials,
     watchPaths: resource.watchPaths,
   });
 
@@ -382,7 +388,7 @@ export function GeneralTab({
       ) {
         setComposeType(resource.composeType);
       }
-      const config = parseResourceCredentials(resource.credentials);
+      const config = parseResourceCredentials(secrets.credentials);
       let typedWatchPaths: string[] = [];
       if (typeof resource.watchPaths === "string") {
         try {
@@ -764,7 +770,7 @@ export function GeneralTab({
                     const val = e.target.checked;
                     setAutoDeploy(val);
                     const config = {
-                      ...parseResourceCredentials(resource.credentials),
+                      ...parseResourceCredentials(secrets.credentials),
                       autoDeploy: val,
                     };
                     updateResource(

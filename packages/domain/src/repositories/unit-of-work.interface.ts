@@ -12,6 +12,7 @@ import type { INotificationDeliveryRepository } from "./notification-delivery-re
 import type { IPreviewDeploymentRepository } from "./preview-deployment-repository.interface";
 import type { IProjectRepository } from "./project-repository.interface";
 import type { IResourceRepository } from "./resource-repository.interface";
+import type { IResourceRuntimeRepository } from "./resource-runtime-repository.interface";
 import type { IS3DestinationRepository } from "./s3-destination-repository.interface";
 import type { IScheduleRepository } from "./schedule-repository.interface";
 import type { IServerBuildSettingsRepository } from "./server-build-settings-repository.interface";
@@ -33,6 +34,7 @@ export interface IUnitOfWork {
   readonly templateRepository: ITemplateRepository;
   readonly environmentRepository: IEnvironmentRepository;
   readonly resourceRepository: IResourceRepository;
+  readonly resourceRuntimeRepository: IResourceRuntimeRepository;
   readonly sshKeyRepository: ISshKeyRepository;
   readonly gitProviderRepository: IGitProviderRepository;
   readonly webServerSettingsRepository: IWebServerSettingsRepository;

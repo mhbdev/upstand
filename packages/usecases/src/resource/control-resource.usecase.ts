@@ -60,12 +60,8 @@ export class ControlResourceUseCase {
 
         const status = input.command === "stop" ? "stopped" : "running";
 
-        // Instantly query updated containers
-        const containers = await dockerService.getContainers(resource);
-
         const updated = await tx.resourceRepository.updateById(resource.id, {
           status,
-          containers: JSON.stringify(containers),
         });
 
         if (!updated) {

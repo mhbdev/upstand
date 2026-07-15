@@ -52,7 +52,6 @@ export class RebuildDatabaseUseCase {
             resource,
             getDatabaseEnvironment(resource),
           );
-          const containers = await dockerService.getContainers(resource);
           const logs = `Database rebuild completed at ${new Date().toISOString()}.\n`;
 
           await tx.deploymentRepository.updateById(deploymentId, {
@@ -60,18 +59,8 @@ export class RebuildDatabaseUseCase {
             logs: `Database rebuild started at ${startedAt.toISOString()}.\n${logs}`,
           });
 
-          const history = parseDeploymentHistory(resource.deployments);
-          history.unshift({
-            id: deploymentId,
-            status: "success",
-            title: "Database rebuild",
-            logs: `Database rebuild started at ${startedAt.toISOString()}.\n${logs}`,
-            createdAt: startedAt.toISOString(),
-          });
           const updated = await tx.resourceRepository.updateById(resource.id, {
             status: "running",
-            containers: JSON.stringify(containers),
-            deployments: JSON.stringify(history.slice(0, 10)),
           });
           if (!updated) throw new Error("Resource could not be updated");
           return updated;
@@ -87,41 +76,5 @@ export class RebuildDatabaseUseCase {
       });
       throw error;
     }
-  }
-}
-
-function parseDeploymentHistory(value: string | null | undefined): Array<{
-  id: string;
-  status: string;
-  title: string;
-  logs: string;
-  createdAt: string;
-}> {
-  try {
-    const parsed: unknown = JSON.parse(value || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (
-        item,
-      ): item is {
-        id: string;
-        status: string;
-        title: string;
-        logs: string;
-        createdAt: string;
-      } => {
-        if (!item || typeof item !== "object") return false;
-        const value = item as Record<string, unknown>;
-        return (
-          typeof value.id === "string" &&
-          typeof value.status === "string" &&
-          typeof value.title === "string" &&
-          typeof value.logs === "string" &&
-          typeof value.createdAt === "string"
-        );
-      },
-    );
-  } catch {
-    return [];
   }
 }

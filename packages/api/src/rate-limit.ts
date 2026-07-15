@@ -78,10 +78,8 @@ export class RateLimiter {
   ) {
     this.now = options.now ?? Date.now;
     this.redisTimeoutMs = options.redisTimeoutMs ?? DEFAULT_REDIS_TIMEOUT_MS;
-    this.redisCooldownMs =
-      options.redisCooldownMs ?? DEFAULT_REDIS_COOLDOWN_MS;
-    this.localEntryLimit =
-      options.localEntryLimit ?? DEFAULT_LOCAL_ENTRY_LIMIT;
+    this.redisCooldownMs = options.redisCooldownMs ?? DEFAULT_REDIS_COOLDOWN_MS;
+    this.localEntryLimit = options.localEntryLimit ?? DEFAULT_LOCAL_ENTRY_LIMIT;
     if (this.redisTimeoutMs < 1 || this.redisCooldownMs < 1) {
       throw new Error("Redis rate-limit timing values must be positive");
     }

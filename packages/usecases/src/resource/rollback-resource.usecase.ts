@@ -97,25 +97,14 @@ export class RollbackResourceUseCase {
             };
           }
           await dockerService.rollbackService(resource, registryAuth);
-          const containers = await dockerService.getContainers(resource);
           const logs = `Rollback completed at ${new Date().toISOString()}.\n`;
           await tx.deploymentRepository.updateById(deploymentId, {
             status: "success",
             logs: `Rollback requested at ${startedAt.toISOString()}.\n${logs}`,
           });
 
-          const history = parseDeploymentHistory(resource.deployments);
-          history.unshift({
-            id: deploymentId,
-            status: "success",
-            title: "Swarm service rollback",
-            logs: `Rollback requested at ${startedAt.toISOString()}.\n${logs}`,
-            createdAt: startedAt.toISOString(),
-          });
           const updated = await tx.resourceRepository.updateById(resource.id, {
             status: "running",
-            containers: JSON.stringify(containers),
-            deployments: JSON.stringify(history.slice(0, 10)),
           });
           if (!updated)
             throw new ValidationError("Resource could not be updated");
@@ -133,38 +122,5 @@ export class RollbackResourceUseCase {
       });
       throw error;
     }
-  }
-}
-
-function parseDeploymentHistory(value: string | null | undefined): Array<{
-  id: string;
-  status: string;
-  title: string;
-  logs: string;
-  createdAt: string;
-}> {
-  try {
-    const parsed: unknown = JSON.parse(value || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (
-        item,
-      ): item is {
-        id: string;
-        status: string;
-        title: string;
-        logs: string;
-        createdAt: string;
-      } =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as Record<string, unknown>).id === "string" &&
-        typeof (item as Record<string, unknown>).status === "string" &&
-        typeof (item as Record<string, unknown>).title === "string" &&
-        typeof (item as Record<string, unknown>).logs === "string" &&
-        typeof (item as Record<string, unknown>).createdAt === "string",
-    );
-  } catch {
-    return [];
   }
 }

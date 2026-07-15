@@ -315,8 +315,6 @@ export class CreateResourceUseCase {
         ),
         envVars: serializeResourceEnvironmentVariables(input.envVars ?? {}),
         domains: serializeDomainMappings(input.domains ?? []),
-        deployments: "[]",
-        containers: "[]",
         serverId: input.serverId ?? null,
         buildServerId: input.buildServerId ?? null,
       });

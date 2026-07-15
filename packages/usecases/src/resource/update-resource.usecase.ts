@@ -70,8 +70,6 @@ export const UpdateResourceInputSchema = z.object({
   advancedConfig: z.string().optional(),
   envVars: z.string().optional(),
   domains: z.string().optional(),
-  deployments: z.string().optional(),
-  containers: z.string().optional(),
   serverId: z.string().nullable().optional(),
   buildServerId: z.string().nullable().optional(),
 });
@@ -384,8 +382,6 @@ export class UpdateResourceUseCase {
         );
       }
     }
-    if (input.deployments !== undefined) patch.deployments = input.deployments;
-    if (input.containers !== undefined) patch.containers = input.containers;
     if (input.serverId !== undefined || input.buildServerId !== undefined) {
       if (input.buildServerId) {
         assertResourceCanUseBuildServer(resource.type);
