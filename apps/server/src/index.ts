@@ -74,6 +74,10 @@ import { type Context, Hono } from "hono";
 import { upgradeWebSocket, websocket } from "hono/bun";
 import { cors } from "hono/cors";
 import { z } from "zod";
+import {
+  ApplicationArchiveValidationError,
+  extractApplicationArchive,
+} from "./application-archive";
 import { AutoUpdateRuntime } from "./auto-update-runtime";
 import { DeploymentRuntime } from "./deployment-runtime";
 import { ScheduledDockerCleanup } from "./docker-cleanup-scheduler";
@@ -704,7 +708,7 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
   fs.mkdirSync(tempDir, { recursive: true });
   const archivePath = path.join(
     tempDir,
-    `upload-${resourceId}-${Date.now()}.zip`,
+    `upload-${resourceRecord.id}-${randomUUID()}.archive`,
   );
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -712,43 +716,23 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
     return c.json({ error: "Archive exceeds the 50MB upload limit" }, 413);
   }
   fs.writeFileSync(archivePath, buffer);
-
-  const dropsDir = path.join(process.cwd(), ".builds", "drops", resourceId);
-  if (fs.existsSync(dropsDir)) {
-    fs.rmSync(dropsDir, { recursive: true, force: true });
-  }
-  fs.mkdirSync(dropsDir, { recursive: true });
-
-  const { execFile } = await import("node:child_process");
-  const { promisify } = await import("node:util");
-  const execFileAsync = promisify(execFile);
+  const dropsDir = path.join(
+    process.cwd(),
+    ".builds",
+    "drops",
+    resourceRecord.id,
+  );
 
   try {
-    const listing = await execFileAsync("tar", ["-tf", archivePath]);
-    const unsafeEntry = listing.stdout
-      .split(/\r?\n/)
-      .map((entry) => entry.trim())
-      .find((entry) => {
-        if (!entry || path.isAbsolute(entry)) return Boolean(entry);
-        const normalized = path.posix.normalize(entry.replaceAll("\\", "/"));
-        return normalized === ".." || normalized.startsWith("../");
-      });
-    if (unsafeEntry) {
-      throw new Error(
-        `Archive entry escapes the extraction directory: ${unsafeEntry}`,
-      );
-    }
-    await execFileAsync("tar", ["-xf", archivePath, "-C", dropsDir]);
-  } catch (err: any) {
-    try {
-      fs.unlinkSync(archivePath);
-    } catch {}
-    return c.json({ error: `Extraction failed: ${err.message}` }, 500);
+    await extractApplicationArchive(archivePath, dropsDir);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const status =
+      error instanceof ApplicationArchiveValidationError ? 400 : 500;
+    return c.json({ error: `Extraction failed: ${message}` }, status);
+  } finally {
+    fs.rmSync(archivePath, { force: true });
   }
-
-  try {
-    fs.unlinkSync(archivePath);
-  } catch {}
 
   await uow.transaction(async (tx) => {
     await tx.resourceRepository.updateById(resourceId, {
