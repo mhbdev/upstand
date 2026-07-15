@@ -16,6 +16,7 @@ import {
   isApiKeyPrincipal,
   setApiKeyRateLimitHeaders,
 } from "./api-key-auth";
+import { resolveClientIp } from "./client-ip";
 import type { Context } from "./context";
 
 export const t = initTRPC.context<Context>().create();
@@ -30,10 +31,14 @@ export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
     );
     return next();
   }
-  const ip =
-    ctx.honoContext.req.header("x-forwarded-for") ||
-    ctx.honoContext.req.header("x-real-ip") ||
-    "127.0.0.1";
+  const peerAddress = ctx.honoContext.env.server?.requestIP(
+    ctx.honoContext.req.raw,
+  )?.address;
+  const ip = resolveClientIp({
+    peerAddress,
+    forwardedFor: ctx.honoContext.req.header("x-forwarded-for"),
+    realIp: ctx.honoContext.req.header("x-real-ip"),
+  });
 
   // Use user id if logged in, otherwise fall back to IP address
   const identifier = ctx.session ? `user:${ctx.session.user.id}` : `ip:${ip}`;

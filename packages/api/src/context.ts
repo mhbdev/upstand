@@ -15,8 +15,17 @@ export type SessionActor = {
 export type Actor = SessionActor | ApiKeyPrincipal;
 
 export type CreateContextOptions = {
-  context: HonoContext<{ Variables: { scope: ServiceScope } }>;
+  context: HonoContext<{
+    Bindings: {
+      server?: {
+        requestIP(request: Request): { address: string } | null;
+      };
+    };
+    Variables: { scope: ServiceScope };
+  }>;
 };
+
+export type ApiBindings = NonNullable<CreateContextOptions["context"]["env"]>;
 
 export async function createContext({ context }: CreateContextOptions) {
   const authenticatedSession = await auth.api.getSession({

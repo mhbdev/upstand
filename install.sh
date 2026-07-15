@@ -157,6 +157,7 @@ write_environment() {
   local requested_better_auth_url="${BETTER_AUTH_URL:-}"
   local requested_cors_origin="${CORS_ORIGIN:-}"
   local requested_server_url="${NEXT_PUBLIC_SERVER_URL:-}"
+  local requested_trusted_proxy_cidrs="${TRUSTED_PROXY_CIDRS:-}"
   local requested_server_image="${UPSTAND_SERVER_IMAGE:-}"
   local requested_web_image="${UPSTAND_WEB_IMAGE:-}"
   local requested_docs_image="${UPSTAND_DOCS_IMAGE:-}"
@@ -209,6 +210,11 @@ write_environment() {
   BETTER_AUTH_URL="${requested_better_auth_url:-${BETTER_AUTH_URL:-}}"
   CORS_ORIGIN="${requested_cors_origin:-${CORS_ORIGIN:-}}"
   NEXT_PUBLIC_SERVER_URL="${requested_server_url:-${NEXT_PUBLIC_SERVER_URL:-}}"
+  TRUSTED_PROXY_CIDRS="${requested_trusted_proxy_cidrs:-${TRUSTED_PROXY_CIDRS:-}}"
+  if [[ -z "$TRUSTED_PROXY_CIDRS" ]]; then
+    TRUSTED_PROXY_CIDRS="$(docker network inspect --format '{{range .IPAM.Config}}{{.Subnet}}{{"\n"}}{{end}}' "$NETWORK_NAME" | awk 'NF { printf "%s%s", sep, $0; sep="," }')"
+  fi
+  [[ -n "$TRUSTED_PROXY_CIDRS" ]] || fail "could not determine the trusted proxy CIDR for '$NETWORK_NAME'"
   UPSTAND_SERVER_IMAGE="${requested_server_image:-${UPSTAND_SERVER_IMAGE:-}}"
   UPSTAND_WEB_IMAGE="${requested_web_image:-${UPSTAND_WEB_IMAGE:-}}"
   UPSTAND_DOCS_IMAGE="${requested_docs_image:-${UPSTAND_DOCS_IMAGE:-}}"
@@ -237,6 +243,7 @@ write_environment() {
 DOCKER_NETWORK=$DOCKER_NETWORK
 BETTER_AUTH_URL=$BETTER_AUTH_URL
 CORS_ORIGIN=$CORS_ORIGIN
+TRUSTED_PROXY_CIDRS=$TRUSTED_PROXY_CIDRS
 NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL
 UPSTAND_DASHBOARD_HOST=$UPSTAND_DASHBOARD_HOST
 UPSTAND_API_HOST=$UPSTAND_API_HOST
@@ -338,8 +345,8 @@ main() {
   local advertise_address
   advertise_address="$(detect_advertise_address)"
   ensure_stack_file
-  write_environment "$advertise_address"
   ensure_swarm "$advertise_address"
+  write_environment "$advertise_address"
   deploy_stack
   wait_for_stack
 
