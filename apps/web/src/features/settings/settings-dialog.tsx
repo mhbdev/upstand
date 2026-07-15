@@ -10,8 +10,8 @@ import {
   Shield01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -49,15 +49,15 @@ import {
 } from "@upstand/ui/components/sidebar";
 import { cn } from "@upstand/ui/lib/utils";
 import { useEffect, useState } from "react";
-import { UpGalSettingsPanel } from "@/app/(dashboard)/settings/ai/page";
 import { authClient } from "@/lib/auth-client";
+import { ApiKeysPanel } from "./components/api-keys-panel";
 import { AppInfoPanel } from "./components/app-info-panel";
 import { MembersPanel } from "./components/members-panel";
 import { OrganizationPanel } from "./components/organization-panel";
 import { ProfilePanel } from "./components/profile-panel";
 import { SecurityPanel } from "./components/security-panel";
 import { SessionsPanel } from "./components/sessions-panel";
-import { ApiKeysPanel } from "./components/api-keys-panel";
+import { UpGalSettingsPanel } from "./components/upgal-settings-panel";
 
 type SettingsLeafItem = {
   name: string;
@@ -136,7 +136,7 @@ export function SettingsDialog() {
       if (group.visible === false) continue;
       for (const item of group.items) {
         if ("subItems" in item) {
-          const match = item.subItems!.find((s) => s.name === activeTab);
+          const match = item.subItems?.find((s) => s.name === activeTab);
           if (match) return match.label;
         } else if (item.name === activeTab) {
           return item.label;
@@ -167,12 +167,12 @@ export function SettingsDialog() {
               collapsible="none"
               className="hidden w-48 shrink-0 border-r md:flex"
             >
-              <SidebarContent className="py-2 space-y-4">
+              <SidebarContent className="space-y-4 py-2">
                 {groups.map((group) => {
                   if (group.visible === false) return null;
                   return (
                     <SidebarGroup key={group.id} className="p-0 px-2">
-                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                      <div className="px-3 py-1 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider">
                         {group.label}
                       </div>
                       <SidebarGroupContent>
@@ -180,29 +180,36 @@ export function SettingsDialog() {
                           {group.items.map((item) => {
                             if ("subItems" in item) {
                               return (
-                                <SidebarMenuItem key={item.name} className="space-y-1">
-                                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-muted-foreground/80">
-                                    <HugeiconsIcon icon={item.icon} className="size-4" />
+                                <SidebarMenuItem
+                                  key={item.name}
+                                  className="space-y-1"
+                                >
+                                  <div className="flex items-center gap-2 px-3 py-1.5 font-semibold text-muted-foreground/80 text-xs">
+                                    <HugeiconsIcon
+                                      icon={item.icon}
+                                      className="size-4"
+                                    />
                                     <span>{item.label}</span>
                                   </div>
-                                  <SidebarMenuSub className="ml-4 border-l pl-3 space-y-1">
-                                    {item.subItems!.map((subItem) => (
+                                  <SidebarMenuSub className="ml-4 space-y-1 border-l pl-3">
+                                    {item.subItems?.map((subItem) => (
                                       <SidebarMenuSubItem key={subItem.name}>
                                         <SidebarMenuSubButton
                                           render={
                                             <button
                                               type="button"
-                                              onClick={() => setActiveTab(subItem.name)}
+                                              onClick={() =>
+                                                setActiveTab(subItem.name)
+                                              }
                                             />
                                           }
                                           isActive={activeTab === subItem.name}
-                                          className="text-xs h-7"
+                                          className="h-7 text-xs"
                                         >
                                           <span>{subItem.label}</span>
                                         </SidebarMenuSubButton>
                                       </SidebarMenuSubItem>
-                                    ))
-                                  }
+                                    ))}
                                   </SidebarMenuSub>
                                 </SidebarMenuItem>
                               );
@@ -260,9 +267,7 @@ export function SettingsDialog() {
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      <BreadcrumbPage>
-                        {getActiveTabLabel()}
-                      </BreadcrumbPage>
+                      <BreadcrumbPage>{getActiveTabLabel()}</BreadcrumbPage>
                     </BreadcrumbItem>
                   </BreadcrumbList>
                 </Breadcrumb>
@@ -290,24 +295,27 @@ export function SettingsDialog() {
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>Choose a section to manage.</SheetDescription>
           </SheetHeader>
-          <nav className="p-2 space-y-4">
+          <nav className="space-y-4 p-2">
             {groups.map((group) => {
               if (group.visible === false) return null;
               return (
                 <div key={group.id} className="space-y-1">
-                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                  <div className="px-3 py-1 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider">
                     {group.label}
                   </div>
                   {group.items.map((item) => {
                     if ("subItems" in item) {
                       return (
                         <div key={item.name} className="space-y-1">
-                          <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-muted-foreground/80">
-                            <HugeiconsIcon icon={item.icon} className="size-4 shrink-0" />
+                          <div className="flex items-center gap-2 px-3 py-1.5 font-semibold text-muted-foreground/80 text-xs">
+                            <HugeiconsIcon
+                              icon={item.icon}
+                              className="size-4 shrink-0"
+                            />
                             <span>{item.label}</span>
                           </div>
-                          <div className="ml-4 border-l pl-3 space-y-1">
-                            {item.subItems!.map((subItem) => (
+                          <div className="ml-4 space-y-1 border-l pl-3">
+                            {item.subItems?.map((subItem) => (
                               <button
                                 key={subItem.name}
                                 type="button"
@@ -316,7 +324,7 @@ export function SettingsDialog() {
                                   setMobileMenuOpen(false);
                                 }}
                                 className={cn(
-                                  "flex w-full items-center rounded-md px-3 py-1.5 text-xs transition-colors text-left",
+                                  "flex w-full items-center rounded-md px-3 py-1.5 text-left text-xs transition-colors",
                                   activeTab === subItem.name
                                     ? "bg-accent font-medium text-accent-foreground"
                                     : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
@@ -345,7 +353,10 @@ export function SettingsDialog() {
                             : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                         )}
                       >
-                        <HugeiconsIcon icon={item.icon} className="size-4 shrink-0" />
+                        <HugeiconsIcon
+                          icon={item.icon}
+                          className="size-4 shrink-0"
+                        />
                         <span>{item.label}</span>
                       </button>
                     );

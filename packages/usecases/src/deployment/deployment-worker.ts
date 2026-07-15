@@ -471,11 +471,13 @@ export class DeploymentWorker {
           // to the local Docker socket.
           appendLog(
             `Warning: serverId '${deployedResource.serverId}' not found in server registry. ` +
-              `Falling back to local Docker socket.\n`,
+              "Falling back to local Docker socket.\n",
           );
         } else {
           if (!server.sshKeyId) {
-            throw new Error("Target deployment server has no SSH key configured");
+            throw new Error(
+              "Target deployment server has no SSH key configured",
+            );
           }
           const sshKey = await uow.sshKeyRepository.findById(server.sshKeyId);
           if (!sshKey)
@@ -495,7 +497,10 @@ export class DeploymentWorker {
           const remoteDocker = createRemoteDocker(connection);
           const remoteCli = createRemoteDockerCliEnvironment(connection);
           remoteCliCleanup = remoteCli.cleanup;
-          dockerService = new DockerService(remoteDocker, remoteCli.environment);
+          dockerService = new DockerService(
+            remoteDocker,
+            remoteCli.environment,
+          );
           dockerService.setCancellationKey(cancellationKey);
           caddyService = new CaddyService(remoteDocker);
           targetDestinationDocker = remoteDocker;
@@ -504,7 +509,6 @@ export class DeploymentWorker {
           );
         } // end else (server found)
       } // end if (non-local serverId)
-
 
       if (
         deployedResource.buildServerId &&

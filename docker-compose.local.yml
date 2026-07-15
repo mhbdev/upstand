@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: upstand
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
     ports:
       - "5432:5432"
     volumes:
@@ -36,13 +36,14 @@ services:
       - /app/apps/fumadocs/node_modules
       - /app/packages/repositories/node_modules
       - /app/packages/domain/node_modules
+      - /app/packages/platform/node_modules
       - /app/packages/usecases/node_modules
       - /var/run/docker.sock:/var/run/docker.sock
       - ./.docker/caddy:/etc/caddy
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/upstand
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-local-development-secret-change-before-exposing-any-service}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}@postgres:5432/upstand
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in the environment}
       BETTER_AUTH_URL: http://localhost:3000
       CORS_ORIGIN: http://localhost:3001
       REDIS_URL: redis://redis:6379

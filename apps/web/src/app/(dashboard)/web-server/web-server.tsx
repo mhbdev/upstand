@@ -593,7 +593,12 @@ export default function WebServerDashboard(_props: {
       <DashboardPageHeader
         title="Web Server (Caddy)"
         description="Configure dynamic domain routing, global SSL settings, ACME Let's Encrypt certificates, and review proxy access logs."
-        icon={<HugeiconsIcon icon={ServerStack01Icon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon
+            icon={ServerStack01Icon}
+            className="size-6 text-primary"
+          />
+        }
         actions={
           <Button
             variant="outline"

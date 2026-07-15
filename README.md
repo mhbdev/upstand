@@ -29,7 +29,8 @@ packages/repositories/ Persistence implementations
 packages/ui/    Shared UI primitives and design tokens
 packages/env/   Validated server/client environment configuration
 install.sh      Self-hosted installation and upgrade entry point
-docker-compose*.yml  Local, development, and production topologies
+docker-compose.local.yml  Bind-mounted local development stack
+docker-compose.prod.yml   Production Docker Swarm stack used by install.sh
 ```
 
 ## Prerequisites
@@ -48,8 +49,8 @@ Production self-hosting requires a Linux Docker Swarm manager with a routable ad
 git clone https://github.com/mhbdev/upstand.git
 cd upstand
 bun install --frozen-lockfile
-cp .env.example .env
-bun run db:start
+Create local ignored environment files using the variables documented in the self-hosting guide. Never commit them.
+bun run docker:local:up
 bun run db:push
 bun run dev
 ```
@@ -105,7 +106,3 @@ Start with the [documentation index](apps/fumadocs/content/docs/index.mdx):
 ## Contribution and project hygiene
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Security issues belong in [SECURITY.md](SECURITY.md), not in a public issue. The expected community standards are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and support boundaries are in [SUPPORT.md](SUPPORT.md). Release notes are maintained in [CHANGELOG.md](CHANGELOG.md).
-
-## License
-
-The repository does not currently declare a license file. Until the project owner publishes one, treat the source as all-rights-reserved and do not redistribute it. Contributions are accepted under the terms selected by the project owner.

@@ -282,7 +282,9 @@ export default function S3Destinations(_props: {
       <DashboardPageHeader
         title="S3 Storage"
         description="Manage your S3-compatible destinations. These providers will be used to store backups of your resources."
-        icon={<HugeiconsIcon icon={CloudIcon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon icon={CloudIcon} className="size-6 text-primary" />
+        }
         actions={
           <Button onClick={handleOpenAdd} className="gap-2 font-medium">
             <HugeiconsIcon icon={PlusSignIcon} className="size-4" />

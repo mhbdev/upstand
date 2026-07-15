@@ -248,9 +248,18 @@ export default function RemoteServersPage() {
   return (
     <DashboardPage>
       <DashboardPageHeader
-        title={typeof serverCount === "number" ? `Remote Servers (${serverCount})` : "Remote Servers"}
+        title={
+          typeof serverCount === "number"
+            ? `Remote Servers (${serverCount})`
+            : "Remote Servers"
+        }
         description="Add isolated deployment servers for applications, databases, and Compose workloads."
-        icon={<HugeiconsIcon icon={CloudServerIcon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon
+            icon={CloudServerIcon}
+            className="size-6 text-primary"
+          />
+        }
         actions={
           <Button
             onClick={() => {
@@ -272,7 +281,7 @@ export default function RemoteServersPage() {
             return (
               <Card
                 key={srv.id}
-                className="group relative overflow-hidden border border-border/30 bg-gradient-to-br from-card/60 via-card/40 to-card/20 hover:from-card/85 hover:via-card/60 hover:to-card/35 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1 rounded-xl flex flex-col justify-between"
+                className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/30 bg-gradient-to-br from-card/60 via-card/40 to-card/20 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:from-card/85 hover:via-card/60 hover:to-card/35 hover:shadow-primary/5 hover:shadow-xl"
               >
                 <CardHeader className="space-y-1 pb-3">
                   <div className="flex items-start justify-between gap-4">
@@ -281,44 +290,58 @@ export default function RemoteServersPage() {
                         <span className="relative flex h-2 w-2">
                           {srv.status === "ready" ? (
                             <>
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                             </>
                           ) : srv.status === "setting_up" ? (
                             <>
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500 animate-pulse"></span>
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 animate-pulse rounded-full bg-blue-500" />
                             </>
                           ) : (
                             <>
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
                             </>
                           )}
                         </span>
-                        <CardTitle className="font-semibold text-base tracking-tight text-foreground/90 group-hover:text-foreground transition-colors duration-300">
+                        <CardTitle className="font-semibold text-base text-foreground/90 tracking-tight transition-colors duration-300 group-hover:text-foreground">
                           {srv.name}
                         </CardTitle>
                         <Badge
                           variant={getStatusBadgeVariant(srv.status)}
-                          className="h-4 px-1.5 font-medium text-[9px] capitalize tracking-wide rounded-md"
+                          className="h-4 rounded-md px-1.5 font-medium text-[9px] capitalize tracking-wide"
                         >
                           {srv.status.replace("_", " ")}
                         </Badge>
                       </div>
-                      <CardDescription className="text-muted-foreground/80 text-xs line-clamp-1">
+                      <CardDescription className="line-clamp-1 text-muted-foreground/80 text-xs">
                         {srv.description || "Remote deployment environment"}
                       </CardDescription>
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="flex items-center gap-1 opacity-60 transition-opacity duration-300 group-hover:opacity-100">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(srv)}
                         className="size-7 hover:bg-muted/65"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="size-3.5"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                        </svg>
                       </Button>
                       <Button
                         variant="ghost"
@@ -326,41 +349,66 @@ export default function RemoteServersPage() {
                         onClick={() => handleDelete(srv.id)}
                         className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
-                        <HugeiconsIcon icon={Delete02Icon} className="size-3.5" />
+                        <HugeiconsIcon
+                          icon={Delete02Icon}
+                          className="size-3.5"
+                        />
                       </Button>
                     </div>
                   </div>
                   {srv.setupError && (
-                    <div className="mt-2.5 rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-destructive text-[11px] leading-relaxed flex gap-1.5 items-start">
-                      <span className="font-semibold shrink-0">Setup Error:</span> 
-                      <span className="break-all text-left">{srv.setupError}</span>
+                    <div className="mt-2.5 flex items-start gap-1.5 rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-[11px] text-destructive leading-relaxed">
+                      <span className="shrink-0 font-semibold">
+                        Setup Error:
+                      </span>
+                      <span className="break-all text-left">
+                        {srv.setupError}
+                      </span>
                     </div>
                   )}
                 </CardHeader>
 
                 <CardContent className="space-y-4 pt-0">
-                  <div className="grid grid-cols-2 gap-2 text-xs py-3 border-y border-border/20">
-                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
-                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">Host Address</span>
-                      <span className="font-mono font-semibold text-foreground/90 truncate">{srv.ipAddress}:{srv.port}</span>
+                  <div className="grid grid-cols-2 gap-2 border-border/20 border-y py-3 text-xs">
+                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
+                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
+                        Host Address
+                      </span>
+                      <span className="truncate font-mono font-semibold text-foreground/90">
+                        {srv.ipAddress}:{srv.port}
+                      </span>
                     </div>
-                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
-                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">Role</span>
-                      <span className="capitalize font-semibold text-foreground/90 flex items-center gap-1">
-                        <HugeiconsIcon icon={CloudServerIcon} className="size-3 text-primary/75" />
+                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
+                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
+                        Role
+                      </span>
+                      <span className="flex items-center gap-1 font-semibold text-foreground/90 capitalize">
+                        <HugeiconsIcon
+                          icon={CloudServerIcon}
+                          className="size-3 text-primary/75"
+                        />
                         {srv.serverType}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
-                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">SSH Key</span>
-                      <span className="font-semibold text-foreground/90 flex items-center gap-1 truncate">
-                        <HugeiconsIcon icon={Key01Icon} className="size-3 text-amber-500/75" />
+                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
+                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
+                        SSH Key
+                      </span>
+                      <span className="flex items-center gap-1 truncate font-semibold text-foreground/90">
+                        <HugeiconsIcon
+                          icon={Key01Icon}
+                          className="size-3 text-amber-500/75"
+                        />
                         {matchedKey?.name || "None"}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-black/10 border border-border/10">
-                      <span className="text-[10px] text-muted-foreground/80 font-medium uppercase tracking-wider">Username</span>
-                      <span className="font-semibold text-foreground/90 truncate">{srv.username}</span>
+                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
+                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
+                        Username
+                      </span>
+                      <span className="truncate font-semibold text-foreground/90">
+                        {srv.username}
+                      </span>
                     </div>
                   </div>
 
@@ -374,9 +422,25 @@ export default function RemoteServersPage() {
                     >
                       {srv.status === "setting_up" ? (
                         <span className="flex items-center gap-1.5">
-                          <svg className="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <svg
+                            className="mr-1 -ml-1 h-3.5 w-3.5 animate-spin text-current"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
                           </svg>
                           Setting up...
                         </span>
@@ -389,7 +453,7 @@ export default function RemoteServersPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="font-semibold text-xs border-primary/20 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300"
+                      className="border-primary/20 font-semibold text-xs transition-all duration-300 hover:border-primary/50 hover:bg-primary/5"
                       onClick={() => setInspectServerId(srv.id)}
                     >
                       Validate
@@ -426,29 +490,39 @@ export default function RemoteServersPage() {
         </div>
       )}
 
-      <Dialog open={!!inspectServerId} onOpenChange={(open) => !open && setInspectServerId(null)}>
-        <DialogContent className="sm:max-w-lg border-border/40 bg-card/95 backdrop-blur-md overflow-hidden rounded-2xl">
+      <Dialog
+        open={!!inspectServerId}
+        onOpenChange={(open) => !open && setInspectServerId(null)}
+      >
+        <DialogContent className="overflow-hidden rounded-2xl border-border/40 bg-card/95 backdrop-blur-md sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
-              <HugeiconsIcon icon={CloudServerIcon} className="size-5 text-primary animate-pulse" />
-              Server Validation: {servers?.find(s => s.id === inspectServerId)?.name}
+              <HugeiconsIcon
+                icon={CloudServerIcon}
+                className="size-5 animate-pulse text-primary"
+              />
+              Server Validation:{" "}
+              {servers?.find((s) => s.id === inspectServerId)?.name}
             </DialogTitle>
             <DialogDescription>
-              Real-time Docker daemon validation, clock synchronization, and system resource metrics.
+              Real-time Docker daemon validation, clock synchronization, and
+              system resource metrics.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 text-sm">
             <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
-              <p className="font-semibold text-foreground flex items-center gap-2">
+              <p className="flex items-center gap-2 font-semibold text-foreground">
                 <span className="relative flex h-2 w-2">
                   {validationQuery.isPending ? (
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/75"></span>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75" />
                   ) : null}
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${validationQuery.isPending ? 'bg-primary' : validationQuery.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                  <span
+                    className={`relative inline-flex h-2 w-2 rounded-full ${validationQuery.isPending ? "bg-primary" : validationQuery.isError ? "bg-rose-500" : "bg-emerald-500"}`}
+                  />
                 </span>
                 Docker Daemon Validation
               </p>
-              <p className="mt-2 font-mono text-xs text-muted-foreground break-all whitespace-pre-wrap leading-relaxed">
+              <p className="mt-2 whitespace-pre-wrap break-all font-mono text-muted-foreground text-xs leading-relaxed">
                 {validationQuery.isPending
                   ? "Checking Docker version and daemon state..."
                   : validationQuery.isError
@@ -458,16 +532,18 @@ export default function RemoteServersPage() {
             </div>
 
             <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
-              <p className="font-semibold text-foreground flex items-center gap-2">
+              <p className="flex items-center gap-2 font-semibold text-foreground">
                 <span className="relative flex h-2 w-2">
                   {hostTimeQuery.isPending ? (
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/75"></span>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75" />
                   ) : null}
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${hostTimeQuery.isPending ? 'bg-primary' : hostTimeQuery.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                  <span
+                    className={`relative inline-flex h-2 w-2 rounded-full ${hostTimeQuery.isPending ? "bg-primary" : hostTimeQuery.isError ? "bg-rose-500" : "bg-emerald-500"}`}
+                  />
                 </span>
                 Host Time Sync
               </p>
-              <p className="mt-2 font-mono text-xs text-muted-foreground break-all">
+              <p className="mt-2 break-all font-mono text-muted-foreground text-xs">
                 {hostTimeQuery.isPending
                   ? "Reading host clock..."
                   : hostTimeQuery.isError
@@ -477,24 +553,34 @@ export default function RemoteServersPage() {
             </div>
 
             <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
-              <p className="font-semibold text-foreground flex items-center gap-2">
+              <p className="flex items-center gap-2 font-semibold text-foreground">
                 <span className="relative flex h-2 w-2">
                   {runtimeStatsQuery.isPending ? (
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/75"></span>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75" />
                   ) : null}
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${runtimeStatsQuery.isPending ? 'bg-primary' : runtimeStatsQuery.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                  <span
+                    className={`relative inline-flex h-2 w-2 rounded-full ${runtimeStatsQuery.isPending ? "bg-primary" : runtimeStatsQuery.isError ? "bg-rose-500" : "bg-emerald-500"}`}
+                  />
                 </span>
                 Runtime Metrics
               </p>
-              <div className="mt-2 font-mono text-xs text-muted-foreground space-y-1">
+              <div className="mt-2 space-y-1 font-mono text-muted-foreground text-xs">
                 {runtimeStatsQuery.isPending ? (
                   <p>Reading Docker runtime stats...</p>
                 ) : runtimeStatsQuery.isError ? (
-                  <p className="text-rose-400">{runtimeStatsQuery.error.message}</p>
+                  <p className="text-rose-400">
+                    {runtimeStatsQuery.error.message}
+                  </p>
                 ) : runtimeStatsQuery.data ? (
                   <>
-                    <p>Docker Version: {runtimeStatsQuery.data.dockerVersion || "unknown"}</p>
-                    <p>Containers: {runtimeStatsQuery.data.activeContainers} active</p>
+                    <p>
+                      Docker Version:{" "}
+                      {runtimeStatsQuery.data.dockerVersion || "unknown"}
+                    </p>
+                    <p>
+                      Containers: {runtimeStatsQuery.data.activeContainers}{" "}
+                      active
+                    </p>
                     <p>CPU Usage: {runtimeStatsQuery.data.cpu}%</p>
                     <p>Memory Usage: {runtimeStatsQuery.data.memoryPercent}%</p>
                   </>
@@ -505,10 +591,7 @@ export default function RemoteServersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button
-              className="w-full"
-              onClick={() => setInspectServerId(null)}
-            >
+            <Button className="w-full" onClick={() => setInspectServerId(null)}>
               Close Validation
             </Button>
           </DialogFooter>

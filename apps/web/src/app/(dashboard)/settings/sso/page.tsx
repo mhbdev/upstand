@@ -201,7 +201,7 @@ export default function SsoSettingsPage() {
     <DashboardPage className="flex-1">
       <DashboardPageHeader
         title="Single Sign-On"
-        description="Register organization-scoped OIDC or SAML providers, verify ownership, and enforce enterprise sign-in."
+        description="Register organization-scoped OIDC or SAML providers, verify ownership, and enforce provider sign-in."
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

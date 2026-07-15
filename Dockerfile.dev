@@ -21,6 +21,7 @@ COPY packages/env/package.json ./packages/env/
 COPY packages/api/package.json ./packages/api/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
+COPY packages/platform/package.json ./packages/platform/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/

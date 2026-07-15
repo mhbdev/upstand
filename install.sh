@@ -13,6 +13,32 @@ readonly NETWORK_NAME="${DOCKER_NETWORK:-upstand-network}"
 # has no array element, so use the scalar expansion with a safe $0 fallback.
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE:-$0}")" && pwd)"
 STACK_FILE="$INSTALL_DIR/docker-compose.prod.yml"
+INTERACTIVE=false
+
+usage() {
+  cat <<'EOF'
+Usage: install.sh [--interactive]
+
+The installer is non-interactive by default. Set deployment variables in the
+environment before running it. Use --interactive to prompt for missing public
+origins when installing from a terminal.
+
+Options:
+  --interactive         prompt for missing public origins
+  --help                show this help
+EOF
+}
+
+parse_args() {
+  while (($# > 0)); do
+    case "$1" in
+      --interactive) INTERACTIVE=true ;;
+      --help|-h) usage; exit 0 ;;
+      *) fail "unknown option '$1' (use --help for usage)" ;;
+    esac
+    shift
+  done
+}
 
 fail() {
   echo "error: $*" >&2
@@ -149,7 +175,7 @@ write_environment() {
     if [[ "$advertise_address" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
       local default_api="https://api.${advertise_address}.nip.io"
       local default_dashboard="https://app.${advertise_address}.nip.io"
-      if [[ -t 0 ]]; then
+      if [[ "$INTERACTIVE" == true ]]; then
         read -r -p "API origin [${BETTER_AUTH_URL:-$default_api}]: " input_api
         read -r -p "Dashboard origin [${CORS_ORIGIN:-$default_dashboard}]: " input_dashboard
         BETTER_AUTH_URL="${input_api:-${BETTER_AUTH_URL:-$default_api}}"
@@ -301,6 +327,7 @@ wait_for_stack() {
 }
 
 main() {
+  parse_args "$@"
   require_root
   require_command openssl
   require_command awk

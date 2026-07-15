@@ -61,7 +61,7 @@ supported. Deactivated members are denied normal organization authorization,
 and deleting a SCIM user removes only that organization membership, preserving
 the global identity for future provisioning.
 
-## Enterprise SSO
+## Single sign-on
 
 Organization owners and admins can open **Settings → Single Sign-On** to
 register an OIDC or SAML provider. Provider configuration is stored through
@@ -78,38 +78,6 @@ sign-in is rejected for existing members of that organization and the login
 page's SSO flow routes them through the provider selected by their email
 domain. SSO callback URLs must be reachable from the identity provider and the
 Upstand API's configured trusted origins.
-
-## Enterprise licensing
-
-Self-hosted installations can activate an organization-bound enterprise
-license from **Settings → Enterprise License**. Configure
-`UPSTAND_LICENSE_PUBLIC_KEY` with the issuer's Ed25519 public key before
-activation. Upstand verifies the issuer, audience, organization binding,
-signature, issue time, and expiry locally, then stores the signed token
-encrypted with the platform Secret Box. The dashboard exposes only the
-license fingerprint, plan, seats, features, status, and expiry—not the token.
-
-Set `UPSTAND_LICENSE_VALIDATION_URL` when the licensing service should also
-validate activations and periodic checks remotely. Owners can validate or
-deactivate the current license from the same page; the licensing issuer,
-checkout, and Stripe/cloud provisioning are intentionally separate services.
-
-## Stripe billing
-
-For installations that sell hosted or enterprise plans, configure
-`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and
-`UPSTAND_BILLING_PLANS`. The plan variable is a JSON array such as
-`[{"id":"pro","name":"Pro","priceId":"price_...","features":["advanced-operations"]}]`.
-Owners and admins can start Stripe Checkout or open the Stripe customer
-portal from **Settings → Billing**. Configure the optional success and cancel
-URLs with `STRIPE_SUCCESS_URL` and `STRIPE_CANCEL_URL`.
-
-Register `POST /api/billing/stripe/webhook` in Stripe. Upstand verifies the
-raw request body and `Stripe-Signature`, stores event IDs for idempotent retry
-handling, and synchronizes checkout completion, subscription changes, paid or
-failed invoices, and cancellation state. Stripe remains the source of truth
-for payment methods and invoices; cloud server provisioning is deliberately a
-separate operational concern.
 
 ## AI and MCP operations
 

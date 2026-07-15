@@ -14,7 +14,26 @@ The installer supports two modes.
 
 Use release images for a production fleet once a release is published. Source builds are intentionally pinned to the checked-out Git commit and stay on the manager node.
 
-The installer accepts omitted origins for a first-run evaluation. It asks for API and dashboard origins in an interactive terminal, or derives temporary `nip.io` HTTPS origins from a public IPv4 manager in non-interactive mode. For a production rollout, set real HTTPS origins explicitly and rerun the installer after DNS is configured.
+The installer is non-interactive by default. It accepts omitted origins for a
+first-run evaluation and derives temporary `nip.io` HTTPS origins from a public
+IPv4 manager. Pass `--interactive` to prompt for missing API and dashboard
+origins. For a production rollout, set real HTTPS origins explicitly and rerun
+the installer after DNS is configured.
+
+## Installer contract
+
+The installer accepts `--help` and `--interactive`. It validates immutable
+image digests, HTTPS origins, Docker Swarm manager access, and the attachable
+overlay network before deployment. It writes only non-secret configuration to
+`/etc/upstand/.env`; generated passwords and encryption material are separate
+mode-0600 files under `/etc/upstand/secrets/`. Re-running the installer is the
+supported upgrade and repair path.
+
+For a fully non-interactive release deployment, provide
+`BETTER_AUTH_URL`, `CORS_ORIGIN`, `NEXT_PUBLIC_SERVER_URL`, and the three
+`UPSTAND_*_IMAGE` variables as immutable digests. Set
+`UPSTAND_BUILD_FROM_SOURCE=true` only when intentionally building a pinned
+Git revision on the manager.
 
 ## Secrets and state
 

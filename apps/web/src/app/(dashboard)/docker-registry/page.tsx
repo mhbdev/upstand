@@ -174,7 +174,9 @@ export default function DockerRegistryPage() {
       <DashboardPageHeader
         title="Docker Registry"
         description="Configure external Docker registries to publish and pull images during deployments."
-        icon={<HugeiconsIcon icon={ContainerIcon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon icon={ContainerIcon} className="size-6 text-primary" />
+        }
         actions={
           <Button onClick={openCreate} className="gap-2 font-medium">
             <HugeiconsIcon icon={PlusSignIcon} className="size-4" />

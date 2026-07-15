@@ -16,7 +16,6 @@ export const monitoringSettings = pgTable("monitoring_settings", {
     .$onUpdate(() => new Date()),
 });
 
-
 export const monitoringSettingsRelations = relations(
   monitoringSettings,
   ({ one }) => ({

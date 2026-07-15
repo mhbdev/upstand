@@ -4,6 +4,27 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.39 - 2026-07-15
+
+### Added
+
+- Add complete router and use-case smoke coverage for registration and module loading.
+- Document local development, production installation, supported platform features, and installer behavior in the Fumadocs guides.
+
+### Changed
+
+- Consolidate Docker Compose configuration into the local development stack and the production Docker Swarm stack.
+- Make `install.sh` non-interactive by default, with an explicit `--interactive` mode and safer immutable-image validation.
+- Remove product enterprise, licensing, and billing surfaces and keep SSO, SCIM, and custom roles available through normal organization permissions.
+- Remove E2E and external-service integration test harnesses, retaining deterministic unit, contract, and smoke coverage.
+
+### Fixed
+
+- Fix the login page hook-order runtime error by removing redundant session subscriptions from credential forms.
+- Use the active Bun/Node runtime executable for the Docker API proxy test path.
+- Enable Better Auth email/password sign-in and correct auth middleware error responses.
+- Remove committed environment examples and credential-bearing E2E artifacts from the project.
+
 ## 0.1.38 - 2026-07-15
 
 ### Fixed
@@ -69,7 +90,6 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ### Changed
 
-- Remove all licensing implementation, enterprise plans, and billing restrictions.
 - Unlock all features (SSO, SCIM, Custom Roles, Branding/Whitelabeling) for free as OSS.
 - Fix workspace dependencies configuration in Dockerfiles.
 

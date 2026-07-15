@@ -5,7 +5,6 @@ import { scimProvider } from "@upstand/db/schema/scim";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
-import { assertEnterpriseFeature } from "../enterprise";
 import { router, twoFactorVerifiedProcedure } from "../index";
 
 const baseInput = z.object({ organizationId: z.string().min(1) });
@@ -35,11 +34,6 @@ export const scimRouter = router({
     .input(baseInput)
     .query(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "scim",
-      );
       const db = createDb();
       const rows = await db
         .select({
@@ -59,11 +53,6 @@ export const scimRouter = router({
     .input(baseInput.extend({ providerId: z.string().trim().min(1).max(120) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "scim",
-      );
       const db = createDb();
       const token = createScimToken();
       try {
@@ -100,11 +89,6 @@ export const scimRouter = router({
     .input(baseInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "scim",
-      );
       const db = createDb();
       const token = createScimToken();
       const [row] = await db
@@ -133,11 +117,6 @@ export const scimRouter = router({
     .input(baseInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "scim",
-      );
       const db = createDb();
       const deleted = await db
         .delete(scimProvider)

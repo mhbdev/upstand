@@ -525,10 +525,15 @@ export default function Projects(_props: {
         description={
           <>
             Manage your apps, databases, and environments under{" "}
-            <span className="font-semibold text-foreground">{activeOrg?.name || "your organization"}</span>.
+            <span className="font-semibold text-foreground">
+              {activeOrg?.name || "your organization"}
+            </span>
+            .
           </>
         }
-        icon={<HugeiconsIcon icon={Folder01Icon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon icon={Folder01Icon} className="size-6 text-primary" />
+        }
         actions={
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input

@@ -246,8 +246,17 @@ export class SetupServerUseCase {
         ? "/app/apps/monitoring"
         : path.join(process.cwd(), "apps", "monitoring");
 
-    if (process.env.NODE_ENV !== "production" && !fs.existsSync(monitoringPath)) {
-      const alternativePath = path.join(process.cwd(), "..", "..", "apps", "monitoring");
+    if (
+      process.env.NODE_ENV !== "production" &&
+      !fs.existsSync(monitoringPath)
+    ) {
+      const alternativePath = path.join(
+        process.cwd(),
+        "..",
+        "..",
+        "apps",
+        "monitoring",
+      );
       if (fs.existsSync(alternativePath)) {
         monitoringPath = alternativePath;
       }

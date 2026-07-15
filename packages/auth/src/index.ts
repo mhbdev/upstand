@@ -84,6 +84,11 @@ export function createAuth() {
     trustedOrigins: [env.CORS_ORIGIN, env.BETTER_AUTH_URL],
     emailAndPassword: {
       enabled: true,
+      // The dashboard's local bootstrap and normal sign-up flow expect the
+      // newly created account to receive a session immediately. Email
+      // verification remains independently configurable for deployments that
+      // require it.
+      autoSignIn: true,
     },
     user: {
       // Admin-created members still use Better Auth's normal credential
@@ -214,18 +219,13 @@ export function createAuth() {
           const userCount = result[0]?.value ?? 0;
 
           if (userCount > 0) {
-            return {
-              response: new Response(
-                JSON.stringify({
-                  error:
-                    "This Upstand instance has already been configured. Sign in with the owner account.",
-                }),
-                {
-                  status: 403,
-                  headers: { "content-type": "application/json" },
-                },
-              ),
-            };
+            return ctx.json(
+              {
+                error:
+                  "This Upstand instance has already been configured. Sign in with the owner account.",
+              },
+              { status: 403 },
+            );
           }
         }
 
@@ -247,26 +247,24 @@ export function createAuth() {
 
           if (org?.metadata) {
             try {
-              const metadata = JSON.parse(org.metadata);
+              const metadata = JSON.parse(org.metadata) as {
+                isPersonal?: boolean;
+              };
               if (metadata.isPersonal) {
-                return {
-                  response: new Response(
-                    JSON.stringify({
-                      error: "Cannot delete personal organization",
-                    }),
-                    {
-                      status: 400,
-                      headers: { "content-type": "application/json" },
-                    },
-                  ),
-                };
+                return ctx.json(
+                  { error: "Cannot delete personal organization" },
+                  { status: 400 },
+                );
               }
-            } catch (_) {}
+            } catch {
+              // Ignore malformed legacy metadata; deletion authorization is
+              // still enforced by the organization permission checks.
+            }
           }
         }
 
         // Password sign-in must not become a bypass for an organization that
-        // explicitly requires its verified enterprise identity provider. The
+        // explicitly requires its verified identity provider. The
         // SSO endpoint is intentionally not blocked, and organizations with
         // no registered provider are ignored to prevent accidental lockout.
         if (ctx.path.endsWith("/sign-in/email")) {
@@ -307,18 +305,13 @@ export function createAuth() {
             }
           });
           if (isEnforced) {
-            return {
-              response: new Response(
-                JSON.stringify({
-                  error:
-                    "This organization requires sign-in through its verified SSO provider.",
-                }),
-                {
-                  status: 403,
-                  headers: { "content-type": "application/json" },
-                },
-              ),
-            };
+            return ctx.json(
+              {
+                error:
+                  "This organization requires sign-in through its verified SSO provider.",
+              },
+              { status: 403 },
+            );
           }
         }
       }),

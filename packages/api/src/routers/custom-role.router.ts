@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { createDb } from "@upstand/db";
-import { member, invitation } from "@upstand/db/schema/auth";
+import { invitation, member } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
-import { assertEnterpriseFeature } from "../enterprise";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { type PermissionAction, ROLE_PERMISSIONS } from "../permissions";
 
@@ -42,11 +41,6 @@ export const customRoleRouter = router({
     .input(baseInput)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "custom_roles",
-      );
       const db = createDb();
       const rows = await db
         .select()
@@ -65,11 +59,6 @@ export const customRoleRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "custom_roles",
-      );
       const db = createDb();
       const [row] = await db
         .insert(customRole)
@@ -98,11 +87,6 @@ export const customRoleRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "custom_roles",
-      );
       const db = createDb();
       const [row] = await db
         .update(customRole)
@@ -135,11 +119,6 @@ export const customRoleRouter = router({
     .input(baseInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "custom_roles",
-      );
       const db = createDb();
 
       // Degrade active members with this custom role to standard "member"

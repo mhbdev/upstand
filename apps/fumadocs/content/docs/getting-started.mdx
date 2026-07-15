@@ -24,7 +24,7 @@ Run this on the manager. Replace the example hosts before pasting it.
 curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash
 ```
 
-If you already have domains, export `BETTER_AUTH_URL`, `CORS_ORIGIN`, and `NEXT_PUBLIC_SERVER_URL` before running the command. If you omit them, interactive installs ask for them and non-interactive installs derive temporary HTTPS `nip.io` origins from the public IPv4 address. You can replace them in `/etc/upstand/.env` and rerun the installer after DNS is ready.
+If you already have domains, export `BETTER_AUTH_URL`, `CORS_ORIGIN`, and `NEXT_PUBLIC_SERVER_URL` before running the command. The installer is non-interactive by default; when origins are omitted it derives temporary HTTPS `nip.io` origins from the public IPv4 address. To answer origin prompts explicitly, pass `--interactive`. Replace temporary origins in `/etc/upstand/.env` and rerun the installer after DNS is ready.
 
 The first run installs Docker when required, initializes Swarm, creates an attachable `upstand-network`, pulls immutable release images, generates Docker secrets under `/etc/upstand/secrets/`, and waits for Postgres, Redis, API, dashboard, and docs health checks.
 
@@ -40,3 +40,18 @@ curl -fsS https://api.example.com/health/ready
 Every service should report `1/1`; the health response must report database, Redis, workers, and Caddy as ready.
 
 Next: [self-hosting](/docs/self-hosting), [remote servers](/docs/remote-servers), or [deployments](/docs/deployments).
+
+## Local development
+
+The repository has one local topology: `docker-compose.local.yml`. It provides
+PostgreSQL, Redis, the hot-reloading API, the dashboard, and the documentation
+site with bind mounts. Start it with:
+
+```bash
+bun run docker:local:up
+bun run db:push
+```
+
+The production topology is intentionally separate: `docker-compose.prod.yml` is
+a Docker Swarm stack consumed by `install.sh`. There is no third default
+Compose file.

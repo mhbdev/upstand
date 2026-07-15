@@ -245,7 +245,9 @@ export default function SSHKeys(_props: {
       <DashboardPageHeader
         title="SSH Keys"
         description="Create and manage SSH Keys to securely access your servers and Git repositories."
-        icon={<HugeiconsIcon icon={Key01Icon} className="size-6 text-primary" />}
+        icon={
+          <HugeiconsIcon icon={Key01Icon} className="size-6 text-primary" />
+        }
         actions={
           <Button
             onClick={() => {

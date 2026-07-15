@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
-import { Copy, KeyRound, ShieldCheck, Trash2 } from "lucide-react";
+import { Copy, ShieldCheck, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
@@ -133,26 +133,38 @@ export function ApiKeysPanel() {
     <div className="flex flex-col gap-4">
       <Card className="border border-border/40 bg-card/25 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Create an API key</CardTitle>
+          <CardTitle className="font-semibold text-sm">
+            Create an API key
+          </CardTitle>
           <CardDescription className="text-xs">
             Secrets are shown once, hashed by Better Auth, and rate limited
             through Redis.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 border-t border-border/10 pt-5">
+        <CardContent className="flex flex-col gap-4 border-border/10 border-t pt-5">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="key-name" className="text-xs font-medium text-foreground/80">Name</Label>
+              <Label
+                htmlFor="key-name"
+                className="font-medium text-foreground/80 text-xs"
+              >
+                Name
+              </Label>
               <Input
                 id="key-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="CI deployment key"
-                className="text-xs h-9"
+                className="h-9 text-xs"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="key-expiration" className="text-xs font-medium text-foreground/80">Expiration (days)</Label>
+              <Label
+                htmlFor="key-expiration"
+                className="font-medium text-foreground/80 text-xs"
+              >
+                Expiration (days)
+              </Label>
               <Input
                 id="key-expiration"
                 type="number"
@@ -160,12 +172,17 @@ export function ApiKeysPanel() {
                 max={365}
                 value={expiresInDays}
                 onChange={(event) => setExpiresInDays(event.target.value)}
-                className="text-xs h-9"
+                className="h-9 text-xs"
               />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="key-preset" className="text-xs font-medium text-foreground/80">Permission preset</Label>
+            <Label
+              htmlFor="key-preset"
+              className="font-medium text-foreground/80 text-xs"
+            >
+              Permission preset
+            </Label>
             <Select
               value={preset}
               disabled={advanced}
@@ -175,24 +192,28 @@ export function ApiKeysPanel() {
             >
               <SelectTrigger
                 id="key-preset"
-                className="w-full text-xs h-9"
+                className="h-9 w-full text-xs"
                 aria-label="Permission preset"
               >
                 <SelectValue placeholder="Select a permission preset" />
               </SelectTrigger>
               <SelectContent>
                 {PRESETS.map((item) => (
-                  <SelectItem key={item.value} value={item.value} className="text-xs">
+                  <SelectItem
+                    key={item.value}
+                    value={item.value}
+                    className="text-xs"
+                  >
                     {item.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-[11px] text-muted-foreground">
               {PRESETS.find((item) => item.value === preset)?.description}
             </p>
           </div>
-          <label className="flex items-center gap-2 text-xs font-medium text-foreground/80 cursor-pointer">
+          <label className="flex cursor-pointer items-center gap-2 font-medium text-foreground/80 text-xs">
             <Checkbox
               checked={advanced}
               onCheckedChange={(checked) => setAdvanced(checked === true)}
@@ -200,11 +221,11 @@ export function ApiKeysPanel() {
             Use advanced permissions
           </label>
           {advanced ? (
-            <div className="grid gap-2 rounded-md border border-border/40 bg-background/30 p-3 grid-cols-1 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 rounded-md border border-border/40 bg-background/30 p-3 sm:grid-cols-2">
               {API_KEY_PERMISSION_ACTIONS.map((permission) => (
                 <label
                   key={permission}
-                  className="flex items-center gap-2 text-xs font-medium text-foreground/80 cursor-pointer"
+                  className="flex cursor-pointer items-center gap-2 font-medium text-foreground/80 text-xs"
                 >
                   <Checkbox
                     checked={selectedPermissions.includes(permission)}
@@ -231,7 +252,9 @@ export function ApiKeysPanel() {
               <p className="font-medium text-amber-800 dark:text-amber-200">
                 Copy this secret now. It cannot be recovered.
               </p>
-              <code className="break-all font-mono text-[11px] bg-background/50 p-2 rounded border">{secret}</code>
+              <code className="break-all rounded border bg-background/50 p-2 font-mono text-[11px]">
+                {secret}
+              </code>
               <Button
                 variant="outline"
                 size="sm"
@@ -251,28 +274,35 @@ export function ApiKeysPanel() {
 
       <Card className="border border-border/40 bg-card/25 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Organization keys</CardTitle>
+          <CardTitle className="font-semibold text-sm">
+            Organization keys
+          </CardTitle>
           <CardDescription className="text-xs">
             Revoked and expired keys cannot be used, even if cached clients
             retry.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2 border-t border-border/10 pt-5">
+        <CardContent className="flex flex-col gap-2 border-border/10 border-t pt-5">
           {keys.data?.apiKeys.map((key) => (
             <div
               key={key.id}
               className="flex flex-wrap items-center gap-3 rounded-md border border-border/40 bg-background/30 p-3 text-xs"
             >
               <div className="mr-auto">
-                <p className="font-semibold text-foreground/90">{key.name || "Unnamed key"}</p>
-                <p className="text-muted-foreground text-[10px]">
+                <p className="font-semibold text-foreground/90">
+                  {key.name || "Unnamed key"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
                   {key.start || key.prefix || "key"} · expires{" "}
                   {key.expiresAt
                     ? new Date(key.expiresAt).toLocaleDateString()
                     : "never"}
                 </p>
               </div>
-              <Badge variant={key.enabled ? "secondary" : "destructive"} className="text-[10px] px-2 py-0.5">
+              <Badge
+                variant={key.enabled ? "secondary" : "destructive"}
+                className="px-2 py-0.5 text-[10px]"
+              >
                 {key.enabled ? "Active" : "Disabled"}
               </Badge>
               <Button
@@ -280,7 +310,7 @@ export function ApiKeysPanel() {
                 variant="outline"
                 onClick={() => revoke.mutate({ organizationId, keyId: key.id })}
                 disabled={revoke.isPending}
-                className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                className="h-8 text-destructive text-xs hover:bg-destructive/10 hover:text-destructive"
               >
                 <Trash2 className="mr-1.5 size-3.5" />
                 Revoke
@@ -294,7 +324,7 @@ export function ApiKeysPanel() {
           ) : null}
         </CardContent>
       </Card>
-      <div className="flex items-center gap-2 text-muted-foreground text-[11px] px-1">
+      <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
         <ShieldCheck className="size-4 text-emerald-600" />
         Organization keys never create browser sessions.
       </div>

@@ -1,3 +1,5 @@
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { PermissionAction } from "@upstand/api/permissions";
@@ -22,8 +24,6 @@ import {
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
-import { Delete02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { toast } from "sonner";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
@@ -150,7 +150,7 @@ export function MembersPanel() {
           const newRole = await createCustomRole.mutateAsync({
             organizationId,
             name: value.customRoleName.trim(),
-            description: `Created during member invitation`,
+            description: "Created during member invitation",
             permissions: value.permissions,
           });
           customRoleId = newRole.id;
@@ -162,7 +162,8 @@ export function MembersPanel() {
         customRoleId = value.role.slice("custom:".length);
       }
 
-      const isCustom = value.role === "create-custom" || value.role.startsWith("custom:");
+      const isCustom =
+        value.role === "create-custom" || value.role.startsWith("custom:");
       const apiRole = (isCustom ? "member" : value.role) as "member" | "admin";
 
       if (mode === "create") {
@@ -221,7 +222,9 @@ export function MembersPanel() {
       );
     } else {
       const customId = roleVal.slice("custom:".length);
-      const selectedRole = customRolesQuery.data?.find((r) => r.id === customId);
+      const selectedRole = customRolesQuery.data?.find(
+        (r) => r.id === customId,
+      );
       if (selectedRole) {
         form.setFieldValue("permissions", selectedRole.permissions as any);
       }
@@ -368,12 +371,13 @@ export function MembersPanel() {
                         value: `custom:${role.id}`,
                         label: `${role.name} (Custom)`,
                       })),
-                      { value: "create-custom", label: "Create custom role..." },
+                      {
+                        value: "create-custom",
+                        label: "Create custom role...",
+                      },
                     ]}
                     value={field.state.value}
-                    onValueChange={(val) =>
-                      handleRoleChange(val ?? "")
-                    }
+                    onValueChange={(val) => handleRoleChange(val ?? "")}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -391,17 +395,29 @@ export function MembersPanel() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                if (confirm(`Are you sure you want to delete the custom role "${role.name}"? Active members with this role will be degraded to the Member role.`)) {
-                                  removeCustomRole.mutate({ organizationId, id: role.id });
+                                if (
+                                  confirm(
+                                    `Are you sure you want to delete the custom role "${role.name}"? Active members with this role will be degraded to the Member role.`,
+                                  )
+                                ) {
+                                  removeCustomRole.mutate({
+                                    organizationId,
+                                    id: role.id,
+                                  });
                                 }
                               }}
                             >
-                              <HugeiconsIcon icon={Delete02Icon} className="size-3.5" />
+                              <HugeiconsIcon
+                                icon={Delete02Icon}
+                                className="size-3.5"
+                              />
                             </button>
                           </div>
                         </SelectItem>
                       ))}
-                      <SelectItem value="create-custom">Create custom role...</SelectItem>
+                      <SelectItem value="create-custom">
+                        Create custom role...
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -414,7 +430,9 @@ export function MembersPanel() {
                   <form.Field name="customRoleName">
                     {(field) => (
                       <Field>
-                        <FieldLabel htmlFor={field.name}>Custom Role Name</FieldLabel>
+                        <FieldLabel htmlFor={field.name}>
+                          Custom Role Name
+                        </FieldLabel>
                         <Input
                           id={field.name}
                           name={field.name}

@@ -4,7 +4,6 @@ import { organization, ssoProvider } from "@upstand/db/schema/auth";
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
-import { assertEnterpriseFeature } from "../enterprise";
 import { router, twoFactorVerifiedProcedure } from "../index";
 
 const inputSchema = z.object({ organizationId: z.string().min(1) });
@@ -37,11 +36,6 @@ export const ssoRouter = router({
     .input(inputSchema)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "sso",
-      );
       const db = createDb();
       const [workspace, providerCount] = await Promise.all([
         db
@@ -68,11 +62,6 @@ export const ssoRouter = router({
     .input(inputSchema.extend({ enforced: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      await assertEnterpriseFeature(
-        ctx.session.user.id,
-        input.organizationId,
-        "sso",
-      );
       const db = createDb();
       const current = await db
         .select({ metadata: organization.metadata })

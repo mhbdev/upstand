@@ -263,7 +263,7 @@ function ensureDockerProxy() {
       server.listen(PORT, "127.0.0.1");
     `;
 
-    const child = spawn("node", ["-e", code], {
+    const child = spawn(process.execPath, ["-e", code], {
       detached: true,
       stdio: "ignore",
     });
