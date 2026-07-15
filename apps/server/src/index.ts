@@ -83,7 +83,8 @@ import { DeploymentRuntime } from "./deployment-runtime";
 import { ScheduledDockerCleanup } from "./docker-cleanup-scheduler";
 import { initializeMonitoring } from "./monitoring-agent";
 import { runDatabaseMigrations } from "./startup";
-import { terminalBroker } from "./terminal-broker";
+import { isStepUpAuthenticationSatisfied } from "./step-up-auth";
+import { matchesTerminalSession, terminalBroker } from "./terminal-broker";
 
 initLogger({
   env: { service: "upstand-server" },
@@ -162,6 +163,9 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 app.post("/api/terminal/session", async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) return c.json({ error: "Authentication required" }, 401);
+  if (!(await isStepUpAuthenticationSatisfied(session))) {
+    return c.json({ error: "2FA verification required" }, 403);
+  }
 
   const body = (await c.req.json().catch(() => null)) as {
     organizationId?: string;
@@ -213,6 +217,8 @@ app.post("/api/terminal/session", async (c) => {
   });
   const token = terminalBroker.create({
     userId: session.user.id,
+    sessionId: session.session.id,
+    twoFactorEnabled: session.user.twoFactorEnabled === true,
     host: settings.serverIp,
     port: body.port && Number.isInteger(body.port) ? body.port : 22,
     username: body.username?.trim() || "root",
@@ -224,6 +230,9 @@ app.post("/api/terminal/session", async (c) => {
 app.post("/api/container-terminal/session", async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) return c.json({ error: "Authentication required" }, 401);
+  if (!(await isStepUpAuthenticationSatisfied(session))) {
+    return c.json({ error: "2FA verification required" }, 403);
+  }
 
   const body = (await c.req.json().catch(() => null)) as {
     organizationId?: string;
@@ -336,6 +345,8 @@ app.post("/api/container-terminal/session", async (c) => {
 
   const token = terminalBroker.create({
     userId: session.user.id,
+    sessionId: session.session.id,
+    twoFactorEnabled: session.user.twoFactorEnabled === true,
     host,
     port,
     username,
@@ -348,6 +359,9 @@ app.post("/api/container-terminal/session", async (c) => {
 app.post("/api/docker/terminal/session", async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) return c.json({ error: "Authentication required" }, 401);
+  if (!(await isStepUpAuthenticationSatisfied(session))) {
+    return c.json({ error: "2FA verification required" }, 403);
+  }
 
   const body = (await c.req.json().catch(() => null)) as {
     organizationId?: string;
@@ -371,13 +385,6 @@ app.post("/api/docker/terminal/session", async (c) => {
   } catch {
     return c.json({ error: "Docker terminal permission is required" }, 403);
   }
-  if (session.user.twoFactorEnabled) {
-    const verified = await redis.get(`2fa-verified:${session.session.id}`);
-    if (verified !== "true") {
-      return c.json({ error: "2FA verification required" }, 403);
-    }
-  }
-
   const scope = c.get("scope");
   const uow = scope.resolve(UnitOfWorkToken);
   const serverId =
@@ -466,6 +473,8 @@ app.post("/api/docker/terminal/session", async (c) => {
 
   const token = terminalBroker.create({
     userId: session.user.id,
+    sessionId: session.session.id,
+    twoFactorEnabled: session.user.twoFactorEnabled === true,
     host,
     port,
     username,
@@ -496,6 +505,23 @@ app.get(
                 ) as ArrayBuffer,
               ),
             (message) => ws.close(1000, message),
+            async (identity) => {
+              const currentSession = await auth.api.getSession({
+                headers: c.req.raw.headers,
+              });
+              if (!currentSession) return false;
+              if (
+                !matchesTerminalSession(identity, {
+                  userId: currentSession.user.id,
+                  sessionId: currentSession.session.id,
+                  twoFactorEnabled:
+                    currentSession.user.twoFactorEnabled === true,
+                })
+              ) {
+                return false;
+              }
+              return isStepUpAuthenticationSatisfied(currentSession);
+            },
           );
           ws.send(JSON.stringify({ type: "terminal.ready" }));
         } catch (error) {

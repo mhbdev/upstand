@@ -3,6 +3,8 @@ import { Client, type ClientChannel } from "ssh2";
 
 type TerminalSession = {
   userId: string;
+  sessionId: string;
+  twoFactorEnabled: boolean;
   host: string;
   port: number;
   username: string;
@@ -10,6 +12,22 @@ type TerminalSession = {
   command?: string;
   expiresAt: number;
 };
+
+export type TerminalSessionIdentity = Pick<
+  TerminalSession,
+  "userId" | "sessionId" | "twoFactorEnabled"
+>;
+
+export function matchesTerminalSession(
+  expected: TerminalSessionIdentity,
+  actual: TerminalSessionIdentity,
+): boolean {
+  return (
+    expected.userId === actual.userId &&
+    expected.sessionId === actual.sessionId &&
+    expected.twoFactorEnabled === actual.twoFactorEnabled
+  );
+}
 
 type TerminalConnection = {
   client: Client;
@@ -31,6 +49,7 @@ export class TerminalBroker {
     token: string,
     onData: (data: Uint8Array) => void,
     onClose: (message: string) => void,
+    validateSession: (identity: TerminalSessionIdentity) => Promise<boolean>,
   ): Promise<void> {
     const session = this.sessions.get(token);
     this.sessions.delete(token);
@@ -38,6 +57,15 @@ export class TerminalBroker {
       throw new Error(
         "Terminal session expired. Open a new terminal and try again.",
       );
+    }
+    if (
+      !(await validateSession({
+        userId: session.userId,
+        sessionId: session.sessionId,
+        twoFactorEnabled: session.twoFactorEnabled,
+      }))
+    ) {
+      throw new Error("Terminal session is no longer valid.");
     }
 
     const client = new Client();
