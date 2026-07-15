@@ -15,6 +15,7 @@ export function mockUnitOfWork<T extends object>(
     templateRepository: emptyRepository(),
     environmentRepository: emptyRepository(),
     resourceRepository: emptyRepository(),
+    resourceRuntimeRepository: emptyRepository(),
     sshKeyRepository: emptyRepository(),
     gitProviderRepository: emptyRepository(),
     webServerSettingsRepository: emptyRepository(),

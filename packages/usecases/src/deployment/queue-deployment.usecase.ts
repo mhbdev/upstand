@@ -133,24 +133,10 @@ export class QueueDeploymentUseCase {
         sourceRevision: input.sourceRevision ?? null,
       });
 
-      // 3. Update the resource's JSON deployments list (backwards compatibility)
-      const currentDeps = JSON.parse(resource.deployments || "[]");
-      const newDeploymentItem = {
-        id: deploymentId,
-        status: "queued" as const,
-        createdAt: new Date().toISOString(),
-        logs: "Added to queue. Waiting for slot...\n",
-        ...(input.sourceRevision
-          ? { sourceRevision: input.sourceRevision }
-          : {}),
-      };
-      const updatedDeps = [newDeploymentItem, ...currentDeps].slice(0, 10);
-
       const updatedResource = await tx.resourceRepository.updateById(
         resource.id,
         {
           status: "queued",
-          deployments: JSON.stringify(updatedDeps),
         },
       );
 
@@ -202,17 +188,7 @@ export class QueueDeploymentUseCase {
           queued.updatedResource.id,
         );
         if (resource) {
-          const deployments = JSON.parse(resource.deployments || "[]");
-          const item = deployments.find(
-            (candidate: { id?: string }) =>
-              candidate.id === queued.deploymentId,
-          );
-          if (item) {
-            item.status = "failed";
-            item.logs = `${item.logs || ""}\nUnable to enqueue deployment: ${message}\n`;
-          }
           await tx.resourceRepository.updateById(resource.id, {
-            deployments: JSON.stringify(deployments),
             status:
               resource.status === "queued"
                 ? queued.previousResourceStatus

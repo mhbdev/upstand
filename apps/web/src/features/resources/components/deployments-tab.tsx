@@ -38,50 +38,21 @@ type DeploymentItem = {
   title: string;
   logs: string;
   createdAt: string;
-  sourceRevision?: string;
+  sourceRevision?: string | null;
 };
 
 interface DeploymentsTabProps {
   resource: any;
+  deployments: DeploymentItem[];
+  refetchDeployments: () => Promise<unknown>;
   deployResource: any;
   isDeployingResource: boolean;
 }
 
-const parseDeploymentItems = (
-  value: string | null | undefined,
-): DeploymentItem[] => {
-  if (!value) return [];
-  try {
-    const parsed: unknown = JSON.parse(value || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((item) => {
-      if (typeof item !== "object" || item === null) return [];
-      const id = typeof item.id === "string" ? item.id : undefined;
-      if (!id) return [];
-      return [
-        {
-          id,
-          status: typeof item.status === "string" ? item.status : "unknown",
-          title: typeof item.title === "string" ? item.title : "Deployment",
-          logs: typeof item.logs === "string" ? item.logs : "",
-          createdAt:
-            typeof item.createdAt === "string"
-              ? item.createdAt
-              : new Date(0).toISOString(),
-          sourceRevision:
-            typeof item.sourceRevision === "string"
-              ? item.sourceRevision
-              : undefined,
-        },
-      ];
-    });
-  } catch {
-    return [];
-  }
-};
-
 export function DeploymentsTab({
   resource,
+  deployments,
+  refetchDeployments,
   deployResource,
   isDeployingResource,
 }: DeploymentsTabProps) {
@@ -140,10 +111,8 @@ export function DeploymentsTab({
   });
 
   useEffect(() => {
-    if (resource) {
-      setDeployList(parseDeploymentItems(resource.deployments));
-    }
-  }, [resource]);
+    setDeployList(deployments);
+  }, [deployments]);
 
   const isBuilding = deployList.some((d) => d.status === "running");
   const isGitBackedApplication =
@@ -162,18 +131,7 @@ export function DeploymentsTab({
   const cancelDeploymentMutation = useMutation({
     ...trpc.deployment.cancelDeploymentJob.mutationOptions(),
     onSuccess: () => {
-      if (!queuedDeployment) return;
-      setDeployList((current) =>
-        current.map((deployment) =>
-          deployment.id === queuedDeployment.id
-            ? {
-                ...deployment,
-                status: "failed",
-                logs: `${deployment.logs}\nDeployment cancelled by user.\n`,
-              }
-            : deployment,
-        ),
-      );
+      void refetchDeployments();
       toast.success("Queued deployment cancelled");
     },
     onError: (error) => toast.error(error.message),
@@ -188,11 +146,8 @@ export function DeploymentsTab({
   const removeDeploymentMutation = useMutation({
     ...trpc.deployment.removeDeployment.mutationOptions(),
     onSuccess: (_, variables) => {
-      setDeployList((current) =>
-        current.filter(
-          (deployment) => deployment.id !== variables.deploymentId,
-        ),
-      );
+      void variables;
+      void refetchDeployments();
       toast.success("Deployment removed from history");
     },
     onError: (error) => toast.error(error.message),
@@ -200,11 +155,7 @@ export function DeploymentsTab({
   const clearHistoryMutation = useMutation({
     ...trpc.deployment.clearHistory.mutationOptions(),
     onSuccess: () => {
-      setDeployList((current) =>
-        current.filter(
-          (deployment) => !["success", "failed"].includes(deployment.status),
-        ),
-      );
+      void refetchDeployments();
       toast.success("Completed deployment history cleared");
     },
     onError: (error) => toast.error(error.message),
@@ -212,8 +163,8 @@ export function DeploymentsTab({
 
   const rollbackMutation = useMutation({
     ...trpc.resource.rollback.mutationOptions(),
-    onSuccess: (updated) => {
-      setDeployList(parseDeploymentItems(updated.deployments));
+    onSuccess: () => {
+      void refetchDeployments();
       toast.success(
         supportsHistoricalRollback
           ? "Historical revision queued for redeployment"

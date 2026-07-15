@@ -53,21 +53,27 @@ import { checkPermission } from "../permissions";
 
 function publicResource(resource: Resource): Omit<
   Resource,
-  "webhookTokenHash" | "buildSecrets"
+  "webhookTokenHash" | "credentials" | "buildSecrets" | "envVars"
 > & {
+  credentialsConfigured: boolean;
+  buildSecretsConfigured: boolean;
+  envVarsConfigured: boolean;
   managedEnvironment: Record<string, string>;
 } {
   const {
     webhookTokenHash: _webhookTokenHash,
+    credentials: _credentials,
     buildSecrets: _buildSecrets,
+    envVars: _envVars,
     ...safeResource
   } = resource;
   return {
     ...safeResource,
-    credentials: resourceCredentialsJson(resource),
-    envVars: JSON.stringify(
-      parseResourceEnvironmentVariables(resource.envVars),
-    ),
+    credentialsConfigured: Boolean(resource.credentials),
+    buildSecretsConfigured: Boolean(resource.buildSecrets),
+    envVarsConfigured:
+      Object.keys(parseResourceEnvironmentVariables(resource.envVars)).length >
+      0,
     managedEnvironment:
       resource.type === "database"
         ? getManagedDatabaseEnvironment(resource)
@@ -191,6 +197,46 @@ export const resourceRouter = router({
       );
 
       return publicResource(resource);
+    }),
+
+  getSecrets: twoFactorVerifiedProcedure
+    .input(GetResourceInputSchema)
+    .query(async ({ ctx, input }) => {
+      const resource = await ctx.scope
+        .resolve(GetResourceUseCaseToken)
+        .execute(input);
+      if (!resource) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource not found",
+        });
+      }
+
+      const environment = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: resource.environmentId });
+      const project = environment
+        ? await ctx.scope
+            .resolve(GetProjectUseCaseToken)
+            .execute({ id: environment.projectId })
+        : null;
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resource project not found",
+        });
+      }
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "resource:view",
+      );
+
+      return {
+        credentials: resourceCredentialsJson(resource),
+        envVars: parseResourceEnvironmentVariables(resource.envVars),
+        buildSecretsConfigured: Boolean(resource.buildSecrets),
+      };
     }),
 
   update: twoFactorVerifiedProcedure

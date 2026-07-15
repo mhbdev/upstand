@@ -320,8 +320,6 @@ export const ResourceSchema = z.object({
   advancedConfig: z.string().optional(),
   envVars: z.string(),
   domains: z.string(),
-  deployments: z.string(),
-  containers: z.string(),
   serverId: z.string().nullable().optional(),
   buildServerId: z.string().nullable().optional(),
   createdAt: z.date(),
@@ -363,8 +361,6 @@ export interface CreateResourceDTO {
   advancedConfig?: string;
   envVars?: string;
   domains?: string;
-  deployments?: string;
-  containers?: string;
   serverId?: string | null;
   buildServerId?: string | null;
 }

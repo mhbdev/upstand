@@ -63,6 +63,7 @@ type ContainerItem = {
 
 interface ContainersTabProps {
   resource: any;
+  secrets: { envVars: Record<string, string> };
   liveContainers: any;
   containerLogsData: any;
   controlContainer: any;
@@ -70,32 +71,6 @@ interface ContainersTabProps {
   setContainerModalOpen: (open: boolean) => void;
   setSelectedContainerId: (id: string | null) => void;
 }
-
-const parseContainerItems = (
-  value: string | null | undefined,
-): ContainerItem[] => {
-  if (!value) return [];
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((item) => {
-      if (typeof item !== "object" || item === null) return [];
-      const id = typeof item.id === "string" ? item.id : undefined;
-      if (!id) return [];
-      return [
-        {
-          id,
-          name: typeof item.name === "string" ? item.name : "container",
-          status: typeof item.status === "string" ? item.status : "unknown",
-          ports: typeof item.ports === "string" ? item.ports : "",
-          node: typeof item.node === "string" ? item.node : "",
-        },
-      ];
-    });
-  } catch {
-    return [];
-  }
-};
 
 function resourceIngressNetwork(resource: any): {
   name: string;
@@ -128,6 +103,7 @@ function resourceIngressNetwork(resource: any): {
 
 export function ContainersTab({
   resource,
+  secrets,
   liveContainers,
   containerLogsData,
   controlContainer,
@@ -136,7 +112,7 @@ export function ContainersTab({
   setSelectedContainerId,
 }: ContainersTabProps) {
   const { data: organization } = authClient.useActiveOrganization();
-  const [containerList, setContainerList] = useState<ContainerItem[]>([]);
+  const containerList = (liveContainers ?? []) as ContainerItem[];
   const [selectedContainer, setSelectedContainer] =
     useState<ContainerItem | null>(null);
   const [containerModalType, setContainerModalType] = useState<
@@ -144,14 +120,6 @@ export function ContainersTab({
   >(null);
   const [terminalContainer, setTerminalContainer] =
     useState<ContainerItem | null>(null);
-
-  useEffect(() => {
-    if (liveContainers) {
-      setContainerList(liveContainers);
-    } else if (resource) {
-      setContainerList(parseContainerItems(resource.containers));
-    }
-  }, [resource, liveContainers]);
 
   const dispatchContainerCommand = (
     containerId: string,
@@ -224,12 +192,7 @@ export function ContainersTab({
   };
 
   const getEnvMap = () => {
-    try {
-      const parsed = JSON.parse(resource.envVars || "{}");
-      return parsed;
-    } catch {
-      return {};
-    }
+    return secrets.envVars;
   };
 
   return (

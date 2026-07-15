@@ -77,6 +77,17 @@ export function useResourceDetail({
     refetchInterval: 5000,
   });
 
+  const secretsQuery = useQuery({
+    ...trpc.resource.getSecrets.queryOptions({ id: resourceId }),
+    enabled: Boolean(resourceId),
+  });
+
+  const deploymentsQuery = useQuery({
+    ...trpc.deployment.getByResource.queryOptions({ resourceId }),
+    enabled: Boolean(resourceId),
+    refetchInterval: 3000,
+  });
+
   const logsQuery = useQuery({
     ...trpc.resource.getLogs.queryOptions({
       id: resourceId,
@@ -108,6 +119,7 @@ export function useResourceDetail({
     ...trpc.resource.update.mutationOptions(),
     onSuccess: () => {
       void resourceQuery.refetch();
+      void secretsQuery.refetch();
     },
     onError: (err) => toast.error(err.message || "Failed to update resource"),
   });
@@ -171,10 +183,18 @@ export function useResourceDetail({
     gitProviders: gitProvidersQuery.data ?? [],
     certificates: certificatesQuery.data ?? [],
     resource: resourceQuery.data,
+    secrets: secretsQuery.data ?? {
+      credentials: "{}",
+      envVars: {},
+      buildSecretsConfigured: false,
+    },
+    refetchSecrets: secretsQuery.refetch,
     loadingResource: resourceQuery.isPending,
     refetchResource: resourceQuery.refetch,
     routingTargets: routingTargetsQuery.data ?? [],
     liveContainers: liveContainersQuery.data,
+    deployments: deploymentsQuery.data ?? [],
+    refetchDeployments: deploymentsQuery.refetch,
     logsData: logsQuery.data,
     statsData: statsQuery.data,
     containerLogsData: containerLogsQuery.data,

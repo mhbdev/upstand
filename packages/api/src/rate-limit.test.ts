@@ -59,9 +59,21 @@ describe("bounded Redis rate-limit fallback", () => {
       windowSeconds: 60,
     });
 
-    expect(first).toMatchObject({ allowed: true, source: "redis", remaining: 1 });
-    expect(second).toMatchObject({ allowed: true, source: "redis", remaining: 0 });
-    expect(third).toMatchObject({ allowed: false, source: "redis", remaining: 0 });
+    expect(first).toMatchObject({
+      allowed: true,
+      source: "redis",
+      remaining: 1,
+    });
+    expect(second).toMatchObject({
+      allowed: true,
+      source: "redis",
+      remaining: 0,
+    });
+    expect(third).toMatchObject({
+      allowed: false,
+      source: "redis",
+      remaining: 0,
+    });
     expect(fake.incrementCalls).toBe(3);
     expect(fake.expireCalls).toBe(1);
   });

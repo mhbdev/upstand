@@ -10,6 +10,7 @@ import {
   type IAIRepository,
   type IUnitOfWork,
   type JsonValue,
+  type Resource,
   toJsonValue,
 } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
@@ -76,6 +77,25 @@ export type UpGalContext = UpGalInstructionContext & {
   runId: string;
   scope: ServiceScope;
 };
+
+function redactResource(
+  resource: Resource,
+  projectId?: string,
+): Omit<Resource, "credentials" | "buildSecrets"> & {
+  projectId?: string;
+} {
+  const {
+    credentials: _credentials,
+    buildSecrets: _buildSecrets,
+    envVars: _envVars,
+    ...safeResource
+  } = resource;
+  return {
+    ...safeResource,
+    envVars: "[redacted]",
+    ...(projectId ? { projectId } : {}),
+  };
+}
 
 export const UPGAL_TOOL_METADATA = [
   [
@@ -487,19 +507,13 @@ const resourceOutputSchema = z
       .any()
       .optional()
       .describe("Optional Docker image reference."),
-    credentials: z
-      .any()
-      .optional()
-      .describe("Stored resource credentials, if present."),
     buildConfig: z.string().describe("Serialized build configuration."),
     advancedConfig: z
       .any()
       .optional()
       .describe("Serialized advanced configuration."),
-    envVars: z.string().describe("Serialized environment variables."),
     domains: z.string().describe("Serialized domain mappings."),
-    deployments: z.string().describe("Serialized recent deployment entries."),
-    containers: z.string().describe("Serialized known container entries."),
+    envVars: z.string().describe("Redacted environment variables."),
     serverId: z
       .any()
       .optional()
@@ -818,10 +832,9 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
         const resources = await run(GetResourcesUseCaseToken).execute({
           environmentId,
         });
-        return resources.map((resource) => ({
-          ...resource,
-          projectId: environment.projectId,
-        }));
+        return resources.map((resource) =>
+          redactResource(resource, environment.projectId),
+        );
       },
       resourcesOutputSchema,
     ),
@@ -933,7 +946,9 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
       idSchema,
       async ({ id }) => {
         await assertResource(context, id);
-        return run(DeployResourceUseCaseToken).execute({ id });
+        return run(DeployResourceUseCaseToken)
+          .execute({ id })
+          .then((resource) => redactResource(resource));
       },
       resourceOutputSchema,
     ),
@@ -942,7 +957,9 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
       controlResourceSchema,
       async (input) => {
         await assertResource(context, input.id);
-        return run(ControlResourceUseCaseToken).execute(input);
+        return run(ControlResourceUseCaseToken)
+          .execute(input)
+          .then((resource) => redactResource(resource));
       },
       resourceOutputSchema,
     ),

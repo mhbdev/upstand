@@ -33,10 +33,17 @@ export class GetResourceContainersUseCase {
       try {
         const containers = await dockerService.getContainers(resource);
 
-        // Update database with the live containers list
-        await tx.resourceRepository.updateById(resource.id, {
-          containers: JSON.stringify(containers),
-        });
+        try {
+          await tx.resourceRuntimeRepository.upsert(input.id, {
+            version: 1,
+            containers,
+            observedAt: new Date(),
+            source: "docker-live",
+          });
+        } catch {
+          // Runtime state is an observability cache. A cache write must never
+          // turn a successful live Docker read into a failed request.
+        }
 
         return containers;
       } finally {

@@ -114,6 +114,12 @@ const createMockUnitOfWork = () =>
     webServerSettingsRepository: { findGlobal: async () => null } as any,
     serverBuildSettingsRepository: new MockServerBuildSettingsRepository(),
     deploymentRepository: new MockDeploymentRepository(),
+    resourceRuntimeRepository: {
+      upsert: async (resourceId: string, values: any) => ({
+        resourceId,
+        ...values,
+      }),
+    },
   }) as any;
 
 const mockCaddyService = {
@@ -248,8 +254,6 @@ describe("Resource Usecases", () => {
         dbName: "appdb",
       }),
       envVars: "{}",
-      deployments: "[]",
-      containers: "[]",
       serverId: null,
     });
     const calls: string[] = [];
@@ -267,8 +271,10 @@ describe("Resource Usecases", () => {
 
     expect(calls).toEqual(["remove", "deploy:app:appdb"]);
     expect(updated.status).toBe("running");
-    expect(updated.deployments).toContain("Database rebuild");
-    expect(uow.deploymentRepository.store[0].status).toBe("success");
+    expect(uow.deploymentRepository.store[0]).toMatchObject({
+      title: "Database rebuild",
+      status: "success",
+    });
   });
 
   test("queues a resource deployment for the background worker", async () => {
@@ -300,7 +306,10 @@ describe("Resource Usecases", () => {
 
     const deployed = await deployUseCase.execute({ id: res.id });
     expect(deployed.status).toBe("queued");
-    expect(deployed.deployments).toContain("dep-");
+    expect(uow.deploymentRepository.store[0]).toMatchObject({
+      id: queuedJobs[0].data.deploymentId,
+      status: "queued",
+    });
     expect(queuedJobs).toHaveLength(1);
     expect(queuedJobs[0].options.jobId).toBe(queuedJobs[0].data.deploymentId);
     expect(queuedJobs[0].options.attempts).toBe(1);
@@ -399,10 +408,10 @@ describe("Resource Usecases", () => {
     const updated = await rollbackUseCase.execute({ id: resource.id });
 
     expect(updated.status).toBe("running");
-    expect(JSON.parse(updated.deployments)[0].title).toBe(
-      "Swarm service rollback",
-    );
-    expect(uow.deploymentRepository.store[0].status).toBe("success");
+    expect(uow.deploymentRepository.store[0]).toMatchObject({
+      title: "Swarm service rollback",
+      status: "success",
+    });
   });
 
   test("passes the organization-owned rollback registry credentials to Swarm", async () => {
@@ -574,7 +583,7 @@ describe("Resource Usecases", () => {
     expect(caddyCalls[0][0].id).toBe(resource.id);
   });
 
-  test("queries containers list and updates database", async () => {
+  test("queries the live containers list", async () => {
     const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const getContainersUseCase = new GetResourceContainersUseCase(
@@ -598,9 +607,6 @@ describe("Resource Usecases", () => {
     const containers = await getContainersUseCase.execute({ id: res.id });
     expect(containers).toHaveLength(1);
     expect(containers[0].id).toBe("task-1");
-
-    const updatedResource = await uow.resourceRepository.findById(res.id);
-    expect(updatedResource?.containers).toContain("task-1");
   });
 
   test("retrieves resource logs from DockerService", async () => {

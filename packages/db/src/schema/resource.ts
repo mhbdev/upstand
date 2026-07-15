@@ -36,22 +36,9 @@ export const resource = pgTable("resource", {
   externalPort: integer("external_port"),
   libsqlGrpcPort: integer("libsql_grpc_port"),
   libsqlAdminPort: integer("libsql_admin_port"),
-  credentials: text("credentials"),
   triggerType: text("trigger_type").default("push").notNull(),
-  watchPaths: text("watch_paths").default("[]").notNull(),
   webhookTokenHash: text("webhook_token_hash").unique(),
   webhookTokenPrefix: text("webhook_token_prefix"),
-  buildConfig: text("build_config")
-    .default(
-      '{"type":"dockerfile","dockerfilePath":"Dockerfile","dockerContextPath":"."}',
-    )
-    .notNull(),
-  buildSecrets: text("build_secrets"),
-  advancedConfig: text("advanced_config").default("{}").notNull(),
-  envVars: text("env_vars").default("{}").notNull(),
-  domains: text("domains").default("[]").notNull(),
-  deployments: text("deployments").default("[]").notNull(),
-  containers: text("containers").default("[]").notNull(),
   serverId: text("server_id"),
   buildServerId: text("build_server_id").references(() => server.id, {
     onDelete: "set null",
@@ -70,6 +57,45 @@ export const resource = pgTable("resource", {
     .notNull(),
 });
 
+export const resourceConfiguration = pgTable("resource_configuration", {
+  resourceId: text("resource_id")
+    .primaryKey()
+    .references(() => resource.id, { onDelete: "cascade" }),
+  version: integer("version").default(1).notNull(),
+  buildConfig: text("build_config").notNull(),
+  advancedConfig: text("advanced_config").notNull(),
+  watchPaths: text("watch_paths").notNull(),
+  domains: text("domains").notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export const resourceSecret = pgTable("resource_secret", {
+  resourceId: text("resource_id")
+    .primaryKey()
+    .references(() => resource.id, { onDelete: "cascade" }),
+  version: integer("version").default(1).notNull(),
+  credentials: text("credentials"),
+  buildSecrets: text("build_secrets"),
+  envVars: text("env_vars").notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export const resourceRuntime = pgTable("resource_runtime", {
+  resourceId: text("resource_id")
+    .primaryKey()
+    .references(() => resource.id, { onDelete: "cascade" }),
+  version: integer("version").default(1).notNull(),
+  containers: text("containers").notNull(),
+  observedAt: timestamp("observed_at"),
+  source: text("source").default("docker").notNull(),
+});
+
 export const resourceRelations = relations(resource, ({ one }) => ({
   environment: one(environment, {
     fields: [resource.environmentId],
@@ -86,5 +112,17 @@ export const resourceRelations = relations(resource, ({ one }) => ({
   buildRegistry: one(dockerRegistry, {
     fields: [resource.buildRegistryId],
     references: [dockerRegistry.id],
+  }),
+  configuration: one(resourceConfiguration, {
+    fields: [resource.id],
+    references: [resourceConfiguration.resourceId],
+  }),
+  secrets: one(resourceSecret, {
+    fields: [resource.id],
+    references: [resourceSecret.resourceId],
+  }),
+  runtime: one(resourceRuntime, {
+    fields: [resource.id],
+    references: [resourceRuntime.resourceId],
   }),
 }));

@@ -88,10 +88,7 @@ export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
 
   // Set standard rate limit headers on Hono context
   ctx.honoContext.header("X-RateLimit-Limit", result.limit.toString());
-  ctx.honoContext.header(
-    "X-RateLimit-Remaining",
-    result.remaining.toString(),
-  );
+  ctx.honoContext.header("X-RateLimit-Remaining", result.remaining.toString());
   ctx.honoContext.header(
     "X-RateLimit-Reset",
     Math.floor(result.resetAt / 1000).toString(),

@@ -92,9 +92,13 @@ export default function ResourceDetail({
     gitProviders,
     certificates,
     resource,
+    secrets,
+    refetchSecrets,
     loadingResource,
     routingTargets,
     liveContainers,
+    deployments,
+    refetchDeployments,
     logsData,
     statsData,
     containerLogsData,
@@ -126,17 +130,8 @@ export default function ResourceDetail({
   }, [logsData]);
 
   const containerList = useMemo(() => {
-    if (liveContainers) return liveContainers;
-    if (resource?.containers) {
-      try {
-        const parsed = JSON.parse(resource.containers);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  }, [liveContainers, resource]);
+    return liveContainers ?? [];
+  }, [liveContainers]);
 
   if (loadingResource || !resource) {
     return (
@@ -235,6 +230,9 @@ export default function ResourceDetail({
         <TabsContent value="general" className="min-w-0 outline-none">
           <GeneralTab
             resource={resource}
+            secrets={secrets}
+            refetchSecrets={refetchSecrets}
+            deployments={deployments}
             sshKeys={sshKeys}
             servers={servers}
             gitProviders={gitProviders}
@@ -284,6 +282,8 @@ export default function ResourceDetail({
         <TabsContent value="deployments" className="min-w-0 outline-none">
           <DeploymentsTab
             resource={resource}
+            deployments={deployments}
+            refetchDeployments={refetchDeployments}
             deployResource={deployResource}
             isDeployingResource={isDeployingResource}
           />
@@ -292,6 +292,7 @@ export default function ResourceDetail({
         <TabsContent value="containers" className="min-w-0 outline-none">
           <ContainersTab
             resource={resource}
+            secrets={secrets}
             liveContainers={liveContainers}
             containerLogsData={containerLogsData}
             controlContainer={controlContainer}

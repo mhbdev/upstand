@@ -18,8 +18,6 @@ const databaseResource: Resource = {
   advancedConfig: "{}",
   envVars: "{}",
   domains: "[]",
-  deployments: "[]",
-  containers: "[]",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
