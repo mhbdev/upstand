@@ -9,6 +9,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ServiceScope } from "@circulo-ai/di";
 import { trpcServer } from "@hono/trpc-server";
+import { getRateLimiterHealth } from "@upstand/api";
 import { ensureOrganizationAccess } from "@upstand/api/access-control";
 import {
   createUpGalResponse,
@@ -2329,6 +2330,7 @@ app.get("/health/ready", async (c) => {
     backupWorker.isReady() &&
     backupScheduler.isReady();
   const redisReady = await pingRedis(redis);
+  const rateLimiterHealth = getRateLimiterHealth();
   let databaseReady = false;
   try {
     const uow = c.get("scope").resolve(UnitOfWorkToken);
@@ -2350,6 +2352,7 @@ app.get("/health/ready", async (c) => {
         database: databaseReady,
         caddy: caddyReady,
         redis: redisReady,
+        rateLimiter: rateLimiterHealth,
         workers: workersReady,
       },
     },

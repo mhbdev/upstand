@@ -45,6 +45,18 @@ client-facing networks.
 
 `/etc/upstand/.env` is mode `0600` and contains origins and immutable image references. The installer stores database, Redis, authentication, and encryption material as individual mode `0600` Docker secret files under `/etc/upstand/secrets/`. Back up both locations securely. Losing the SSH-key secret means stored SSH-key and credential secrets cannot be decrypted.
 
+## Rate limiting during Redis outages
+
+The API normally uses Redis for its distributed tRPC rate limiter. If Redis is
+temporarily unavailable, each server switches to a bounded in-process token
+bucket and probes Redis again after a short cooldown. The emergency policy is
+stricter than normal operation: sensitive procedures allow 10 requests per
+minute, expensive mutations allow 15, unauthenticated requests allow 20, and
+authenticated reads allow 30 per identity. Local limiter state is capped and
+expires when inactive, so an outage cannot disable abuse controls or grow
+memory without bound. The readiness endpoint reports whether this fallback is
+active and how many requests it has handled.
+
 Persistent Docker volumes hold Postgres and Redis. They are local volumes, so do not move the `upstand.control-plane=true` label to another machine without migrating state.
 
 If UpGal is enabled, provider credentials are encrypted with the configured application encryption key and stored in Postgres. Back up that key with the database and `.env`; changing or losing it without a migration plan makes existing AI provider credentials unusable. External MCP keys are hashed and can be revoked from **Settings → AI**.
