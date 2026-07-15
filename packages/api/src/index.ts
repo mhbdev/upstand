@@ -17,12 +17,47 @@ import {
   setApiKeyRateLimitHeaders,
 } from "./api-key-auth";
 import type { Context } from "./context";
+import { RateLimiter } from "./rate-limit";
 
 export const t = initTRPC.context<Context>().create();
 
 export const router = t.router;
 
-// Centralized Rate Limit Middleware using Redis
+const DISTRIBUTED_RATE_LIMIT = 60;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+const rateLimiter = new RateLimiter(redis);
+
+export function getRateLimiterHealth() {
+  return rateLimiter.getHealth();
+}
+
+type RateLimitPolicy = {
+  fallbackLimit: number;
+};
+
+export function rateLimitPolicy(
+  path: string,
+  hasSession: boolean,
+): RateLimitPolicy {
+  const normalizedPath = path.toLowerCase();
+  const isSensitive =
+    /(?:^|\.)(?:auth|scim)\./.test(normalizedPath) ||
+    /(?:login|signin|signup|verify|password|token|invite|setup)/.test(
+      normalizedPath,
+    );
+  if (isSensitive) return { fallbackLimit: 10 };
+
+  const isExpensive =
+    /(?:create|update|delete|remove|deploy|control|rebuild|command|generate|restore|run|reload|prune|rotate)/.test(
+      normalizedPath,
+    );
+  if (isExpensive) return { fallbackLimit: 15 };
+
+  return { fallbackLimit: hasSession ? 30 : 20 };
+}
+
+// Centralized rate limiting uses Redis during normal operation and a bounded,
+// per-process emergency limiter while Redis is unavailable.
 export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
   if (isApiKeyPrincipal(ctx.actor)) {
     setApiKeyRateLimitHeaders(ctx.actor, (name, value) =>
@@ -38,38 +73,26 @@ export const rateLimitMiddleware = t.middleware(async ({ ctx, path, next }) => {
   // Use user id if logged in, otherwise fall back to IP address
   const identifier = ctx.session ? `user:${ctx.session.user.id}` : `ip:${ip}`;
   const key = `ratelimit:${path}:${identifier}`;
-
-  // Configure limit: 60 requests per 60 seconds
-  const limit = 60;
-  const windowSize = 60; // 1 minute
-  const now = Math.floor(Date.now() / 1000);
-  const currentWindow = now - (now % windowSize);
-  const redisKey = `${key}:${currentWindow}`;
-
-  let count = 0;
-  try {
-    count = await redis.incr(redisKey);
-    if (count === 1) {
-      await redis.expire(redisKey, windowSize);
-    }
-  } catch (error: unknown) {
-    // Fail-open logging to avoid blocking users if Redis is down
-    log.error({
-      message: "Rate limit check failed (Redis error)",
-      err: error instanceof Error ? error.message : String(error),
-    });
-    return next();
-  }
-
-  const remaining = Math.max(0, limit - count);
-  const reset = currentWindow + windowSize;
+  const policy = rateLimitPolicy(path, Boolean(ctx.session));
+  const result = await rateLimiter.check({
+    key,
+    limit: DISTRIBUTED_RATE_LIMIT,
+    fallbackLimit: policy.fallbackLimit,
+    windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+  });
 
   // Set standard rate limit headers on Hono context
-  ctx.honoContext.header("X-RateLimit-Limit", limit.toString());
-  ctx.honoContext.header("X-RateLimit-Remaining", remaining.toString());
-  ctx.honoContext.header("X-RateLimit-Reset", reset.toString());
+  ctx.honoContext.header("X-RateLimit-Limit", result.limit.toString());
+  ctx.honoContext.header(
+    "X-RateLimit-Remaining",
+    result.remaining.toString(),
+  );
+  ctx.honoContext.header(
+    "X-RateLimit-Reset",
+    Math.floor(result.resetAt / 1000).toString(),
+  );
 
-  if (count > limit) {
+  if (!result.allowed) {
     throw new TRPCError({
       code: "TOO_MANY_REQUESTS",
       message: "Rate limit exceeded. Please try again in a minute.",
