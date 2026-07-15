@@ -69,6 +69,7 @@ import {
   RAILPACK_VERSIONS,
   type ResourceProvider,
 } from "./general-tab.helpers";
+import { getServerUrl } from "@/lib/server-url";
 
 interface GeneralTabProps {
   resource: any;
@@ -127,8 +128,7 @@ export function GeneralTab({
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rebuildDialogOpen, setRebuildDialogOpen] = useState(false);
-  const webhookBaseUrl =
-    typeof window === "undefined" ? "" : window.location.origin;
+  const webhookBaseUrl = getServerUrl();
   const [webhookToken, setWebhookToken] = useState<string | null>(null);
   const rotateWebhookToken = useMutation({
     ...trpc.resource.rotateWebhookToken.mutationOptions(),
