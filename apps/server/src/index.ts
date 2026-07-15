@@ -26,7 +26,7 @@ import {
   authenticateApiKey,
   setApiKeyRateLimitHeaders,
 } from "@upstand/api/api-key-auth";
-import { createContext } from "@upstand/api/context";
+import { type ApiBindings, createContext } from "@upstand/api/context";
 import { serviceProvider } from "@upstand/api/di";
 import { checkPermission } from "@upstand/api/permissions";
 import { appRouter } from "@upstand/api/routers/index";
@@ -99,6 +99,7 @@ const identifyUser = createAuthMiddleware(auth as BetterAuthInstance, {
 });
 
 type AppEnv = EvlogVariables & {
+  Bindings: ApiBindings;
   Variables: {
     scope: ServiceScope;
   };
