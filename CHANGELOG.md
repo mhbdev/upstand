@@ -4,6 +4,17 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.41 - 2026-07-15
+
+### Changed
+
+- Require a complete GitHub release manifest containing verified server, web, and documentation image digests before showing an available update.
+- Publish the release manifest only after all three GHCR images have been pushed successfully.
+
+### Fixed
+
+- Include the infrastructure workspace package in every Docker build context so release image builds resolve all workspace dependencies.
+
 ## 0.1.40 - 2026-07-15
 
 ### Added

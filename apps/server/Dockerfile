@@ -20,6 +20,7 @@ COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/
 COPY packages/domain/package.json ./packages/domain/
 COPY packages/usecases/package.json ./packages/usecases/
+COPY packages/infrastructure/package.json ./packages/infrastructure/
 COPY packages/platform/package.json ./packages/platform/
 
 # Install all dependencies without running postinstall scripts (which require source files)
@@ -37,6 +38,7 @@ COPY packages/redis ./packages/redis
 COPY packages/repositories ./packages/repositories
 COPY packages/domain ./packages/domain
 COPY packages/usecases ./packages/usecases
+COPY packages/infrastructure ./packages/infrastructure
 COPY packages/platform ./packages/platform
 
 # Compile the Hono application
@@ -98,6 +100,7 @@ COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/
 COPY packages/domain/package.json ./packages/domain/
 COPY packages/usecases/package.json ./packages/usecases/
+COPY packages/infrastructure/package.json ./packages/infrastructure/
 COPY packages/platform/package.json ./packages/platform/
 
 # Fumadocs owns a workspace postinstall hook. It must have its source config
@@ -105,6 +108,7 @@ COPY packages/platform/package.json ./packages/platform/
 # included in the final server command.
 COPY apps/fumadocs ./apps/fumadocs
 COPY apps/monitoring ./apps/monitoring
+COPY packages/infrastructure ./packages/infrastructure
 COPY packages/platform ./packages/platform
 
 # Install production dependencies with their platform-specific install steps.

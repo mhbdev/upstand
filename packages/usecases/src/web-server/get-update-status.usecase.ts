@@ -11,6 +11,29 @@ export interface UpdateStatusResult {
   checkedAt: string;
 }
 
+const RELEASE_MANIFEST_ASSET = "upstand-release-manifest.json";
+const REQUIRED_IMAGES = ["server", "web", "fumadocs"] as const;
+
+type GitHubRelease = {
+  tag_name?: string;
+  draft?: boolean;
+  prerelease?: boolean;
+  assets?: Array<{
+    name?: string;
+    browser_download_url?: string;
+  }>;
+};
+
+type ReleaseManifest = {
+  schemaVersion?: number;
+  version?: string;
+  images?: Array<{
+    name?: string;
+    image?: string;
+    digest?: string;
+  }>;
+};
+
 let cachedStatus: {
   result: UpdateStatusResult;
   expiresAt: number;
@@ -33,6 +56,48 @@ function compareVersions(left: string, right: string): number {
     if (leftPart !== rightPart) return leftPart > rightPart ? 1 : -1;
   }
   return 0;
+}
+
+function unavailableStatus(
+  currentVersion: string,
+  channel: UpdateStatusResult["channel"],
+  checkedAt: string,
+): UpdateStatusResult {
+  return {
+    currentVersion,
+    latestVersion: currentVersion,
+    updateAvailable: false,
+    channel,
+    canUpdate: channel !== "source",
+    checkedAt,
+  };
+}
+
+function isCompleteRelease(
+  release: GitHubRelease,
+  manifest: ReleaseManifest,
+  repo: string,
+): boolean {
+  const version = release.tag_name;
+  if (
+    !version ||
+    manifest.schemaVersion !== 1 ||
+    manifest.version !== version
+  ) {
+    return false;
+  }
+
+  const images = new Map(
+    (manifest.images ?? []).map((image) => [image.name, image]),
+  );
+  return REQUIRED_IMAGES.every((name) => {
+    const image = images.get(name);
+    return (
+      image?.image === `ghcr.io/${repo}-${name}:${version}` &&
+      typeof image.digest === "string" &&
+      /^sha256:[a-f0-9]{64}$/i.test(image.digest)
+    );
+  });
 }
 
 export class GetUpdateStatusUseCase {
@@ -86,48 +151,59 @@ export class GetUpdateStatusUseCase {
         },
       });
 
-      if (!response.ok && response.status !== 404) {
+      if (!response.ok) {
         log.warn({
           message: `GitHub API returned ${response.status} when checking for updates.`,
         });
-        return {
-          currentVersion,
-          latestVersion: currentVersion,
-          updateAvailable: false,
-          channel,
-          canUpdate: channel !== "source",
-          checkedAt,
-        };
+        return unavailableStatus(currentVersion, channel, checkedAt);
       }
 
-      let data: unknown = await response.json();
-      // A repository may publish tags before creating a GitHub Release. Fall
-      // back to the tags endpoint so self-hosted installs do not report a
-      // misleading API error during that short release window.
-      if (response.status === 404) {
-        const tagsResponse = await fetch(
-          `https://api.github.com/repos/${repo}/tags?per_page=30`,
-          {
-            cache: "no-store",
-            headers: {
-              Accept: "application/vnd.github+json",
-              "User-Agent": "Upstand",
-            },
-          },
-        );
-        if (!tagsResponse.ok) {
-          throw new Error(`GitHub API returned ${tagsResponse.status}`);
-        }
-        data = await tagsResponse.json();
+      const data = (await response.json()) as GitHubRelease | GitHubRelease[];
+      const release = Array.isArray(data)
+        ? data.find((candidate) =>
+            channel === "canary"
+              ? candidate.prerelease === true
+              : candidate.prerelease !== true,
+          )
+        : data;
+      if (!release || release.draft || !release.tag_name) {
+        return unavailableStatus(currentVersion, channel, checkedAt);
       }
-      const latestVersion =
-        channel === "canary" && Array.isArray(data)
-          ? ((data as Array<{ name?: string }>).find((tag) =>
-              tag.name?.includes("canary"),
-            )?.name ?? currentVersion)
-          : Array.isArray(data)
-            ? ((data as Array<{ name?: string }>)[0]?.name ?? currentVersion)
-            : ((data as { tag_name?: string }).tag_name ?? currentVersion);
+
+      const manifestAsset = release.assets?.find(
+        (asset) => asset.name === RELEASE_MANIFEST_ASSET,
+      );
+      if (!manifestAsset?.browser_download_url) {
+        log.warn({
+          message: "Latest GitHub release has no complete image manifest.",
+          release: release.tag_name,
+        });
+        return unavailableStatus(currentVersion, channel, checkedAt);
+      }
+
+      const manifestResponse = await fetch(manifestAsset.browser_download_url, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Upstand",
+        },
+      });
+      if (!manifestResponse.ok) {
+        throw new Error(
+          `Release manifest returned ${manifestResponse.status} for ${release.tag_name}`,
+        );
+      }
+      const manifest = (await manifestResponse.json()) as ReleaseManifest;
+      if (!isCompleteRelease(release, manifest, repo)) {
+        log.warn({
+          message:
+            "Latest GitHub release does not contain all required images.",
+          release: release.tag_name,
+        });
+        return unavailableStatus(currentVersion, channel, checkedAt);
+      }
+
+      const latestVersion = release.tag_name;
 
       const updateAvailable =
         compareVersions(latestVersion, currentVersion) > 0;
@@ -153,14 +229,7 @@ export class GetUpdateStatusUseCase {
         message: "Failed to check for updates from GitHub",
         err: err.message,
       });
-      return {
-        currentVersion,
-        latestVersion: currentVersion,
-        updateAvailable: false,
-        channel,
-        canUpdate: channel !== "source",
-        checkedAt,
-      };
+      return unavailableStatus(currentVersion, channel, checkedAt);
     }
   }
 }
