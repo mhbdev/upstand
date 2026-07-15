@@ -45,6 +45,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@upstand/ui/components/sidebar";
 import { Spinner } from "@upstand/ui/components/spinner";
 import type { Route } from "next";
@@ -114,6 +115,85 @@ const NAVIGATION_GROUPS = [
     ],
   },
 ];
+
+function DashboardSidebarGroup({
+  group,
+  pathname,
+  isCollapsed,
+}: {
+  group: (typeof NAVIGATION_GROUPS)[number];
+  pathname: string;
+  isCollapsed: boolean;
+}) {
+  const content = (
+    <SidebarGroupContent className={isCollapsed ? undefined : "mt-1"}>
+      <SidebarMenu>
+        {group.items.map((item) => (
+          <SidebarMenuItem key={item.title}>
+            <SidebarMenuButton
+              render={<Link href={item.href as Route} />}
+              isActive={
+                pathname === item.href || pathname.startsWith(`${item.href}/`)
+              }
+              tooltip={item.title}
+              className="text-xs"
+            >
+              <HugeiconsIcon icon={item.icon} className="size-5!" />
+              <span>{item.title}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </SidebarGroupContent>
+  );
+
+  if (isCollapsed) {
+    return <SidebarGroup className="p-0">{content}</SidebarGroup>;
+  }
+
+  return (
+    <Collapsible defaultOpen className="group/collapsible">
+      <SidebarGroup className="p-0">
+        <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between px-3 py-1.5 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider transition-colors hover:text-foreground">
+          <span>{group.title}</span>
+          <HugeiconsIcon
+            icon={ArrowRight01Icon}
+            className="size-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+          />
+        </CollapsibleTrigger>
+        <CollapsibleContent>{content}</CollapsibleContent>
+      </SidebarGroup>
+    </Collapsible>
+  );
+}
+
+function DashboardSidebar({ pathname }: { pathname: string }) {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  return (
+    <Sidebar collapsible="icon">
+      <OrganizationSwitcher className="min-h-[55px] w-full border-none p-[11.5px]" />
+
+      <Separator />
+
+      <SidebarContent className="group-data-[collapsible=icon]:!overflow-auto space-y-4 px-2 py-2">
+        {NAVIGATION_GROUPS.map((group) => (
+          <DashboardSidebarGroup
+            key={group.title}
+            group={group}
+            isCollapsed={isCollapsed}
+            pathname={pathname}
+          />
+        ))}
+      </SidebarContent>
+
+      <SidebarFooter>
+        <UserButton className="w-full" />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -195,57 +275,7 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <div className="flex h-svh w-full overflow-hidden">
-        <Sidebar collapsible="icon">
-          <OrganizationSwitcher className="min-h-[55px] w-full border-none p-[11.5px]" />
-
-          <Separator />
-
-          <SidebarContent className="space-y-4 px-2 py-2">
-            {NAVIGATION_GROUPS.map((group) => (
-              <Collapsible
-                key={group.title}
-                defaultOpen
-                className="group/collapsible"
-              >
-                <SidebarGroup className="p-0">
-                  <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between px-3 py-1.5 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider transition-colors hover:text-foreground">
-                    <span>{group.title}</span>
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      className="size-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-                    />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarGroupContent className="mt-1">
-                      <SidebarMenu>
-                        {group.items.map((item) => (
-                          <SidebarMenuItem key={item.title}>
-                            <SidebarMenuButton
-                              render={<Link href={item.href as Route} />}
-                              isActive={
-                                pathname === item.href ||
-                                pathname.startsWith(`${item.href}/`)
-                              }
-                              tooltip={item.title}
-                              className="text-xs"
-                            >
-                              <HugeiconsIcon icon={item.icon} />
-                              <span>{item.title}</span>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        ))}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </CollapsibleContent>
-                </SidebarGroup>
-              </Collapsible>
-            ))}
-          </SidebarContent>
-
-          <SidebarFooter>
-            <UserButton className="w-full" />
-          </SidebarFooter>
-        </Sidebar>
+        <DashboardSidebar pathname={pathname} />
 
         <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 sm:flex-nowrap sm:px-4 sm:py-0">

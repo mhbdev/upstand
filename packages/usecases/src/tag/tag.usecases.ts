@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { IUnitOfWork, Tag } from "@upstand/domain";
-import { TAG_COLORS } from "@upstand/domain";
+import {
+  DEFAULT_TAG_COLOR,
+  type IUnitOfWork,
+  type Tag,
+  TagColorSchema,
+} from "@upstand/domain";
 import { z } from "zod";
-
-const TagColorSchema = z.enum(TAG_COLORS);
 
 export const ListTagsInputSchema = z.object({
   organizationId: z.string().min(1),
@@ -11,7 +13,7 @@ export const ListTagsInputSchema = z.object({
 export const CreateTagInputSchema = z.object({
   organizationId: z.string().min(1),
   name: z.string().trim().min(1).max(64),
-  color: TagColorSchema.default("primary"),
+  color: TagColorSchema.default(DEFAULT_TAG_COLOR),
 });
 export const UpdateTagInputSchema = z.object({
   id: z.string().min(1),

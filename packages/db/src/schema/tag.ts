@@ -1,5 +1,6 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
+  check,
   index,
   pgTable,
   text,
@@ -17,7 +18,7 @@ export const tag = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    color: text("color").notNull().default("primary"),
+    color: text("color").notNull().default("#6366f1"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -30,6 +31,7 @@ export const tag = pgTable(
       table.name,
     ),
     index("tag_organization_idx").on(table.organizationId),
+    check("tag_color_hex_check", sql`${table.color} ~ '^#[0-9a-fA-F]{6}$'`),
   ],
 );
 

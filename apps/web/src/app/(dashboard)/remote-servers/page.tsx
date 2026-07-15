@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  Alert02Icon,
   CloudServerIcon,
   Delete02Icon,
+  Edit02Icon,
   Key01Icon,
   PlusSignIcon,
   ServerStack01Icon,
@@ -10,12 +12,18 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ServerType } from "@upstand/domain";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@upstand/ui/components/alert";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
@@ -121,6 +129,7 @@ export default function RemoteServersPage() {
       refetch();
     },
     onError: () => {
+      refetch();
       toast.error("Remote server setup needs attention");
     },
   });
@@ -280,187 +289,121 @@ export default function RemoteServersPage() {
           {servers.map((srv) => {
             const matchedKey = sshKeys?.find((k) => k.id === srv.sshKeyId);
             return (
-              <Card
-                key={srv.id}
-                className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/30 bg-gradient-to-br from-card/60 via-card/40 to-card/20 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:from-card/85 hover:via-card/60 hover:to-card/35 hover:shadow-primary/5 hover:shadow-xl"
-              >
-                <CardHeader className="space-y-1 pb-3">
+              <Card key={srv.id} className="h-full">
+                <CardHeader className="border-b">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="relative flex h-2 w-2">
-                          {srv.status === "ready" ? (
-                            <>
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                            </>
-                          ) : srv.status === "setting_up" ? (
-                            <>
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
-                              <span className="relative inline-flex h-2 w-2 animate-pulse rounded-full bg-blue-500" />
-                            </>
-                          ) : (
-                            <>
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
-                              <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
-                            </>
-                          )}
-                        </span>
-                        <CardTitle className="font-semibold text-base text-foreground/90 tracking-tight transition-colors duration-300 group-hover:text-foreground">
-                          {srv.name}
-                        </CardTitle>
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <CardTitle className="truncate">{srv.name}</CardTitle>
                         <Badge
                           variant={getStatusBadgeVariant(srv.status)}
-                          className="h-4 rounded-md px-1.5 font-medium text-[9px] capitalize tracking-wide"
+                          className="capitalize"
                         >
                           {srv.status.replace("_", " ")}
                         </Badge>
                       </div>
-                      <CardDescription className="line-clamp-1 text-muted-foreground/80 text-xs">
+                      <CardDescription className="line-clamp-2">
                         {srv.description || "Remote deployment environment"}
                       </CardDescription>
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-60 transition-opacity duration-300 group-hover:opacity-100">
+                    <div className="flex shrink-0 items-center gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={`Edit ${srv.name}`}
                         onClick={() => handleEdit(srv)}
-                        className="size-7 hover:bg-muted/65"
+                        className="size-8"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="size-3.5"
-                        >
-                          <path d="M12 20h9" />
-                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                        </svg>
+                        <HugeiconsIcon icon={Edit02Icon} />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={`Delete ${srv.name}`}
                         onClick={() => handleDelete(srv.id)}
-                        className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="size-8 text-destructive hover:text-destructive"
                       >
-                        <HugeiconsIcon
-                          icon={Delete02Icon}
-                          className="size-3.5"
-                        />
+                        <HugeiconsIcon icon={Delete02Icon} />
                       </Button>
                     </div>
                   </div>
                   {srv.setupError && (
-                    <div className="mt-2.5 flex items-start gap-1.5 rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-[11px] text-destructive leading-relaxed">
-                      <span className="shrink-0 font-semibold">
-                        Setup Error:
-                      </span>
-                      <span className="break-all text-left">
+                    <Alert variant="destructive" className="mt-1 p-3">
+                      <HugeiconsIcon icon={Alert02Icon} />
+                      <AlertTitle>Setup failed</AlertTitle>
+                      <AlertDescription className="break-words">
                         {srv.setupError}
-                      </span>
-                    </div>
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </CardHeader>
 
-                <CardContent className="space-y-4 pt-0">
-                  <div className="grid grid-cols-2 gap-2 border-border/20 border-y py-3 text-xs">
-                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
-                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
-                        Host Address
-                      </span>
-                      <span className="truncate font-mono font-semibold text-foreground/90">
+                <CardContent className="flex flex-1 flex-col gap-4">
+                  <dl className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
+                      <dt className="font-medium text-muted-foreground text-xs">
+                        Host address
+                      </dt>
+                      <dd className="mt-1 truncate font-medium font-mono">
                         {srv.ipAddress}:{srv.port}
-                      </span>
+                      </dd>
                     </div>
-                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
-                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
+                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
+                      <dt className="font-medium text-muted-foreground text-xs">
                         Role
-                      </span>
-                      <span className="flex items-center gap-1 font-semibold text-foreground/90 capitalize">
-                        <HugeiconsIcon
-                          icon={CloudServerIcon}
-                          className="size-3 text-primary/75"
-                        />
+                      </dt>
+                      <dd className="mt-1 flex items-center gap-1 font-medium capitalize">
+                        <HugeiconsIcon icon={CloudServerIcon} />
                         {srv.serverType}
-                      </span>
+                      </dd>
                     </div>
-                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
-                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
+                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
+                      <dt className="font-medium text-muted-foreground text-xs">
                         SSH Key
-                      </span>
-                      <span className="flex items-center gap-1 truncate font-semibold text-foreground/90">
-                        <HugeiconsIcon
-                          icon={Key01Icon}
-                          className="size-3 text-amber-500/75"
-                        />
+                      </dt>
+                      <dd className="mt-1 flex items-center gap-1 truncate font-medium">
+                        <HugeiconsIcon icon={Key01Icon} />
                         {matchedKey?.name || "None"}
-                      </span>
+                      </dd>
                     </div>
-                    <div className="flex flex-col gap-0.5 rounded-lg border border-border/10 bg-black/10 p-2">
-                      <span className="font-medium text-[10px] text-muted-foreground/80 uppercase tracking-wider">
+                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
+                      <dt className="font-medium text-muted-foreground text-xs">
                         Username
-                      </span>
-                      <span className="truncate font-semibold text-foreground/90">
+                      </dt>
+                      <dd className="mt-1 truncate font-medium">
                         {srv.username}
-                      </span>
+                      </dd>
                     </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      className="w-full font-semibold text-xs transition-all duration-300"
-                      variant={srv.status === "ready" ? "outline" : "default"}
-                      onClick={() => handleSetup(srv.id)}
-                      disabled={srv.status === "setting_up"}
-                    >
-                      {srv.status === "setting_up" ? (
-                        <span className="flex items-center gap-1.5">
-                          <svg
-                            className="mr-1 -ml-1 h-3.5 w-3.5 animate-spin text-current"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            />
-                          </svg>
-                          Setting up...
-                        </span>
-                      ) : srv.status === "ready" ? (
-                        "Reinstall Server"
-                      ) : (
-                        "Setup Server"
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-primary/20 font-semibold text-xs transition-all duration-300 hover:border-primary/50 hover:bg-primary/5"
-                      onClick={() => setInspectServerId(srv.id)}
-                    >
-                      Validate
-                    </Button>
-                  </div>
+                  </dl>
                 </CardContent>
+                <CardFooter className="gap-2 border-t">
+                  <Button
+                    size="sm"
+                    className="min-w-0 flex-1"
+                    variant={srv.status === "ready" ? "outline" : "default"}
+                    onClick={() => handleSetup(srv.id)}
+                    disabled={srv.status === "setting_up"}
+                  >
+                    {srv.status === "setting_up" ? (
+                      <>
+                        <Spinner data-icon="inline-start" />
+                        Setting up…
+                      </>
+                    ) : srv.status === "ready" ? (
+                      "Set up again"
+                    ) : (
+                      "Set up server"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setInspectServerId(srv.id)}
+                  >
+                    Validate
+                  </Button>
+                </CardFooter>
               </Card>
             );
           })}
@@ -815,17 +758,18 @@ export default function RemoteServersPage() {
             )}
 
             {setupMutation.isError && (
-              <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
-                <p className="font-medium text-destructive">
+              <Alert variant="destructive">
+                <HugeiconsIcon icon={Alert02Icon} />
+                <AlertTitle className="break-words">
                   {setupMutation.error.message}
-                </p>
-                <p className="text-muted-foreground text-xs">
+                </AlertTitle>
+                <AlertDescription>
                   Upstand does not force-leave an existing Swarm. An active
                   existing Swarm can be reused; if initialization failed,
                   resolve the Docker or advertised-address issue on the server,
                   then retry setup.
-                </p>
-              </div>
+                </AlertDescription>
+              </Alert>
             )}
           </div>
 

@@ -68,6 +68,11 @@ export function TagsTab({
                 aria-pressed={active}
               >
                 <Badge variant={active ? "secondary" : "outline"}>
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: tag.color }}
+                    aria-hidden="true"
+                  />
                   {tag.name}
                 </Badge>
               </Button>

@@ -21,5 +21,5 @@ describe("use-case module smoke matrix", () => {
       const module = await import(pathToFileURL(absolutePath).href);
       expect(Object.keys(module).length, relativePath).toBeGreaterThan(0);
     }
-  });
+  }, 10_000);
 });

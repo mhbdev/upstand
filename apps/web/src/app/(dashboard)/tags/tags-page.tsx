@@ -7,6 +7,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  DEFAULT_TAG_COLOR,
+  type TagColor,
+  TagColorSchema,
+} from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -22,15 +27,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
-import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@upstand/ui/components/select";
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@upstand/ui/components/field";
+import { Input } from "@upstand/ui/components/input";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -41,26 +45,16 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const COLORS = [
-  "primary",
-  "emerald",
-  "amber",
-  "violet",
-  "rose",
-  "sky",
-  "slate",
-] as const;
-
 export default function TagsPage() {
   const { data: organization } = authClient.useActiveOrganization();
   const organizationId = organization?.id ?? "";
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [color, setColor] = useState<(typeof COLORS)[number]>("primary");
+  const [color, setColor] = useState<string>(DEFAULT_TAG_COLOR);
   const [editingTag, setEditingTag] = useState<{
     id: string;
     name: string;
-    color: (typeof COLORS)[number];
+    color: TagColor;
   } | null>(null);
   const tags = useQuery({
     ...trpc.tag.list.queryOptions({ organizationId }),
@@ -71,7 +65,7 @@ export default function TagsPage() {
     onSuccess: () => {
       toast.success("Tag created");
       setName("");
-      setColor("primary");
+      setColor(DEFAULT_TAG_COLOR);
       setOpen(false);
       tags.refetch();
     },
@@ -83,7 +77,7 @@ export default function TagsPage() {
       toast.success("Tag updated");
       setEditingTag(null);
       setName("");
-      setColor("primary");
+      setColor(DEFAULT_TAG_COLOR);
       setOpen(false);
       void tags.refetch();
     },
@@ -94,6 +88,8 @@ export default function TagsPage() {
     onSuccess: () => tags.refetch(),
     onError: (error) => toast.error(error.message),
   });
+  const parsedColor = TagColorSchema.safeParse(color);
+  const colorIsValid = parsedColor.success;
 
   return (
     <DashboardPage>
@@ -105,7 +101,7 @@ export default function TagsPage() {
             onClick={() => {
               setEditingTag(null);
               setName("");
-              setColor("primary");
+              setColor(DEFAULT_TAG_COLOR);
               setOpen(true);
             }}
           >
@@ -133,6 +129,11 @@ export default function TagsPage() {
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <Badge variant="secondary" className="max-w-40 truncate">
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: tag.color }}
+                      aria-hidden="true"
+                    />
                     {tag.name}
                   </Badge>
                   <span className="text-muted-foreground text-xs">
@@ -185,46 +186,65 @@ export default function TagsPage() {
             className="flex flex-col gap-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!name.trim()) return;
+              if (!name.trim() || !parsedColor.success) return;
+              const validColor = parsedColor.data;
               if (editingTag)
                 update.mutate({
                   id: editingTag.id,
                   organizationId,
                   name: name.trim(),
-                  color,
+                  color: validColor,
                 });
-              else create.mutate({ organizationId, name: name.trim(), color });
+              else
+                create.mutate({
+                  organizationId,
+                  name: name.trim(),
+                  color: validColor,
+                });
             }}
           >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="tag-name">Name</Label>
-              <Input
-                id="tag-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="tag-color">Color</Label>
-              <Select
-                value={color}
-                onValueChange={(value) =>
-                  setColor(value as (typeof COLORS)[number])
-                }
-              >
-                <SelectTrigger id="tag-color">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COLORS.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="tag-name">Name</FieldLabel>
+                <Input
+                  id="tag-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  autoFocus
+                />
+              </Field>
+              <Field data-invalid={!colorIsValid}>
+                <FieldLabel htmlFor="tag-color">Color</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="tag-color-picker"
+                    type="color"
+                    value={colorIsValid ? color : DEFAULT_TAG_COLOR}
+                    onChange={(event) => setColor(event.target.value)}
+                    aria-invalid={!colorIsValid}
+                    aria-label="Choose tag color"
+                    className="size-10 cursor-pointer rounded-md border border-input bg-background p-1"
+                  />
+                  <Input
+                    id="tag-color"
+                    value={color}
+                    onChange={(event) => setColor(event.target.value)}
+                    placeholder="#6366f1"
+                    aria-invalid={!colorIsValid}
+                    className="font-mono uppercase"
+                  />
+                </div>
+                {colorIsValid ? (
+                  <FieldDescription>
+                    Choose a color or enter a 6-digit hex value.
+                  </FieldDescription>
+                ) : (
+                  <FieldError>
+                    Enter a valid 6-digit hex color, such as #6366f1.
+                  </FieldError>
+                )}
+              </Field>
+            </FieldGroup>
             <DialogFooter>
               <Button
                 type="button"
@@ -235,7 +255,12 @@ export default function TagsPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={create.isPending || update.isPending || !name.trim()}
+                disabled={
+                  create.isPending ||
+                  update.isPending ||
+                  !name.trim() ||
+                  !colorIsValid
+                }
               >
                 {(create.isPending || update.isPending) && (
                   <Spinner data-icon="inline-start" />
