@@ -20,18 +20,32 @@ The repository is public and welcomes focused, well-tested contributions. The do
 apps/web/       Next.js dashboard and PWA
 apps/server/    Hono API, tRPC adapter, workers, migrations, terminal broker
 apps/fumadocs/  User and operator documentation
-packages/api/   tRPC routers and dependency-injection registrations
-packages/usecases/ Domain workflows and integrations
-packages/domain/ Entities, repositories, validation, and crypto contracts
-packages/db/    Drizzle schema, migrations, and database adapter
-packages/auth/  Better Auth configuration
-packages/repositories/ Persistence implementations
+packages/domain/ Enterprise entities, value objects, errors, and repository ports
+packages/usecases/ Application workflows, service ports, and operational services
+packages/infrastructure/ External provider adapters owned by the composition edge
+packages/db/    Drizzle schema, migrations, and database infrastructure
+packages/repositories/ Persistence adapters implementing domain repository ports
+packages/redis/ Redis connection and queue runtime infrastructure
+packages/platform/ Cross-cutting crypto and SSH platform capabilities
+packages/auth/  Better Auth infrastructure and identity adapters
+packages/api/   Interface adapters, tRPC routers, and the composition root
 packages/ui/    Shared UI primitives and design tokens
 packages/env/   Validated server/client environment configuration
 install.sh      Self-hosted installation and upgrade entry point
 docker-compose.local.yml  Bind-mounted local development stack
 docker-compose.prod.yml   Production Docker Swarm stack used by install.sh
 ```
+
+Dependencies point inward: apps and API adapters compose infrastructure and
+application services; persistence implements contracts owned by the domain;
+the domain never imports an outer workspace package, and use cases never import
+API, auth, database, repository, environment, or UI adapters. Typed DI
+tokens are declared only in `packages/usecases/src/tokens.ts` and
+`packages/repositories/src/tokens.ts`. Consumers must import those tokens rather
+than reconstructing their names with `Symbol.for(...)`. These rules are checked
+by `packages/config/src/architecture.test.ts` and Turborepo's boundary checker.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the package responsibilities and the
+decision to retain a focused platform package.
 
 ## Prerequisites
 

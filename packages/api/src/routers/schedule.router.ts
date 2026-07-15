@@ -15,7 +15,7 @@ import {
   GetSchedulesUseCaseToken,
   UnitOfWorkToken,
   UpdateScheduleUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission, type PermissionAction } from "../permissions";

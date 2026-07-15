@@ -1,31 +1,31 @@
+import { requestJson, requestJsonWithResponse } from "./http";
+
 export async function refreshGitlabToken(
   gitlabUrl: string,
   refreshToken: string,
   clientId: string,
   clientSecret: string,
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: number }> {
-  const response = await fetch(`${gitlabUrl}/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to refresh GitLab token: ${response.statusText}`);
-  }
-
-  const data = (await response.json()) as {
+  const data = await requestJson<{
     access_token: string;
     refresh_token: string;
     expires_in: number;
-  };
+  }>(
+    `${gitlabUrl}/oauth/token`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    },
+    (response) => `Failed to refresh GitLab token: ${response.statusText}`,
+  );
 
   return {
     accessToken: data.access_token,
@@ -44,22 +44,15 @@ export async function getGitlabRepositories(
   const perPage = 100;
 
   while (true) {
-    const response = await fetch(
+    const { data: projects, response } = await requestJsonWithResponse<any[]>(
       `${gitlabUrl}/api/v4/projects?membership=true&page=${page}&per_page=${perPage}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       },
+      (response) => `Failed to fetch GitLab projects: ${response.statusText}`,
     );
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch GitLab projects: ${response.statusText}`,
-      );
-    }
-
-    const projects = (await response.json()) as any[];
     if (projects.length === 0) {
       break;
     }
@@ -105,22 +98,17 @@ export async function getGitlabBranches(
   const perPage = 100;
 
   while (true) {
-    const response = await fetch(
+    const { data: branches, response } = await requestJsonWithResponse<
+      { name: string }[]
+    >(
       `${gitlabUrl}/api/v4/projects/${encodedId}/repository/branches?page=${page}&per_page=${perPage}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       },
+      (response) => `Failed to fetch GitLab branches: ${response.statusText}`,
     );
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch GitLab branches: ${response.statusText}`,
-      );
-    }
-
-    const branches = (await response.json()) as { name: string }[];
     if (branches.length === 0) {
       break;
     }

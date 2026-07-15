@@ -25,6 +25,7 @@
     "@upstand/auth": "workspace:*",
     "@upstand/db": "workspace:*",
     "@upstand/domain": "workspace:*",
+    "@upstand/infrastructure": "workspace:*",
     "@upstand/platform": "workspace:*",
     "@upstand/redis": "workspace:*",
     "@upstand/repositories": "workspace:*",

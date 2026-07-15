@@ -6,11 +6,9 @@ import * as schema from "@upstand/db/schema/auth";
 import { notificationChannel } from "@upstand/db/schema/notification";
 import { NotificationChannelSchema } from "@upstand/domain";
 import { env } from "@upstand/env/server";
+import { NotificationTransportRegistry } from "@upstand/infrastructure";
 import { redis } from "@upstand/redis";
-import {
-  decryptNotificationConfiguration,
-  NotificationTransportRegistry,
-} from "@upstand/usecases";
+import { decryptNotificationConfiguration } from "@upstand/usecases";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";

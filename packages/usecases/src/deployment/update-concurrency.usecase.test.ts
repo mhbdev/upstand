@@ -17,4 +17,23 @@ describe("UpdateConcurrencyUseCase", () => {
       }),
     ).rejects.toThrow("not part of the active organization");
   });
+
+  test("rejects database servers as build-concurrency targets", async () => {
+    const useCase = new UpdateConcurrencyUseCase({
+      serverRepository: {
+        findById: async () => ({
+          organizationId: "active-org",
+          serverType: "database",
+        }),
+      },
+    } as any);
+
+    await expect(
+      useCase.execute({
+        organizationId: "active-org",
+        serverId: "database-server",
+        concurrency: 2,
+      }),
+    ).rejects.toThrow("Database servers cannot be used");
+  });
 });

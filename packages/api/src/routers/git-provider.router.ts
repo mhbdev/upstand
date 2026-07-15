@@ -12,16 +12,16 @@ import {
   redactGitProvider,
   UpdateGitProviderInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
-import { z } from "zod";
 import {
   CreateGitProviderUseCaseToken,
   DeleteGitProviderUseCaseToken,
   GetGitProvidersUseCaseToken,
   ListGitBranchesUseCaseToken,
   ListGitRepositoriesUseCaseToken,
+  UnitOfWorkToken,
   UpdateGitProviderUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";

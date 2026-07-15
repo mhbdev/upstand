@@ -5,6 +5,10 @@ import {
   type JsonObject,
 } from "@upstand/domain";
 import { redis } from "@upstand/redis";
+import {
+  CreateAuditLogUseCaseToken,
+  UnitOfWorkToken,
+} from "@upstand/usecases/tokens";
 import { log } from "evlog";
 import { ensureOrganizationAccess } from "./access-control";
 import {
@@ -13,7 +17,6 @@ import {
   setApiKeyRateLimitHeaders,
 } from "./api-key-auth";
 import type { Context } from "./context";
-import { CreateAuditLogUseCaseToken, UnitOfWorkToken } from "./di";
 
 export const t = initTRPC.context<Context>().create();
 

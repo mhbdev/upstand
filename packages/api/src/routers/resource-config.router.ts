@@ -5,13 +5,13 @@ import {
   ResourcePortSchema,
   ResourceVolumeSchema,
 } from "@upstand/domain";
-import { z } from "zod";
 import {
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
   GetResourceUseCaseToken,
   UpdateResourceUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { z } from "zod";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 

@@ -6,10 +6,9 @@ import {
   Folder01Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@upstand/ui/components/button";
-import { Card } from "@upstand/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -31,56 +30,6 @@ import {
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function _parseIsPersonal(metadata: string | null | undefined): boolean {
-  if (!metadata) return false;
-  try {
-    return JSON.parse(metadata).isPersonal === true;
-  } catch {
-    return false;
-  }
-}
-
-const ACCENT_MAP = {
-  primary: "bg-primary/10 text-primary",
-  emerald: "bg-emerald-500/10 text-emerald-500",
-  violet: "bg-violet-500/10 text-violet-500",
-  amber: "bg-amber-500/10 text-amber-500",
-} as const;
-
-function _StatCard({
-  label,
-  value,
-  icon,
-  accent = "primary",
-  loading = false,
-}: {
-  label: string;
-  value: React.ReactNode;
-  icon: IconSvgElement;
-  accent?: keyof typeof ACCENT_MAP;
-  loading?: boolean;
-}) {
-  return (
-    <Card className="border border-border/40 bg-card/45 p-5 backdrop-blur-md transition-all duration-300 hover:border-border/80">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
-            {label}
-          </p>
-          <div className="font-bold text-2xl text-foreground">
-            {loading ? <Spinner className="size-5" /> : value}
-          </div>
-        </div>
-        <div className={cn("p-2.5", ACCENT_MAP[accent])}>
-          <HugeiconsIcon icon={icon} className="size-5" />
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 function ProjectCard({
   project,

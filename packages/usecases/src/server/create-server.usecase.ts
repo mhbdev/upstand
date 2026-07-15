@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
-import type { IUnitOfWork, Server } from "@upstand/domain";
+import {
+  type IUnitOfWork,
+  type Server,
+  ServerTypeSchema,
+} from "@upstand/domain";
 import { z } from "zod";
 
 export const CreateServerInputSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
   name: z.string().min(1, "Server name is required"),
   description: z.string().optional().nullable(),
-  serverType: z.string().min(1, "Server type is required"),
+  serverType: ServerTypeSchema,
   sshKeyId: z.string().optional().nullable(),
   ipAddress: z.string().min(1, "IP address is required"),
   port: z.number().default(22),

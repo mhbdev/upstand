@@ -9,7 +9,6 @@ import {
   RebuildDatabaseInputSchema,
   UpdateResourceInputSchema,
 } from "@upstand/usecases";
-import { z } from "zod";
 import {
   ControlResourceUseCaseToken,
   CreateResourceUseCaseToken,
@@ -20,7 +19,8 @@ import {
   GetResourceUseCaseToken,
   RebuildDatabaseUseCaseToken,
   UpdateResourceUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";

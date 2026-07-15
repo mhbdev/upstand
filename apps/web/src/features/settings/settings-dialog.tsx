@@ -167,12 +167,12 @@ export function SettingsDialog() {
               collapsible="none"
               className="hidden w-48 shrink-0 border-r md:flex"
             >
-              <SidebarContent className="space-y-4 py-2">
+              <SidebarContent className="gap-3 py-1">
                 {groups.map((group) => {
                   if (group.visible === false) return null;
                   return (
-                    <SidebarGroup key={group.id} className="p-0 px-2">
-                      <div className="px-3 py-1 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider">
+                    <SidebarGroup key={group.id} className="px-1 py-0">
+                      <div className="px-2 py-1 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider">
                         {group.label}
                       </div>
                       <SidebarGroupContent>
@@ -182,7 +182,7 @@ export function SettingsDialog() {
                               return (
                                 <SidebarMenuItem
                                   key={item.name}
-                                  className="space-y-1"
+                                  className="flex flex-col gap-1"
                                 >
                                   <div className="flex items-center gap-2 px-3 py-1.5 font-semibold text-muted-foreground/80 text-xs">
                                     <HugeiconsIcon
@@ -191,7 +191,7 @@ export function SettingsDialog() {
                                     />
                                     <span>{item.label}</span>
                                   </div>
-                                  <SidebarMenuSub className="ml-4 space-y-1 border-l pl-3">
+                                  <SidebarMenuSub className="ml-4 gap-1 border-l pl-3">
                                     {item.subItems?.map((subItem) => (
                                       <SidebarMenuSubItem key={subItem.name}>
                                         <SidebarMenuSubButton
@@ -244,7 +244,7 @@ export function SettingsDialog() {
 
             {/* Main content area */}
             <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-              <header className="flex h-12 shrink-0 items-center border-b px-4">
+              <header className="flex h-12 shrink-0 items-center border-b px-3">
                 <Button
                   type="button"
                   variant="ghost"
@@ -273,7 +273,7 @@ export function SettingsDialog() {
                 </Breadcrumb>
               </header>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+              <div className="min-h-0 flex-1 overflow-y-auto p-2 md:p-3">
                 {activeTab === "profile" && <ProfilePanel />}
                 {activeTab === "sessions" && <SessionsPanel />}
                 {activeTab === "members" && <MembersPanel />}
@@ -295,18 +295,18 @@ export function SettingsDialog() {
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>Choose a section to manage.</SheetDescription>
           </SheetHeader>
-          <nav className="space-y-4 p-2">
+          <nav className="flex flex-col gap-3 p-2">
             {groups.map((group) => {
               if (group.visible === false) return null;
               return (
-                <div key={group.id} className="space-y-1">
+                <div key={group.id} className="flex flex-col gap-1">
                   <div className="px-3 py-1 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider">
                     {group.label}
                   </div>
                   {group.items.map((item) => {
                     if ("subItems" in item) {
                       return (
-                        <div key={item.name} className="space-y-1">
+                        <div key={item.name} className="flex flex-col gap-1">
                           <div className="flex items-center gap-2 px-3 py-1.5 font-semibold text-muted-foreground/80 text-xs">
                             <HugeiconsIcon
                               icon={item.icon}

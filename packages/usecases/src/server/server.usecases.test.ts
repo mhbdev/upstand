@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { IUnitOfWork } from "@upstand/domain";
+import { CreateServerInputSchema } from "./create-server.usecase";
+import { DeleteServerUseCase } from "./delete-server.usecase";
 import { GetServerUseCase } from "./get-server.usecase";
 import { GetServerCountUseCase } from "./get-server-count.usecase";
+import {
+  assertBuildServerSupportsResource,
+  assertDeploymentServerSupportsResource,
+  getServerProvisioningPlan,
+} from "./server-role";
 import { UpdateServerUseCase } from "./update-server.usecase";
 
 function createUow() {
@@ -24,6 +31,7 @@ function createUow() {
       },
     ],
   ]);
+  const resources = new Map<string, any>();
   const uow = {
     serverRepository: {
       findById: async (id: string) => servers.get(id) ?? null,
@@ -37,12 +45,63 @@ function createUow() {
         Object.assign(server, patch);
         return server;
       },
+      deleteById: async (id: string) => servers.delete(id),
+    },
+    resourceRepository: {
+      findMany: async () => [...resources.values()],
     },
   } as unknown as IUnitOfWork;
-  return { uow, servers };
+  return { uow, servers, resources };
 }
 
 describe("server use cases", () => {
+  test("accepts only the supported server roles", () => {
+    expect(
+      CreateServerInputSchema.safeParse({
+        organizationId: "org-1",
+        name: "Build host",
+        serverType: "unsupported",
+        ipAddress: "203.0.113.10",
+      }).success,
+    ).toBeFalse();
+  });
+
+  test("keeps deployment and build server capabilities distinct", () => {
+    const buildServer = { name: "Builder", serverType: "build" } as never;
+    const databaseServer = {
+      name: "Database host",
+      serverType: "database",
+    } as never;
+
+    expect(() =>
+      assertDeploymentServerSupportsResource(buildServer, "application"),
+    ).toThrow("cannot host deployments");
+    expect(() =>
+      assertDeploymentServerSupportsResource(databaseServer, "compose"),
+    ).toThrow("can only host database resources");
+    expect(() =>
+      assertBuildServerSupportsResource(databaseServer, "application"),
+    ).toThrow("cannot build applications");
+  });
+
+  test("provisions each server role with only its required host services", () => {
+    expect(getServerProvisioningPlan("deploy")).toEqual({
+      requiresSwarm: true,
+      requiresCaddy: true,
+      requiresMonitoring: true,
+    });
+    expect(getServerProvisioningPlan("build")).toEqual({
+      requiresSwarm: false,
+      requiresCaddy: false,
+      requiresMonitoring: true,
+    });
+    expect(getServerProvisioningPlan("database")).toEqual({
+      requiresSwarm: true,
+      requiresCaddy: false,
+      requiresMonitoring: true,
+    });
+  });
+
   test("does not expose a server across organizations", async () => {
     const { uow } = createUow();
     await expect(
@@ -83,5 +142,51 @@ describe("server use cases", () => {
     expect(updated.status).toBe("idle");
     expect(updated.setupError).toBeNull();
     expect(servers.get("server-1")).toBe(updated);
+  });
+
+  test("resets readiness when a role change requires reprovisioning", async () => {
+    const { uow } = createUow();
+    const updated = await new UpdateServerUseCase(uow).execute({
+      organizationId: "org-1",
+      id: "server-1",
+      serverType: "database",
+    });
+
+    expect(updated.serverType).toBe("database");
+    expect(updated.status).toBe("idle");
+  });
+
+  test("prevents a role change that would invalidate existing assignments", async () => {
+    const { uow, resources } = createUow();
+    resources.set("resource-1", {
+      id: "resource-1",
+      name: "Frontend",
+      type: "application",
+      serverId: "server-1",
+      buildServerId: null,
+    });
+
+    await expect(
+      new UpdateServerUseCase(uow).execute({
+        organizationId: "org-1",
+        id: "server-1",
+        serverType: "database",
+      }),
+    ).rejects.toThrow("Cannot change this server");
+  });
+
+  test("prevents deleting a server while it is assigned to a resource", async () => {
+    const { uow, resources } = createUow();
+    resources.set("resource-1", {
+      id: "resource-1",
+      name: "Frontend",
+      type: "application",
+      serverId: null,
+      buildServerId: "server-1",
+    });
+
+    await expect(
+      new DeleteServerUseCase(uow).execute({ id: "server-1" }),
+    ).rejects.toThrow("Reassign those resources before deleting the server");
   });
 });

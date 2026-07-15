@@ -117,7 +117,7 @@ export default function WebServerDashboard(_props: {
   const [caddyLogsTail, setCaddyLogsTail] = useState(100);
   const [serverLogsTail, setServerLogsTail] = useState(100);
   const [caddyLogsCopied, setCaddyLogsCopied] = useState(false);
-  const [_serverLogsCopied, setServerLogsCopied] = useState(false);
+  const [, setServerLogsCopied] = useState(false);
   const [autoRefreshCaddyLogs, setAutoRefreshCaddyLogs] = useState(true);
   const [autoRefreshServerLogs, setAutoRefreshServerLogs] = useState(true);
 
@@ -585,8 +585,6 @@ export default function WebServerDashboard(_props: {
   };
 
   const isSaving = updateSettingsMutation.isPending;
-  const _isOperating = reloadMutation.isPending;
-
   return (
     <DashboardPage>
       {/* Page Header */}

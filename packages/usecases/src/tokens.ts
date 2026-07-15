@@ -1,14 +1,15 @@
 import { createToken } from "@circulo-ai/di";
 import type { IUnitOfWork } from "@upstand/domain";
 import type * as UseCases from "./index";
-import type { NotificationTransportRegistry } from "./notification/notification-transport";
+import type { NotificationTransport } from "./notification/notification-transport.port";
 
 // Application composition token. The domain exposes the IUnitOfWork contract,
 // while the DI token belongs to the outer composition layer.
 export const UnitOfWorkToken = createToken<IUnitOfWork>("IUnitOfWork");
 
-export const NotificationTransportToken =
-  createToken<NotificationTransportRegistry>("NotificationTransport");
+export const NotificationTransportToken = createToken<NotificationTransport>(
+  "NotificationTransport",
+);
 export const CaddyServiceToken =
   createToken<UseCases.CaddyService>("CaddyService");
 export const DockerServiceToken =
@@ -18,9 +19,7 @@ export const DatabaseCommandUseCaseToken =
 export const DockerReadOnlyServiceToken =
   createToken<UseCases.DockerReadOnlyService>("DockerReadOnlyService");
 export const PublishNotificationUseCaseToken =
-  createToken<UseCases.PublishNotificationUseCase>(
-    "PublishNotificationUseCase",
-  );
+  createToken<UseCases.NotificationPublisher>("PublishNotificationUseCase");
 export const CreateAuditLogUseCaseToken =
   createToken<UseCases.CreateAuditLogUseCase>("CreateAuditLogUseCase");
 export const ListAuditLogsUseCaseToken =

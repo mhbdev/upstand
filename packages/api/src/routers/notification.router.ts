@@ -3,16 +3,16 @@ import {
   CreateNotificationChannelInputSchema,
   UpdateNotificationChannelInputSchema,
 } from "@upstand/domain";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
-import { z } from "zod";
 import {
   CreateNotificationChannelUseCaseToken,
   DeleteNotificationChannelUseCaseToken,
   GetNotificationChannelsUseCaseToken,
   RetryNotificationDeliveryUseCaseToken,
   TestNotificationChannelUseCaseToken,
+  UnitOfWorkToken,
   UpdateNotificationChannelUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";

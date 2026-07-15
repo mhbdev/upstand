@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { IUnitOfWork } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
+import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { ControlContainerUseCase } from "./control-container.usecase";
 import { ControlResourceUseCase } from "./control-resource.usecase";
 import { CreateResourceUseCase } from "./create-resource.usecase";
@@ -11,6 +12,10 @@ import { GetResourceLogsUseCase } from "./get-resource-logs.usecase";
 import { RebuildDatabaseUseCase } from "./rebuild-database.usecase";
 import { RollbackResourceUseCase } from "./rollback-resource.usecase";
 import { UpdateResourceUseCase } from "./update-resource.usecase";
+
+process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
+  "base64",
+);
 
 class MockEnvironmentRepository {
   public store: any[] = [];
@@ -102,39 +107,14 @@ class MockServerBuildSettingsRepository {
   }
 }
 
-class MockUnitOfWork implements IUnitOfWork {
-  public readonly tagRepository = {} as any;
-  public readonly templateRepository = {} as any;
-  public readonly auditLogRepository = {} as any;
-  public readonly backupScheduleRepository = {} as any;
-  public readonly backupRunRepository = {} as any;
-  public readonly certificateRepository = {} as any;
-  public readonly environmentRepository =
-    new MockEnvironmentRepository() as any;
-  public readonly resourceRepository = new MockResourceRepository() as any;
-  public readonly sshKeyRepository = {} as any;
-  public readonly gitProviderRepository = {} as any;
-  public readonly projectRepository = {} as any;
-  public readonly userRepository = {} as any;
-  public readonly webServerSettingsRepository = {
-    findGlobal: async () => null,
-  } as any;
-  public readonly s3DestinationRepository = {} as any;
-  public readonly serverBuildSettingsRepository =
-    new MockServerBuildSettingsRepository() as any;
-  public readonly deploymentRepository = new MockDeploymentRepository() as any;
-  public readonly dockerRegistryRepository = {} as any;
-  public readonly serverRepository = {} as any;
-  public readonly notificationChannelRepository = {} as any;
-  public readonly notificationDeliveryRepository = {} as any;
-  public readonly monitoringSettingsRepository = {} as any;
-  public readonly previewDeploymentRepository = {} as any;
-  public readonly scheduleRepository = {} as any;
-
-  async transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T> {
-    return work(this as any);
-  }
-}
+const createMockUnitOfWork = () =>
+  mockUnitOfWork({
+    environmentRepository: new MockEnvironmentRepository(),
+    resourceRepository: new MockResourceRepository(),
+    webServerSettingsRepository: { findGlobal: async () => null } as any,
+    serverBuildSettingsRepository: new MockServerBuildSettingsRepository(),
+    deploymentRepository: new MockDeploymentRepository(),
+  }) as any;
 
 const mockCaddyService = {
   syncResourceConfigs: async () => ({ success: true, domains: [] }),
@@ -164,7 +144,7 @@ const mockDockerService = {
 
 describe("Resource Usecases", () => {
   test("creates a new resource and increments environment resource count", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
 
     // Seed mock environment
@@ -188,7 +168,7 @@ describe("Resource Usecases", () => {
   });
 
   test("accepts an explicitly opted-in safe custom database image", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     uow.environmentRepository.store.push({
       id: "env-custom-image",
       name: "production",
@@ -221,7 +201,7 @@ describe("Resource Usecases", () => {
   });
 
   test("deletes a resource and decrements environment resource count", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const deleteUseCase = new DeleteResourceUseCase(
       uow as IUnitOfWork,
@@ -252,7 +232,7 @@ describe("Resource Usecases", () => {
   });
 
   test("rebuilds a database only through the confirmed destructive path", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const resource = await uow.resourceRepository.create({
       id: "db-1",
       environmentId: "env-1",
@@ -292,7 +272,7 @@ describe("Resource Usecases", () => {
   });
 
   test("queues a resource deployment for the background worker", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const queuedJobs: any[] = [];
     let queueClosed = false;
@@ -328,7 +308,7 @@ describe("Resource Usecases", () => {
   });
 
   test("marks a deployment failed when Redis enqueueing fails", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     let queueClosed = false;
     const deployUseCase = new DeployResourceUseCase(uow as IUnitOfWork, () => ({
@@ -361,7 +341,7 @@ describe("Resource Usecases", () => {
   });
 
   test("controls a resource state via start/stop command", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const controlUseCase = new ControlResourceUseCase(
       uow as IUnitOfWork,
@@ -397,7 +377,7 @@ describe("Resource Usecases", () => {
   });
 
   test("rolls back a Swarm resource and records the rollback history", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const rollbackUseCase = new RollbackResourceUseCase(
       uow as IUnitOfWork,
@@ -429,7 +409,7 @@ describe("Resource Usecases", () => {
     process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
       "base64",
     );
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     uow.environmentRepository.store.push({
       id: "env-rollback",
       projectId: "project-rollback",
@@ -480,7 +460,7 @@ describe("Resource Usecases", () => {
   });
 
   test("validates a per-resource build registry against the project organization", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     uow.environmentRepository.store.push({
       id: "env-build-registry",
       projectId: "project-build-registry",
@@ -528,7 +508,7 @@ describe("Resource Usecases", () => {
   });
 
   test("controls only the selected container, including kill", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const controlContainerUseCase = new ControlContainerUseCase(
       uow as IUnitOfWork,
@@ -557,7 +537,7 @@ describe("Resource Usecases", () => {
   });
 
   test("normalizes a domain before Caddy receives the complete resource set", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const caddyCalls: any[] = [];
     const updateUseCase = new UpdateResourceUseCase(
@@ -595,7 +575,7 @@ describe("Resource Usecases", () => {
   });
 
   test("queries containers list and updates database", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const getContainersUseCase = new GetResourceContainersUseCase(
       uow as IUnitOfWork,
@@ -624,7 +604,7 @@ describe("Resource Usecases", () => {
   });
 
   test("retrieves resource logs from DockerService", async () => {
-    const uow = new MockUnitOfWork();
+    const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
     const getLogsUseCase = new GetResourceLogsUseCase(
       uow as IUnitOfWork,

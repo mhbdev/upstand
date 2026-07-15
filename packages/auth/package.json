@@ -19,6 +19,7 @@
     "@upstand/db": "workspace:*",
     "@upstand/domain": "workspace:*",
     "@upstand/env": "workspace:*",
+    "@upstand/infrastructure": "workspace:*",
     "@upstand/redis": "workspace:*",
     "@upstand/usecases": "workspace:*",
     "better-auth": "catalog:",

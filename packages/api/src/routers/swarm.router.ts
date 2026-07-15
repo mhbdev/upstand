@@ -5,9 +5,6 @@ import {
   RotateSwarmJoinTokenInputSchema,
   UpdateSwarmNodeInputSchema,
 } from "@upstand/usecases";
-import { log } from "evlog";
-import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import {
   GetSwarmContainersUseCaseToken,
   GetSwarmInfoUseCaseToken,
@@ -18,7 +15,10 @@ import {
   RemoveSwarmNodeUseCaseToken,
   RotateSwarmJoinTokenUseCaseToken,
   UpdateSwarmNodeUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import { log } from "evlog";
+import { z } from "zod";
+import { ensureOrganizationAccess } from "../access-control";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 
@@ -64,13 +64,8 @@ async function notifyClusterOperation(
     metadata?: Record<string, unknown>;
   },
 ) {
-  await (
-    scope.resolve(PublishNotificationUseCaseToken) as {
-      execute: (
-        value: typeof input & { idempotencyKey: string },
-      ) => Promise<number>;
-    }
-  )
+  await scope
+    .resolve(PublishNotificationUseCaseToken)
     .execute({
       ...input,
       idempotencyKey: `cluster:${input.event}:${input.organizationId}:${JSON.stringify(input.metadata ?? {})}`,

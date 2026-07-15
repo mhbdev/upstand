@@ -1,21 +1,12 @@
 import type { NotificationConfiguration } from "@upstand/domain";
+import type {
+  NotificationMessage,
+  NotificationTransport,
+} from "@upstand/usecases/notification/notification-transport.port";
 import nodemailer from "nodemailer";
 
 const NOTIFICATION_REQUEST_TIMEOUT_MS = 15_000;
 const MAX_PROVIDER_ERROR_BODY_LENGTH = 500;
-
-export interface NotificationMessage {
-  title: string;
-  message: string;
-  metadata?: Record<string, unknown> | null;
-}
-
-export interface NotificationTransport {
-  send(
-    configuration: NotificationConfiguration,
-    message: NotificationMessage,
-  ): Promise<void>;
-}
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");

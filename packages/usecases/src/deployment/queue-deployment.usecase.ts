@@ -6,7 +6,6 @@ import {
 } from "@upstand/domain";
 import { redis } from "@upstand/redis";
 import { Queue } from "bullmq";
-import { getDockerInstance } from "../resource/docker-client";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 
 export interface QueueDeploymentInput {
@@ -37,6 +36,20 @@ export interface DeploymentQueue {
 
 export type DeploymentQueueFactory = (queueName: string) => DeploymentQueue;
 
+export interface LocalDeploymentTarget {
+  name: string;
+  ip: string;
+}
+
+export type LocalDeploymentTargetResolver =
+  () => Promise<LocalDeploymentTarget>;
+
+const defaultLocalDeploymentTarget: LocalDeploymentTargetResolver =
+  async () => ({
+    name: "Dokploy Server",
+    ip: "127.0.0.1",
+  });
+
 const createDeploymentQueue: DeploymentQueueFactory = (queueName) =>
   new Queue(queueName, { connection: redis as any });
 
@@ -44,6 +57,7 @@ export class QueueDeploymentUseCase {
   constructor(
     private readonly uow: IUnitOfWork,
     private readonly queueFactory: DeploymentQueueFactory = createDeploymentQueue,
+    private readonly localTargetResolver: LocalDeploymentTargetResolver = defaultLocalDeploymentTarget,
   ) {}
 
   async execute(input: QueueDeploymentInput): Promise<Resource> {
@@ -65,23 +79,9 @@ export class QueueDeploymentUseCase {
       let serverIp = "127.0.0.1";
 
       if (!serverId) {
-        // For local/swarm-manager nodes, always use the sentinel "local" serverId.
-        // The raw swarm node hex ID is not registered in serverRepository and would
-        // cause the deployment worker to throw "Target deployment server not found".
-        const docker = getDockerInstance();
-        try {
-          const info = await docker.info();
-          if (info.Swarm && info.Swarm.LocalNodeState === "active") {
-            const nodes = await docker.listNodes().catch(() => []);
-            const leader = nodes.find((n: any) => n.ManagerStatus?.Leader);
-            if (leader) {
-              // Use "local" as the canonical id for the swarm manager node.
-              // The raw node ID (leader.ID) is kept only for metadata.
-              serverName = leader.Description?.Hostname || leader.ID;
-              serverIp = leader.Status?.Addr || "127.0.0.1";
-            }
-          }
-        } catch {}
+        const target = await this.localTargetResolver();
+        serverName = target.name;
+        serverIp = target.ip;
 
         // Always keep the sentinel so the deployment worker uses the local Docker socket.
         serverId = "local";

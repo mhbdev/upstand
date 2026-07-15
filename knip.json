@@ -8,6 +8,16 @@
     "**/.source/**",
     "apps/web/src/components/ai-elements/**"
   ],
-  "ignoreDependencies": ["@upstand/config"],
+  "ignoreDependencies": [
+    "@upstand/config",
+    "@radix-ui/react-use-controllable-state",
+    "@rive-app/react-webgl2",
+    "@xyflow/react",
+    "ansi-to-react",
+    "media-chrome",
+    "motion",
+    "react-jsx-parser",
+    "tokenlens"
+  ],
   "ignoreExportsUsedInFile": true
 }

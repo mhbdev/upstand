@@ -7,14 +7,14 @@ import {
   TestDockerRegistryConnectionInputSchema,
   UpdateDockerRegistryInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateDockerRegistryUseCaseToken,
   DeleteDockerRegistryUseCaseToken,
   GetDockerRegistriesUseCaseToken,
   TestDockerRegistryConnectionUseCaseToken,
+  UnitOfWorkToken,
   UpdateDockerRegistryUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";

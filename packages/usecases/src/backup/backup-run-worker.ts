@@ -2,7 +2,7 @@ import type { IUnitOfWork } from "@upstand/domain";
 import { closeRedis, createRedis, type Redis } from "@upstand/redis";
 import { type Job, Worker } from "bullmq";
 import { log } from "evlog";
-import { UnitOfWorkToken } from "../tokens";
+import { ExecuteBackupRunUseCaseToken, UnitOfWorkToken } from "../tokens";
 import { releaseBackupRunLock, renewBackupRunLock } from "./backup-run-lock";
 import type { ExecuteBackupRunUseCase } from "./execute-backup-run.usecase";
 import { BACKUP_RUN_QUEUE } from "./trigger-backup-run.usecase";
@@ -117,7 +117,7 @@ export class BackupRunWorker {
       renewalTimer.unref?.();
 
       const execute = scope.resolve<ExecuteBackupRunUseCase>(
-        Symbol.for("ExecuteBackupRunUseCase"),
+        ExecuteBackupRunUseCaseToken,
       );
       await execute.execute(runId);
       await releaseBackupRunLock(run.scheduleId, runId);

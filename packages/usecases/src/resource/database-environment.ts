@@ -4,8 +4,11 @@ import { parseResourceEnvironmentVariables } from "./resource-environment";
 
 type DatabaseCredentials = Record<string, string>;
 
-/** Resolve the runtime database environment without returning credentials to callers. */
-export function getDatabaseEnvironment(
+/**
+ * Derive the environment owned by a database engine from its protected
+ * credentials. These values are distinct from user-managed resource variables.
+ */
+export function getManagedDatabaseEnvironment(
   resource: Resource,
 ): Record<string, string> {
   const credentials: DatabaseCredentials = {};
@@ -47,11 +50,15 @@ export function getDatabaseEnvironment(
     }
   }
 
-  for (const [key, value] of Object.entries(
-    parseResourceEnvironmentVariables(resource.envVars),
-  )) {
-    databaseEnvironment[key] = value;
-  }
-
   return databaseEnvironment;
+}
+
+/** Resolve the complete runtime environment without persisting derived secrets twice. */
+export function getDatabaseEnvironment(
+  resource: Resource,
+): Record<string, string> {
+  return {
+    ...getManagedDatabaseEnvironment(resource),
+    ...parseResourceEnvironmentVariables(resource.envVars),
+  };
 }

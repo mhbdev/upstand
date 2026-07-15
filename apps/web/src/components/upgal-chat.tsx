@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpGalUIMessage } from "@upstand/api/ai/upgal";
+import type { UpGalPageContext } from "@upstand/api/ai/upgal-page-context";
 import {
   Alert,
   AlertDescription,
@@ -45,7 +46,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -75,7 +77,10 @@ import { UpGalToolOutput } from "@/components/upgal-tool-output";
 import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
-type UpGalChatProps = { organizationId?: string };
+type UpGalChatProps = {
+  organizationId?: string;
+  pageTitle?: string;
+};
 
 const conversationDateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -239,7 +244,8 @@ function Part({
   return null;
 }
 
-export function UpGalChat({ organizationId }: UpGalChatProps) {
+export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string>();
@@ -277,14 +283,24 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
     enabled: Boolean(organizationId),
   });
 
-  const transport = new DefaultChatTransport<UpGalUIMessage>({
-    // UpGal is served by the API origin in self-hosted deployments. Using a
-    // relative URL sends the request to the Next.js dashboard and returns its
-    // HTML 404 page instead of an AI stream.
-    api: `${getServerUrl()}/api/ai/chat`,
-    credentials: "include",
-    body: { organizationId },
-  });
+  const pageContext = useMemo<UpGalPageContext>(
+    () => ({
+      path: pathname,
+      ...(pageTitle ? { title: pageTitle } : {}),
+    }),
+    [pageTitle, pathname],
+  );
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport<UpGalUIMessage>({
+        // UpGal is served by the API origin in self-hosted deployments. Using
+        // a relative URL sends the request to the dashboard instead.
+        api: `${getServerUrl()}/api/ai/chat`,
+        credentials: "include",
+      }),
+    [],
+  );
   const chat = useChat<UpGalUIMessage>({
     transport,
     sendAutomaticallyWhen: ({ messages }) =>
@@ -293,7 +309,10 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
 
   async function ensureConversation() {
     if (conversationId || !organizationId) return conversationId;
-    const result = await createConversation.mutateAsync({ organizationId });
+    const result = await createConversation.mutateAsync({
+      organizationId,
+      context: { page: pageContext },
+    });
     setConversationId(result.id);
     void conversations.refetch();
     return result.id;
@@ -379,7 +398,7 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
     const id = await ensureConversation();
     await chat.sendMessage(
       { text: trimmedText },
-      { body: { organizationId, conversationId: id } },
+      { body: { organizationId, conversationId: id, page: pageContext } },
     );
   }
 
@@ -403,7 +422,9 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
         await chat.addToolApprovalResponse({
           id,
           approved,
-          options: { body: { organizationId, conversationId } },
+          options: {
+            body: { organizationId, conversationId, page: pageContext },
+          },
         });
       } finally {
         setApprovalPendingId(undefined);
@@ -579,7 +600,11 @@ export function UpGalChat({ organizationId }: UpGalChatProps) {
                       <Button
                         onClick={() =>
                           void chat.regenerate({
-                            body: { organizationId, conversationId },
+                            body: {
+                              organizationId,
+                              conversationId,
+                              page: pageContext,
+                            },
                           })
                         }
                         size="sm"

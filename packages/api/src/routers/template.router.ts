@@ -12,7 +12,7 @@ import {
   DeployTemplateUseCaseToken,
   ListTemplatesUseCaseToken,
   UpdateTemplateUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";

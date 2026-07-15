@@ -6,14 +6,14 @@ import {
   GetSshKeysInputSchema,
   UpdateSshKeyInputSchema,
 } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import {
   CreateSshKeyUseCaseToken,
   DeleteSshKeyUseCaseToken,
   GenerateSshKeyUseCaseToken,
   GetSshKeysUseCaseToken,
+  UnitOfWorkToken,
   UpdateSshKeyUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";

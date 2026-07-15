@@ -1,6 +1,6 @@
 import { log } from "evlog";
 import { z } from "zod";
-import type { PublishNotificationUseCase } from "../notification/publish-notification.usecase";
+import type { NotificationPublisher } from "../notification/publish-notification.usecase";
 import { getDockerInstance } from "../resource/docker-client";
 
 export const TriggerUpdateInputSchema = z.object({
@@ -12,9 +12,7 @@ export type TriggerUpdateInput = z.infer<typeof TriggerUpdateInputSchema>;
 export class TriggerUpdateUseCase {
   private readonly docker = getDockerInstance();
 
-  constructor(
-    private readonly notificationPublisher?: PublishNotificationUseCase,
-  ) {}
+  constructor(private readonly notificationPublisher?: NotificationPublisher) {}
 
   async execute(input: TriggerUpdateInput): Promise<{ success: boolean }> {
     const version = input.version;

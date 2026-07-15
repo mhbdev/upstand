@@ -17,6 +17,11 @@ import {
 } from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
+import {
+  assertBuildServerSupportsResource,
+  assertDeploymentServerSupportsResource,
+  assertResourceCanUseBuildServer,
+} from "../server/server-role";
 import { CaddyService } from "../web-server/caddy.service";
 import { createRemoteDocker } from "./docker-client";
 import { validateLibsqlSettings } from "./libsql-settings";
@@ -382,6 +387,9 @@ export class UpdateResourceUseCase {
     if (input.deployments !== undefined) patch.deployments = input.deployments;
     if (input.containers !== undefined) patch.containers = input.containers;
     if (input.serverId !== undefined || input.buildServerId !== undefined) {
+      if (input.buildServerId) {
+        assertResourceCanUseBuildServer(resource.type);
+      }
       const environment = await this.uow.environmentRepository.findById(
         resource.environmentId,
       );
@@ -390,15 +398,25 @@ export class UpdateResourceUseCase {
         : null;
       if (!project) throw new ValidationError("Project not found");
 
-      for (const serverId of [input.serverId, input.buildServerId]) {
-        if (!serverId || ["local", "manager"].includes(serverId)) continue;
+      const validateServer = async (
+        serverId: string | null | undefined,
+        assignment: "build" | "deployment",
+      ) => {
+        if (!serverId || ["local", "manager"].includes(serverId)) return;
         const server = await this.uow.serverRepository.findById(serverId);
         if (!server || server.organizationId !== project.organizationId) {
           throw new ValidationError(
             "Selected server is not available to this organization",
           );
         }
-      }
+        if (assignment === "build") {
+          assertBuildServerSupportsResource(server, resource.type);
+        } else {
+          assertDeploymentServerSupportsResource(server, resource.type);
+        }
+      };
+      await validateServer(input.serverId, "deployment");
+      await validateServer(input.buildServerId, "build");
       if (input.serverId !== undefined) patch.serverId = input.serverId;
       if (input.buildServerId !== undefined)
         patch.buildServerId = input.buildServerId;

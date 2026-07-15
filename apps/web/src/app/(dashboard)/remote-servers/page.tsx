@@ -9,6 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { ServerType } from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -52,7 +53,7 @@ export default function RemoteServersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [serverType, setServerType] = useState("deploy");
+  const [serverType, setServerType] = useState<ServerType>("deploy");
   const [sshKeyId, setSshKeyId] = useState("");
   const [ipAddress, setIpAddress] = useState("");
   const [port, setPort] = useState(22);
@@ -164,7 +165,7 @@ export default function RemoteServersPage() {
     id: string;
     name: string;
     description?: string | null;
-    serverType: string;
+    serverType: ServerType;
     sshKeyId?: string | null;
     ipAddress: string;
     port: number;
@@ -253,7 +254,7 @@ export default function RemoteServersPage() {
             ? `Remote Servers (${serverCount})`
             : "Remote Servers"
         }
-        description="Add isolated deployment servers for applications, databases, and Compose workloads."
+        description="Add isolated deploy, build, and database hosts with role-specific provisioning."
         icon={
           <HugeiconsIcon
             icon={CloudServerIcon}
@@ -637,7 +638,9 @@ export default function RemoteServersPage() {
               <Label htmlFor="serverType">Server Type</Label>
               <Select
                 value={serverType}
-                onValueChange={(value) => value && setServerType(value)}
+                onValueChange={(value) =>
+                  value && setServerType(value as ServerType)
+                }
               >
                 <SelectTrigger id="serverType" className="w-full">
                   <SelectValue placeholder="Select server type" />
@@ -648,6 +651,13 @@ export default function RemoteServersPage() {
                   <SelectItem value="database">DB Server</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-muted-foreground text-xs">
+                {serverType === "deploy"
+                  ? "Deploy hosts run Swarm, Caddy, and monitoring for application, database, and Compose workloads."
+                  : serverType === "build"
+                    ? "Build hosts run Docker and monitoring only; they compile application images but never receive deployed workloads."
+                    : "Database hosts run an isolated Swarm and monitoring for database resources only; they do not expose Caddy."}
+              </p>
             </div>
 
             <div className="space-y-2">

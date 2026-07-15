@@ -13,7 +13,7 @@ import {
   toJsonValue,
 } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
-import { AIRepositoryToken } from "@upstand/repositories";
+import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import type {
   ControlResourceUseCase,
   CreateEnvironmentUseCase,
@@ -32,23 +32,6 @@ import type {
   GetServersUseCase,
 } from "@upstand/usecases";
 import { validateTemplateComposeFile } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
-import {
-  createAgentUIStream,
-  createUIMessageStream,
-  createUIMessageStreamResponse,
-  type FlexibleSchema,
-  generateText,
-  type InferUITools,
-  safeValidateUIMessages,
-  stepCountIs,
-  type Tool,
-  type ToolExecutionOptions,
-  ToolLoopAgent,
-  type UIMessage,
-} from "ai";
-import { log } from "evlog";
-import { z } from "zod";
 import {
   ControlResourceUseCaseToken,
   CreateEnvironmentUseCaseToken,
@@ -65,11 +48,30 @@ import {
   GetResourceStatsUseCaseToken,
   GetResourcesUseCaseToken,
   GetServersUseCaseToken,
-} from "../di";
+  UnitOfWorkToken,
+} from "@upstand/usecases/tokens";
+import {
+  createAgentUIStream,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type FlexibleSchema,
+  generateText,
+  type InferUITools,
+  safeValidateUIMessages,
+  stepCountIs,
+  type Tool,
+  type ToolExecutionOptions,
+  ToolLoopAgent,
+  type UIMessage,
+} from "ai";
+import { log } from "evlog";
+import { z } from "zod";
+import type { UpGalInstructionContext } from "./upgal-instructions";
+import { buildUpGalInstructions } from "./upgal-instructions";
 
-export type UpGalContext = {
-  organizationId: string;
-  userId: string;
+export { buildUpGalInstructions } from "./upgal-instructions";
+
+export type UpGalContext = UpGalInstructionContext & {
   conversationId: string;
   runId: string;
   scope: ServiceScope;
@@ -516,7 +518,9 @@ const serverOutputSchema = z
     organizationId: z.string().describe("Owning organization ID."),
     name: z.string().describe("Human-readable server name."),
     description: z.any().optional().describe("Optional server description."),
-    serverType: z.string().describe("Server role, such as deploy or database."),
+    serverType: z
+      .enum(["deploy", "build", "database"])
+      .describe("Server role."),
     sshKeyId: z.any().optional().describe("Configured SSH key ID, if present."),
     ipAddress: z.string().describe("Server IP address."),
     port: z.number().describe("SSH port."),
@@ -524,7 +528,9 @@ const serverOutputSchema = z
     enableDockerCleanup: z
       .boolean()
       .describe("Whether automatic Docker cleanup is enabled."),
-    status: z.string().describe("Current server setup status."),
+    status: z
+      .enum(["idle", "setting_up", "ready", "failed"])
+      .describe("Current server setup status."),
     createdAt: z.any().describe("Server creation timestamp."),
     updatedAt: z.any().describe("Most recent server update timestamp."),
   })
@@ -1350,7 +1356,7 @@ export async function createUpGalResponse(
     id: "upgal",
     model: provider.model,
     temperature: 0.5,
-    instructions: `You are UpGal, Upstand's operations assistant. Be precise, transparent, and concise. You may inspect organization resources automatically. Every mutation requires user approval through the tool approval protocol. For a mutation, call the mutation tool with the exact confirmed target and parameters; do not ask for confirmation in prose, do not simulate an approval request in text, and do not claim an action completed until the tool returns success. The client renders the approval controls after the tool call. If a mutation is denied, acknowledge the denial and do not retry it unless the user explicitly asks again. After every tool call, continue with a concise plain-language answer; never leave the user with only a tool result card. If a list is empty, say that explicitly. Use IDs from tool results for follow-up calls and do not guess them. The active organization is ${context.organizationId}.`,
+    instructions: buildUpGalInstructions(context),
     tools: createUpGalTools(context),
     toolApproval: ({ toolCall }) =>
       upGalToolNeedsApproval(toolCall.toolName) ? "user-approval" : undefined,

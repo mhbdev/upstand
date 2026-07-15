@@ -1,3 +1,5 @@
+import { requestJson } from "./http";
+
 export function getBitbucketHeaders(
   username: string,
   appPassword: string,
@@ -21,18 +23,15 @@ export async function getBitbucketRepositories(
   const headers = getBitbucketHeaders(username, appPassword);
 
   while (url) {
-    const response = await fetch(url, {
-      method: "GET",
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(
+    const data = await requestJson<{ values: any[]; next?: string }>(
+      url,
+      {
+        method: "GET",
+        headers,
+      },
+      (response) =>
         `Failed to fetch Bitbucket repositories: ${response.statusText}`,
-      );
-    }
-
-    const data = (await response.json()) as { values: any[]; next?: string };
+    );
     repositories = repositories.concat(data.values);
     url = data.next || "";
   }
@@ -57,18 +56,15 @@ export async function getBitbucketBranches(
   const headers = getBitbucketHeaders(username, appPassword);
 
   while (url) {
-    const response = await fetch(url, {
-      method: "GET",
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(
+    const data = await requestJson<{ values: any[]; next?: string }>(
+      url,
+      {
+        method: "GET",
+        headers,
+      },
+      (response) =>
         `Failed to fetch Bitbucket branches: ${response.statusText}`,
-      );
-    }
-
-    const data = (await response.json()) as { values: any[]; next?: string };
+    );
     branches = branches.concat(data.values.map((b) => b.name));
     url = data.next || "";
   }

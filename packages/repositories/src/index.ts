@@ -22,6 +22,5 @@ export * from "./shared";
 export * from "./ssh-key/drizzle-ssh-key.repository";
 export * from "./tag/drizzle-tag.repository";
 export * from "./template/drizzle-template.repository";
-export * from "./tokens";
 export * from "./user/drizzle-user.repository";
 export * from "./web-server/drizzle-web-server-settings.repository";

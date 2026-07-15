@@ -33,6 +33,8 @@ export function EnvironmentTab({
     {},
   );
   const environmentVersion = resource?.envVars ?? "";
+  const managedEnvironment = resource?.managedEnvironment ?? {};
+  const managedEntries = Object.entries(managedEnvironment);
 
   useEffect(() => {
     if (environmentVersion) {
@@ -102,6 +104,32 @@ export function EnvironmentTab({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 border-border/20 border-t pt-4">
+        {managedEntries.length > 0 ? (
+          <div className="space-y-2 rounded-md border border-border/40 bg-muted/20 p-4">
+            <div>
+              <p className="font-medium text-sm">Managed database variables</p>
+              <p className="text-muted-foreground text-xs">
+                Upstand derives these from the database credentials. They are
+                read-only here and are injected alongside the variables below.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {managedEntries.map(([key, value]) => (
+                <div
+                  key={key}
+                  className="flex min-w-0 items-center justify-between gap-3 rounded border border-border/30 bg-background/50 px-3 py-2"
+                >
+                  <span className="truncate font-medium font-mono text-xs">
+                    {key}
+                  </span>
+                  <span className="font-mono text-muted-foreground text-xs">
+                    {value ? "••••••••••••" : "Empty"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-3">
           <Input
             placeholder="Key (e.g. API_KEY)"

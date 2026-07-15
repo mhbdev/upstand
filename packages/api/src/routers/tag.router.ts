@@ -7,7 +7,6 @@ import {
   ResourceTagsInputSchema,
   UpdateTagInputSchema,
 } from "@upstand/usecases";
-import type { Context } from "../context";
 import {
   AssignResourceTagUseCaseToken,
   CreateTagUseCaseToken,
@@ -17,7 +16,8 @@ import {
   RemoveResourceTagUseCaseToken,
   UnitOfWorkToken,
   UpdateTagUseCaseToken,
-} from "../di";
+} from "@upstand/usecases/tokens";
+import type { Context } from "../context";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
