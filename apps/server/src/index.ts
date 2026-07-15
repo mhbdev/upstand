@@ -36,14 +36,13 @@ import * as authSchema from "@upstand/db/schema/auth";
 import { scimProvider } from "@upstand/db/schema/scim";
 import { isJsonObject } from "@upstand/domain";
 import { env } from "@upstand/env/server";
+import { CaddyService, getDockerInstance } from "@upstand/infrastructure";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, pingRedis, redis } from "@upstand/redis";
 import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import {
   AccessLogCleanupScheduler,
   BackupRunWorker,
-  CaddyService,
-  getDockerInstance,
   gitProviderOAuthStateKey,
   hashWebhookToken,
   matchesDockerImageWebhook,

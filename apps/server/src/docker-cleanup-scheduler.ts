@@ -1,8 +1,6 @@
 import { serviceProvider } from "@upstand/api/di";
-import {
-  DockerCleanupService,
-  resolveDockerCliEnvironmentForServer,
-} from "@upstand/usecases";
+import { DockerCleanupService } from "@upstand/infrastructure";
+import { resolveDockerCliEnvironmentForServer } from "@upstand/usecases";
 import {
   PublishNotificationUseCaseToken,
   UnitOfWorkToken,

@@ -22,8 +22,8 @@ import {
   assertDeploymentServerSupportsResource,
   assertResourceCanUseBuildServer,
 } from "../server/server-role";
-import { CaddyService } from "../web-server/caddy.service";
-import { createRemoteDocker } from "./docker-client";
+import type { CaddyService } from "../web-server/caddy.service";
+import { createRemoteServices } from "./docker-client";
 import { validateLibsqlSettings } from "./libsql-settings";
 import { serializeResourceCredentials } from "./resource-credentials";
 import { serializeResourceEnvironmentVariables } from "./resource-environment";
@@ -482,8 +482,7 @@ export class UpdateResourceUseCase {
           username: server.username,
           privateKey,
         };
-        const remoteDocker = createRemoteDocker(connection);
-        caddyService = new CaddyService(remoteDocker);
+        caddyService = createRemoteServices(connection).caddyService;
       }
     }
 

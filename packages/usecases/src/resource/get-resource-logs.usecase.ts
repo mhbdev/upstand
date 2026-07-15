@@ -1,6 +1,6 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { z } from "zod";
-import type { DockerService } from "./docker.service";
+import type { DockerService } from "./docker-client";
 import { resolveDockerServiceForServer } from "./docker-client";
 import { dockerLogLevels } from "./docker-log-filter";
 

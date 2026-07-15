@@ -8,11 +8,8 @@ import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
 import { getInstallationToken } from "../git-provider/github-client";
 import { getDatabaseEnvironment } from "../resource/database-environment";
-import { DockerService } from "../resource/docker.service";
-import {
-  createRemoteDocker,
-  createRemoteDockerCliEnvironment,
-} from "../resource/docker-client";
+import type { DockerService } from "../resource/docker-client";
+import { createRemoteServices } from "../resource/docker-client";
 import { parseResourceCredentials } from "../resource/resource-credentials";
 import { parseResourceEnvironmentVariables } from "../resource/resource-environment";
 import {
@@ -25,7 +22,7 @@ import {
   PublishNotificationUseCaseToken,
   UnitOfWorkToken,
 } from "../tokens";
-import { CaddyService } from "../web-server/caddy.service";
+import type { CaddyService } from "../web-server/caddy.service";
 import { buildRegistryImageTag } from "./build-registry";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 import { ResourceLock } from "./resource-lock";
@@ -499,16 +496,12 @@ export class DeploymentWorker {
             username: server.username,
             privateKey,
           };
-          const remoteDocker = createRemoteDocker(connection);
-          const remoteCli = createRemoteDockerCliEnvironment(connection);
-          remoteCliCleanup = remoteCli.cleanup;
-          dockerService = new DockerService(
-            remoteDocker,
-            remoteCli.environment,
-          );
+          const remote = createRemoteServices(connection);
+          remoteCliCleanup = remote.cli.cleanup;
+          dockerService = remote.dockerService;
           dockerService.setCancellationKey(cancellationKey);
-          caddyService = new CaddyService(remoteDocker);
-          targetDestinationDocker = remoteDocker;
+          caddyService = remote.caddyService;
+          targetDestinationDocker = remote.docker;
           appendLog(
             `Using independent Docker environment on '${server.name}'.\n`,
           );
@@ -548,13 +541,9 @@ export class DeploymentWorker {
           username: buildServer.username,
           privateKey,
         };
-        const remoteBuildDocker = createRemoteDocker(connection);
-        const remoteBuildCli = createRemoteDockerCliEnvironment(connection);
-        buildCliCleanup = remoteBuildCli.cleanup;
-        buildDockerService = new DockerService(
-          remoteBuildDocker,
-          remoteBuildCli.environment,
-        );
+        const remoteBuild = createRemoteServices(connection);
+        buildCliCleanup = remoteBuild.cli.cleanup;
+        buildDockerService = remoteBuild.dockerService;
         buildDockerService.setCancellationKey(cancellationKey);
         appendLog(
           `Offloading build compilation tasks to separate build server '${buildServer.name}'.\n`,

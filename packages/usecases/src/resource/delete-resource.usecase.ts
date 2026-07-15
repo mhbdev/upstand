@@ -2,7 +2,7 @@ import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { log } from "evlog";
 import { z } from "zod";
 import type { CaddyService } from "../web-server/caddy.service";
-import type { DockerService } from "./docker.service";
+import type { DockerService } from "./docker-client";
 import { resolveServicesForResource } from "./docker-client";
 
 export const DeleteResourceInputSchema = z.object({

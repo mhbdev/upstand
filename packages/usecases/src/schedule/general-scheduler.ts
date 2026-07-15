@@ -3,7 +3,7 @@ import { Cron } from "croner";
 import { log } from "evlog";
 import { TriggerBackupRunUseCase } from "../backup/trigger-backup-run.usecase";
 import { QueueDeploymentUseCase } from "../deployment/queue-deployment.usecase";
-import type { DockerService } from "../resource/docker.service";
+import type { DockerService } from "../resource/docker-client";
 import { resolveDockerServiceForServer } from "../resource/docker-client";
 import { UnitOfWorkToken } from "../tokens";
 

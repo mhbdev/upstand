@@ -1,1 +1,13 @@
+export { CaddyService, generateCaddyfileContent } from "./caddy/caddy.service";
+export { DockerService } from "./docker/docker.service";
+export { DockerCleanupService } from "./docker/docker-cleanup.service";
+export {
+  createDockerInfrastructureResolver,
+  getDockerInstance,
+} from "./docker/docker-client";
+export { DockerReadOnlyService } from "./docker/docker-readonly.service";
+export {
+  createMonitoringAgentPort,
+  requestMonitoringAgent,
+} from "./monitoring/monitoring-agent.client";
 export { NotificationTransportRegistry } from "./notification/notification-transport";

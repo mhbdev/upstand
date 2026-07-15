@@ -1,9 +1,6 @@
 import { serviceProvider } from "@upstand/api/di";
-import {
-  DeploymentWorker,
-  getDockerInstance,
-  reconcileQueuedJobs,
-} from "@upstand/usecases";
+import { getDockerInstance } from "@upstand/infrastructure";
+import { DeploymentWorker, reconcileQueuedJobs } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 

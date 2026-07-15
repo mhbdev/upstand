@@ -2,104 +2,24 @@ import { randomUUID } from "node:crypto";
 import { rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
+import type {
+  DockerContainer,
+  DockerContainerCommand,
+  DockerContainerStats,
+  DockerImage,
+  DockerInfo,
+  DockerInspectionTarget,
+  DockerLogRequest,
+  DockerNetwork,
+  DockerResourceCommand,
+  DockerServiceSummary,
+  DockerVolume,
+} from "@upstand/usecases/ports/docker";
+import { filterDockerLogs } from "@upstand/usecases/resource/docker-log-filter";
 import type Docker from "dockerode";
 import { Client } from "ssh2";
 import { getDockerInstance } from "./docker-client";
-import { type DockerLogLevel, filterDockerLogs } from "./docker-log-filter";
 
-export type DockerInspectionTarget =
-  | { kind: "local"; name: string }
-  | {
-      kind: "remote";
-      name: string;
-      host: string;
-      port: number;
-      username: string;
-      privateKey: string;
-    };
-
-export type DockerInfo = {
-  name: string;
-  serverVersion: string;
-  operatingSystem: string;
-  architecture: string;
-  containers: number;
-  images: number;
-  memoryBytes: number;
-  swarmState: string;
-};
-
-export type DockerContainer = {
-  id: string;
-  name: string;
-  image: string;
-  state: string;
-  status: string;
-  ports: string;
-  mounts: string[];
-  networks: string[];
-  labels: string[];
-  createdAt: string | null;
-};
-
-export type DockerImage = {
-  id: string;
-  tags: string[];
-  sizeBytes: number;
-  createdAt: string | null;
-};
-
-export type DockerVolume = {
-  name: string;
-  driver: string;
-  mountpoint: string;
-};
-
-export type DockerNetwork = {
-  id: string;
-  name: string;
-  driver: string;
-  scope: string;
-  internal: boolean;
-  attachable: boolean;
-};
-
-export type DockerServiceSummary = {
-  id: string;
-  name: string;
-  mode: string;
-  replicas: string;
-  image: string;
-  ports: string;
-};
-
-export type DockerContainerStats = {
-  containerId: string;
-  cpuPercent: number;
-  memoryUsageBytes: number;
-  memoryLimitBytes: number;
-  memoryPercent: number;
-  networkRxBytes: number;
-  networkTxBytes: number;
-  blockReadBytes: number;
-  blockWriteBytes: number;
-  pids: number;
-};
-
-export type DockerLogRequest = {
-  containerId?: string;
-  serviceName?: string;
-  tail: number;
-  since?: number;
-  search?: string;
-  levels?: DockerLogLevel[];
-};
-
-export type DockerContainerCommand = "restart" | "stop" | "start" | "remove";
-export type DockerResourceCommand =
-  | "remove-volume"
-  | "remove-network"
-  | "remove-image";
 const VOLUME_HELPER_IMAGE = "alpine:3.20";
 
 const identifierPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;

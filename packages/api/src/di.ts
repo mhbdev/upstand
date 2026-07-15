@@ -1,6 +1,14 @@
 import { ServiceCollection } from "@circulo-ai/di";
 import { db } from "@upstand/db";
-import { NotificationTransportRegistry } from "@upstand/infrastructure";
+import {
+  CaddyService,
+  createDockerInfrastructureResolver,
+  createMonitoringAgentPort,
+  DockerReadOnlyService,
+  DockerService,
+  getDockerInstance,
+  NotificationTransportRegistry,
+} from "@upstand/infrastructure";
 import {
   DrizzleAIRepository,
   DrizzleBackupRunRepository,
@@ -44,7 +52,6 @@ import {
 import {
   AssignResourceTagUseCase,
   BackupScheduler,
-  CaddyService,
   ControlContainerUseCase,
   ControlResourceUseCase,
   CreateAuditLogUseCase,
@@ -64,6 +71,8 @@ import {
   CreateTemplateUseCase,
   CreateUserUseCase,
   CreateWebServerBackupScheduleUseCase,
+  configureDockerInfrastructure,
+  configureMonitoringAgent,
   DatabaseCommandUseCase,
   DeleteBackupScheduleUseCase,
   DeleteCertificateUseCase,
@@ -82,8 +91,6 @@ import {
   DeliverNotificationUseCase,
   DeployResourceUseCase,
   DeployTemplateUseCase,
-  DockerReadOnlyService,
-  DockerService,
   DuplicateProjectUseCase,
   ExecuteBackupRunUseCase,
   GeneralScheduler,
@@ -307,6 +314,12 @@ import {
 } from "@upstand/usecases/tokens";
 
 export const services = new ServiceCollection();
+
+configureDockerInfrastructure(
+  createDockerInfrastructureResolver(),
+  getDockerInstance,
+);
+configureMonitoringAgent(createMonitoringAgentPort());
 
 // 1. Database Infrastructure
 services.addSingleton(DbToken, () => db);

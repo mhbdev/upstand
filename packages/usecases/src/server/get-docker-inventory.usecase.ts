@@ -1,12 +1,12 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
-import { dockerLogLevels } from "../resource/docker-log-filter";
 import type {
   DockerContainerCommand,
   DockerInspectionTarget,
-  DockerReadOnlyService,
-} from "../resource/docker-readonly.service";
+  DockerReadOnlyPort as DockerReadOnlyService,
+} from "../ports/docker";
+import { dockerLogLevels } from "../resource/docker-log-filter";
 
 export const DockerInventoryKindSchema = z.enum([
   "info",

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { serviceProvider } from "@upstand/api/di";
-import { getDockerInstance } from "@upstand/usecases";
+import { getDockerInstance } from "@upstand/infrastructure";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 

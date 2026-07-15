@@ -273,7 +273,7 @@ export function SettingsDialog() {
                 </Breadcrumb>
               </header>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-2 md:p-3">
+              <div className="min-h-0 flex-1 overflow-y-auto p-0">
                 {activeTab === "profile" && <ProfilePanel />}
                 {activeTab === "sessions" && <SessionsPanel />}
                 {activeTab === "members" && <MembersPanel />}

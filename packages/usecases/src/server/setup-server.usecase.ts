@@ -6,8 +6,7 @@ import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { Client } from "ssh2";
 import { z } from "zod";
-import { createRemoteDocker } from "../resource/docker-client";
-import { CaddyService } from "../web-server/caddy.service";
+import { createRemoteServices } from "../resource/docker-client";
 import { getServerProvisioningPlan } from "./server-role";
 
 interface CommandResult {
@@ -141,13 +140,17 @@ export class SetupServerUseCase {
         await privileged('usermod -aG docker "$USER"');
       }
 
-      const remoteDocker = createRemoteDocker({
+      const remote = createRemoteServices({
         host: server.ipAddress,
         port: server.port,
         username: server.username,
         privateKey,
       });
-      const remoteInfo = await remoteDocker.info();
+      // systemctl can return before dockerd has finished creating its socket.
+      // Give the daemon a short, bounded window to become ready before
+      // attempting Swarm operations. This also makes retries after a failed
+      // setup deterministic instead of depending on daemon startup timing.
+      const remoteInfo = await waitForDocker(() => remote.info());
       if (plan.requiresSwarm) {
         // Each deployment/database host owns an independent Swarm. It must
         // never join the control-plane cluster because its resource network,
@@ -158,7 +161,7 @@ export class SetupServerUseCase {
         });
         const remoteSwarmStatus =
           remoteInfo.Swarm?.LocalNodeState ?? "inactive";
-        if (remoteSwarmStatus !== "active") {
+        if (remoteSwarmStatus === "inactive") {
           log.info({
             message: `[Server Setup] Initializing an independent Docker Swarm on ${server.ipAddress}...`,
             serverType: server.serverType,
@@ -166,13 +169,17 @@ export class SetupServerUseCase {
           await privileged(
             `docker swarm init --advertise-addr ${shellQuote(server.ipAddress)}`,
           );
+        } else if (remoteSwarmStatus !== "active") {
+          throw new Error(
+            `Docker Swarm is in '${remoteSwarmStatus}' state. Resolve the Docker or advertised-address issue on the server, then retry setup.`,
+          );
         }
 
         await privileged(
           "docker network inspect upstand-network >/dev/null 2>&1 || docker network create --driver overlay --attachable upstand-network",
         );
 
-        const initializedInfo = await remoteDocker.info();
+        const initializedInfo = await waitForDocker(() => remote.info());
         if (initializedInfo.Swarm?.LocalNodeState !== "active") {
           throw new Error(
             `Remote Docker Swarm is not active after initialization (state: ${initializedInfo.Swarm?.LocalNodeState ?? "unknown"}).`,
@@ -189,9 +196,7 @@ export class SetupServerUseCase {
         // have no edge proxy, so database credentials and ports stay private.
         const webServerSettings =
           await this.uow.webServerSettingsRepository.findGlobal();
-        await new CaddyService(remoteDocker).initializeCaddy(
-          webServerSettings ?? {},
-        );
+        await remote.caddyService.initializeCaddy(webServerSettings ?? {});
       }
 
       if (plan.requiresMonitoring) {
@@ -376,13 +381,51 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
+const EXISTING_SWARM_SETUP_GUIDANCE =
+  "Upstand does not force-leave an existing Swarm. An active existing Swarm can be reused; if initialization failed, resolve the Docker or advertised-address issue on the server, then retry setup.";
+
+async function waitForDocker<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableDockerError(error) || attempt === 7) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+function isRetryableDockerError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /ECONNREFUSED|Cannot connect to the Docker daemon|socket hang up|ENOENT/i.test(
+    message,
+  );
+}
+
 function toSetupErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/already part of a swarm/i.test(message)) {
-    return "This server is already part of a Docker Swarm. Upstand will not force it to leave an existing cluster. Leave that swarm explicitly on the server, then retry setup.";
+    return EXISTING_SWARM_SETUP_GUIDANCE;
   }
   if (/different Docker Swarm cluster/i.test(message)) {
-    return "This server belongs to a different Docker Swarm cluster. Leave that cluster explicitly on the server, then retry setup.";
+    return EXISTING_SWARM_SETUP_GUIDANCE;
+  }
+  if (/ECONNREFUSED|Cannot connect to the Docker daemon/i.test(message)) {
+    return `Docker refused the connection on the remote server. Verify that Docker is running and its local socket is available (for example, run 'sudo systemctl status docker' and 'sudo docker info' on the server), then retry setup. ${EXISTING_SWARM_SETUP_GUIDANCE}`;
+  }
+  if (
+    /advertise|advertised address|address.*(available|assigned|bound)/i.test(
+      message,
+    )
+  ) {
+    return `Docker could not use the advertised address. Make sure the address is assigned to a network interface on the server and is reachable by its Docker network, then retry setup. ${EXISTING_SWARM_SETUP_GUIDANCE}`;
   }
   if (/authentication methods failed|client-authentication/i.test(message)) {
     return "SSH authentication failed. Verify the selected private key matches the public key in the remote user's ~/.ssh/authorized_keys, and confirm the username and port.";

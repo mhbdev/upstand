@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
 import { z } from "zod";
 import { getDatabaseEnvironment } from "./database-environment";
-import type { DockerService } from "./docker.service";
+import type { DockerService } from "./docker-client";
 import { resolveDockerServiceForServer } from "./docker-client";
 
 export const RebuildDatabaseInputSchema = z.object({

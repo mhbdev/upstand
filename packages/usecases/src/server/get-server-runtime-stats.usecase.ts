@@ -1,9 +1,7 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { z } from "zod";
-import type {
-  DockerService,
-  ServerRuntimeStats,
-} from "../resource/docker.service";
+import type { ServerRuntimeStats } from "../ports/docker";
+import type { DockerService } from "../resource/docker-client";
 import { resolveDockerServiceForServer } from "../resource/docker-client";
 
 export const GetServerRuntimeStatsInputSchema = z.object({

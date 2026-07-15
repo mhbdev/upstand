@@ -27,6 +27,7 @@ COPY packages/redis/package.json ./packages/redis/
 COPY packages/repositories/package.json ./packages/repositories/
 COPY packages/domain/package.json ./packages/domain/
 COPY packages/usecases/package.json ./packages/usecases/
+COPY packages/infrastructure/package.json ./packages/infrastructure/
 
 # Install workspace dependencies without running postinstall scripts (which require source files)
 RUN bun install --ignore-scripts

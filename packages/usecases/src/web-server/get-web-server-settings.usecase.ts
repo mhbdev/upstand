@@ -14,12 +14,24 @@ function addUpstreamRetry(snippets: string, upstream: string): string {
   );
 }
 
+function controlPlaneUpstream(service: "server" | "web" | "fumadocs"): string {
+  const configured =
+    process.env[`UPSTAND_${service.toUpperCase()}_UPSTREAM`]?.trim();
+  const port = service === "server" ? 3000 : service === "web" ? 3001 : 4000;
+  return configured || `${service}:${port}`;
+}
+
 function ensureControlPlaneRetries(snippets: string): string {
-  return [
-    "upstand_web:3001",
-    "upstand_server:3000",
-    "upstand_fumadocs:4000",
-  ].reduce(addUpstreamRetry, snippets);
+  const replacements: readonly (readonly [string, string])[] = [
+    ["upstand_web:3001", controlPlaneUpstream("web")],
+    ["upstand_server:3000", controlPlaneUpstream("server")],
+    ["upstand_fumadocs:4000", controlPlaneUpstream("fumadocs")],
+  ];
+  return replacements.reduce(
+    (current, [legacy, upstream]) =>
+      addUpstreamRetry(current.replaceAll(legacy, upstream), upstream),
+    snippets,
+  );
 }
 
 export class GetWebServerSettingsUseCase {
