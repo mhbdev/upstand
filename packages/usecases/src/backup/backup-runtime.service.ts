@@ -287,7 +287,7 @@ export class BackupRuntimeService {
         postgresContainer,
         "sh",
         "-ec",
-        String.raw`pg_dump -Fc -U "\${POSTGRES_USER:-postgres}" -d "\${POSTGRES_DB:-upstand}"`,
+        'pg_dump -Fc -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-upstand}"',
       ],
       "rclone",
       ["rcat", ...storage.rcloneFlags, rcloneRemote(storage, postgresKey)],
@@ -368,7 +368,7 @@ export class BackupRuntimeService {
         postgresContainer,
         "sh",
         "-ec",
-        String.raw`psql -U "\${POSTGRES_USER:-postgres}" -d "\${POSTGRES_DB:-upstand}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();"`,
+        'psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-upstand}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();"',
       ]);
       await pipeProcesses(
         "rclone",
@@ -380,7 +380,7 @@ export class BackupRuntimeService {
           postgresContainer,
           "sh",
           "-ec",
-          String.raw`pg_restore -U "\${POSTGRES_USER:-postgres}" -d "\${POSTGRES_DB:-upstand}" --clean --if-exists --no-owner`,
+          'pg_restore -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-upstand}" --clean --if-exists --no-owner',
         ],
       );
 
