@@ -419,6 +419,29 @@ function ensureDockerProxy() {
       stdio: "ignore",
     });
     child.unref();
+
+    // Synchronously wait for the proxy to start listening (up to 2 seconds)
+    const checkCode = `
+      const net = require("net");
+      const PORT = ${PROXY_PORT};
+      let attempts = 0;
+      function check() {
+        const socket = new net.Socket();
+        socket.connect(PORT, "127.0.0.1", () => {
+          socket.destroy();
+          process.exit(0);
+        });
+        socket.on("error", () => {
+          attempts++;
+          if (attempts > 50) {
+            process.exit(1);
+          }
+          setTimeout(check, 20);
+        });
+      }
+      check();
+    `;
+    spawnSync(process.execPath, ["-e", checkCode], { timeout: 2000 });
     proxyStarted = true;
   });
 }

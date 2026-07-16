@@ -612,7 +612,8 @@ const PLATFORM_COLUMNS = [
     name: "Upstand",
     description: "Your control plane",
     stack: "Bun · TypeScript · Swarm",
-    className: "bg-primary/[0.06]",
+    className:
+      "after:absolute after:inset-0 after:bg-primary/[0.06] after:pointer-events-none",
   },
   {
     key: "dokploy" as const,
@@ -735,9 +736,9 @@ function ComparisonSection() {
               Comparison of Upstand, Dokploy, and Coolify capabilities based on
               checked source code.
             </caption>
-            <TableHeader className="sticky top-16 z-20 bg-card">
+            <TableHeader className="z-20">
               <TableRow className="hover:bg-card">
-                <TableHead className="sticky left-0 z-30 w-[280px] min-w-[280px] border-r bg-card px-5 py-5 align-bottom">
+                <TableHead className="sticky top-16 left-0 z-30 w-[280px] min-w-[280px] border-r bg-card px-5 py-5 align-bottom">
                   <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.16em]">
                     Capability
                   </span>
@@ -746,11 +747,11 @@ function ComparisonSection() {
                   <TableHead
                     key={platform.key}
                     className={cn(
-                      "w-[253px] min-w-[253px] px-5 py-5 align-bottom",
+                      "sticky top-16 z-20 bg-card px-5 py-5 align-bottom relative overflow-hidden",
                       platform.className,
                     )}
                   >
-                    <div className="flex flex-col gap-1">
+                    <div className="relative z-10 flex flex-col gap-1">
                       <span className="font-semibold text-base text-foreground">
                         {platform.name}
                       </span>
