@@ -13,8 +13,14 @@ export function verifyHostKeyFingerprint(
   received: string | Buffer,
 ): boolean {
   const normalized = normalizeHostKeyFingerprint(expected);
-  const value = typeof received === "string" ? received : received.toString();
-  if (value.startsWith("SHA256:")) return value === normalized;
+  if (typeof received === "string") {
+    // ssh2 returns the SHA-256 fingerprint without the OpenSSH `SHA256:`
+    // label when `hostHash: "sha256"` is configured.
+    const value = received.startsWith("SHA256:")
+      ? received
+      : `SHA256:${received}`;
+    return value === normalized;
+  }
   try {
     return (
       sshpk.parseKey(received, "ssh").fingerprint("sha256").toString() ===

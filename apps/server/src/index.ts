@@ -86,7 +86,10 @@ import { DeploymentRuntime } from "./deployment-runtime";
 import { ScheduledDockerCleanup } from "./docker-cleanup-scheduler";
 import { initializeMonitoring } from "./monitoring-agent";
 import { OutboxRuntime } from "./outbox-runtime";
-import { runDatabaseMigrations } from "./startup";
+import {
+  configureManagedUserProvisioning,
+  runDatabaseMigrations,
+} from "./startup";
 import { isStepUpAuthenticationSatisfied } from "./step-up-auth";
 import { matchesTerminalSession, terminalBroker } from "./terminal-broker";
 
@@ -95,6 +98,7 @@ initLogger({
 });
 
 await runDatabaseMigrations();
+await configureManagedUserProvisioning();
 
 const identifyUser = createAuthMiddleware(auth as BetterAuthInstance, {
   exclude: [
@@ -1569,6 +1573,7 @@ async function handleScimCreateUser(c: Context<AppEnv>) {
         name: displayName,
         password: randomBytes(32).toString("base64url"),
         role: "user",
+        data: { managed: true },
       },
     });
     user = await db

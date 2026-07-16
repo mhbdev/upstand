@@ -132,7 +132,6 @@ export class TriggerUpdateUseCase {
             },
             UpdateConfig: inspect.Spec.UpdateConfig,
             RollbackConfig: inspect.Spec.RollbackConfig,
-            Networks: inspect.Spec.Networks,
             EndpointSpec: inspect.Spec.EndpointSpec,
           });
           updatedCount++;

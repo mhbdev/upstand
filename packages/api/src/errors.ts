@@ -3,13 +3,12 @@ import { DomainError } from "@upstand/domain";
 import { log } from "evlog";
 
 export function handleUseCaseError(error: unknown): never {
+  if (error instanceof TRPCError) throw error;
+
   if (error instanceof DomainError) {
     let trpcCode:
-      | "CONFLICT"
-      | "NOT_FOUND"
-      | "BAD_REQUEST"
-      | "UNAUTHORIZED"
-      | "FORBIDDEN" = "BAD_REQUEST";
+      "CONFLICT" | "NOT_FOUND" | "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" =
+      "BAD_REQUEST";
 
     switch (error.code) {
       case "CONFLICT":
@@ -49,6 +48,10 @@ export function handleUseCaseError(error: unknown): never {
     errorMessage.includes("dial tcp") ||
     errorMessage.includes("Permission denied") ||
     errorMessage.includes("host unreachable") ||
+    errorMessage.includes("fetch failed") ||
+    errorMessage.includes("ENOTFOUND") ||
+    errorMessage.includes("EAI_AGAIN") ||
+    errorMessage.includes("ETIMEDOUT") ||
     errorMessage.includes("All configured authentication methods failed");
 
   if (isExpectedOperationalError) {

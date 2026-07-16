@@ -18,4 +18,10 @@ describe("SSH host key verification", () => {
     expect(verifyHostKeyFingerprint(expected, "SHA256:ZGVmZw==")).toBe(false);
     expect(hostVerifierForFingerprint(expected)("SHA256:YWJjZA==")).toBe(true);
   });
+
+  test("accepts the bare SHA256 value returned by ssh2", () => {
+    const expected = "SHA256:YWJjZA==";
+    expect(hostVerifierForFingerprint(expected)("YWJjZA==")).toBe(true);
+    expect(hostVerifierForFingerprint(expected)("ZGVmZw==")).toBe(false);
+  });
 });

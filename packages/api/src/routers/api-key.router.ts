@@ -124,7 +124,6 @@ export const apiKeyRouter = router({
       await requireKeyAdmin(ctx.session.user.id, input.organizationId);
       try {
         const result = await auth.api.createApiKey({
-          headers: headersFrom(ctx),
           body: {
             configId: API_KEY_CONFIG_ID,
             organizationId: input.organizationId,
@@ -175,10 +174,10 @@ export const apiKeyRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requireKeyAdmin(ctx.session.user.id, input.organizationId);
       const result = await auth.api.updateApiKey({
-        headers: headersFrom(ctx),
         body: {
           configId: API_KEY_CONFIG_ID,
           keyId: input.keyId,
+          userId: ctx.session.user.id,
           ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.expiresInDays === undefined
             ? {}

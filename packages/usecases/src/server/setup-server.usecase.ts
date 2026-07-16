@@ -265,74 +265,80 @@ export class SetupServerUseCase {
 
     const token = settings.token;
 
-    let monitoringPath =
-      process.env.NODE_ENV === "production"
-        ? "/app/apps/monitoring"
-        : path.join(process.cwd(), "apps", "monitoring");
+    const configuredMonitoringImage =
+      process.env.UPSTAND_MONITORING_IMAGE?.trim();
+    let monitoringImage =
+      configuredMonitoringImage || "upstand-monitoring-agent";
+    let remoteTarPath: string | undefined;
+    let remoteSrcPath: string | undefined;
 
-    if (
-      process.env.NODE_ENV !== "production" &&
-      !fs.existsSync(monitoringPath)
-    ) {
-      const alternativePath = path.join(
-        process.cwd(),
-        "..",
-        "..",
-        "apps",
-        "monitoring",
-      );
-      if (fs.existsSync(alternativePath)) {
-        monitoringPath = alternativePath;
+    if (configuredMonitoringImage) {
+      log.info({
+        message: `[Monitoring Setup] Pulling immutable monitoring image ${configuredMonitoringImage} on ${server.ipAddress}...`,
+      });
+      await privileged(`docker pull ${shellQuote(configuredMonitoringImage)}`);
+    } else {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "UPSTAND_MONITORING_IMAGE is required in production for remote monitoring setup",
+        );
       }
-    }
 
-    if (!fs.existsSync(monitoringPath)) {
-      throw new Error(
-        `Monitoring agent source path not found: ${monitoringPath}`,
-      );
-    }
+      let monitoringPath = path.join(process.cwd(), "apps", "monitoring");
+      if (!fs.existsSync(monitoringPath)) {
+        const alternativePath = path.join(
+          process.cwd(),
+          "..",
+          "..",
+          "apps",
+          "monitoring",
+        );
+        if (fs.existsSync(alternativePath)) monitoringPath = alternativePath;
+      }
+      if (!fs.existsSync(monitoringPath)) {
+        throw new Error(
+          `Monitoring agent source path not found: ${monitoringPath}`,
+        );
+      }
 
-    const tarFileName = `monitoring-${server.id}-${Date.now()}.tar.gz`;
-    const localTarPath = path.join(process.cwd(), ".builds", tarFileName);
-    fs.mkdirSync(path.dirname(localTarPath), { recursive: true });
+      const tarFileName = `monitoring-${server.id}-${Date.now()}.tar.gz`;
+      const localTarPath = path.join(process.cwd(), ".builds", tarFileName);
+      fs.mkdirSync(path.dirname(localTarPath), { recursive: true });
+      const { exec } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execAsync = promisify(exec);
+      log.info({
+        message: `[Monitoring Setup] Creating tarball at ${localTarPath}`,
+      });
+      await execAsync(`tar -czf "${localTarPath}" -C "${monitoringPath}" .`);
 
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-
-    log.info({
-      message: `[Monitoring Setup] Creating tarball at ${localTarPath}`,
-    });
-    await execAsync(`tar -czf "${localTarPath}" -C "${monitoringPath}" .`);
-
-    const remoteTarPath = `/tmp/${tarFileName}`;
-    const remoteSrcPath = `/tmp/monitoring-src-${server.id}`;
-
-    log.info({
-      message: `[Monitoring Setup] Uploading tarball to ${server.ipAddress}:${remoteTarPath}`,
-    });
-    await new Promise<void>((resolve, reject) => {
-      conn.sftp((err, sftp) => {
-        if (err) return reject(err);
-        sftp.fastPut(localTarPath, remoteTarPath, {}, (err) => {
-          if (err) reject(err);
-          else resolve();
+      remoteTarPath = `/tmp/${tarFileName}`;
+      remoteSrcPath = `/tmp/monitoring-src-${server.id}`;
+      log.info({
+        message: `[Monitoring Setup] Uploading tarball to ${server.ipAddress}:${remoteTarPath}`,
+      });
+      await new Promise<void>((resolve, reject) => {
+        conn.sftp((err, sftp) => {
+          if (err) return reject(err);
+          sftp.fastPut(localTarPath, remoteTarPath!, {}, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
         });
       });
-    });
+      fs.unlinkSync(localTarPath);
 
-    fs.unlinkSync(localTarPath);
-
-    log.info({
-      message:
-        "[Monitoring Setup] Extracting and building Docker image on remote server...",
-    });
-    await privileged(
-      `mkdir -p ${remoteSrcPath} && tar -xzf ${remoteTarPath} -C ${remoteSrcPath}`,
-    );
-    await privileged(
-      `docker build -t upstand-monitoring-agent ${remoteSrcPath}`,
-    );
+      log.info({
+        message:
+          "[Monitoring Setup] Extracting and building Docker image on remote server...",
+      });
+      await privileged(
+        `mkdir -p ${remoteSrcPath} && tar -xzf ${remoteTarPath} -C ${remoteSrcPath}`,
+      );
+      await privileged(
+        `docker build -t ${shellQuote(monitoringImage)} ${shellQuote(remoteSrcPath)}`,
+      );
+    }
 
     const containerName = "upstand-monitoring-agent";
     const globalSettings =
@@ -379,10 +385,12 @@ export class SetupServerUseCase {
         "-v /sys:/host/sys:ro " +
         "-v /etc/os-release:/etc/os-release:ro " +
         "-v upstand-monitoring-data:/data " +
-        "upstand-monitoring-agent",
+        shellQuote(monitoringImage),
     );
 
-    await privileged(`rm -rf ${remoteTarPath} ${remoteSrcPath}`);
+    if (remoteTarPath && remoteSrcPath) {
+      await privileged(`rm -rf ${remoteTarPath} ${remoteSrcPath}`);
+    }
     log.info({
       message: `[Monitoring Setup] Monitoring Agent configured successfully on ${server.ipAddress}! ✅`,
     });

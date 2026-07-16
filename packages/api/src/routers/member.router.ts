@@ -178,6 +178,7 @@ export const memberRouter = router({
           name: input.name,
           password: input.password,
           role: "user",
+          data: { managed: true },
         },
       });
       await db.insert(member).values({

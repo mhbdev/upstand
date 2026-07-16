@@ -580,7 +580,8 @@ export class CaddyService {
 
       const serviceSpec = inspect.Spec;
       if (!serviceSpec) continue;
-      const networks = serviceSpec.Networks || [];
+      const networks =
+        serviceSpec.TaskTemplate?.Networks || serviceSpec.Networks || [];
       if (
         networks.some(
           (entry: { Target?: string }) => entry.Target === network.id,
@@ -597,8 +598,10 @@ export class CaddyService {
         version: inspect.Version?.Index,
         Name: serviceName,
         Mode: serviceSpec.Mode,
-        TaskTemplate: serviceSpec.TaskTemplate,
-        Networks: [...networks, { Target: network.id }],
+        TaskTemplate: {
+          ...serviceSpec.TaskTemplate,
+          Networks: [...networks, { Target: network.id }],
+        },
         EndpointSpec: serviceSpec.EndpointSpec,
         UpdateConfig: serviceSpec.UpdateConfig,
         RollbackConfig: serviceSpec.RollbackConfig,

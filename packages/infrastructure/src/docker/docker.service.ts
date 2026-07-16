@@ -465,8 +465,8 @@ export class DockerService {
           Condition: "any",
         },
         Placement: constraints ? { Constraints: constraints } : undefined,
+        Networks: [{ Target: networkId }],
       },
-      Networks: [{ Target: networkId }],
       EndpointSpec: {
         Ports: ports.map((p) => ({
           Protocol: "tcp",
@@ -549,8 +549,8 @@ export class DockerService {
           Condition: "any",
         },
         Placement: constraints ? { Constraints: constraints } : undefined,
+        Networks: [{ Target: networkId }],
       },
-      Networks: [{ Target: networkId }],
     };
 
     const endpointSpec = spec.EndpointSpec || {};
@@ -742,8 +742,8 @@ export class DockerService {
             Condition: "any",
           },
           Placement: constraints ? { Constraints: constraints } : undefined,
+          Networks: [{ Target: networkId }],
         },
-        Networks: [{ Target: networkId }],
       };
 
       const endpointSpec = spec.EndpointSpec || {};
@@ -1580,7 +1580,6 @@ export class DockerService {
         Name: serviceName,
         Mode: { Replicated: { Replicas: 0 } },
         TaskTemplate: inspect.Spec.TaskTemplate,
-        Networks: inspect.Spec.Networks,
       });
     } else if (cmd === "start") {
       log.info({ message: `Starting Swarm service '${serviceName}'...` });
@@ -1589,7 +1588,6 @@ export class DockerService {
         Name: serviceName,
         Mode: { Replicated: { Replicas: 1 } },
         TaskTemplate: inspect.Spec.TaskTemplate,
-        Networks: inspect.Spec.Networks,
         EndpointSpec: inspect.Spec.EndpointSpec,
       });
     } else if (cmd === "restart") {
@@ -1609,7 +1607,6 @@ export class DockerService {
         Name: serviceName,
         Mode: inspect.Spec.Mode,
         TaskTemplate: taskTemplate,
-        Networks: inspect.Spec.Networks,
         EndpointSpec: inspect.Spec.EndpointSpec,
       });
     }
@@ -2022,7 +2019,6 @@ export class DockerService {
         version: inspect.Version.Index,
         Name: serviceName,
         TaskTemplate: spec.TaskTemplate,
-        Networks: spec.Networks,
         EndpointSpec: spec.EndpointSpec,
       });
     } catch (err: any) {
@@ -2049,7 +2045,8 @@ export class DockerService {
     const docker = targetDocker || this.docker;
     const service = docker.getService(serviceName);
     const inspect = await service.inspect();
-    const networks = inspect.Spec?.Networks || [];
+    const networks =
+      inspect.Spec?.TaskTemplate?.Networks || inspect.Spec?.Networks || [];
     if (
       networks.some(
         (network: { Target?: string }) => network.Target === networkId,
@@ -2066,8 +2063,10 @@ export class DockerService {
       version: inspect.Version.Index,
       Name: serviceName,
       Mode: inspect.Spec.Mode,
-      TaskTemplate: inspect.Spec.TaskTemplate,
-      Networks: [...networks, { Target: networkId }],
+      TaskTemplate: {
+        ...inspect.Spec.TaskTemplate,
+        Networks: [...networks, { Target: networkId }],
+      },
       EndpointSpec: inspect.Spec.EndpointSpec,
       UpdateConfig: inspect.Spec.UpdateConfig,
       RollbackConfig: inspect.Spec.RollbackConfig,
@@ -2312,6 +2311,12 @@ export class DockerService {
             () => {},
           );
         }
+
+        const containerLabel =
+          resource.composeType === "compose"
+            ? `com.docker.compose.project=${serviceName}`
+            : `com.docker.stack.namespace=${serviceName}`;
+        await this.waitForManagedContainersGone(containerLabel);
       } catch (err: any) {
         log.error({
           message: `Failed to remove Compose resource ${serviceName}`,
@@ -2354,6 +2359,10 @@ export class DockerService {
       }
     }
 
+    await this.waitForManagedContainersGone(
+      `com.docker.swarm.service.name=${serviceName}`,
+    );
+
     if (deleteVolumes) {
       try {
         const volumeName = `upstand-db-data-${resource.id}`;
@@ -2390,6 +2399,14 @@ export class DockerService {
       if (error?.statusCode !== 404) throw error;
     }
 
+    // Swarm acknowledges service removal before the task container has
+    // stopped. Wait for that container to disappear before removing the
+    // managed volume; otherwise rebuilds intermittently fail with Docker's
+    // "volume is in use" conflict.
+    await this.waitForManagedContainersGone(
+      `com.docker.swarm.service.name=${serviceName}`,
+    );
+
     const volumeName = `upstand-db-data-${resource.id}`;
     try {
       await this.docker.getVolume(volumeName).remove();
@@ -2398,6 +2415,22 @@ export class DockerService {
     }
 
     await this.removeResourceNetwork(resource);
+  }
+
+  private async waitForManagedContainersGone(label: string): Promise<void> {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const containers = await this.docker.listContainers({
+        all: true,
+        filters: JSON.stringify({ label: [label] }),
+      });
+      if (containers.length === 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    log.warn({
+      message: "Timed out waiting for managed Docker containers to stop",
+      label,
+    });
   }
 
   private async removeResourceNetwork(resource: Resource): Promise<void> {

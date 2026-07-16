@@ -1,11 +1,11 @@
 import { relations } from "drizzle-orm";
 import {
-  boolean,
-  index,
-  integer,
   pgTable,
   text,
   timestamp,
+  boolean,
+  integer,
+  index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -25,6 +25,7 @@ export const user = pgTable("user", {
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  managed: boolean("managed").default(false),
 });
 
 export const session = pgTable(

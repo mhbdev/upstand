@@ -11,7 +11,7 @@
   },
   "scripts": {
     "db:push": "drizzle-kit push",
-    "db:generate": "SKIP_ENV_VALIDATION=1 BETTER_AUTH_URL=${BETTER_AUTH_URL:?Set BETTER_AUTH_URL} CORS_ORIGIN=${CORS_ORIGIN:?Set CORS_ORIGIN} BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET} DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL} better-auth generate --config ../auth/src/index.ts --output src/schema/auth.ts --yes && drizzle-kit generate",
+    "db:generate": "bun scripts/db-generate.ts",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
     "check-types": "tsc --noEmit",

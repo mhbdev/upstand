@@ -71,7 +71,13 @@ export function createAuth() {
     user: {
       // Admin-created members still use Better Auth's normal credential
       // account and can sign in immediately with the password they were given.
-      additionalFields: {},
+      additionalFields: {
+        managed: {
+          type: "boolean",
+          required: false,
+          defaultValue: false,
+        },
+      },
     },
     socialProviders: {
       google:
