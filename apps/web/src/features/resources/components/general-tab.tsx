@@ -59,8 +59,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { authClient } from "@/lib/auth-client";
+import { getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
-
 import {
   createBuildConfig,
   type DatabaseCredentials,
@@ -69,7 +69,6 @@ import {
   RAILPACK_VERSIONS,
   type ResourceProvider,
 } from "./general-tab.helpers";
-import { getServerUrl } from "@/lib/server-url";
 
 interface GeneralTabProps {
   resource: any;

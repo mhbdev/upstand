@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -21,6 +22,33 @@ import (
 	"github.com/mauriciogm/dokploy/apps/monitoring/config"
 	"github.com/mauriciogm/dokploy/apps/monitoring/database"
 )
+
+var healthState = struct {
+	sync.RWMutex
+	lastCollectedAt string
+	collectionError string
+}{}
+
+func RecordCollection(result error) {
+	healthState.Lock()
+	defer healthState.Unlock()
+	healthState.lastCollectedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	if result != nil {
+		healthState.collectionError = result.Error()
+	} else {
+		healthState.collectionError = ""
+	}
+}
+
+func Health() (string, string, string) {
+	healthState.RLock()
+	defer healthState.RUnlock()
+	status := "ok"
+	if healthState.collectionError != "" {
+		status = "degraded"
+	}
+	return status, healthState.lastCollectedAt, healthState.collectionError
+}
 
 type SystemMetrics struct {
 	CPU              string  `json:"cpu"`

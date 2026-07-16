@@ -27,7 +27,25 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const ACTIONS = ["all", "read", "create", "update", "delete", "deploy", "run"];
+const ACTIONS = [
+  "all",
+  "read",
+  "create",
+  "update",
+  "delete",
+  "deploy",
+  "cancel",
+  "run",
+  "start",
+  "stop",
+  "reload",
+  "invite",
+  "revoke",
+  "rotate",
+  "test",
+  "restore",
+  "configure",
+];
 const RESOURCE_TYPES = [
   "all",
   "project",
@@ -38,6 +56,14 @@ const RESOURCE_TYPES = [
   "settings",
   "docker",
   "system",
+  "user",
+  "organization",
+  "certificate",
+  "domain",
+  "application",
+  "database",
+  "compose",
+  "custom_role",
 ];
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -151,7 +177,7 @@ export default function AuditLogsPage() {
           {(logs.data?.items.length ?? 0) > 0 ? (
             <div className="divide-y">
               {logs.data?.items.map((item) => (
-                <div
+                <article
                   className="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-center sm:gap-4"
                   key={item.id}
                 >
@@ -169,8 +195,29 @@ export default function AuditLogsPage() {
                       ) : null}
                     </div>
                     <p className="mt-1 truncate text-muted-foreground text-xs">
-                      {item.route}
+                      {item.actorEmail} · {item.route}
                     </p>
+                    <details className="mt-2 text-xs">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        View event details
+                      </summary>
+                      <dl className="mt-2 grid gap-x-4 gap-y-1 rounded-md bg-muted/40 p-3 sm:grid-cols-2">
+                        <div>
+                          <dt className="text-muted-foreground">Actor role</dt>
+                          <dd>{item.actorRole || "Unknown"}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">IP address</dt>
+                          <dd>{item.ipAddress || "Not recorded"}</dd>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <dt className="text-muted-foreground">Metadata</dt>
+                          <dd className="mt-1 overflow-x-auto whitespace-pre-wrap font-mono">
+                            {JSON.stringify(item.metadata ?? {}, null, 2)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </details>
                   </div>
                   <time
                     className="shrink-0 text-muted-foreground text-sm"
@@ -178,7 +225,7 @@ export default function AuditLogsPage() {
                   >
                     {dateFormatter.format(new Date(item.createdAt))}
                   </time>
-                </div>
+                </article>
               ))}
             </div>
           ) : null}

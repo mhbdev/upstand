@@ -81,6 +81,6 @@ export class DrizzleMonitoringSettingsRepository
     if (!row) {
       throw new Error("upsert: insert/update returned no rows");
     }
-    return row;
+    return { ...row, token: decodeToken(row.token) };
   }
 }

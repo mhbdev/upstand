@@ -1,11 +1,15 @@
 import { TRPCError } from "@trpc/server";
+import type { IUnitOfWork } from "@upstand/domain";
+import { parseDomainMappings } from "@upstand/domain";
 import {
   CreateCertificateInputSchema,
   DeleteCertificateInputSchema,
   ListCertificatesInputSchema,
   UpdateCertificateInputSchema,
 } from "@upstand/usecases";
+import type { CaddyServicePort } from "@upstand/usecases/ports/caddy";
 import {
+  CaddyServiceToken,
   CreateCertificateUseCaseToken,
   DeleteCertificateUseCaseToken,
   ListCertificatesUseCaseToken,
@@ -34,6 +38,20 @@ function publicCertificate(certificate: {
     createdAt: certificate.createdAt,
     updatedAt: certificate.updatedAt,
   };
+}
+
+async function syncCertificateRoutes(
+  uow: IUnitOfWork,
+  caddyService: CaddyServicePort,
+) {
+  const settings = await uow.webServerSettingsRepository.findGlobal();
+  if (!settings) return;
+  const certificates = (await uow.certificateRepository.findAll?.()) ?? [];
+  await caddyService.syncResourceConfigs(
+    await uow.resourceRepository.findMany(),
+    settings,
+    certificates,
+  );
 }
 
 export const certificateRouter = router({
@@ -67,6 +85,10 @@ export const certificateRouter = router({
         const certificate = await ctx.scope
           .resolve(CreateCertificateUseCaseToken)
           .execute(input);
+        await syncCertificateRoutes(
+          ctx.scope.resolve(UnitOfWorkToken),
+          ctx.scope.resolve(CaddyServiceToken),
+        );
         return publicCertificate(certificate);
       } catch (error) {
         handleUseCaseError(error);
@@ -97,6 +119,10 @@ export const certificateRouter = router({
             code: "NOT_FOUND",
             message: "Certificate not found",
           });
+        await syncCertificateRoutes(
+          ctx.scope.resolve(UnitOfWorkToken),
+          ctx.scope.resolve(CaddyServiceToken),
+        );
         return publicCertificate(certificate);
       } catch (error) {
         handleUseCaseError(error);
@@ -119,9 +145,33 @@ export const certificateRouter = router({
         "certificate:delete",
       );
       try {
-        return await ctx.scope
+        const resources = await uow.resourceRepository.findMany();
+        const isInUse = resources.some((resource) => {
+          try {
+            return parseDomainMappings(resource.domains).some(
+              (domain) =>
+                domain.certificateType === "custom" &&
+                domain.certificateId === existing.id,
+            );
+          } catch {
+            return false;
+          }
+        });
+        if (isInUse) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message:
+              "This certificate is assigned to a resource domain. Remove that assignment before deleting it.",
+          });
+        }
+        const result = await ctx.scope
           .resolve(DeleteCertificateUseCaseToken)
           .execute(input);
+        await syncCertificateRoutes(
+          ctx.scope.resolve(UnitOfWorkToken),
+          ctx.scope.resolve(CaddyServiceToken),
+        );
+        return result;
       } catch (error) {
         handleUseCaseError(error);
       }

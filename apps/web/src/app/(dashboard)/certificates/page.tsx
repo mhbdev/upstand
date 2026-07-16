@@ -7,6 +7,16 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@upstand/ui/components/alert-dialog";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -34,6 +44,10 @@ export default function CertificatesPage() {
   const [certificatePem, setCertificatePem] = useState("");
   const [privateKeyPem, setPrivateKeyPem] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const certificatesQuery = useQuery({
     ...trpc.certificate.list.queryOptions({ organizationId }),
@@ -90,7 +104,7 @@ export default function CertificatesPage() {
           </CardHeader>
           <CardContent>
             <form
-              className="space-y-4"
+              className="flex flex-col gap-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!organizationId) return;
@@ -115,6 +129,8 @@ export default function CertificatesPage() {
                 <Label htmlFor="certificate-name">Name</Label>
                 <Input
                   id="certificate-name"
+                  name="certificate-name"
+                  autoComplete="off"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   required={!editingId}
@@ -124,6 +140,8 @@ export default function CertificatesPage() {
                 <Label htmlFor="certificate-pem">Certificate PEM</Label>
                 <Textarea
                   id="certificate-pem"
+                  name="certificate-pem"
+                  spellCheck={false}
                   value={certificatePem}
                   onChange={(event) => setCertificatePem(event.target.value)}
                   required={!editingId}
@@ -134,9 +152,11 @@ export default function CertificatesPage() {
                 <Label htmlFor="private-key-pem">Private key PEM</Label>
                 <Textarea
                   id="private-key-pem"
+                  name="private-key-pem"
+                  spellCheck={false}
                   value={privateKeyPem}
                   onChange={(event) => setPrivateKeyPem(event.target.value)}
-                  required
+                  required={!editingId}
                   rows={7}
                 />
               </div>
@@ -156,6 +176,20 @@ export default function CertificatesPage() {
                     ? "Save changes"
                     : "Store certificate"}
               </Button>
+              {editingId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingId(null);
+                    setName("");
+                    setCertificatePem("");
+                    setPrivateKeyPem("");
+                  }}
+                >
+                  Cancel editing
+                </Button>
+              ) : null}
             </form>
           </CardContent>
         </Card>
@@ -167,7 +201,12 @@ export default function CertificatesPage() {
               Only configuration status is displayed.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-col gap-3">
+            {certificatesQuery.isPending ? (
+              <p className="text-muted-foreground text-sm">
+                Loading certificates…
+              </p>
+            ) : null}
             {(certificatesQuery.data ?? []).map((certificate) => (
               <div
                 key={certificate.id}
@@ -197,10 +236,12 @@ export default function CertificatesPage() {
                     variant="ghost"
                     size="icon"
                     aria-label={`Delete ${certificate.name}`}
-                    onClick={() => {
-                      if (confirm(`Delete ${certificate.name}?`))
-                        deleteMutation.mutate({ id: certificate.id });
-                    }}
+                    onClick={() =>
+                      setPendingDelete({
+                        id: certificate.id,
+                        name: certificate.name,
+                      })
+                    }
                   >
                     <HugeiconsIcon
                       icon={Delete02Icon}
@@ -218,6 +259,32 @@ export default function CertificatesPage() {
           </CardContent>
         </Card>
       </div>
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete certificate?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.name} will be removed from Upstand and cannot be
+              used by Caddy routes afterward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingDelete) return;
+                deleteMutation.mutate({ id: pendingDelete.id });
+                setPendingDelete(null);
+              }}
+            >
+              Delete certificate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardPage>
   );
 }

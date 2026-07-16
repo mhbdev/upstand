@@ -51,8 +51,11 @@ func main() {
 	}))
 
 	app.Get("/health", func(c *fiber.Ctx) error {
+		status, lastCollectedAt, collectionError := monitoring.Health()
 		return c.JSON(fiber.Map{
-			"status": "ok",
+			"status":          status,
+			"lastCollectedAt": lastCollectedAt,
+			"collectionError": collectionError,
 		})
 	})
 
@@ -164,8 +167,11 @@ func main() {
 	collectServerMetrics := func() {
 		metrics := monitoring.GetServerMetrics()
 		if err := db.SaveMetric(metrics); err != nil {
+			monitoring.RecordCollection(err)
 			log.Printf("Error saving metrics: %v", err)
+			return
 		}
+		monitoring.RecordCollection(nil)
 
 		if err := monitoring.CheckThresholds(metrics); err != nil {
 			log.Printf("Error checking thresholds: %v", err)

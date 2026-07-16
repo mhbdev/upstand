@@ -113,6 +113,7 @@ export * from "./server/get-docker-inventory.usecase";
 export * from "./server/get-server.usecase";
 export * from "./server/get-server-count.usecase";
 export * from "./server/get-server-historical-metrics.usecase";
+export * from "./server/get-server-monitoring-status.usecase";
 export * from "./server/get-server-runtime-stats.usecase";
 export * from "./server/get-servers.usecase";
 export * from "./server/monitoring-agent.client";
