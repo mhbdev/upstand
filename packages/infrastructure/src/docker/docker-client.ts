@@ -52,6 +52,9 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
     port: connection.port,
     username: connection.username,
     protocol: "ssh",
+    // docker-modem otherwise retains its default local Unix socket and never
+    // invokes the SSH transport, even when protocol is set to `ssh`.
+    socketPath: undefined,
     // dockerode's type definition omits sshOptions although the runtime
     // supports it. Keep the cast local to this adapter.
     ...({

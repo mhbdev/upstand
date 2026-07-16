@@ -13,5 +13,6 @@ describe("remote Docker client", () => {
 
     expect((docker as any).modem.host).toBe("203.0.113.10");
     expect((docker as any).modem.protocol).toBe("ssh");
+    expect((docker as any).modem.socketPath).toBeUndefined();
   });
 });

@@ -2504,12 +2504,16 @@ app.get("/api/docs/assets/:asset", async (c) => {
 // Keep the existing /api routes above authoritative, and expose the generated
 // REST compatibility routes for any remaining /api path.
 app.all("/api/*", async (c) => {
+  // trpc-to-openapi strips its endpoint with String#replace. Give it a request
+  // URL whose hostname cannot contain the `/api` endpoint substring (the
+  // production API hostname does), while keeping the original request headers,
+  // method, and body intact for authentication and input parsing.
+  const openApiUrl = new URL(c.req.url);
+  openApiUrl.hostname = "openapi.invalid";
+  openApiUrl.port = "";
   return createOpenApiFetchHandler({
-    // Keep the trailing slash: the adapter removes its endpoint using a
-    // string replacement, and `/api` would otherwise match the `api`
-    // subdomain before it reaches the request path.
-    endpoint: "/api/",
-    req: c.req.raw,
+    endpoint: "/api",
+    req: new Request(openApiUrl.toString(), c.req.raw),
     router: openApiRouter,
     createContext: () => createContext({ context: c as any }),
   });
