@@ -68,6 +68,9 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
   const socketPath = path.join(os.tmpdir(), `upstand-docker-${key}.sock`);
   fs.rmSync(socketPath, { force: true });
   const proxy = net.createServer((socket) => {
+    // Dockerode can write the HTTP request immediately after connecting. Keep
+    // it buffered until the SSH command stream is ready to receive it.
+    socket.pause();
     const client = new Client();
     const fail = () => {
       client.end();
@@ -81,6 +84,7 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
           socket.once("end", () => stream.end());
           stream.on("data", (chunk: Buffer) => socket.write(chunk));
           stream.once("end", () => socket.end());
+          socket.resume();
           stream.once("close", () => {
             client.end();
           });
