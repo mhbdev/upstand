@@ -292,7 +292,9 @@ export function SecurityPanel() {
               <enableForm.Field name="password">
                 {(field) => (
                   <Field>
-                    <FieldLabel htmlFor={field.name}>Current password</FieldLabel>
+                    <FieldLabel htmlFor={field.name}>
+                      Current password
+                    </FieldLabel>
                     <Input
                       id={field.name}
                       name={field.name}

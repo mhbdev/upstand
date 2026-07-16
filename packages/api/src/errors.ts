@@ -7,8 +7,11 @@ export function handleUseCaseError(error: unknown): never {
 
   if (error instanceof DomainError) {
     let trpcCode:
-      "CONFLICT" | "NOT_FOUND" | "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" =
-      "BAD_REQUEST";
+      | "CONFLICT"
+      | "NOT_FOUND"
+      | "BAD_REQUEST"
+      | "UNAUTHORIZED"
+      | "FORBIDDEN" = "BAD_REQUEST";
 
     switch (error.code) {
       case "CONFLICT":

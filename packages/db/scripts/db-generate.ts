@@ -14,7 +14,9 @@ const required = [
 
 for (const name of required) {
   if (!process.env[name]) {
-    throw new Error(`${name} must be set before generating the database schema`);
+    throw new Error(
+      `${name} must be set before generating the database schema`,
+    );
   }
 }
 

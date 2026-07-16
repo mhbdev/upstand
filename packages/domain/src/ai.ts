@@ -11,11 +11,19 @@ export function isAIProvider(value: string): value is AIProvider {
   return (AI_PROVIDERS as readonly string[]).includes(value);
 }
 
+export const AI_FEATURES = ["chat", "template"] as const;
+export type AIFeature = (typeof AI_FEATURES)[number];
+
+export function isAIFeature(value: string): value is AIFeature {
+  return (AI_FEATURES as readonly string[]).includes(value);
+}
+
 import type { JsonObject, JsonValue } from "./json";
 
 export type AIProviderConfigRecord = {
   id: string;
   organizationId: string;
+  name: string;
   provider: AIProvider;
   model: string;
   baseUrl: string | null;
@@ -28,8 +36,24 @@ export type AIProviderConfigRecord = {
   updatedAt: Date;
 };
 
-export type SaveAIProviderConfig = {
+/**
+ * The "safe" view of a provider config — no secret fields — returned by the
+ * API to the client.
+ */
+export type AIProviderConfigView = {
+  id: string;
+  name: string;
+  provider: AIProvider;
+  model: string;
+  baseUrl: string | null;
+  enabled: boolean;
+  configured: boolean;
+};
+
+export type CreateAIProviderConfig = {
+  id: string;
   organizationId: string;
+  name: string;
   provider: AIProvider;
   model: string;
   baseUrl: string | null;
@@ -39,6 +63,31 @@ export type SaveAIProviderConfig = {
     authTag: string;
     keyVersion: number;
   } | null;
+};
+
+export type UpdateAIProviderConfig = {
+  name?: string;
+  provider?: AIProvider;
+  model?: string;
+  baseUrl?: string | null;
+  secret?: {
+    ciphertext: string;
+    iv: string;
+    authTag: string;
+    keyVersion: number;
+  } | null;
+};
+
+/** @deprecated Use CreateAIProviderConfig / UpdateAIProviderConfig instead. */
+export type SaveAIProviderConfig = CreateAIProviderConfig;
+
+export type AIFeatureAssignmentRecord = {
+  id: string;
+  organizationId: string;
+  feature: AIFeature;
+  providerConfigId: string;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type AIConversationRecord = {
@@ -76,11 +125,45 @@ export type CreateAIRun = {
 };
 
 export interface IAIRepository {
-  findProviderConfig(
+  // ── Provider configs ──────────────────────────────────────────────────────
+  listProviderConfigs(
+    organizationId: string,
+  ): Promise<AIProviderConfigRecord[]>;
+  findProviderConfigById(
+    id: string,
     organizationId: string,
   ): Promise<AIProviderConfigRecord | null>;
-  saveProviderConfig(input: SaveAIProviderConfig): Promise<void>;
-  deleteProviderConfig(organizationId: string): Promise<void>;
+  findFirstEnabledProviderConfig(
+    organizationId: string,
+  ): Promise<AIProviderConfigRecord | null>;
+  createProviderConfig(
+    input: CreateAIProviderConfig,
+  ): Promise<AIProviderConfigRecord>;
+  updateProviderConfig(
+    id: string,
+    patch: UpdateAIProviderConfig,
+  ): Promise<void>;
+  deleteProviderConfig(id: string, organizationId: string): Promise<void>;
+
+  // ── Feature assignments ───────────────────────────────────────────────────
+  listFeatureAssignments(
+    organizationId: string,
+  ): Promise<AIFeatureAssignmentRecord[]>;
+  findFeatureAssignment(
+    organizationId: string,
+    feature: AIFeature,
+  ): Promise<AIFeatureAssignmentRecord | null>;
+  saveFeatureAssignment(
+    organizationId: string,
+    feature: AIFeature,
+    providerConfigId: string,
+  ): Promise<void>;
+  removeFeatureAssignment(
+    organizationId: string,
+    feature: AIFeature,
+  ): Promise<void>;
+
+  // ── Conversations ─────────────────────────────────────────────────────────
   createConversation(
     input: CreateAIConversation,
   ): Promise<AIConversationRecord>;
@@ -99,11 +182,15 @@ export interface IAIRepository {
     organizationId: string,
     userId: string,
   ): Promise<void>;
+
+  // ── Messages ──────────────────────────────────────────────────────────────
   listMessages(conversationId: string): Promise<AIMessageRecord[]>;
   saveMessages(
     conversationId: string,
     messages: readonly AIMessageRecord[],
   ): Promise<void>;
+
+  // ── Runs ──────────────────────────────────────────────────────────────────
   createRun(input: CreateAIRun): Promise<void>;
   updateRun(
     runId: string,

@@ -1,6 +1,6 @@
 {
-  "id": "dc49dff1-9ece-4312-96cf-2d101821924a",
-  "prevId": "9ccad9f3-f7d4-4bac-872c-5342ae0dba23",
+  "id": "e4310d69-84b7-4403-b43c-61fd6bea11f0",
+  "prevId": "dc49dff1-9ece-4312-96cf-2d101821924a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -276,6 +276,113 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.ai_feature_assignment": {
+      "name": "ai_feature_assignment",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "feature": {
+          "name": "feature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_config_id": {
+          "name": "provider_config_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ai_feature_assignment_org_feature_uidx": {
+          "name": "ai_feature_assignment_org_feature_uidx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "feature",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ai_feature_assignment_org_idx": {
+          "name": "ai_feature_assignment_org_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ai_feature_assignment_organization_id_organization_id_fk": {
+          "name": "ai_feature_assignment_organization_id_organization_id_fk",
+          "tableFrom": "ai_feature_assignment",
+          "tableTo": "organization",
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "ai_feature_assignment_provider_config_id_ai_provider_config_id_fk": {
+          "name": "ai_feature_assignment_provider_config_id_ai_provider_config_id_fk",
+          "tableFrom": "ai_feature_assignment",
+          "tableTo": "ai_provider_config",
+          "columnsFrom": ["provider_config_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.ai_message": {
       "name": "ai_message",
       "schema": "",
@@ -374,6 +481,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Default'"
+        },
         "provider": {
           "name": "provider",
           "type": "text",
@@ -439,17 +553,23 @@
         }
       },
       "indexes": {
-        "ai_provider_config_org_uidx": {
-          "name": "ai_provider_config_org_uidx",
+        "ai_provider_config_org_idx": {
+          "name": "ai_provider_config_org_idx",
           "columns": [
             {
               "expression": "organization_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

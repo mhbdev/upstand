@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AI_PROVIDERS } from "@upstand/domain";
+import { AI_FEATURES, AI_PROVIDERS } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import { z } from "zod";
@@ -14,9 +14,23 @@ import { UpGalPageContextSchema } from "../ai/upgal-page-context";
 import { protectedProcedure, router } from "../index";
 import { checkPermission } from "../permissions";
 
+// ── Shared input schemas ──────────────────────────────────────────────────────
+
 const organizationInput = z.object({ organizationId: z.string().min(1) });
 
+const providerFormSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  provider: z.enum(AI_PROVIDERS),
+  model: z.string().min(1).max(160),
+  apiKey: z.string().min(1).optional(),
+  baseUrl: z.url().optional().or(z.literal("")),
+});
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
 export const aiRouter = router({
+  // ── Template generation ──────────────────────────────────────────────────
+
   generateTemplate: protectedProcedure
     .input(
       organizationInput.extend({
@@ -36,7 +50,9 @@ export const aiRouter = router({
       );
     }),
 
-  settings: protectedProcedure
+  // ── Provider management ──────────────────────────────────────────────────
+
+  listProviders: protectedProcedure
     .input(organizationInput)
     .query(async ({ ctx, input }) => {
       await checkPermission(
@@ -44,30 +60,22 @@ export const aiRouter = router({
         input.organizationId,
         "ai:view",
       );
-      const row = await ctx.scope
+      const rows = await ctx.scope
         .resolve(AIRepositoryToken)
-        .findProviderConfig(input.organizationId);
-      return row
-        ? {
-            provider: row.provider,
-            model: row.model,
-            baseUrl: row.baseUrl,
-            enabled: row.enabled,
-            configured: Boolean(row.apiKeyCiphertext),
-          }
-        : null;
+        .listProviderConfigs(input.organizationId);
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        provider: row.provider,
+        model: row.model,
+        baseUrl: row.baseUrl,
+        enabled: row.enabled,
+        configured: Boolean(row.apiKeyCiphertext),
+      }));
     }),
 
-  saveSettings: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string().min(1),
-        provider: z.enum(AI_PROVIDERS),
-        model: z.string().min(1).max(160),
-        apiKey: z.string().min(1).optional(),
-        baseUrl: z.url().optional().or(z.literal("")),
-      }),
-    )
+  addProvider: protectedProcedure
+    .input(organizationInput.merge(providerFormSchema))
     .mutation(async ({ ctx, input }) => {
       await checkPermission(
         ctx.session.user.id,
@@ -75,18 +83,59 @@ export const aiRouter = router({
         "ai:manage",
       );
       const encrypted = input.apiKey ? encryptSecret(input.apiKey) : null;
-      await ctx.scope.resolve(AIRepositoryToken).saveProviderConfig({
-        organizationId: input.organizationId,
+      const created = await ctx.scope
+        .resolve(AIRepositoryToken)
+        .createProviderConfig({
+          id: randomUUID(),
+          organizationId: input.organizationId,
+          name: input.name,
+          provider: input.provider,
+          model: input.model,
+          baseUrl: input.baseUrl || null,
+          secret: encrypted,
+        });
+      return {
+        id: created.id,
+        name: created.name,
+        provider: created.provider,
+        model: created.model,
+        baseUrl: created.baseUrl,
+        enabled: created.enabled,
+        configured: Boolean(created.apiKeyCiphertext),
+      };
+    }),
+
+  updateProvider: protectedProcedure
+    .input(
+      organizationInput
+        .extend({ id: z.string().min(1) })
+        .merge(providerFormSchema),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:manage",
+      );
+      const repo = ctx.scope.resolve(AIRepositoryToken);
+      const existing = await repo.findProviderConfigById(
+        input.id,
+        input.organizationId,
+      );
+      if (!existing) throw new Error("Provider config not found.");
+      const encrypted = input.apiKey ? encryptSecret(input.apiKey) : undefined;
+      await repo.updateProviderConfig(input.id, {
+        name: input.name,
         provider: input.provider,
         model: input.model,
         baseUrl: input.baseUrl || null,
         secret: encrypted,
       });
-      return { saved: true };
+      return { updated: true };
     }),
 
-  removeSettings: protectedProcedure
-    .input(organizationInput)
+  removeProvider: protectedProcedure
+    .input(organizationInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await checkPermission(
         ctx.session.user.id,
@@ -95,13 +144,14 @@ export const aiRouter = router({
       );
       await ctx.scope
         .resolve(AIRepositoryToken)
-        .deleteProviderConfig(input.organizationId);
+        .deleteProviderConfig(input.id, input.organizationId);
       return { removed: true };
     }),
 
-  testSettings: protectedProcedure
+  testProvider: protectedProcedure
     .input(
       organizationInput.extend({
+        id: z.string().min(1).optional(),
         provider: z.enum(AI_PROVIDERS).optional(),
         model: z.string().min(1).max(160).optional(),
         baseUrl: z.url().optional().or(z.literal("")),
@@ -115,6 +165,7 @@ export const aiRouter = router({
         "ai:manage",
       );
       return testUpGalProvider(input.organizationId, ctx.scope, {
+        providerConfigId: input.id,
         provider: input.provider,
         model: input.model,
         baseUrl: input.baseUrl,
@@ -142,6 +193,69 @@ export const aiRouter = router({
         baseUrl: input.baseUrl,
       });
     }),
+
+  // ── Feature assignments ──────────────────────────────────────────────────
+
+  listFeatureAssignments: protectedProcedure
+    .input(organizationInput)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:view",
+      );
+      return ctx.scope
+        .resolve(AIRepositoryToken)
+        .listFeatureAssignments(input.organizationId);
+    }),
+
+  saveFeatureAssignment: protectedProcedure
+    .input(
+      organizationInput.extend({
+        feature: z.enum(AI_FEATURES),
+        providerConfigId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:manage",
+      );
+      // Verify the provider config belongs to this org before assigning
+      const repo = ctx.scope.resolve(AIRepositoryToken);
+      const config = await repo.findProviderConfigById(
+        input.providerConfigId,
+        input.organizationId,
+      );
+      if (!config) throw new Error("Provider config not found.");
+      await repo.saveFeatureAssignment(
+        input.organizationId,
+        input.feature,
+        input.providerConfigId,
+      );
+      return { saved: true };
+    }),
+
+  removeFeatureAssignment: protectedProcedure
+    .input(
+      organizationInput.extend({
+        feature: z.enum(AI_FEATURES),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:manage",
+      );
+      await ctx.scope
+        .resolve(AIRepositoryToken)
+        .removeFeatureAssignment(input.organizationId, input.feature);
+      return { removed: true };
+    }),
+
+  // ── Conversations ────────────────────────────────────────────────────────
 
   conversations: protectedProcedure
     .input(organizationInput)

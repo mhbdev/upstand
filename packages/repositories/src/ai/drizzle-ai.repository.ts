@@ -1,83 +1,202 @@
 import { randomUUID } from "node:crypto";
 import {
   aiConversation,
+  aiFeatureAssignment,
   aiMessage,
   aiProviderConfig,
   aiRun,
 } from "@upstand/db";
 import type {
   AIConversationRecord,
+  AIFeature,
+  AIFeatureAssignmentRecord,
   AIMessageRecord,
   AIProviderConfigRecord,
   CreateAIConversation,
+  CreateAIProviderConfig,
   CreateAIRun,
   IAIRepository,
   JsonValue,
-  SaveAIProviderConfig,
+  UpdateAIProviderConfig,
 } from "@upstand/domain";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { Executor } from "../shared/types";
 
 export class DrizzleAIRepository implements IAIRepository {
   constructor(private readonly executor: Executor) {}
 
-  async findProviderConfig(
+  // ── Provider configs ──────────────────────────────────────────────────────
+
+  async listProviderConfigs(
+    organizationId: string,
+  ): Promise<AIProviderConfigRecord[]> {
+    const rows = await this.executor
+      .select()
+      .from(aiProviderConfig)
+      .where(eq(aiProviderConfig.organizationId, organizationId))
+      .orderBy(asc(aiProviderConfig.createdAt));
+    return rows.map((r) => ({ ...r, enabled: r.enabled === 1 }));
+  }
+
+  async findProviderConfigById(
+    id: string,
     organizationId: string,
   ): Promise<AIProviderConfigRecord | null> {
     const row = await this.executor
       .select()
       .from(aiProviderConfig)
-      .where(eq(aiProviderConfig.organizationId, organizationId))
+      .where(
+        and(
+          eq(aiProviderConfig.id, id),
+          eq(aiProviderConfig.organizationId, organizationId),
+        ),
+      )
       .limit(1)
       .then((rows) => rows[0]);
     return row ? { ...row, enabled: row.enabled === 1 } : null;
   }
 
-  async saveProviderConfig(input: SaveAIProviderConfig): Promise<void> {
-    const existing = await this.executor
-      .select({ id: aiProviderConfig.id })
+  async findFirstEnabledProviderConfig(
+    organizationId: string,
+  ): Promise<AIProviderConfigRecord | null> {
+    const row = await this.executor
+      .select()
       .from(aiProviderConfig)
-      .where(eq(aiProviderConfig.organizationId, input.organizationId))
+      .where(
+        and(
+          eq(aiProviderConfig.organizationId, organizationId),
+          eq(aiProviderConfig.enabled, 1),
+        ),
+      )
+      .orderBy(asc(aiProviderConfig.createdAt))
       .limit(1)
       .then((rows) => rows[0]);
-    const patch = {
-      provider: input.provider,
-      model: input.model,
-      baseUrl: input.baseUrl,
-      enabled: 1,
-      updatedAt: new Date(),
-      ...(input.secret
-        ? {
-            apiKeyCiphertext: input.secret.ciphertext,
-            apiKeyIv: input.secret.iv,
-            apiKeyAuthTag: input.secret.authTag,
-            apiKeyVersion: input.secret.keyVersion,
-          }
-        : {}),
-    };
-    if (existing) {
-      await this.executor
-        .update(aiProviderConfig)
-        .set(patch)
-        .where(eq(aiProviderConfig.id, existing.id));
-      return;
-    }
-    await this.executor.insert(aiProviderConfig).values({
-      id: randomUUID(),
-      organizationId: input.organizationId,
-      ...patch,
-      apiKeyCiphertext: input.secret?.ciphertext ?? null,
-      apiKeyIv: input.secret?.iv ?? null,
-      apiKeyAuthTag: input.secret?.authTag ?? null,
-      apiKeyVersion: input.secret?.keyVersion ?? null,
-    });
+    return row ? { ...row, enabled: true } : null;
   }
 
-  async deleteProviderConfig(organizationId: string): Promise<void> {
+  async createProviderConfig(
+    input: CreateAIProviderConfig,
+  ): Promise<AIProviderConfigRecord> {
+    const [row] = await this.executor
+      .insert(aiProviderConfig)
+      .values({
+        id: input.id,
+        organizationId: input.organizationId,
+        name: input.name,
+        provider: input.provider,
+        model: input.model,
+        baseUrl: input.baseUrl,
+        enabled: 1,
+        apiKeyCiphertext: input.secret?.ciphertext ?? null,
+        apiKeyIv: input.secret?.iv ?? null,
+        apiKeyAuthTag: input.secret?.authTag ?? null,
+        apiKeyVersion: input.secret?.keyVersion ?? null,
+      })
+      .returning();
+    if (!row) throw new Error("AI provider config insert returned no row.");
+    return { ...row, enabled: row.enabled === 1 };
+  }
+
+  async updateProviderConfig(
+    id: string,
+    patch: UpdateAIProviderConfig,
+  ): Promise<void> {
+    const set: Record<string, unknown> = { updatedAt: new Date() };
+    if (patch.name !== undefined) set.name = patch.name;
+    if (patch.provider !== undefined) set.provider = patch.provider;
+    if (patch.model !== undefined) set.model = patch.model;
+    if (patch.baseUrl !== undefined) set.baseUrl = patch.baseUrl;
+    if (patch.secret !== undefined && patch.secret !== null) {
+      set.apiKeyCiphertext = patch.secret.ciphertext;
+      set.apiKeyIv = patch.secret.iv;
+      set.apiKeyAuthTag = patch.secret.authTag;
+      set.apiKeyVersion = patch.secret.keyVersion;
+    }
+    await this.executor
+      .update(aiProviderConfig)
+      .set(set)
+      .where(eq(aiProviderConfig.id, id));
+  }
+
+  async deleteProviderConfig(
+    id: string,
+    organizationId: string,
+  ): Promise<void> {
     await this.executor
       .delete(aiProviderConfig)
-      .where(eq(aiProviderConfig.organizationId, organizationId));
+      .where(
+        and(
+          eq(aiProviderConfig.id, id),
+          eq(aiProviderConfig.organizationId, organizationId),
+        ),
+      );
   }
+
+  // ── Feature assignments ───────────────────────────────────────────────────
+
+  async listFeatureAssignments(
+    organizationId: string,
+  ): Promise<AIFeatureAssignmentRecord[]> {
+    return this.executor
+      .select()
+      .from(aiFeatureAssignment)
+      .where(eq(aiFeatureAssignment.organizationId, organizationId));
+  }
+
+  async findFeatureAssignment(
+    organizationId: string,
+    feature: AIFeature,
+  ): Promise<AIFeatureAssignmentRecord | null> {
+    const row = await this.executor
+      .select()
+      .from(aiFeatureAssignment)
+      .where(
+        and(
+          eq(aiFeatureAssignment.organizationId, organizationId),
+          eq(aiFeatureAssignment.feature, feature),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0]);
+    return row ?? null;
+  }
+
+  async saveFeatureAssignment(
+    organizationId: string,
+    feature: AIFeature,
+    providerConfigId: string,
+  ): Promise<void> {
+    const existing = await this.findFeatureAssignment(organizationId, feature);
+    if (existing) {
+      await this.executor
+        .update(aiFeatureAssignment)
+        .set({ providerConfigId, updatedAt: new Date() })
+        .where(eq(aiFeatureAssignment.id, existing.id));
+    } else {
+      await this.executor.insert(aiFeatureAssignment).values({
+        id: randomUUID(),
+        organizationId,
+        feature,
+        providerConfigId,
+      });
+    }
+  }
+
+  async removeFeatureAssignment(
+    organizationId: string,
+    feature: AIFeature,
+  ): Promise<void> {
+    await this.executor
+      .delete(aiFeatureAssignment)
+      .where(
+        and(
+          eq(aiFeatureAssignment.organizationId, organizationId),
+          eq(aiFeatureAssignment.feature, feature),
+        ),
+      );
+  }
+
+  // ── Conversations ─────────────────────────────────────────────────────────
 
   async createConversation(
     input: CreateAIConversation,
@@ -153,6 +272,8 @@ export class DrizzleAIRepository implements IAIRepository {
       );
   }
 
+  // ── Messages ──────────────────────────────────────────────────────────────
+
   async listMessages(conversationId: string): Promise<AIMessageRecord[]> {
     return this.executor
       .select()
@@ -188,6 +309,8 @@ export class DrizzleAIRepository implements IAIRepository {
       .set({ updatedAt: new Date() })
       .where(eq(aiConversation.id, conversationId));
   }
+
+  // ── Runs ──────────────────────────────────────────────────────────────────
 
   async createRun(input: CreateAIRun): Promise<void> {
     await this.executor.insert(aiRun).values(input);

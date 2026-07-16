@@ -6,7 +6,9 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { ServiceScope, TokenLike } from "@circulo-ai/di";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import {
+  type AIFeature,
   type AIProvider,
+  type AIProviderConfigRecord,
   type Capability,
   type IAIRepository,
   type IUnitOfWork,
@@ -1104,18 +1106,58 @@ export async function executeUpGalReadTool(
 }
 
 type ProviderOverrides = {
+  /** Look up a specific saved provider config by its ID. */
+  providerConfigId?: string;
+  /** Override the feature slot used to look up the feature assignment. */
+  feature?: AIFeature;
+  /** Inline overrides — used when testing before saving. */
   provider?: AIProvider;
   model?: string;
   baseUrl?: string;
   apiKey?: string;
 };
 
+/**
+ * Resolve the AI provider instance to use for a given operation.
+ *
+ * Resolution order:
+ * 1. Explicit `providerConfigId` (used for test/preview of a specific row)
+ * 2. Feature assignment: look up which provider is assigned to `feature`
+ * 3. Fallback: first enabled provider config for the org
+ *
+ * Inline overrides (provider/model/baseUrl/apiKey) are applied on top of
+ * whatever stored config is resolved, enabling the test-before-save flow.
+ */
 async function getProvider(
   organizationId: string,
   ai: IAIRepository,
   overrides: ProviderOverrides = {},
 ) {
-  const stored = await ai.findProviderConfig(organizationId);
+  let stored: AIProviderConfigRecord | null = null;
+
+  if (overrides.providerConfigId) {
+    stored = await ai.findProviderConfigById(
+      overrides.providerConfigId,
+      organizationId,
+    );
+  } else if (overrides.feature) {
+    const assignment = await ai.findFeatureAssignment(
+      organizationId,
+      overrides.feature,
+    );
+    if (assignment) {
+      stored = await ai.findProviderConfigById(
+        assignment.providerConfigId,
+        organizationId,
+      );
+    }
+  }
+
+  // Fall back to the first enabled provider if no specific config was found
+  if (!stored) {
+    stored = await ai.findFirstEnabledProviderConfig(organizationId);
+  }
+
   const config = stored
     ? {
         ...stored,
@@ -1131,10 +1173,12 @@ async function getProvider(
           enabled: true,
         }
       : null;
+
   if (!config?.enabled)
     throw new Error(
       "Configure an AI provider in Settings → AI before using UpGal.",
     );
+
   const apiKey = overrides.apiKey?.trim() || decryptProviderApiKey(stored);
   if (!apiKey) throw new Error("The configured AI provider has no API key.");
 
@@ -1190,9 +1234,7 @@ async function getProvider(
   };
 }
 
-function decryptProviderApiKey(
-  config: Awaited<ReturnType<IAIRepository["findProviderConfig"]>>,
-) {
+function decryptProviderApiKey(config: AIProviderConfigRecord | null) {
   if (
     !config?.apiKeyCiphertext ||
     !config.apiKeyIv ||
@@ -1234,10 +1276,24 @@ const MODEL_CATALOG_BASE_URLS: Record<AIProvider, string> = {
 export async function listProviderModels(
   organizationId: string,
   scope: ServiceScope,
-  input: { provider: AIProvider; apiKey?: string; baseUrl?: string },
+  input: {
+    provider: AIProvider;
+    apiKey?: string;
+    baseUrl?: string;
+    providerConfigId?: string;
+  },
 ) {
   const repository = resolve(scope, AIRepositoryToken);
-  const config = await repository.findProviderConfig(organizationId);
+  let config: AIProviderConfigRecord | null = null;
+  if (input.providerConfigId) {
+    config = await repository.findProviderConfigById(
+      input.providerConfigId,
+      organizationId,
+    );
+  } else {
+    const allConfigs = await repository.listProviderConfigs(organizationId);
+    config = allConfigs.find((c) => c.provider === input.provider) ?? null;
+  }
   const apiKey = input.apiKey?.trim() || decryptProviderApiKey(config);
   if (!apiKey) throw new Error(`Enter a ${input.provider} API key first.`);
   const effectiveProvider =
@@ -1327,6 +1383,7 @@ export async function generateComposeTemplate(
   const provider = await getProvider(
     organizationId,
     resolve(scope, AIRepositoryToken),
+    { feature: "template" },
   );
   const result = await generateText({
     model: provider.model,
@@ -1351,7 +1408,9 @@ export async function createUpGalResponse(
   request: Request,
 ) {
   const ai = repository(context);
-  const provider = await getProvider(context.organizationId, ai);
+  const provider = await getProvider(context.organizationId, ai, {
+    feature: "chat",
+  });
   const runId = context.runId || randomUUID();
   await ai.createRun({
     id: runId,

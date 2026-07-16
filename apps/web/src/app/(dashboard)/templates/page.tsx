@@ -166,7 +166,7 @@ export default function TemplatesPage() {
     enabled: Boolean(organizationId),
   });
   const aiSettings = useQuery({
-    ...trpc.ai.settings.queryOptions({ organizationId }),
+    ...trpc.ai.listProviders.queryOptions({ organizationId }),
     enabled: Boolean(organizationId),
   });
 
@@ -256,7 +256,10 @@ export default function TemplatesPage() {
     (server) => server.status === "ready",
   );
   const aiReady = Boolean(
-    aiSettings.data?.configured && aiSettings.data.enabled,
+    aiSettings.data &&
+      aiSettings.data.some(
+        (provider) => provider.configured && provider.enabled,
+      ),
   );
   const isSaving = create.isPending || update.isPending;
   const canGenerate = Boolean(

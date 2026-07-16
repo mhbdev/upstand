@@ -1,4 +1,9 @@
-import type { AIProvider, JsonObject, JsonValue } from "@upstand/domain";
+import type {
+  AIFeature,
+  AIProvider,
+  JsonObject,
+  JsonValue,
+} from "@upstand/domain";
 import { relations } from "drizzle-orm";
 import {
   index,
@@ -18,6 +23,7 @@ export const aiProviderConfig = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull().default("Default"),
     provider: text("provider").$type<AIProvider>().notNull(),
     model: text("model").notNull(),
     baseUrl: text("base_url"),
@@ -30,7 +36,33 @@ export const aiProviderConfig = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("ai_provider_config_org_uidx").on(table.organizationId),
+    index("ai_provider_config_org_idx").on(
+      table.organizationId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const aiFeatureAssignment = pgTable(
+  "ai_feature_assignment",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    feature: text("feature").$type<AIFeature>().notNull(),
+    providerConfigId: text("provider_config_id")
+      .notNull()
+      .references(() => aiProviderConfig.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("ai_feature_assignment_org_feature_uidx").on(
+      table.organizationId,
+      table.feature,
+    ),
+    index("ai_feature_assignment_org_idx").on(table.organizationId),
   ],
 );
 
@@ -134,3 +166,20 @@ export const aiRelations = relations(aiConversation, ({ many }) => ({
   messages: many(aiMessage),
   runs: many(aiRun),
 }));
+
+export const aiProviderConfigRelations = relations(
+  aiProviderConfig,
+  ({ many }) => ({
+    featureAssignments: many(aiFeatureAssignment),
+  }),
+);
+
+export const aiFeatureAssignmentRelations = relations(
+  aiFeatureAssignment,
+  ({ one }) => ({
+    providerConfig: one(aiProviderConfig, {
+      fields: [aiFeatureAssignment.providerConfigId],
+      references: [aiProviderConfig.id],
+    }),
+  }),
+);
