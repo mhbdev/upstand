@@ -117,7 +117,9 @@ export default function ResourceDetail({
     if (value === "general") params.delete("tab");
     else params.set("tab", value);
     const query = params.toString();
-    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+    router.replace(`${pathname}${query ? `?${query}` : ""}` as Route, {
+      scroll: false,
+    });
   };
 
   const {
