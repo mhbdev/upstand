@@ -118,6 +118,7 @@ import {
   GetSchedulesUseCase,
   GetServerCountUseCase,
   GetServerHistoricalMetricsUseCase,
+  GetServerMonitoringStatusUseCase,
   GetServerRuntimeStatsUseCase,
   GetServersUseCase,
   GetServerUseCase,
@@ -249,6 +250,7 @@ import {
   GetSchedulesUseCaseToken,
   GetServerCountUseCaseToken,
   GetServerHistoricalMetricsUseCaseToken,
+  GetServerMonitoringStatusUseCaseToken,
   GetServerRuntimeStatsUseCaseToken,
   GetServersUseCaseToken,
   GetServerUseCaseToken,
@@ -951,6 +953,10 @@ services.addTransient(
 services.addTransient(
   GetServerHistoricalMetricsUseCaseToken,
   (c) => new GetServerHistoricalMetricsUseCase(c.resolve(UnitOfWorkToken)),
+);
+services.addTransient(
+  GetServerMonitoringStatusUseCaseToken,
+  (c) => new GetServerMonitoringStatusUseCase(c.resolve(UnitOfWorkToken)),
 );
 services.addTransient(
   UpdateMonitoringSettingsUseCaseToken,

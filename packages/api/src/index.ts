@@ -134,7 +134,7 @@ export const protectedProcedure = t.procedure
       const input = await getRawInput();
       const organizationId = await resolveAuditOrganizationId(ctx, path, input);
       if (organizationId) {
-        void recordAuditEvent(ctx, path, organizationId, input);
+        await recordAuditEvent(ctx, path, organizationId, input);
       }
     }
     return result;
@@ -193,6 +193,15 @@ async function resolveAuditOrganizationId(
   if (!input || typeof input !== "object" || Array.isArray(input))
     return undefined;
   const values = input as Record<string, unknown>;
+  const activeOrganizationId = (
+    ctx.session?.session as { activeOrganizationId?: unknown } | undefined
+  )?.activeOrganizationId;
+  if (
+    typeof activeOrganizationId === "string" &&
+    (path.startsWith("webServer.") || path.startsWith("auth."))
+  ) {
+    return activeOrganizationId;
+  }
   const id = ["resourceId", "environmentId", "projectId", "serverId", "id"]
     .map((key) => values[key])
     .find(

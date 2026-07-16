@@ -257,6 +257,14 @@ export default function MonitoringPage() {
     }),
     enabled: Boolean(activeOrganization?.id),
   });
+  const monitoringStatusQuery = useQuery({
+    ...trpc.server.monitoringStatus.queryOptions({
+      organizationId: activeOrganization?.id ?? "",
+      serverId: selectedServerId,
+    }),
+    enabled: Boolean(activeOrganization?.id),
+    refetchInterval: 30_000,
+  });
   const historicalQuery = useQuery({
     ...trpc.server.historicalMetrics.queryOptions({
       organizationId: activeOrganization?.id ?? "",
@@ -430,6 +438,44 @@ export default function MonitoringPage() {
           </div>
         }
       />
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+          <div className="min-w-0">
+            <p className="font-medium">Monitoring agent</p>
+            <p className="truncate text-muted-foreground text-sm">
+              {monitoringStatusQuery.data?.status === "not_configured"
+                ? "This server has not been provisioned for monitoring yet."
+                : monitoringStatusQuery.data?.collectionError ||
+                  (monitoringStatusQuery.data?.lastCollectedAt
+                    ? `Last sample ${new Intl.DateTimeFormat(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }).format(
+                        new Date(monitoringStatusQuery.data.lastCollectedAt),
+                      )}`
+                    : "Waiting for the first sample…")}
+            </p>
+          </div>
+          <Badge
+            variant={
+              monitoringStatusQuery.data?.status === "healthy"
+                ? "default"
+                : monitoringStatusQuery.data?.status === "not_configured"
+                  ? "secondary"
+                  : "destructive"
+            }
+          >
+            {monitoringStatusQuery.isPending
+              ? "Checking…"
+              : monitoringStatusQuery.data?.status === "healthy"
+                ? "Healthy"
+                : monitoringStatusQuery.data?.status === "not_configured"
+                  ? "Not configured"
+                  : "Needs attention"}
+          </Badge>
+        </CardContent>
+      </Card>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard

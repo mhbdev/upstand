@@ -1,6 +1,16 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@upstand/ui/components/alert-dialog";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -25,6 +35,7 @@ export default function ScimSettingsPage() {
   const organizationId = organization?.id || "";
   const [providerId, setProviderId] = useState("identity-provider");
   const [newToken, setNewToken] = useState<string | null>(null);
+  const [pendingRevoke, setPendingRevoke] = useState<string | null>(null);
   const providersQuery = useQuery({
     ...trpc.scim.list.queryOptions({ organizationId }),
     enabled: Boolean(organizationId),
@@ -78,9 +89,11 @@ export default function ScimSettingsPage() {
             rotation. Use the endpoint shown below with a bearer token.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
+              name="scim-provider-id"
+              autoComplete="off"
               value={providerId}
               onChange={(event) => setProviderId(event.target.value)}
               placeholder="identity-provider"
@@ -97,7 +110,11 @@ export default function ScimSettingsPage() {
             </Button>
           </div>
           {newToken && (
-            <div className="space-y-2 rounded-lg border border-warning/40 bg-warning/10 p-3">
+            <div
+              className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3"
+              role="status"
+              aria-live="polite"
+            >
               <p className="font-medium text-sm">Copy this token now</p>
               <div className="flex gap-2">
                 <Input
@@ -126,7 +143,10 @@ export default function ScimSettingsPage() {
         <CardHeader>
           <CardTitle>Active provider tokens</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="flex flex-col gap-3">
+          {providersQuery.isPending ? (
+            <p className="text-muted-foreground text-sm">Loading providers…</p>
+          ) : null}
           {(providersQuery.data ?? []).map((provider) => (
             <div
               key={provider.id}
@@ -151,13 +171,9 @@ export default function ScimSettingsPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => {
-                    if (!window.confirm("Revoke this SCIM provider token?"))
-                      return;
-                    remove.mutate({ organizationId, id: provider.id });
-                  }}
+                  onClick={() => setPendingRevoke(provider.id)}
                 >
-                  <Trash2 className="mr-1 size-3" /> Revoke
+                  <Trash2 data-icon="inline-start" /> Revoke
                 </Button>
               </div>
             </div>
@@ -169,6 +185,32 @@ export default function ScimSettingsPage() {
           )}
         </CardContent>
       </Card>
+      <AlertDialog
+        open={pendingRevoke !== null}
+        onOpenChange={(open) => !open && setPendingRevoke(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke this SCIM provider?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Provisioning requests will fail immediately and cannot be
+              authenticated with this token again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingRevoke) return;
+                remove.mutate({ organizationId, id: pendingRevoke });
+                setPendingRevoke(null);
+              }}
+            >
+              Revoke provider
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardPage>
   );
 }

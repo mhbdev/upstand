@@ -8,6 +8,7 @@ import {
   GetServerCountInputSchema,
   GetServerHistoricalMetricsInputSchema,
   GetServerInputSchema,
+  GetServerMonitoringStatusInputSchema,
   GetServerRuntimeStatsInputSchema,
   GetServersInputSchema,
   SetupServerInputSchema,
@@ -20,6 +21,7 @@ import {
   GetDockerInventoryUseCaseToken,
   GetServerCountUseCaseToken,
   GetServerHistoricalMetricsUseCaseToken,
+  GetServerMonitoringStatusUseCaseToken,
   GetServerRuntimeStatsUseCaseToken,
   GetServersUseCaseToken,
   GetServerUseCaseToken,
@@ -355,6 +357,23 @@ export const serverRouter = router({
       const useCase = ctx.scope.resolve(GetServerHistoricalMetricsUseCaseToken);
       try {
         return await useCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  monitoringStatus: twoFactorVerifiedProcedure
+    .input(GetServerMonitoringStatusInputSchema)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:view",
+      );
+      try {
+        return await ctx.scope
+          .resolve(GetServerMonitoringStatusUseCaseToken)
+          .execute(input);
       } catch (error) {
         handleUseCaseError(error);
       }

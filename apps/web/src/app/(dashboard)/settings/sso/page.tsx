@@ -1,6 +1,16 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@upstand/ui/components/alert-dialog";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -60,6 +70,10 @@ export default function SsoSettingsPage() {
   const [saml, setSaml] = useState(false);
   const [entryPoint, setEntryPoint] = useState("");
   const [certificate, setCertificate] = useState("");
+  const [verificationTokens, setVerificationTokens] = useState<
+    Record<string, string>
+  >({});
+  const [pendingRemove, setPendingRemove] = useState<string | null>(null);
 
   const settings = useQuery({
     ...trpc.sso.getSettings.queryOptions({ organizationId }),
@@ -100,6 +114,10 @@ export default function SsoSettingsPage() {
       );
       const provider = providers.find((item) => item.providerId === id);
       if (provider) {
+        setVerificationTokens((current) => ({
+          ...current,
+          [id]: result.domainVerificationToken,
+        }));
         toast.info(
           `Add TXT _upstand-sso.${provider.domain} = ${result.domainVerificationToken}`,
         );
@@ -149,6 +167,10 @@ export default function SsoSettingsPage() {
       >("/sso/register", { method: "POST", body: JSON.stringify(body) });
       toast.success("SSO provider registered");
       if (result.domainVerificationToken) {
+        setVerificationTokens((current) => ({
+          ...current,
+          [providerId.trim()]: result.domainVerificationToken as string,
+        }));
         toast.info(
           `Add TXT _upstand-sso.${normalizedDomain} = ${result.domainVerificationToken}`,
         );
@@ -239,7 +261,7 @@ export default function SsoSettingsPage() {
               users.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-col gap-3">
             {providers.map((provider) => (
               <div
                 key={provider.providerId}
@@ -274,17 +296,19 @@ export default function SsoSettingsPage() {
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => remove(provider.providerId)}
+                      onClick={() => setPendingRemove(provider.providerId)}
                     >
                       Remove
                     </Button>
                   </div>
                 </div>
                 {!provider.domainVerified &&
-                  provider.domainVerificationToken && (
+                  (verificationTokens[provider.providerId] ||
+                    provider.domainVerificationToken) && (
                     <p className="mt-2 break-all font-mono text-[11px] text-muted-foreground">
                       TXT _upstand-sso.{provider.domain} ={" "}
-                      {provider.domainVerificationToken}
+                      {verificationTokens[provider.providerId] ||
+                        provider.domainVerificationToken}
                     </p>
                   )}
               </div>
@@ -410,6 +434,32 @@ export default function SsoSettingsPage() {
           </CardContent>
         </Card>
       </div>
+      <AlertDialog
+        open={pendingRemove !== null}
+        onOpenChange={(open) => !open && setPendingRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this SSO provider?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Members using this provider will no longer be able to start SSO
+              sign-in for this organization.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingRemove) return;
+                void remove(pendingRemove);
+                setPendingRemove(null);
+              }}
+            >
+              Remove provider
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardPage>
   );
 }

@@ -303,6 +303,10 @@ export const GetServerHistoricalMetricsUseCaseToken =
   createToken<UseCases.GetServerHistoricalMetricsUseCase>(
     "GetServerHistoricalMetricsUseCase",
   );
+export const GetServerMonitoringStatusUseCaseToken =
+  createToken<UseCases.GetServerMonitoringStatusUseCase>(
+    "GetServerMonitoringStatusUseCase",
+  );
 export const UpdateMonitoringSettingsUseCaseToken =
   createToken<UseCases.UpdateMonitoringSettingsUseCase>(
     "UpdateMonitoringSettingsUseCase",

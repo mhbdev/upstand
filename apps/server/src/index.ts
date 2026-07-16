@@ -1307,7 +1307,7 @@ const SCIM_MESSAGES_SCHEMA = `${SCIM_SCHEMA}:messages:2.0`;
 
 function scimError(
   c: Context<AppEnv>,
-  status: 400 | 401 | 404 | 409 | 500,
+  status: 400 | 401 | 404 | 405 | 409 | 422 | 500,
   detail: string,
 ) {
   return c.json(
@@ -1525,12 +1525,23 @@ async function handleScimPatchUser(c: Context<AppEnv>) {
   const existing = await findScimMembership(organizationId, userId);
   if (!existing) return scimError(c, 404, "SCIM user not found");
   const body = scimRecord(await c.req.json().catch(() => null));
+  if (c.req.method === "PUT") {
+    if (typeof body.userName !== "string") {
+      return scimError(c, 400, "SCIM PUT requires userName");
+    }
+    if (
+      body.userName.trim().toLowerCase() !== existing.user.email.toLowerCase()
+    ) {
+      return scimError(c, 422, "SCIM userName cannot be changed");
+    }
+  }
   const operations = Array.isArray(body.Operations) ? body.Operations : [];
   let active: boolean | undefined;
   let displayName: string | undefined;
   let externalId: string | null | undefined;
   for (const operation of operations) {
     const item = scimRecord(operation);
+    const operationName = String(item.op ?? "replace").toLowerCase();
     const path = String(item.path ?? "").toLowerCase();
     const value = item.value;
     if (path === "active") {
@@ -1542,6 +1553,8 @@ async function handleScimPatchUser(c: Context<AppEnv>) {
     } else if (path === "" && typeof value === "object") {
       const record = scimRecord(value);
       if (typeof record.active === "boolean") active = record.active;
+    } else if (path === "externalid" && operationName === "remove") {
+      externalId = null;
     } else if (path === "displayname" && typeof value === "string") {
       displayName = value.trim().slice(0, 120);
     } else if (path === "externalid" && typeof value === "string") {
@@ -1549,10 +1562,12 @@ async function handleScimPatchUser(c: Context<AppEnv>) {
     }
   }
   if (typeof body.active === "boolean") active = body.active;
+  if (c.req.method === "PUT" && active === undefined) active = true;
   if (typeof body.displayName === "string")
     displayName = body.displayName.trim().slice(0, 120);
   if (typeof body.externalId === "string")
     externalId = body.externalId.slice(0, 255);
+  if (body.externalId === null) externalId = null;
   await db
     .update(authSchema.member)
     .set({
@@ -1688,15 +1703,30 @@ app.get("/api/scim/v2.0/:organizationId/Users", async (c) => {
   if (!provider) return scimError(c, 401, "Invalid SCIM bearer token");
   let rows = await listScimMemberships(organizationId);
   const filter = c.req.query("filter") || "";
-  const match = filter.match(/^userName\s+eq\s+["']([^"']+)["']$/i);
-  if (match)
-    rows = rows.filter(
-      (row) => row.user.email.toLowerCase() === (match[1] ?? "").toLowerCase(),
-    );
-  const startIndex = Math.max(1, Number(c.req.query("startIndex") || 1));
+  const match = filter.match(
+    /^(userName|externalId|active)\s+eq\s+["']?([^"']+)["']?$/i,
+  );
+  if (match) {
+    const attribute = (match[1] ?? "").toLowerCase();
+    const expected = (match[2] ?? "").toLowerCase();
+    rows = rows.filter((row) => {
+      if (attribute === "username")
+        return row.user.email.toLowerCase() === expected;
+      if (attribute === "externalid")
+        return (row.member.scimExternalId ?? "").toLowerCase() === expected;
+      return String(row.member.scimActive).toLowerCase() === expected;
+    });
+  }
+  const requestedStart = Number(c.req.query("startIndex") || 1);
+  const startIndex = Number.isFinite(requestedStart)
+    ? Math.max(1, Math.trunc(requestedStart))
+    : 1;
+  const requestedCount = Number(c.req.query("count") || 100);
   const countLimit = Math.min(
     1000,
-    Math.max(1, Number(c.req.query("count") || 100)),
+    Number.isFinite(requestedCount)
+      ? Math.max(1, Math.trunc(requestedCount))
+      : 100,
   );
   const resources = rows
     .slice(startIndex - 1, startIndex - 1 + countLimit)
