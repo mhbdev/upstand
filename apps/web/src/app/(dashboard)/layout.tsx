@@ -173,7 +173,9 @@ function DashboardSidebar({ pathname }: { pathname: string }) {
 
   return (
     <Sidebar collapsible="icon">
-      <OrganizationSwitcher className="min-h-[55px] w-full border-none p-[11.5px]" />
+      <div className="px-2">
+        <OrganizationSwitcher className="min-h-[55px] w-full border-none p-[11.5px]" />
+      </div>
 
       <Separator />
 
