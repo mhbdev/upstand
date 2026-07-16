@@ -51,6 +51,36 @@ export function SecurityPanel() {
     codeForm.reset();
   });
 
+  const enableForm = useForm({
+    defaultValues: {
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      const enabled = await handleEnable(value.password);
+      if (enabled) enableForm.reset();
+    },
+    validators: {
+      onSubmit: z.object({
+        password: z.string().min(1, "Current password is required"),
+      }),
+    },
+  });
+
+  const disableForm = useForm({
+    defaultValues: {
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      await handleDisable(value.password);
+      disableForm.reset();
+    },
+    validators: {
+      onSubmit: z.object({
+        password: z.string().min(1, "Current password is required"),
+      }),
+    },
+  });
+
   if (!session) {
     return (
       <p className="text-muted-foreground text-sm">Please sign in first.</p>
@@ -96,8 +126,8 @@ export function SecurityPanel() {
                 Your account is protected. You'll be prompted for a code from
                 your authenticator app on each sign-in.
               </p>
-              <div className="flex justify-end">
-                <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-end">
                   <Button
                     variant="outline"
                     size="sm"
@@ -107,16 +137,55 @@ export function SecurityPanel() {
                     {loading && <Spinner data-icon="inline-start" />}
                     Regenerate recovery codes
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={loading}
-                    onClick={handleDisable}
-                  >
-                    {loading && <Spinner data-icon="inline-start" />}
-                    Disable 2FA
-                  </Button>
                 </div>
+                <form
+                  className="flex flex-col gap-3 rounded-md border border-destructive/20 p-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    disableForm.handleSubmit();
+                  }}
+                >
+                  <disableForm.Field name="password">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Current password to disable 2FA
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          type="password"
+                          autoComplete="current-password"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </disableForm.Field>
+                  <div className="flex justify-end">
+                    <disableForm.Subscribe
+                      selector={(state) => ({
+                        canSubmit: state.canSubmit,
+                        password: state.values.password,
+                      })}
+                    >
+                      {({ canSubmit, password }) => (
+                        <Button
+                          type="submit"
+                          variant="destructive"
+                          size="sm"
+                          disabled={loading || !canSubmit || !password}
+                        >
+                          {loading && <Spinner data-icon="inline-start" />}
+                          Disable 2FA
+                        </Button>
+                      )}
+                    </disableForm.Subscribe>
+                  </div>
+                </form>
               </div>
             </div>
           ) : totpURI ? (
@@ -208,18 +277,55 @@ export function SecurityPanel() {
               </div>
             </form>
           ) : (
-            <div className="flex flex-col gap-3">
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                enableForm.handleSubmit();
+              }}
+            >
               <p className="text-muted-foreground text-sm">
                 Protect your account with a time-based one-time password from
                 your phone.
               </p>
+              <enableForm.Field name="password">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor={field.name}>Current password</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      type="password"
+                      autoComplete="current-password"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                )}
+              </enableForm.Field>
               <div className="flex justify-end">
-                <Button size="sm" disabled={loading} onClick={handleEnable}>
-                  {loading && <Spinner data-icon="inline-start" />}
-                  Set Up Authenticator
-                </Button>
+                <enableForm.Subscribe
+                  selector={(state) => ({
+                    canSubmit: state.canSubmit,
+                    password: state.values.password,
+                  })}
+                >
+                  {({ canSubmit, password }) => (
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={loading || !canSubmit || !password}
+                    >
+                      {loading && <Spinner data-icon="inline-start" />}
+                      Set Up Authenticator
+                    </Button>
+                  )}
+                </enableForm.Subscribe>
               </div>
-            </div>
+            </form>
           )}
         </CardContent>
       </Card>

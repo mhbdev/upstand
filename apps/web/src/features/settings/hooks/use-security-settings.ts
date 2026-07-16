@@ -8,21 +8,23 @@ export function useSecuritySettings(onVerifySuccess?: () => void) {
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [showBackupCodes, setShowBackupCodes] = useState(false);
 
-  const handleEnable = async () => {
+  const handleEnable = async (password: string) => {
     setLoading(true);
     try {
-      const { data, error } = await authClient.twoFactor.enable({});
+      const { data, error } = await authClient.twoFactor.enable({ password });
       if (error) {
         toast.error(error.message || "Failed to start 2FA setup");
       } else if (data) {
         setTotpURI(data.totpURI);
         setBackupCodes(data.backupCodes);
+        return true;
       }
     } catch {
       toast.error("An error occurred.");
     } finally {
       setLoading(false);
     }
+    return false;
   };
 
   const handleConfirm = async (code: string) => {
@@ -48,7 +50,7 @@ export function useSecuritySettings(onVerifySuccess?: () => void) {
     }
   };
 
-  const handleDisable = async () => {
+  const handleDisable = async (password: string) => {
     if (
       !confirm("Are you sure? Disabling 2FA makes your account less secure.")
     ) {
@@ -56,7 +58,7 @@ export function useSecuritySettings(onVerifySuccess?: () => void) {
     }
     setLoading(true);
     try {
-      const { error } = await authClient.twoFactor.disable({});
+      const { error } = await authClient.twoFactor.disable({ password });
       if (error) {
         toast.error(error.message || "Failed to disable 2FA");
       } else {
