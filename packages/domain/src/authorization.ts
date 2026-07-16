@@ -234,7 +234,7 @@ export const CAPABILITY_CATALOG = {
     apiKey: true,
     customRole: false,
     assurance: "standard",
-    roles: [],
+    roles: ownerAdmin,
   },
   "s3_destination:delete": {
     scope: "organization",
