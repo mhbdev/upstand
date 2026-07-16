@@ -149,7 +149,7 @@ export default function TwoFactorVerifyPage() {
               : "Use a recovery code instead"}
           </button>
 
-          <div className="flex items-center justify-between text-muted-foreground text-xs">
+          <div className="mt-4 flex items-center justify-between text-muted-foreground text-xs">
             <button
               type="button"
               onClick={handleSignOut}
