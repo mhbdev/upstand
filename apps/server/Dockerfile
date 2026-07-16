@@ -51,13 +51,13 @@ ENV NODE_ENV=production
 
 ARG TARGETARCH
 ARG NIXPACKS_VERSION=1.41.0
+ARG UPSTAND_RCLONE_VERSION=1.74.4
 
 # Install system dependencies needed by deployment worker and rclone testing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
     docker-cli \
-    rclone \
     ca-certificates \
     curl \
     tar \
@@ -65,6 +65,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     g++ \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# The distro rclone package is an old development build whose S3 streaming
+# uploads are incompatible with some S3-compatible providers, including R2.
+# Pin the official release so backup and restore behavior is reproducible.
+RUN case "$TARGETARCH" in \
+      amd64) RCLONE_ARCH="amd64" ;; \
+      arm64) RCLONE_ARCH="arm64" ;; \
+      *) echo "Unsupported rclone architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && curl --fail --location --retry 3 --retry-all-errors \
+      "https://downloads.rclone.org/v${UPSTAND_RCLONE_VERSION}/rclone-v${UPSTAND_RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip" \
+      --output /tmp/rclone.zip \
+    && python3 -c "import zipfile; zipfile.ZipFile('/tmp/rclone.zip').extractall('/tmp/rclone')" \
+    && install "/tmp/rclone/rclone-v${UPSTAND_RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone" /usr/local/bin/rclone \
+    && rm -rf /tmp/rclone /tmp/rclone.zip \
+    && rclone version
 
 # Nixpacks is pinned at image-build time, so production deployments never run a
 # mutable installer. Railpack is intentionally downloaded per configured release

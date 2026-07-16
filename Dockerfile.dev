@@ -6,10 +6,25 @@ WORKDIR /app
 # with the production runner image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     docker-cli \
-    rclone \
     curl \
+    python3 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+ARG UPSTAND_RCLONE_VERSION=1.74.4
+ARG TARGETARCH=amd64
+RUN case "$TARGETARCH" in \
+      amd64) RCLONE_ARCH="amd64" ;; \
+      arm64) RCLONE_ARCH="arm64" ;; \
+      *) echo "Unsupported rclone architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && curl --fail --location --retry 3 --retry-all-errors \
+      "https://downloads.rclone.org/v${UPSTAND_RCLONE_VERSION}/rclone-v${UPSTAND_RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip" \
+      --output /tmp/rclone.zip \
+    && python3 -c "import zipfile; zipfile.ZipFile('/tmp/rclone.zip').extractall('/tmp/rclone')" \
+    && install "/tmp/rclone/rclone-v${UPSTAND_RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone" /usr/local/bin/rclone \
+    && rm -rf /tmp/rclone /tmp/rclone.zip \
+    && rclone version
 
 # Copy lockfile and package configurations to cache dependencies
 COPY package.json bun.lock tsconfig.json ./
