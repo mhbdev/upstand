@@ -385,24 +385,31 @@ export function DomainsTab({
             ),
           copyHeaders: z.array(z.string()).max(32),
         }),
-        basicAuth: z.object({
-          username: z
-            .string()
-            .refine(
-              (value) => !value.trim() || /^[A-Za-z0-9._-]{1,128}$/.test(value),
-              "Use letters, numbers, dots, underscores, or dashes",
-            ),
-          passwordHash: z
-            .string()
-            .refine(
-              (value) =>
-                !value.trim() ||
-                (value.trim().startsWith("$") &&
-                  value.trim().length >= 20 &&
-                  !/[\s\r\n]/.test(value)),
-              "Use a Caddy-compatible password hash, not plaintext",
-            ),
-        }),
+        basicAuth: z
+          .object({
+            username: z
+              .string()
+              .refine(
+                (value) =>
+                  !value.trim() || /^[A-Za-z0-9._-]{1,128}$/.test(value),
+                "Use letters, numbers, dots, underscores, or dashes",
+              ),
+            passwordHash: z
+              .string()
+              .refine(
+                (value) =>
+                  !value.trim() ||
+                  (value.trim().startsWith("$") &&
+                    value.trim().length >= 20 &&
+                    !/[\s\r\n]/.test(value)),
+                "Use a Caddy-compatible password hash, not plaintext",
+              ),
+          })
+          .refine(
+            ({ username, passwordHash }) =>
+              Boolean(username.trim()) === Boolean(passwordHash.trim()),
+            "Provide both a username and a Caddy password hash, or leave both empty",
+          ),
         securityHeaders: z.object({
           hsts: z.boolean(),
           nosniff: z.boolean(),
@@ -458,7 +465,7 @@ export function DomainsTab({
     const defaultIp = resourceServer?.ipAddress?.match(
       /^(?:\d{1,3}\.){3}\d{1,3}$/,
     )?.[0];
-    const configuredIp = webServerSettings.data?.settings.serverIp;
+    const configuredIp = webServerSettings.data?.settings.serverIp?.trim();
     const ip = configuredIp || defaultIp;
     if (!isPublicIpv4(ip)) {
       toast.error(
@@ -478,10 +485,19 @@ export function DomainsTab({
       toast.info("This generated domain is already linked");
       return;
     }
+    // Keep optional Caddy middleware keys absent. Empty nested objects are not
+    // valid Caddy routes and used to make generated domains fail in production.
     const mapping: DomainMapping = {
-      ...emptyDomainMapping(),
       host,
+      path: "/",
+      internalPath: "/",
+      stripPath: true,
       port: 80,
+      https: true,
+      certificateType: "letsencrypt",
+      middlewares: [],
+      redirectStatus: "302",
+      securityHeaders: emptyDomainMapping().securityHeaders,
     };
     updateResource(
       { id: resource.id, domains: JSON.stringify([...domainList, mapping]) },
@@ -652,7 +668,8 @@ export function DomainsTab({
                       </FieldLabel>
                       <Input
                         id={field.name}
-                        placeholder="app.example.com"
+                        name={field.name}
+                        placeholder="app.example.com…"
                         value={field.state.value}
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
@@ -668,6 +685,7 @@ export function DomainsTab({
                       <FieldLabel htmlFor={field.name}>Target Port</FieldLabel>
                       <Input
                         id={field.name}
+                        name={field.name}
                         type="number"
                         placeholder="80"
                         value={field.state.value}
@@ -718,6 +736,7 @@ export function DomainsTab({
                       </FieldLabel>
                       <Input
                         id={field.name}
+                        name={field.name}
                         placeholder="/"
                         value={field.state.value}
                         onBlur={field.handleBlur}
@@ -736,6 +755,7 @@ export function DomainsTab({
                       </FieldLabel>
                       <Input
                         id={field.name}
+                        name={field.name}
                         placeholder="/"
                         value={field.state.value}
                         onBlur={field.handleBlur}
@@ -850,7 +870,8 @@ export function DomainsTab({
                         </FieldLabel>
                         <Input
                           id={field.name}
-                          placeholder="https://www.example.com{uri} or /new-path"
+                          name={field.name}
+                          placeholder="https://www.example.com{uri} or /new-path…"
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -897,7 +918,9 @@ export function DomainsTab({
                         </FieldLabel>
                         <Input
                           id={field.name}
-                          placeholder="https://auth.example.com/verify"
+                          name={field.name}
+                          type="url"
+                          placeholder="https://auth.example.com/verify…"
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -912,6 +935,7 @@ export function DomainsTab({
                         <FieldLabel htmlFor={field.name}>Auth URI</FieldLabel>
                         <Input
                           id={field.name}
+                          name={field.name}
                           placeholder="/verify"
                           value={field.state.value}
                           onBlur={field.handleBlur}
@@ -930,7 +954,8 @@ export function DomainsTab({
                       </FieldLabel>
                       <Input
                         id={field.name}
-                        placeholder="X-User, X-Email"
+                        name={field.name}
+                        placeholder="X-User, X-Email…"
                         value={(field.state.value ?? []).join(", ")}
                         onBlur={field.handleBlur}
                         onChange={(e) =>
@@ -955,6 +980,8 @@ export function DomainsTab({
                         </FieldLabel>
                         <Input
                           id={field.name}
+                          name={field.name}
+                          autoComplete="username"
                           placeholder="admin"
                           value={field.state.value}
                           onBlur={field.handleBlur}
@@ -972,7 +999,10 @@ export function DomainsTab({
                         </FieldLabel>
                         <Input
                           id={field.name}
-                          placeholder="$2a$14$..."
+                          name={field.name}
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="$2a$14$…"
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}

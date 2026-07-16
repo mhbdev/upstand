@@ -42,22 +42,29 @@ export function TagsTab({
   const assignedIds = new Set(assigned.data?.map((tag) => tag.id));
 
   return (
-    <Card>
+    <Card className="border border-border/40 bg-card/20">
       <CardHeader>
         <CardTitle>Resource tags</CardTitle>
         <CardDescription>
           Apply organization tags for filtering and operations.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+      <CardContent className="flex flex-wrap gap-2 border-border/20 border-t pt-4">
         {allTags.isLoading || assigned.isLoading ? (
-          <Spinner />
+          <div
+            className="flex items-center gap-2 text-muted-foreground text-sm"
+            role="status"
+          >
+            <Spinner />
+            Loading tags…
+          </div>
         ) : allTags.data?.length ? (
           allTags.data.map((tag) => {
             const active = assignedIds.has(tag.id);
             return (
               <Button
                 key={tag.id}
+                type="button"
                 variant={active ? "default" : "outline"}
                 size="sm"
                 onClick={() =>

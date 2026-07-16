@@ -29,6 +29,8 @@
     "evlog": "catalog:",
     "hono": "catalog:",
     "ssh2": "^1.17.0",
+    "swagger-ui-dist": "^5.32.8",
+    "trpc-to-openapi": "^3.3.0",
     "zod": "catalog:"
   },
   "devDependencies": {
