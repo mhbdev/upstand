@@ -68,12 +68,15 @@ export const s3DestinationRouter = router({
       await checkPermission(
         ctx.session.user.id,
         destination.organizationId,
-        "s3_destination:create",
+        "s3_destination:update",
       );
 
       const useCase = ctx.scope.resolve(UpdateS3DestinationUseCaseToken);
       try {
-        return await useCase.execute(input);
+        return await useCase.execute({
+          ...input,
+          organizationId: destination.organizationId,
+        });
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -108,6 +111,11 @@ export const s3DestinationRouter = router({
   testConnection: twoFactorVerifiedProcedure
     .input(TestS3DestinationConnectionInputSchema)
     .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "s3_destination:view",
+      );
       const useCase = ctx.scope.resolve(
         TestS3DestinationConnectionUseCaseToken,
       );

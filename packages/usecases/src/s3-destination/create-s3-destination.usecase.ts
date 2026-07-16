@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { IUnitOfWork, S3Destination } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
+import { publicS3Destination } from "./public-s3-destination";
 
 export const CreateS3DestinationInputSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
@@ -44,11 +45,7 @@ export class CreateS3DestinationUseCase {
         additionalFlags: JSON.stringify(input.additionalFlags || []),
       });
 
-      return {
-        ...created,
-        accessKeyId: input.accessKeyId,
-        secretAccessKey: input.secretAccessKey,
-      };
+      return publicS3Destination(created);
     });
   }
 }

@@ -599,6 +599,7 @@ export const API_KEY_ROUTE_CAPABILITIES = {
   "dockerRegistry.update": "docker_registry:create",
   "dockerRegistry.delete": "docker_registry:delete",
   "dockerRegistry.testConnection": "docker_registry:view",
+  "s3Destination.testConnection": "s3_destination:view",
   "schedule.list": "resource:view",
   "schedule.create": "resource:update",
   "schedule.update": "resource:update",

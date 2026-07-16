@@ -5,6 +5,7 @@ import { z } from "zod";
 const execAsync = promisify(exec);
 
 export const TestS3DestinationConnectionInputSchema = z.object({
+  organizationId: z.string().min(1, "Organization ID is required"),
   provider: z.string().min(1, "Provider is required"),
   accessKeyId: z.string().min(1, "Access Key Id is required"),
   secretAccessKey: z.string().min(1, "Secret Access Key is required"),

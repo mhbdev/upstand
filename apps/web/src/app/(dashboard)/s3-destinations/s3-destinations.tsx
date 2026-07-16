@@ -190,8 +190,8 @@ export default function S3Destinations(_props: {
     setEditId(dest.id);
     setName(dest.name);
     setProvider(dest.provider);
-    setAccessKeyId(dest.accessKeyId);
-    setSecretAccessKey(dest.secretAccessKey);
+    setAccessKeyId("");
+    setSecretAccessKey("");
     setBucket(dest.bucket);
     setRegion(dest.region);
     setEndpoint(dest.endpoint);
@@ -225,13 +225,21 @@ export default function S3Destinations(_props: {
   };
 
   const handleTestConnection = () => {
-    if (!provider || !accessKeyId || !secretAccessKey || !bucket || !endpoint) {
+    if (
+      !orgId ||
+      !provider ||
+      !accessKeyId ||
+      !secretAccessKey ||
+      !bucket ||
+      !endpoint
+    ) {
       toast.error(
         "Please fill in all required fields (Provider, Access Key Id, Secret Access Key, Bucket, Endpoint) to test connection.",
       );
       return;
     }
     testConnectionMutation.mutate({
+      organizationId: orgId,
       provider,
       accessKeyId,
       secretAccessKey,
@@ -460,8 +468,10 @@ export default function S3Destinations(_props: {
               <Label htmlFor="accessKeyId">Access Key Id</Label>
               <Input
                 id="accessKeyId"
-                required
-                placeholder="xcas41dasde"
+                required={!editId}
+                placeholder={
+                  editId ? "Leave blank to keep existing" : "xcas41dasde"
+                }
                 value={accessKeyId}
                 onChange={(e) => setAccessKeyId(e.target.value)}
               />
@@ -471,9 +481,11 @@ export default function S3Destinations(_props: {
               <Label htmlFor="secretAccessKey">Secret Access Key</Label>
               <Input
                 id="secretAccessKey"
-                required
+                required={!editId}
                 type="password"
-                placeholder="asd123asdasw"
+                placeholder={
+                  editId ? "Leave blank to keep existing" : "asd123asdasw"
+                }
                 value={secretAccessKey}
                 onChange={(e) => setSecretAccessKey(e.target.value)}
               />

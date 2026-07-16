@@ -1,9 +1,6 @@
 import type { IUnitOfWork, S3Destination } from "@upstand/domain";
-import {
-  decryptSecret,
-  type EncryptedPayload,
-} from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
+import { publicS3Destination } from "./public-s3-destination";
 
 export const GetS3DestinationsInputSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
@@ -21,33 +18,6 @@ export class GetS3DestinationsUseCase {
       input.organizationId,
     );
 
-    return list.map((dest) => {
-      let accessKeyId = dest.accessKeyId;
-      let secretAccessKey = dest.secretAccessKey;
-
-      try {
-        const parsedAccessKey = JSON.parse(
-          dest.accessKeyId,
-        ) as EncryptedPayload;
-        if (parsedAccessKey?.ciphertext && parsedAccessKey.iv) {
-          accessKeyId = decryptSecret(parsedAccessKey);
-        }
-      } catch {}
-
-      try {
-        const parsedSecret = JSON.parse(
-          dest.secretAccessKey,
-        ) as EncryptedPayload;
-        if (parsedSecret?.ciphertext && parsedSecret.iv) {
-          secretAccessKey = decryptSecret(parsedSecret);
-        }
-      } catch {}
-
-      return {
-        ...dest,
-        accessKeyId,
-        secretAccessKey,
-      };
-    });
+    return list.map(publicS3Destination);
   }
 }
