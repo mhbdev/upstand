@@ -4,17 +4,32 @@ import { createDb } from "@upstand/db";
 import { member, organization, user } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
 import { notificationChannel } from "@upstand/db/schema/notification";
+import {
+  CUSTOM_ROLE_CAPABILITY_ACTIONS,
+  parseCapabilities,
+} from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
 import { protectedProcedure, router } from "../index";
 import { type PermissionAction, ROLE_PERMISSIONS } from "../permissions";
 
-const permissionActions = [
-  ...new Set(Object.values(ROLE_PERMISSIONS).flat()),
-] as [PermissionAction, ...PermissionAction[]];
+const permissionActions = CUSTOM_ROLE_CAPABILITY_ACTIONS as [
+  PermissionAction,
+  ...PermissionAction[],
+];
 const permissionsSchema = z.array(z.enum(permissionActions)).max(100);
 const baseInput = z.object({ organizationId: z.string().min(1) });
+
+function parseStoredPermissions(value: string): PermissionAction[] {
+  try {
+    return parseCapabilities(JSON.parse(value)).filter((permission) =>
+      permissionActions.includes(permission),
+    );
+  } catch {
+    return [];
+  }
+}
 
 function assertManager(actorRole: string, targetRole?: string) {
   if (actorRole === "owner") return;
@@ -58,12 +73,14 @@ async function resolveRoleAssignment(
     });
   return {
     role: `custom:${selected.id}`,
-    permissions: JSON.parse(selected.permissions) as PermissionAction[],
+    permissions: parseStoredPermissions(selected.permissions),
   };
 }
 
 function validatePermissions(role: string, permissions: PermissionAction[]) {
-  const allowed = new Set(ROLE_PERMISSIONS[role] || []);
+  const allowed = new Set(
+    ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [],
+  );
   if (permissions.some((permission) => !allowed.has(permission))) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -85,7 +102,7 @@ export const memberRouter = router({
       members: rows.map(({ member: membership, user: memberUser }) => ({
         ...membership,
         permissions: membership.permissions
-          ? (JSON.parse(membership.permissions) as PermissionAction[])
+          ? parseStoredPermissions(membership.permissions)
           : null,
         user: memberUser,
       })),

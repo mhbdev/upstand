@@ -1,7 +1,11 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { API_KEY_PERMISSION_ACTIONS, type ApiKeyPreset } from "@upstand/domain";
+import {
+  API_KEY_PERMISSION_ACTIONS,
+  type ApiKeyPreset,
+  type Capability,
+} from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -66,7 +70,9 @@ export function ApiKeysPanel() {
   const [preset, setPreset] = useState<ApiKeyPreset>("read-only");
   const [expiresInDays, setExpiresInDays] = useState("90");
   const [advanced, setAdvanced] = useState(false);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [selectedPermissions, setSelectedPermissions] = useState<Capability[]>(
+    [],
+  );
   const [secret, setSecret] = useState<string | null>(null);
 
   const keys = useQuery({
@@ -99,7 +105,7 @@ export function ApiKeysPanel() {
     [preset, selectedPermissions],
   );
 
-  function togglePermission(permission: string, checked: boolean) {
+  function togglePermission(permission: Capability, checked: boolean) {
     setSelectedPermissions((current) =>
       checked
         ? [...new Set([...current, permission])]

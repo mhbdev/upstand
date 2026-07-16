@@ -4,7 +4,11 @@ import { sso } from "@better-auth/sso";
 import { createDb } from "@upstand/db";
 import * as schema from "@upstand/db/schema/auth";
 import { notificationChannel } from "@upstand/db/schema/notification";
-import { NotificationChannelSchema } from "@upstand/domain";
+import {
+  NotificationChannelSchema,
+  ORGANIZATION_ROLE_STATEMENTS,
+  ORGANIZATION_STATEMENT,
+} from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import { NotificationTransportRegistry } from "@upstand/infrastructure";
 import { redis } from "@upstand/redis";
@@ -33,41 +37,13 @@ function getSharedCookieDomain(): string | undefined {
   return domain && apiHost.endsWith(`.${domain}`) ? domain : undefined;
 }
 
-const organizationStatement = {
-  organization: ["update", "delete"],
-  member: ["create", "update", "delete"],
-  invitation: ["create", "cancel"],
-  team: ["create", "update", "delete"],
-  ac: ["create", "read", "update", "delete"],
-  apiKey: ["create", "read", "update", "delete"],
-} as const;
-
-const organizationAccessControl = createAccessControl(organizationStatement);
+const organizationAccessControl = createAccessControl(ORGANIZATION_STATEMENT);
 const organizationRoles = {
-  owner: organizationAccessControl.newRole({
-    organization: ["update", "delete"],
-    member: ["create", "update", "delete"],
-    invitation: ["create", "cancel"],
-    team: ["create", "update", "delete"],
-    ac: ["create", "read", "update", "delete"],
-    apiKey: ["create", "read", "update", "delete"],
-  }),
-  admin: organizationAccessControl.newRole({
-    organization: ["update"],
-    member: ["create", "update", "delete"],
-    invitation: ["create", "cancel"],
-    team: ["create", "update", "delete"],
-    ac: ["create", "read", "update", "delete"],
-    apiKey: ["create", "read", "update", "delete"],
-  }),
-  member: organizationAccessControl.newRole({
-    organization: [],
-    member: [],
-    invitation: [],
-    team: [],
-    ac: ["read"],
-    apiKey: [],
-  }),
+  owner: organizationAccessControl.newRole(ORGANIZATION_ROLE_STATEMENTS.owner),
+  admin: organizationAccessControl.newRole(ORGANIZATION_ROLE_STATEMENTS.admin),
+  member: organizationAccessControl.newRole(
+    ORGANIZATION_ROLE_STATEMENTS.member,
+  ),
 };
 
 export function createAuth() {

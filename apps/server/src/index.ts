@@ -18,6 +18,7 @@ import {
   getConversationForUser,
   isUpGalToolName,
   saveIncomingMessages,
+  UPGAL_TOOL_CAPABILITIES,
   UPGAL_TOOL_METADATA,
   type UpGalUIMessage,
   validateAndRecoverUpGalMessages,
@@ -35,7 +36,7 @@ import { auth } from "@upstand/auth";
 import { db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
 import { scimProvider } from "@upstand/db/schema/scim";
-import { isJsonObject } from "@upstand/domain";
+import { hasApiKeyPermission, isJsonObject } from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import { CaddyService, getDockerInstance } from "@upstand/infrastructure";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
@@ -1795,7 +1796,7 @@ app.post("/api/ai/chat", async (c) => {
   if (!bodyResult.success)
     return c.json({ error: "Invalid UpGal request" }, 400);
   const body = bodyResult.data;
-  await ensureOrganizationAccess(session.user.id, body.organizationId);
+  await checkPermission(session.user.id, body.organizationId, "ai:view");
   const conversationId = body.conversationId || randomUUID();
   const ownedConversation = await getConversationForUser(
     conversationId,
@@ -1880,6 +1881,17 @@ app.all("/api/mcp", async (c) => {
     );
   const body = bodyResult.data;
   const id = body.id ?? null;
+  const canUseMcpTool = (name: string) => {
+    if (!isUpGalToolName(name)) return false;
+    const mcpGrant =
+      key.permissions.mcp.includes("*") ||
+      key.permissions.mcp.includes("read") ||
+      key.permissions.mcp.includes(`tool:${name}`);
+    return (
+      mcpGrant &&
+      hasApiKeyPermission(key.permissions, UPGAL_TOOL_CAPABILITIES[name])
+    );
+  };
   if (body.method === "initialize")
     return c.json({
       jsonrpc: "2.0",
@@ -1895,16 +1907,13 @@ app.all("/api/mcp", async (c) => {
       jsonrpc: "2.0",
       id,
       result: {
-        tools: UPGAL_TOOL_METADATA.filter(
-          ([name]) =>
-            key.permissions.mcp.includes("*") ||
-            key.permissions.mcp.includes("read") ||
-            key.permissions.mcp.includes(`tool:${name}`),
-        ).map(([name, description, mutation]) => ({
-          name,
-          description,
-          annotations: { destructiveHint: mutation, readOnlyHint: !mutation },
-        })),
+        tools: UPGAL_TOOL_METADATA.filter(([name]) => canUseMcpTool(name)).map(
+          ([name, description, mutation]) => ({
+            name,
+            description,
+            annotations: { destructiveHint: mutation, readOnlyHint: !mutation },
+          }),
+        ),
       },
     });
   if (body.method === "tools/call") {
@@ -1925,15 +1934,7 @@ app.all("/api/mcp", async (c) => {
     const metadata = UPGAL_TOOL_METADATA.find(
       ([toolName]) => toolName === name,
     );
-    if (
-      !metadata ||
-      !isUpGalToolName(name) ||
-      !(
-        key.permissions.mcp.includes("*") ||
-        key.permissions.mcp.includes("read") ||
-        key.permissions.mcp.includes(`tool:${name}`)
-      )
-    )
+    if (!metadata || !isUpGalToolName(name) || !canUseMcpTool(name))
       return c.json({
         jsonrpc: "2.0",
         id,

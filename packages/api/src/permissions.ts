@@ -1,204 +1,74 @@
 import { TRPCError } from "@trpc/server";
+import {
+  CAPABILITY_ACTIONS,
+  type Capability,
+  capabilitiesForRole,
+  type OrganizationRole,
+  parseCapabilities,
+} from "@upstand/domain";
 import { ensureOrganizationAccess } from "./access-control";
 
-export type PermissionAction =
-  // Project Permissions
-  | "project:create"
-  | "project:view"
-  | "project:delete"
-  | "tag:create"
-  | "tag:view"
-  | "tag:update"
-  | "tag:delete"
-  // Template permissions
-  | "template:view"
-  | "template:create"
-  | "template:update"
-  | "template:delete"
-  | "template:deploy"
-  // Environment Permissions
-  | "environment:create"
-  | "environment:view"
-  | "environment:delete"
-  // Resource Permissions
-  | "resource:create"
-  | "resource:view"
-  | "resource:update"
-  | "resource:delete"
-  // SSH Key Permissions
-  | "ssh_key:create"
-  | "ssh_key:view"
-  | "ssh_key:delete"
-  // Git Provider Permissions
-  | "git_provider:create"
-  | "git_provider:view"
-  | "git_provider:delete"
-  // S3 Destination Permissions
-  | "s3_destination:create"
-  | "s3_destination:view"
-  | "s3_destination:delete"
-  // Backup permissions
-  | "backup:view"
-  | "backup:manage"
-  // Certificates
-  | "certificate:create"
-  | "certificate:view"
-  | "certificate:update"
-  | "certificate:delete"
-  // Docker Registry Permissions
-  | "docker_registry:create"
-  | "docker_registry:view"
-  | "docker_registry:delete"
-  // Server Permissions
-  | "server:create"
-  | "server:view"
-  | "server:update"
-  | "server:delete"
-  // Notification permissions
-  | "notification:create"
-  | "notification:view"
-  | "notification:update"
-  | "notification:delete";
-
-// Role-to-permissions mapping
-export const ROLE_PERMISSIONS: Record<string, PermissionAction[]> = {
-  owner: [
-    "project:create",
-    "project:view",
-    "project:delete",
-    "tag:create",
-    "tag:view",
-    "tag:update",
-    "tag:delete",
-    "template:view",
-    "template:create",
-    "template:update",
-    "template:delete",
-    "template:deploy",
-    "environment:create",
-    "environment:view",
-    "environment:delete",
-    "resource:create",
-    "resource:view",
-    "resource:update",
-    "resource:delete",
-    "ssh_key:create",
-    "ssh_key:view",
-    "ssh_key:delete",
-    "git_provider:create",
-    "git_provider:view",
-    "git_provider:delete",
-    "s3_destination:create",
-    "s3_destination:view",
-    "s3_destination:delete",
-    "backup:view",
-    "backup:manage",
-    "certificate:create",
-    "certificate:view",
-    "certificate:update",
-    "certificate:delete",
-    "docker_registry:create",
-    "docker_registry:view",
-    "docker_registry:delete",
-    "server:create",
-    "server:view",
-    "server:update",
-    "server:delete",
-    "notification:create",
-    "notification:view",
-    "notification:update",
-    "notification:delete",
-  ],
-  admin: [
-    "project:create",
-    "project:view",
-    "tag:create",
-    "tag:view",
-    "tag:update",
-    "tag:delete",
-    "template:view",
-    "template:create",
-    "template:update",
-    "template:delete",
-    "template:deploy",
-    "environment:create",
-    "environment:view",
-    "environment:delete",
-    "resource:create",
-    "resource:view",
-    "resource:update",
-    "resource:delete",
-    "ssh_key:create",
-    "ssh_key:view",
-    "ssh_key:delete",
-    "git_provider:create",
-    "git_provider:view",
-    "git_provider:delete",
-    "s3_destination:create",
-    "s3_destination:view",
-    "s3_destination:delete",
-    "backup:view",
-    "backup:manage",
-    "certificate:create",
-    "certificate:view",
-    "certificate:update",
-    "certificate:delete",
-    "docker_registry:create",
-    "docker_registry:view",
-    "docker_registry:delete",
-    "server:create",
-    "server:view",
-    "server:update",
-    "server:delete",
-    "notification:create",
-    "notification:view",
-    "notification:update",
-    "notification:delete",
-  ],
-  member: [
-    "project:view",
-    "tag:view",
-    "template:view",
-    "template:deploy",
-    "environment:view",
-    "resource:view",
-    "resource:update",
-    "ssh_key:view",
-    "git_provider:view",
-    "s3_destination:view",
-    "backup:view",
-    "certificate:view",
-    "docker_registry:view",
-    "server:view",
-    "notification:view",
-  ],
-};
+/** Backwards-compatible name used by routers while the catalog stays domain-owned. */
+export type PermissionAction = Capability;
 
 /**
- * Checks if a user has a specific permission in an organization.
- * Throws a TRPCError FORBIDDEN if the permission check fails.
+ * Role grants are generated from CAPABILITY_CATALOG. There is intentionally
+ * no instance-wide role in this map: instance capabilities cannot be granted
+ * by an ordinary organization membership.
+ */
+export const ROLE_PERMISSIONS: Record<OrganizationRole, PermissionAction[]> = {
+  owner: [...capabilitiesForRole("owner")],
+  admin: [...capabilitiesForRole("admin")],
+  member: [...capabilitiesForRole("member")],
+};
+
+export const PERMISSION_ACTIONS = CAPABILITY_ACTIONS;
+
+export type AuthorizationActor = {
+  userId: string;
+  organizationId: string;
+};
+
+/** The application policy decision point used by session-backed routes. */
+export class AuthorizationService {
+  async authorize(actor: AuthorizationActor, action: PermissionAction) {
+    const membership = await ensureOrganizationAccess(
+      actor.userId,
+      actor.organizationId,
+    );
+    const permissions = membership.permissions
+      ? parseStoredPermissions(membership.permissions)
+      : ROLE_PERMISSIONS[membership.role as OrganizationRole] || [];
+
+    if (!permissions.includes(action)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Required permission not met. Action '${action}' is not allowed for role '${membership.role}'`,
+      });
+    }
+
+    return membership;
+  }
+}
+
+function parseStoredPermissions(value: string): PermissionAction[] {
+  try {
+    return parseCapabilities(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
+
+const authorizationService = new AuthorizationService();
+
+/**
+ * Checks if a user has a capability in an organization. All existing router
+ * call sites now pass through the same policy decision point.
  */
 export async function checkPermission(
   userId: string,
   organizationId: string,
   action: PermissionAction,
 ) {
-  const membership = await ensureOrganizationAccess(userId, organizationId);
-  let permissions = ROLE_PERMISSIONS[membership.role] || [];
-  if (membership.permissions) {
-    try {
-      permissions = JSON.parse(membership.permissions) as PermissionAction[];
-    } catch {
-      permissions = [];
-    }
-  }
-
-  if (!permissions.includes(action)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `Required permission not met. Action '${action}' is not allowed for role '${membership.role}'`,
-    });
-  }
-
-  return membership;
+  return authorizationService.authorize({ userId, organizationId }, action);
 }
