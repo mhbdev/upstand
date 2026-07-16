@@ -142,6 +142,9 @@ const createMockUnitOfWork = () =>
     serverBuildSettingsRepository: new MockServerBuildSettingsRepository(),
     deploymentRepository: new MockDeploymentRepository(),
     outboxRepository: new MockOutboxRepository(),
+    projectRepository: {
+      findById: async () => null,
+    } as any,
     resourceRuntimeRepository: {
       upsert: async (resourceId: string, values: any) => ({
         resourceId,
