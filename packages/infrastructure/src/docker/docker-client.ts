@@ -1,7 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -19,6 +18,7 @@ import { DockerService } from "./docker.service";
 
 let proxyStarted = false;
 const PROXY_PORT = 23775;
+const remoteDockerProxies = new Map<string, string>();
 
 export function getDockerInstance(): Docker {
   const isWindows = process.platform === "win32";
@@ -49,37 +49,37 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
   if (!connection.hostKeyFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
-  return new Docker({
-    host: connection.host.replace(/^ssh:\/\//, ""),
-    port: connection.port,
-    protocol: "http",
-    // docker-modem otherwise retains its default local Unix socket.
-    socketPath: undefined,
-    agent: createRemoteDockerSshAgent(connection),
-  } as unknown as Docker.DockerOptions);
+  return new Docker({ socketPath: ensureRemoteDockerProxy(connection) });
 }
 
-function createRemoteDockerSshAgent(connection: RemoteDockerConnection) {
+function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
   const trustedFingerprint = connection.hostKeyFingerprint;
   if (!trustedFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
-  const agent = new http.Agent();
-  agent.createConnection = (_options, callback) => {
+  const key = createHash("sha256")
+    .update(
+      `${connection.host}:${connection.port}:${connection.username}:${connection.privateKey}`,
+    )
+    .digest("hex");
+  const existing = remoteDockerProxies.get(key);
+  if (existing) return existing;
+
+  const socketPath = path.join(os.tmpdir(), `upstand-docker-${key}.sock`);
+  fs.rmSync(socketPath, { force: true });
+  const proxy = net.createServer((socket) => {
     const client = new Client();
-    const fail = (error: Error) => {
+    const fail = () => {
       client.end();
-      agent.destroy();
-      callback?.(error, null as unknown as import("node:stream").Duplex);
+      socket.destroy();
     };
     client
       .once("ready", () => {
         client.exec("docker system dial-stdio", (error, stream) => {
-          if (error) return fail(error);
-          callback?.(null, stream);
+          if (error) return fail();
+          socket.pipe(stream).pipe(socket);
           stream.once("close", () => {
             client.end();
-            agent.destroy();
           });
           stream.once("error", fail);
         });
@@ -93,9 +93,15 @@ function createRemoteDockerSshAgent(connection: RemoteDockerConnection) {
         hostHash: "sha256",
         hostVerifier: hostVerifierForFingerprint(trustedFingerprint),
       });
-    client.once("end", () => agent.destroy());
-  };
-  return agent;
+    socket.once("error", fail);
+  });
+  proxy.once("error", () => {
+    remoteDockerProxies.delete(key);
+    fs.rmSync(socketPath, { force: true });
+  });
+  proxy.listen(socketPath);
+  remoteDockerProxies.set(key, socketPath);
+  return socketPath;
 }
 
 export function createRemoteDockerCliEnvironment(

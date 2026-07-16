@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createRemoteDocker } from "./docker-client";
 
 describe("remote Docker client", () => {
-  test("passes a hostname, not an SSH URL, to ssh2", () => {
+  test("uses a local Unix socket instead of Dockerode's SSH URL transport", () => {
     const docker = createRemoteDocker({
       host: "ssh://203.0.113.10",
       port: 22,
@@ -11,8 +11,7 @@ describe("remote Docker client", () => {
       hostKeyFingerprint: "SHA256:YWJjZA==",
     });
 
-    expect((docker as any).modem.host).toBe("203.0.113.10");
-    expect((docker as any).modem.protocol).toBe("http");
-    expect((docker as any).modem.socketPath).toBeUndefined();
+    expect((docker as any).modem.host).toBeUndefined();
+    expect((docker as any).modem.socketPath).toContain("upstand-docker-");
   });
 });
