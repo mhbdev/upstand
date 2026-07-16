@@ -57,20 +57,24 @@ jobs:
       matrix:
         include:
           - name: server
+            context: .
             file: apps/server/Dockerfile
             scope: upstand-server
             build_args: ""
           - name: web
+            context: .
             file: apps/web/Dockerfile
             scope: upstand-web
             build_args: |
               NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
               NEXT_PUBLIC_UPSTAND_VERSION=${{ github.ref_name }}
           - name: fumadocs
+            context: .
             file: apps/fumadocs/Dockerfile
             scope: upstand-fumadocs
             build_args: ""
           - name: monitoring
+            context: apps/monitoring
             file: apps/monitoring/Dockerfile
             scope: upstand-monitoring
             build_args: ""
@@ -109,7 +113,7 @@ jobs:
       - name: Build and Push ${{ matrix.name }}
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: true
           tags: |
