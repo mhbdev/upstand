@@ -1,5 +1,5 @@
 # Production Docker Swarm stack. Image variables must point to immutable image
-# digests; the installer refuses mutable tags for the three Upstand services.
+# digests; the installer refuses mutable tags for the four Upstand images.
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:16.4-alpine}
@@ -113,6 +113,7 @@ services:
       UPSTAND_API_HOST: ${UPSTAND_API_HOST:-}
       UPSTAND_DOCS_HOST: ${UPSTAND_DOCS_HOST:-}
       UPSTAND_SERVER_IMAGE: ${UPSTAND_SERVER_IMAGE:?UPSTAND_SERVER_IMAGE is required}
+      UPSTAND_MONITORING_IMAGE: ${UPSTAND_MONITORING_IMAGE:?UPSTAND_MONITORING_IMAGE is required}
       UPSTAND_VERSION: ${UPSTAND_VERSION:-}
       UPSTAND_AUTO_UPDATE: ${UPSTAND_AUTO_UPDATE:-false}
       DOCKER_HOST: unix:///var/run/docker.sock

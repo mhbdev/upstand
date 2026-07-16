@@ -83,10 +83,12 @@ build_source_images() {
   UPSTAND_SERVER_IMAGE="upstand-server:source-${revision}"
   UPSTAND_WEB_IMAGE="upstand-web:source-${revision}"
   UPSTAND_DOCS_IMAGE="upstand-docs:source-${revision}"
+  UPSTAND_MONITORING_IMAGE="upstand-monitoring:source-${revision}"
 
   docker build --file "$SOURCE_DIR/apps/server/Dockerfile" --tag "$UPSTAND_SERVER_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/fumadocs/Dockerfile" --tag "$UPSTAND_DOCS_IMAGE" "$SOURCE_DIR"
+  docker build --file "$SOURCE_DIR/apps/monitoring/Dockerfile" --tag "$UPSTAND_MONITORING_IMAGE" "$SOURCE_DIR/apps/monitoring"
   SOURCE_BUILD=true
 }
 
@@ -161,6 +163,7 @@ write_environment() {
   local requested_server_image="${UPSTAND_SERVER_IMAGE:-}"
   local requested_web_image="${UPSTAND_WEB_IMAGE:-}"
   local requested_docs_image="${UPSTAND_DOCS_IMAGE:-}"
+  local requested_monitoring_image="${UPSTAND_MONITORING_IMAGE:-}"
   local requested_auto_update="${UPSTAND_AUTO_UPDATE:-}"
   local requested_version="${UPSTAND_VERSION:-}"
 
@@ -218,6 +221,7 @@ write_environment() {
   UPSTAND_SERVER_IMAGE="${requested_server_image:-${UPSTAND_SERVER_IMAGE:-}}"
   UPSTAND_WEB_IMAGE="${requested_web_image:-${UPSTAND_WEB_IMAGE:-}}"
   UPSTAND_DOCS_IMAGE="${requested_docs_image:-${UPSTAND_DOCS_IMAGE:-}}"
+  UPSTAND_MONITORING_IMAGE="${requested_monitoring_image:-${UPSTAND_MONITORING_IMAGE:-}}"
   UPSTAND_AUTO_UPDATE="${requested_auto_update:-${UPSTAND_AUTO_UPDATE:-false}}"
 
   : "${BETTER_AUTH_URL:?set BETTER_AUTH_URL to the HTTPS API origin}"
@@ -230,13 +234,14 @@ write_environment() {
   UPSTAND_API_HOST="${BETTER_AUTH_URL#https://}"
   [[ "$UPSTAND_DASHBOARD_HOST" != */* && "$UPSTAND_API_HOST" != */* ]] || fail "dashboard and API origins must not include a path"
 
-  if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE" ]]; then
+  if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE$UPSTAND_MONITORING_IMAGE" ]]; then
     build_source_images
   fi
   if [[ "${SOURCE_BUILD:-false}" != true ]]; then
     require_digest_image UPSTAND_SERVER_IMAGE
     require_digest_image UPSTAND_WEB_IMAGE
     require_digest_image UPSTAND_DOCS_IMAGE
+    require_digest_image UPSTAND_MONITORING_IMAGE
   fi
 
   cat >"$ENV_FILE" <<EOF
@@ -251,6 +256,7 @@ UPSTAND_DOCS_HOST=${UPSTAND_DOCS_HOST:-docs.$UPSTAND_API_HOST}
 UPSTAND_SERVER_IMAGE=$UPSTAND_SERVER_IMAGE
 UPSTAND_WEB_IMAGE=$UPSTAND_WEB_IMAGE
 UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE
+UPSTAND_MONITORING_IMAGE=$UPSTAND_MONITORING_IMAGE
 UPSTAND_AUTO_UPDATE=$UPSTAND_AUTO_UPDATE
 UPSTAND_VERSION=$requested_version
 POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16.4-alpine}

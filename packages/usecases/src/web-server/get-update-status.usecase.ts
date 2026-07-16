@@ -9,11 +9,16 @@ export interface UpdateStatusResult {
   channel: "stable" | "canary" | "source";
   canUpdate: boolean;
   checkedAt: string;
-  images: { server: string; web: string; fumadocs: string } | null;
+  images: {
+    server: string;
+    web: string;
+    fumadocs: string;
+    monitoring: string;
+  } | null;
 }
 
 const RELEASE_MANIFEST_ASSET = "upstand-release-manifest.json";
-const REQUIRED_IMAGES = ["server", "web", "fumadocs"] as const;
+const REQUIRED_IMAGES = ["server", "web", "fumadocs", "monitoring"] as const;
 
 type GitHubRelease = {
   tag_name?: string;

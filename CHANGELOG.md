@@ -4,6 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.45 - 2026-07-16
+
+### Changed
+
+- Publish the monitoring agent as a separate Linux image and require its immutable reference in production deployments.
+- Build the monitoring image in CI and source installs, and remove generated vendor directories and binaries from Git.
+- Connect the local monitoring agent to the server over the Swarm network without exposing its port publicly.
+
 ## 0.1.44 - 2026-07-16
 
 ### Added

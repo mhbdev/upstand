@@ -10,6 +10,7 @@ export const TriggerUpdateInputSchema = z.object({
     server: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
     web: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
     fumadocs: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
+    monitoring: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
   }),
 });
 
@@ -88,7 +89,7 @@ export class TriggerUpdateUseCase {
           const newImage = `${baseImage}@${input.images[imageName]}`;
           const currentEnv = (inspect.Spec.TaskTemplate.ContainerSpec.Env ??
             []) as string[];
-          const nextEnv = currentEnv.some((entry) =>
+          let nextEnv = currentEnv.some((entry) =>
             entry.startsWith("UPSTAND_VERSION="),
           )
             ? currentEnv.map((entry) =>
@@ -97,6 +98,22 @@ export class TriggerUpdateUseCase {
                   : entry,
               )
             : [...currentEnv, `UPSTAND_VERSION=${version}`];
+          if (imageName === "server") {
+            const monitoringBaseImage = baseImage.replace(
+              /-server$/,
+              "-monitoring",
+            );
+            const monitoringImage = `${monitoringBaseImage}@${input.images.monitoring}`;
+            nextEnv = nextEnv.some((entry) =>
+              entry.startsWith("UPSTAND_MONITORING_IMAGE="),
+            )
+              ? nextEnv.map((entry) =>
+                  entry.startsWith("UPSTAND_MONITORING_IMAGE=")
+                    ? `UPSTAND_MONITORING_IMAGE=${monitoringImage}`
+                    : entry,
+                )
+              : [...nextEnv, `UPSTAND_MONITORING_IMAGE=${monitoringImage}`];
+          }
           log.info({
             message: `Updating Swarm service '${name}' to use image '${newImage}'...`,
           });

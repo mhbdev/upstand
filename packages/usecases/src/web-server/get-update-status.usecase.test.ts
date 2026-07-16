@@ -33,6 +33,11 @@ const manifest = (version = "v0.1.41") => ({
       image: `ghcr.io/mhbdev/upstand-fumadocs:${version}`,
       digest: `sha256:${"3".repeat(64)}`,
     },
+    {
+      name: "monitoring",
+      image: `ghcr.io/mhbdev/upstand-monitoring:${version}`,
+      digest: `sha256:${"4".repeat(64)}`,
+    },
   ],
 });
 

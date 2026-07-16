@@ -107,7 +107,6 @@ COPY packages/platform/package.json ./packages/platform/
 # available while Bun installs production dependencies, even though it is not
 # included in the final server command.
 COPY apps/fumadocs ./apps/fumadocs
-COPY apps/monitoring ./apps/monitoring
 COPY packages/infrastructure ./packages/infrastructure
 COPY packages/platform ./packages/platform
 
