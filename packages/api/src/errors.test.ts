@@ -17,6 +17,41 @@ describe("use-case error mapping", () => {
     }
   });
 
+  test("maps provider-rejected notifications to a client error", () => {
+    expect(() =>
+      handleUseCaseError(
+        new Error("Slack rejected the notification (404 Not Found)"),
+      ),
+    ).toThrow(TRPCError);
+
+    try {
+      handleUseCaseError(
+        new Error("Slack rejected the notification (404 Not Found)"),
+      );
+    } catch (error) {
+      expect((error as TRPCError).code).toBe("BAD_REQUEST");
+      expect((error as TRPCError).message).toContain(
+        "Slack rejected the notification",
+      );
+    }
+  });
+
+  test("maps unavailable Git provider integrations to a client error", () => {
+    for (const message of [
+      "Unable to connect. Is the computer able to access the url?",
+      "Was there a typo in the url or port?",
+      "Failed to fetch GitHub repositories: upstream unavailable",
+      "GitHub App is not fully configured (missing installation)",
+    ]) {
+      try {
+        handleUseCaseError(new Error(message));
+      } catch (error) {
+        expect((error as TRPCError).code).toBe("BAD_REQUEST");
+        expect((error as TRPCError).message).toBe(message);
+      }
+    }
+  });
+
   test("preserves router errors raised inside a handled operation", () => {
     const conflict = new TRPCError({
       code: "CONFLICT",

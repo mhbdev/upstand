@@ -49,6 +49,11 @@ export function handleUseCaseError(error: unknown): never {
     errorMessage.includes("Permission denied") ||
     errorMessage.includes("host unreachable") ||
     errorMessage.includes("fetch failed") ||
+    errorMessage.includes("rejected the notification") ||
+    errorMessage.includes("Unable to connect") ||
+    errorMessage.includes("Was there a typo in the url or port?") ||
+    errorMessage.includes("Failed to fetch Git") ||
+    errorMessage.includes("GitHub App is not fully configured") ||
     errorMessage.includes("ENOTFOUND") ||
     errorMessage.includes("EAI_AGAIN") ||
     errorMessage.includes("ETIMEDOUT") ||
