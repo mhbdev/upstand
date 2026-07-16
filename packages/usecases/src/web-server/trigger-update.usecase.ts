@@ -86,6 +86,12 @@ export class TriggerUpdateUseCase {
             : name.includes("web")
               ? "web"
               : "server";
+
+          if (!baseImage.includes("/") || baseImage.startsWith("upstand-")) {
+            const repo = process.env.GITHUB_REPOSITORY || "mhbdev/upstand";
+            baseImage = `ghcr.io/${repo}-${imageName}`;
+          }
+
           const newImage = `${baseImage}@${input.images[imageName]}`;
           const currentEnv = (inspect.Spec.TaskTemplate.ContainerSpec.Env ??
             []) as string[];

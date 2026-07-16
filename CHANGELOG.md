@@ -4,7 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.66 - 2026-07-17
+## 0.1.67 - 2026-07-17
+
+### Fixed
+
+- Fix rate limit (403/429) errors from the GitHub API when checking for updates by implementing a manual HTTP redirect-based fallback to scrape the latest release and download the manifest.
+- Fix Swarm self-update failure for local/custom image tags (e.g. `upstand-server:custom`) by dynamically resolving and prepending the GHCR namespace.
+- Fix Chromium horizontal/vertical scroll overlapping glitches and group label clipping in the landing page comparison table.
+- Fix local Docker TCP-to-named-pipe proxy race condition (`ECONNREFUSED` error on startup) on Windows.
 
 ## 0.1.65 - 2026-07-17
 

@@ -81,11 +81,10 @@ function unavailableStatus(
 }
 
 function isCompleteRelease(
-  release: GitHubRelease,
+  version: string | undefined,
   manifest: ReleaseManifest,
   repo: string,
 ): boolean {
-  const version = release.tag_name;
   if (
     !version ||
     manifest.schemaVersion !== 1 ||
@@ -150,67 +149,115 @@ export class GetUpdateStatusUseCase {
         channel === "canary"
           ? `https://api.github.com/repos/${repo}/releases?per_page=30`
           : `https://api.github.com/repos/${repo}/releases/latest`;
-      const response = await fetch(endpoint, {
-        cache: "no-store",
-        headers: {
-          Accept: "application/vnd.github+json",
-          "User-Agent": "Upstand",
-        },
-      });
+      
+      const headers: Record<string, string> = {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "Upstand",
+      };
+      const token = process.env.UPSTAND_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
 
-      if (!response.ok) {
+      let latestVersion: string | null = null;
+      let manifest: ReleaseManifest | null = null;
+
+      try {
+        const response = await fetch(endpoint, {
+          cache: "no-store",
+          headers,
+        });
+
+        if (response.ok) {
+          const data = (await response.json()) as GitHubRelease | GitHubRelease[];
+          const release = Array.isArray(data)
+            ? data.find((candidate) =>
+                channel === "canary"
+                  ? candidate.prerelease === true
+                  : candidate.prerelease !== true,
+              )
+            : data;
+          if (release && !release.draft && release.tag_name) {
+            latestVersion = release.tag_name;
+            const manifestAsset = release.assets?.find(
+              (asset) => asset.name === RELEASE_MANIFEST_ASSET,
+            );
+            if (manifestAsset?.browser_download_url) {
+              const manifestResponse = await fetch(manifestAsset.browser_download_url, {
+                cache: "no-store",
+                headers: {
+                  Accept: "application/json",
+                  "User-Agent": "Upstand",
+                },
+              });
+              if (manifestResponse.ok) {
+                manifest = (await manifestResponse.json()) as ReleaseManifest;
+              }
+            }
+          }
+        } else {
+          log.warn({
+            message: `GitHub API returned ${response.status} when checking for updates.`,
+          });
+        }
+      } catch (apiErr: any) {
         log.warn({
-          message: `GitHub API returned ${response.status} when checking for updates.`,
+          message: "Failed to connect to GitHub API, checking redirect fallback",
+          err: apiErr.message,
+        });
+      }
+
+      // Fallback: If GitHub API failed, was rate-limited (e.g. 403/429), or returned no manifest, and we are on stable channel
+      if ((!latestVersion || !manifest) && channel === "stable") {
+        log.info({
+          message: "Attempting GitHub HTTP redirect fallback to check for updates...",
+        });
+        try {
+          const redirectRes = await fetch(
+            `https://github.com/${repo}/releases/latest`,
+            {
+              redirect: "manual",
+              headers: {
+                "User-Agent": "Upstand",
+              },
+            }
+          );
+          const location = redirectRes.headers.get("location");
+          if (location) {
+            const parts = location.split("/tag/");
+            const tagPart = parts[1];
+            if (tagPart) {
+              const tag = tagPart.trim();
+              const manifestUrl = `https://github.com/${repo}/releases/download/${tag}/${RELEASE_MANIFEST_ASSET}`;
+              const manifestResponse = await fetch(manifestUrl, {
+                cache: "no-store",
+                headers: {
+                  Accept: "application/json",
+                  "User-Agent": "Upstand",
+                },
+              });
+              if (manifestResponse.ok) {
+                latestVersion = tag;
+                manifest = (await manifestResponse.json()) as ReleaseManifest;
+              }
+            }
+          }
+        } catch (fallbackErr: any) {
+          log.warn({
+            message: "GitHub redirect fallback check failed",
+            err: fallbackErr.message,
+          });
+        }
+      }
+
+      if (!latestVersion || !manifest || !isCompleteRelease(latestVersion, manifest, repo)) {
+        log.warn({
+          message: "Could not find a valid release or release manifest for update check.",
+          version: latestVersion,
         });
         return unavailableStatus(currentVersion, channel, checkedAt);
       }
 
-      const data = (await response.json()) as GitHubRelease | GitHubRelease[];
-      const release = Array.isArray(data)
-        ? data.find((candidate) =>
-            channel === "canary"
-              ? candidate.prerelease === true
-              : candidate.prerelease !== true,
-          )
-        : data;
-      if (!release || release.draft || !release.tag_name) {
-        return unavailableStatus(currentVersion, channel, checkedAt);
-      }
-
-      const manifestAsset = release.assets?.find(
-        (asset) => asset.name === RELEASE_MANIFEST_ASSET,
-      );
-      if (!manifestAsset?.browser_download_url) {
-        log.warn({
-          message: "Latest GitHub release has no complete image manifest.",
-          release: release.tag_name,
-        });
-        return unavailableStatus(currentVersion, channel, checkedAt);
-      }
-
-      const manifestResponse = await fetch(manifestAsset.browser_download_url, {
-        cache: "no-store",
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "Upstand",
-        },
-      });
-      if (!manifestResponse.ok) {
-        throw new Error(
-          `Release manifest returned ${manifestResponse.status} for ${release.tag_name}`,
-        );
-      }
-      const manifest = (await manifestResponse.json()) as ReleaseManifest;
-      if (!isCompleteRelease(release, manifest, repo)) {
-        log.warn({
-          message:
-            "Latest GitHub release does not contain all required images.",
-          release: release.tag_name,
-        });
-        return unavailableStatus(currentVersion, channel, checkedAt);
-      }
-
-      const latestVersion = release.tag_name;
       const images = new Map(
         (manifest.images ?? []).map((image) => [image.name, image]),
       );
