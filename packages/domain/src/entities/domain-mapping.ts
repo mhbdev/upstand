@@ -240,7 +240,38 @@ export function parseDomainMappings(domainsJson: string): DomainMapping[] {
     throw new Error("Stored domain mappings are not valid JSON");
   }
 
-  const mappings = z.array(DomainMappingSchema).safeParse(rawMappings);
+  // Older UI versions serialized empty optional middleware objects. Treat
+  // those values as absent so a harmless generated route remains deployable.
+  const normalizedMappings = Array.isArray(rawMappings)
+    ? rawMappings.map((mapping) => {
+        if (typeof mapping !== "object" || mapping === null) return mapping;
+        const value = { ...(mapping as Record<string, unknown>) };
+        if (value.redirectTo === "") delete value.redirectTo;
+
+        const forwardAuth = value.forwardAuth;
+        if (
+          typeof forwardAuth === "object" &&
+          forwardAuth !== null &&
+          !(forwardAuth as { address?: unknown }).address
+        ) {
+          delete value.forwardAuth;
+        }
+
+        const basicAuth = value.basicAuth;
+        if (
+          typeof basicAuth === "object" &&
+          basicAuth !== null &&
+          !(basicAuth as { username?: unknown }).username &&
+          !(basicAuth as { passwordHash?: unknown }).passwordHash
+        ) {
+          delete value.basicAuth;
+        }
+
+        return value;
+      })
+    : rawMappings;
+
+  const mappings = z.array(DomainMappingSchema).safeParse(normalizedMappings);
   if (!mappings.success) {
     throw new Error(
       mappings.error.issues

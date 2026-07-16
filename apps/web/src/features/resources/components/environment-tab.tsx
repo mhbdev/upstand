@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@upstand/ui/components/card";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import { Code, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -130,27 +131,42 @@ export function EnvironmentTab({
             </div>
           </div>
         ) : null}
-        <div className="grid gap-2 sm:grid-cols-3">
-          <Input
-            placeholder="Key (e.g. API_KEY)"
-            value={newEnvKey}
-            onChange={(e) =>
-              setNewEnvKey(
-                e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""),
-              )
-            }
-            className="border-border/40 bg-card/30"
-          />
-          <Input
-            placeholder="Value"
-            value={newEnvValue}
-            onChange={(e) => setNewEnvValue(e.target.value)}
-            className="border-border/40 bg-card/30"
-          />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="resource-env-key">Variable name</Label>
+            <Input
+              id="resource-env-key"
+              name="resource-env-key"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="API_KEY…"
+              value={newEnvKey}
+              onChange={(e) =>
+                setNewEnvKey(
+                  e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""),
+                )
+              }
+              className="border-border/40 bg-card/30"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="resource-env-value">Value</Label>
+            <Input
+              id="resource-env-value"
+              name="resource-env-value"
+              autoComplete="off"
+              placeholder="Value…"
+              value={newEnvValue}
+              onChange={(e) => setNewEnvValue(e.target.value)}
+              className="border-border/40 bg-card/30"
+            />
+          </div>
           <Button
+            type="button"
             onClick={addEnvVar}
             variant="outline"
-            className="gap-2 border-border/40 font-medium"
+            className="mt-auto gap-2 border-border/40 font-medium"
+            disabled={!newEnvKey.trim()}
           >
             <Plus className="size-4" /> Add Variable
           </Button>
@@ -194,8 +210,10 @@ export function EnvironmentTab({
                           </span>
                           {item.value && (
                             <Button
+                              type="button"
                               variant="ghost"
                               size="icon"
+                              aria-label={`${isVisible ? "Hide" : "Show"} ${item.key} value`}
                               onClick={() =>
                                 setVisibleEnvKeys((prev) => ({
                                   ...prev,
@@ -216,18 +234,22 @@ export function EnvironmentTab({
                       <td className="p-3 text-center">
                         <div className="flex justify-center gap-1">
                           <Button
+                            type="button"
                             onClick={() => editEnvVar(item.key, item.value)}
                             variant="ghost"
                             size="icon"
                             className="size-7 text-muted-foreground hover:bg-muted/10"
+                            aria-label={`Edit ${item.key}`}
                           >
                             <Code className="size-3.5" />
                           </Button>
                           <Button
+                            type="button"
                             onClick={() => deleteEnvVar(item.key)}
                             variant="ghost"
                             size="icon"
                             className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={`Delete ${item.key}`}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>

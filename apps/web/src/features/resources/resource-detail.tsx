@@ -41,7 +41,8 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { BackupPanel } from "@/features/backups";
@@ -66,6 +67,19 @@ const TYPE_BG: Record<string, string> = {
   compose: "bg-violet-500/10 text-violet-500",
 };
 
+const RESOURCE_TABS = new Set([
+  "general",
+  "environment",
+  "advanced",
+  "domains",
+  "deployments",
+  "containers",
+  "backups",
+  "logs",
+  "monitoring",
+  "tags",
+]);
+
 interface ResourceDetailProps {
   projectId: string;
   environmentId: string;
@@ -83,7 +97,28 @@ export default function ResourceDetail({
     null,
   );
   const [containerModalOpen, setContainerModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("general");
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    requestedTab && RESOURCE_TABS.has(requestedTab) ? requestedTab : "general",
+  );
+
+  useEffect(() => {
+    if (requestedTab && RESOURCE_TABS.has(requestedTab)) {
+      setActiveTab(requestedTab);
+    }
+  }, [requestedTab]);
+
+  const changeTab = (value: string) => {
+    setActiveTab(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "general") params.delete("tab");
+    else params.set("tab", value);
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  };
 
   const {
     project,
@@ -101,6 +136,9 @@ export default function ResourceDetail({
     refetchDeployments,
     logsData,
     statsData,
+    statsError,
+    isLoadingStats,
+    refetchStats,
     containerLogsData,
     updateResource,
     isUpdatingResource,
@@ -187,8 +225,8 @@ export default function ResourceDetail({
 
       {/* Tabs */}
       <Tabs
-        defaultValue="general"
-        onValueChange={setActiveTab}
+        value={activeTab}
+        onValueChange={changeTab}
         className="min-w-0 space-y-6"
       >
         <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
@@ -227,7 +265,7 @@ export default function ResourceDetail({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="min-w-0 outline-none">
+        <TabsContent value="general" className="min-w-0 space-y-6 outline-none">
           <GeneralTab
             resource={resource}
             secrets={secrets}
@@ -249,7 +287,10 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="environment" className="min-w-0 outline-none">
+        <TabsContent
+          value="environment"
+          className="min-w-0 space-y-6 outline-none"
+        >
           <EnvironmentTab
             resource={resource}
             updateResource={updateResource}
@@ -257,7 +298,10 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="advanced" className="min-w-0 outline-none">
+        <TabsContent
+          value="advanced"
+          className="min-w-0 space-y-6 outline-none"
+        >
           <ResourceAdvancedSettings
             resourceId={resourceId}
             resourceType={resource.type}
@@ -266,7 +310,10 @@ export default function ResourceDetail({
         </TabsContent>
 
         {resource.type !== "database" && (
-          <TabsContent value="domains" className="min-w-0 outline-none">
+          <TabsContent
+            value="domains"
+            className="min-w-0 space-y-6 outline-none"
+          >
             <DomainsTab
               organizationId={project?.organizationId ?? ""}
               resource={resource}
@@ -279,7 +326,10 @@ export default function ResourceDetail({
           </TabsContent>
         )}
 
-        <TabsContent value="deployments" className="min-w-0 outline-none">
+        <TabsContent
+          value="deployments"
+          className="min-w-0 space-y-6 outline-none"
+        >
           <DeploymentsTab
             resource={resource}
             deployments={deployments}
@@ -289,7 +339,10 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="containers" className="min-w-0 outline-none">
+        <TabsContent
+          value="containers"
+          className="min-w-0 space-y-6 outline-none"
+        >
           <ContainersTab
             resource={resource}
             secrets={secrets}
@@ -302,7 +355,7 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent value="backups" className="min-w-0 outline-none">
+        <TabsContent value="backups" className="min-w-0 space-y-6 outline-none">
           {project?.organizationId && (
             <BackupPanel
               resource={resource}
@@ -311,7 +364,7 @@ export default function ResourceDetail({
           )}
         </TabsContent>
 
-        <TabsContent value="logs" className="min-w-0 outline-none">
+        <TabsContent value="logs" className="min-w-0 space-y-6 outline-none">
           <Card className="border border-border/40 bg-card/20">
             <CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -367,15 +420,23 @@ export default function ResourceDetail({
           </Card>
         </TabsContent>
 
-        <TabsContent value="monitoring" className="min-w-0 outline-none">
+        <TabsContent
+          value="monitoring"
+          className="min-w-0 space-y-6 outline-none"
+        >
           <MonitoringTab
             appName={resource.appName ?? resource.name}
             organizationId={project?.organizationId}
-            serverId={resource.serverId ?? undefined}
+            // Resources created on the control plane use a null serverId;
+            // their monitoring agent is the local agent.
+            serverId={resource.serverId ?? "local"}
             statsData={statsData}
+            statsError={statsError}
+            isLoadingStats={isLoadingStats}
+            refetchStats={refetchStats}
           />
         </TabsContent>
-        <TabsContent value="tags" className="min-w-0 outline-none">
+        <TabsContent value="tags" className="min-w-0 space-y-6 outline-none">
           {project?.organizationId && (
             <TagsTab
               resourceId={resourceId}

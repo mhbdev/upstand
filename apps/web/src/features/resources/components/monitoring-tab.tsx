@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Button } from "@upstand/ui/components/button";
 import {
   Card,
   CardContent,
@@ -168,11 +169,17 @@ export function MonitoringTab({
   organizationId,
   serverId,
   statsData,
+  statsError,
+  isLoadingStats,
+  refetchStats,
 }: {
   appName?: string | null;
   organizationId?: string;
   serverId?: string;
   statsData?: LiveStats | null;
+  statsError?: string;
+  isLoadingStats: boolean;
+  refetchStats: () => Promise<unknown>;
 }) {
   const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
   const range = useMemo(() => {
@@ -258,7 +265,10 @@ export function MonitoringTab({
   const liveCpu = finite(statsData?.cpu ?? statsData?.cpuPercent);
   const liveMemory = finite(statsData?.ram ?? statsData?.memoryPercent);
   return (
-    <div className="flex flex-col gap-5">
+    <div
+      className="flex flex-col gap-5"
+      aria-busy={isLoadingStats || historyQuery.isPending}
+    >
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="font-semibold text-lg">Resource monitoring</h2>
@@ -268,25 +278,66 @@ export function MonitoringTab({
               : "Live Docker metrics for this resource."}
           </p>
         </div>
-        <Select
-          value={rangeKey}
-          onValueChange={(value) => value && setRangeKey(value as RangeKey)}
-        >
-          <SelectTrigger
-            className="h-9 w-[160px]"
-            aria-label="Resource monitoring time range"
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={rangeKey}
+            onValueChange={(value) => value && setRangeKey(value as RangeKey)}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {RANGE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              className="h-9 w-[160px]"
+              aria-label="Resource monitoring time range"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RANGE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void refetchStats()}
+            disabled={isLoadingStats}
+          >
+            {isLoadingStats ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
       </div>
+
+      {statsError ? (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium text-sm">
+                Live metrics are unavailable
+              </p>
+              <p className="mt-1 text-muted-foreground text-xs">{statsError}</p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void refetchStats()}
+            >
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {historyQuery.error ? (
+        <p
+          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive text-sm"
+          role="alert"
+        >
+          Historical metrics could not be loaded: {historyQuery.error.message}
+        </p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -316,7 +367,9 @@ export function MonitoringTab({
             <div>
               <p className="text-muted-foreground text-xs">Active containers</p>
               <p className="mt-1 font-semibold text-xl tabular-nums">
-                {statsData?.containerCount ?? latestContainers.length}
+                {isLoadingStats && !statsData
+                  ? "…"
+                  : (statsData?.containerCount ?? latestContainers.length)}
               </p>
             </div>
             <Activity className="size-5 text-primary" aria-hidden="true" />
