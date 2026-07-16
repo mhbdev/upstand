@@ -84,6 +84,7 @@ import { AutoUpdateRuntime } from "./auto-update-runtime";
 import { DeploymentRuntime } from "./deployment-runtime";
 import { ScheduledDockerCleanup } from "./docker-cleanup-scheduler";
 import { initializeMonitoring } from "./monitoring-agent";
+import { OutboxRuntime } from "./outbox-runtime";
 import { runDatabaseMigrations } from "./startup";
 import { isStepUpAuthenticationSatisfied } from "./step-up-auth";
 import { matchesTerminalSession, terminalBroker } from "./terminal-broker";
@@ -114,6 +115,7 @@ type AppEnv = EvlogVariables & {
 
 const app = new Hono<AppEnv>();
 const deploymentRuntime = new DeploymentRuntime();
+const outboxRuntime = new OutboxRuntime();
 const notificationWorker = new NotificationDeliveryWorker(
   () => serviceProvider,
 );
@@ -2376,7 +2378,7 @@ await backupWorker.start();
 await backupScheduler.start();
 await generalScheduler.start();
 await accessLogCleanupScheduler.start();
-await deploymentRuntime.reconcileQueues();
+await outboxRuntime.start();
 log.info({ message: "Background job workers and schedulers started" });
 
 initializeMonitoring().catch((err) => {
@@ -2388,6 +2390,7 @@ initializeMonitoring().catch((err) => {
 
 autoUpdateRuntime.start();
 deploymentRuntime.startMaintenance();
+outboxRuntime.startMaintenance();
 scheduledDockerCleanup.start();
 
 async function shutdown(signal: string): Promise<void> {
@@ -2396,11 +2399,13 @@ async function shutdown(signal: string): Promise<void> {
   log.info({ message: "Graceful shutdown started", signal });
 
   const deploymentDrain = deploymentRuntime.shutdown();
+  const outboxDrain = outboxRuntime.shutdown();
   scheduledDockerCleanup.stop();
   autoUpdateRuntime.stop();
 
   const drain = Promise.all([
     deploymentDrain,
+    outboxDrain,
     Promise.allSettled([
       notificationWorker.stop(),
       backupWorker.stop(),

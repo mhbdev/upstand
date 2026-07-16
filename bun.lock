@@ -263,6 +263,7 @@
         "@upstand/platform": "workspace:*",
         "@upstand/redis": "workspace:*",
         "@upstand/usecases": "workspace:*",
+        "bullmq": "catalog:",
         "dockerode": "^5.0.1",
         "evlog": "catalog:",
         "nodemailer": "^9.0.3",

@@ -58,6 +58,7 @@ describe("API router contract", () => {
       "dockerRegistry",
       "server",
       "notification",
+      "outbox",
       "member",
       "customRole",
       "backup",

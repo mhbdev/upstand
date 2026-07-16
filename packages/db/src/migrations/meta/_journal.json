@@ -218,6 +218,20 @@
       "when": 1784116800000,
       "tag": "0030_hex_tag_colors",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1784194821117,
+      "tag": "0031_resource_state_ownership",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1784194882242,
+      "tag": "0032_transactional_outbox",
+      "breakpoints": true
     }
   ]
 }

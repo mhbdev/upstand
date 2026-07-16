@@ -30,22 +30,28 @@ function delivery(
 test("requeues a failed notification and resets delivery attempts", async () => {
   const updates: Array<Record<string, unknown>> = [];
   const current = delivery("dead_letter");
-  const queueCalls: unknown[] = [];
+  const outboxMessages: unknown[] = [];
   const uow = {
     notificationDeliveryRepository: {
       findById: async () => current,
-      updateById: async (_id: string, patch: Record<string, unknown>) => {
-        updates.push(patch);
-        return { ...current, ...patch };
-      },
     },
+    transaction: async (work: (tx: any) => Promise<unknown>) =>
+      work({
+        notificationDeliveryRepository: {
+          updateById: async (_id: string, patch: Record<string, unknown>) => {
+            updates.push(patch);
+            return { ...current, ...patch };
+          },
+        },
+        outboxRepository: {
+          create: async (message: unknown) => {
+            outboxMessages.push(message);
+            return message;
+          },
+        },
+      }),
   } as never;
-  const useCase = new RetryNotificationDeliveryUseCase(uow, () => ({
-    add: async (...args) => {
-      queueCalls.push(args);
-    },
-    close: async () => undefined,
-  }));
+  const useCase = new RetryNotificationDeliveryUseCase(uow);
 
   const result = await useCase.execute(current.id);
 
@@ -55,7 +61,11 @@ test("requeues a failed notification and resets delivery attempts", async () => 
     attempts: 0,
     error: null,
   });
-  expect(queueCalls).toHaveLength(1);
+  expect(outboxMessages).toHaveLength(1);
+  expect(outboxMessages[0]).toMatchObject({
+    type: "notification.deliver",
+    payload: { deliveryId: current.id },
+  });
 });
 
 test("does not retry a delivered notification", async () => {
@@ -66,10 +76,7 @@ test("does not retry a delivered notification", async () => {
       updateById: async () => current,
     },
   } as never;
-  const useCase = new RetryNotificationDeliveryUseCase(uow, () => ({
-    add: async () => undefined,
-    close: async () => undefined,
-  }));
+  const useCase = new RetryNotificationDeliveryUseCase(uow);
 
   await expect(useCase.execute(current.id)).rejects.toThrow(
     "Only failed notification deliveries can be retried",

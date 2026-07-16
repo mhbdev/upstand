@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { IUnitOfWork, NotificationEventType } from "@upstand/domain";
-import { redis } from "@upstand/redis";
-import { Queue } from "bullmq";
+import {
+  type NotificationDeliveryOutboxPayload,
+  OUTBOX_COMMAND_TYPES,
+} from "../outbox/outbox-commands";
 
 export interface PublishNotificationInput {
   event: NotificationEventType;
@@ -12,7 +14,7 @@ export interface PublishNotificationInput {
   idempotencyKey?: string;
 }
 
-const NOTIFICATION_DELIVERY_QUEUE = "notification-delivery";
+export const NOTIFICATION_DELIVERY_QUEUE = "notification-delivery";
 
 export class PublishNotificationUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
@@ -24,8 +26,8 @@ export class PublishNotificationUseCase {
     );
     if (channels.length === 0) return 0;
 
-    const deliveries = await this.uow.transaction((tx) =>
-      tx.notificationDeliveryRepository.createMany(
+    const deliveries = await this.uow.transaction(async (tx) => {
+      const created = await tx.notificationDeliveryRepository.createMany(
         channels.map((channel) => ({
           id: randomUUID(),
           channelId: channel.id,
@@ -37,50 +39,30 @@ export class PublishNotificationUseCase {
           metadata: input.metadata ?? null,
           status: "queued",
         })),
-      ),
-    );
-
-    const queue = new Queue(NOTIFICATION_DELIVERY_QUEUE, {
-      connection: redis as never,
-    });
-    try {
-      await queue.addBulk(
-        deliveries.map((delivery) => ({
-          name: "deliver",
-          data: { deliveryId: delivery.id },
-          opts: {
-            jobId: delivery.id,
-            attempts: 3,
-            backoff: { type: "exponential", delay: 1_000 },
-            removeOnComplete: 100,
-            removeOnFail: 1_000,
-          },
-        })),
       );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.uow.transaction(async (tx) => {
-        await Promise.all(
-          deliveries.map((delivery) =>
-            tx.notificationDeliveryRepository.updateById(delivery.id, {
-              status: "failed",
-              error: `Unable to enqueue notification: ${message}`.slice(
-                0,
-                1_000,
-              ),
-            }),
-          ),
-        );
-      });
-      throw error;
-    } finally {
-      await queue.close();
-    }
+
+      await tx.outboxRepository.createMany(
+        created.map((delivery) => {
+          const payload: NotificationDeliveryOutboxPayload = {
+            deliveryId: delivery.id,
+          };
+          return {
+            id: delivery.id,
+            type: OUTBOX_COMMAND_TYPES.notificationDelivery,
+            payload,
+            aggregateType: "notification_delivery",
+            aggregateId: delivery.id,
+            organizationId: delivery.organizationId,
+            idempotencyKey: `notification-delivery:${delivery.id}`,
+          };
+        }),
+      );
+
+      return created;
+    });
 
     return deliveries.length;
   }
 }
 
 export type NotificationPublisher = Pick<PublishNotificationUseCase, "execute">;
-
-export { NOTIFICATION_DELIVERY_QUEUE };

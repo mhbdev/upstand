@@ -1,6 +1,6 @@
 import { serviceProvider } from "@upstand/api/di";
 import { getDockerInstance } from "@upstand/infrastructure";
-import { DeploymentWorker, reconcileQueuedJobs } from "@upstand/usecases";
+import { DeploymentWorker } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 
@@ -8,7 +8,6 @@ export class DeploymentRuntime {
   private readonly workers = new Map<string, DeploymentWorker>();
   private refreshInFlight: Promise<void> | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
-  private reconcileTimer: ReturnType<typeof setInterval> | null = null;
 
   isReady(): boolean {
     return (
@@ -33,38 +32,6 @@ export class DeploymentRuntime {
       60_000,
     );
     this.refreshTimer.unref?.();
-
-    this.reconcileTimer = setInterval(
-      () =>
-        void this.reconcileQueues().catch((error) => {
-          log.error({
-            message: "Failed to reconcile queued database records",
-            err: error instanceof Error ? error.message : String(error),
-          });
-        }),
-      30_000,
-    );
-    this.reconcileTimer.unref?.();
-  }
-
-  async reconcileQueues(): Promise<void> {
-    const scope = serviceProvider.createScope();
-    try {
-      const uow = scope.resolve(UnitOfWorkToken);
-      const restored = await reconcileQueuedJobs(uow);
-      if (
-        restored.backups > 0 ||
-        restored.deployments > 0 ||
-        restored.notifications > 0
-      ) {
-        log.info({
-          message: "Queued database records reconciled with BullMQ",
-          restored,
-        });
-      }
-    } finally {
-      await scope.dispose();
-    }
   }
 
   async refreshWorkers(): Promise<void> {
@@ -94,9 +61,7 @@ export class DeploymentRuntime {
 
   async shutdown(): Promise<PromiseSettledResult<void>[]> {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
-    if (this.reconcileTimer) clearInterval(this.reconcileTimer);
     this.refreshTimer = null;
-    this.reconcileTimer = null;
 
     return Promise.allSettled(
       [...this.workers.values()].map((worker) => worker.stop()),

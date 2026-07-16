@@ -4,9 +4,11 @@ import {
   type IUnitOfWork,
   ValidationError,
 } from "@upstand/domain";
-import { redis } from "@upstand/redis";
-import { Queue } from "bullmq";
 import { z } from "zod";
+import {
+  type BackupRunOutboxPayload,
+  OUTBOX_COMMAND_TYPES,
+} from "../outbox/outbox-commands";
 import { acquireBackupRunLock, releaseBackupRunLock } from "./backup-run-lock";
 
 export const BACKUP_RUN_QUEUE = "backup-run";
@@ -16,36 +18,15 @@ export const TriggerBackupRunInputSchema = z.object({
 });
 export type TriggerBackupRunInput = z.infer<typeof TriggerBackupRunInputSchema>;
 
-export interface BackupRunQueue {
-  add(
-    name: string,
-    data: { runId: string },
-    options: {
-      jobId: string;
-      attempts: number;
-      backoff: { type: "exponential"; delay: number };
-      removeOnComplete: number;
-      removeOnFail: number;
-    },
-  ): Promise<unknown>;
-  close(): Promise<void>;
-}
-
-export type BackupRunQueueFactory = () => BackupRunQueue;
-const createBackupRunQueue: BackupRunQueueFactory = () =>
-  new Queue(BACKUP_RUN_QUEUE, { connection: redis as never });
-
 export { backupRunLockKey } from "./backup-run-lock";
 
 /**
- * Creates a durable run record before enqueueing. The Redis lock makes cron
- * execution safe when more than one API process is running.
+ * Creates a durable run record and its publication intent atomically. The
+ * Redis lock makes cron execution safe when more than one API process is
+ * running.
  */
 export class TriggerBackupRunUseCase {
-  constructor(
-    private readonly uow: IUnitOfWork,
-    private readonly queueFactory: BackupRunQueueFactory = createBackupRunQueue,
-  ) {}
+  constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: TriggerBackupRunInput): Promise<BackupRun | null> {
     const schedule = await this.uow.backupScheduleRepository.findById(
@@ -56,10 +37,9 @@ export class TriggerBackupRunUseCase {
     const runId = randomUUID();
     if (!(await acquireBackupRunLock(schedule.id, runId))) return null;
 
-    let run: BackupRun | null = null;
     try {
-      run = await this.uow.transaction((tx) =>
-        tx.backupRunRepository.create({
+      return await this.uow.transaction(async (tx) => {
+        const run = await tx.backupRunRepository.create({
           id: runId,
           scheduleId: schedule.id,
           resourceId: schedule.resourceId,
@@ -67,35 +47,20 @@ export class TriggerBackupRunUseCase {
           destinationId: schedule.destinationId,
           kind: schedule.kind,
           status: "queued",
-        }),
-      );
-
-      const queue = this.queueFactory();
-      try {
-        await queue.add(
-          "run",
-          { runId: run.id },
-          {
-            jobId: run.id,
-            attempts: 2,
-            backoff: { type: "exponential", delay: 5_000 },
-            removeOnComplete: 1_000,
-            removeOnFail: 1_000,
-          },
-        );
-      } finally {
-        await queue.close();
-      }
-      return run;
-    } catch (error) {
-      if (run) {
-        const message = error instanceof Error ? error.message : String(error);
-        await this.uow.backupRunRepository.updateById(run.id, {
-          status: "failed",
-          error: `Unable to enqueue backup: ${message}`.slice(0, 1_000),
-          completedAt: new Date(),
         });
-      }
+        const payload: BackupRunOutboxPayload = { runId: run.id };
+        await tx.outboxRepository.create({
+          id: run.id,
+          type: OUTBOX_COMMAND_TYPES.backupRun,
+          payload,
+          aggregateType: "backup_run",
+          aggregateId: run.id,
+          organizationId: run.organizationId,
+          idempotencyKey: `backup-run:${run.id}`,
+        });
+        return run;
+      });
+    } catch (error) {
       await releaseBackupRunLock(schedule.id, runId);
       throw error;
     }

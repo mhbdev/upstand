@@ -10,6 +10,7 @@ export * from "./environment";
 export * from "./git-provider";
 export * from "./monitoring-settings";
 export * from "./notification";
+export * from "./outbox";
 export * from "./preview-deployment";
 export * from "./project";
 export * from "./resource";

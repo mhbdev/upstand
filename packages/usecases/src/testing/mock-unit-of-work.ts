@@ -29,6 +29,7 @@ export function mockUnitOfWork<T extends object>(
     monitoringSettingsRepository: emptyRepository(),
     previewDeploymentRepository: emptyRepository(),
     scheduleRepository: emptyRepository(),
+    outboxRepository: emptyRepository(),
     transaction: async (work: (unitOfWork: IUnitOfWork) => Promise<unknown>) =>
       work(uow),
     ...overrides,

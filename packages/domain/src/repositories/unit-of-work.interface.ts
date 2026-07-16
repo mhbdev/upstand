@@ -9,6 +9,7 @@ import type { IGitProviderRepository } from "./git-provider-repository.interface
 import type { IMonitoringSettingsRepository } from "./monitoring-settings-repository.interface";
 import type { INotificationChannelRepository } from "./notification-channel-repository.interface";
 import type { INotificationDeliveryRepository } from "./notification-delivery-repository.interface";
+import type { IOutboxRepository } from "./outbox-repository.interface";
 import type { IPreviewDeploymentRepository } from "./preview-deployment-repository.interface";
 import type { IProjectRepository } from "./project-repository.interface";
 import type { IResourceRepository } from "./resource-repository.interface";
@@ -48,5 +49,6 @@ export interface IUnitOfWork {
   readonly monitoringSettingsRepository: IMonitoringSettingsRepository;
   readonly previewDeploymentRepository: IPreviewDeploymentRepository;
   readonly scheduleRepository: IScheduleRepository;
+  readonly outboxRepository: IOutboxRepository;
   transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T>;
 }
