@@ -68,7 +68,7 @@ export const s3DestinationRouter = router({
       await checkPermission(
         ctx.session.user.id,
         destination.organizationId,
-        "s3_destination:update",
+        "s3_destination:create",
       );
 
       const useCase = ctx.scope.resolve(UpdateS3DestinationUseCaseToken);
