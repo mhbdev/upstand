@@ -1,5 +1,3 @@
-"use client";
-
 import {
   CancelCircleIcon,
   CheckmarkCircle02Icon,
@@ -674,7 +672,11 @@ function ComparisonSection() {
       <div className="mb-10 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div className="max-w-3xl">
           <div className="flex items-center gap-2 font-mono text-primary text-xs uppercase tracking-[0.2em]">
-            <HugeiconsIcon icon={InformationCircleIcon} className="size-4" />
+            <HugeiconsIcon
+              aria-hidden="true"
+              icon={InformationCircleIcon}
+              className="size-4"
+            />
             <span>Source-aware comparison</span>
           </div>
           <h2 className="mt-3 text-balance font-semibold text-3xl tracking-tight md:text-5xl">
@@ -841,11 +843,15 @@ function ComparisonSection() {
 
 export default function Home() {
   return (
-    <div className="relative overflow-hidden">
+    <div id="top" className="relative overflow-hidden">
       <PageBackdrop />
       <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-16 pb-20 md:px-10 md:pt-24 md:pb-28">
         <section className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20">
           <div className="max-w-2xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 font-mono text-primary text-xs uppercase tracking-[0.14em]">
+              <span className="size-1.5 rounded-full bg-primary" />
+              Self-hosted by design
+            </div>
             <h1 className="text-balance font-bold text-5xl tracking-[-0.04em] sm:text-7xl">
               Your servers.
               <br />
@@ -952,7 +958,10 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-24 border-t pt-14 md:mt-32 md:pt-20">
+        <section
+          id="features"
+          className="mt-24 scroll-mt-24 border-t pt-14 md:mt-32 md:pt-20"
+        >
           <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
               <p className="font-mono text-primary text-xs uppercase tracking-[0.2em]">
@@ -996,7 +1005,10 @@ export default function Home() {
 
         <ComparisonSection />
 
-        <section className="mt-20 flex flex-col items-start justify-between gap-6 rounded-3xl border border-primary/20 bg-primary/[0.06] p-7 md:flex-row md:items-center md:p-10">
+        <section
+          id="docs"
+          className="mt-20 flex scroll-mt-24 flex-col items-start justify-between gap-6 rounded-3xl border border-primary/20 bg-primary/[0.06] p-7 md:flex-row md:items-center md:p-10"
+        >
           <div>
             <div className="flex items-center gap-2 text-primary">
               <HugeiconsIcon icon={CodeIcon} className="size-4" />
