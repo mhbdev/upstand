@@ -76,6 +76,7 @@ import { type EvlogVariables, evlog } from "evlog/hono";
 import { type Context, Hono } from "hono";
 import { upgradeWebSocket, websocket } from "hono/bun";
 import { cors } from "hono/cors";
+import { createOpenApiFetchHandler } from "trpc-to-openapi";
 import { z } from "zod";
 import {
   ApplicationArchiveValidationError,
@@ -85,6 +86,12 @@ import { AutoUpdateRuntime } from "./auto-update-runtime";
 import { DeploymentRuntime } from "./deployment-runtime";
 import { ScheduledDockerCleanup } from "./docker-cleanup-scheduler";
 import { initializeMonitoring } from "./monitoring-agent";
+import {
+  openApiDocument,
+  openApiRouter,
+  serveSwaggerUiAsset,
+  swaggerUiHtml,
+} from "./openapi";
 import { OutboxRuntime } from "./outbox-runtime";
 import { runDatabaseMigrations } from "./startup";
 import { isStepUpAuthenticationSatisfied } from "./step-up-auth";
@@ -2467,6 +2474,27 @@ app.get("/api/providers/gitea/setup", async (c) => {
   }
 
   return c.redirect(`${env.CORS_ORIGIN}/git-providers`, 307);
+});
+
+app.get("/api/openapi.json", (c) => c.json(openApiDocument));
+
+app.get("/api/docs", (c) => c.redirect("/api/docs/", 308));
+app.get("/api/docs/", (c) => c.html(swaggerUiHtml));
+
+app.get("/api/docs/assets/:asset", async (c) => {
+  const asset = c.req.param("asset");
+  return (await serveSwaggerUiAsset(asset)) ?? c.notFound();
+});
+
+// Keep the existing /api routes above authoritative, and expose the generated
+// REST compatibility routes for any remaining /api path.
+app.all("/api/*", async (c) => {
+  return createOpenApiFetchHandler({
+    endpoint: "/api",
+    req: c.req.raw,
+    router: openApiRouter,
+    createContext: () => createContext({ context: c as any }),
+  });
 });
 
 app.use(

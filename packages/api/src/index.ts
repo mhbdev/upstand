@@ -11,6 +11,7 @@ import {
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
 import { log } from "evlog";
+import type { OpenApiMeta } from "trpc-to-openapi";
 import { ensureOrganizationAccess } from "./access-control";
 import {
   enforceApiKeyRoute,
@@ -21,7 +22,7 @@ import { resolveClientIp } from "./client-ip";
 import type { Context } from "./context";
 import { RateLimiter } from "./rate-limit";
 
-export const t = initTRPC.context<Context>().create();
+export const t = initTRPC.context<Context>().meta<OpenApiMeta>().create();
 
 export const router = t.router;
 
