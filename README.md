@@ -87,6 +87,13 @@ bun run db:studio
 
 Use `bun run check` only when you intentionally want Biome to write formatting changes. Before a pull request, prefer the read-only checks above and inspect the resulting diff.
 
+## API documentation
+
+The server exposes the generated OpenAPI contract at `/api/openapi.json` and
+the interactive Swagger UI at `/api/docs/`. The REST-compatible routes under
+`/api` delegate to the canonical tRPC procedures, so existing authentication,
+authorization, rate limiting, and auditing remain in effect.
+
 ## Configuration
 
 Server variables are validated in `packages/env`. At minimum, development needs a PostgreSQL URL, Redis connection details, Better Auth URL/secret, CORS origin, and the SSH-key encryption key. Production secrets are generated as Docker secrets under `/etc/upstand/secrets/`; non-secret origins and image metadata remain in `/etc/upstand/.env`. Protect both paths.
