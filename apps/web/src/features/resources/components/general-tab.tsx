@@ -886,6 +886,13 @@ export function GeneralTab({
             <div className="space-y-2">
               <Label htmlFor="deployment-server">Deployment server</Label>
               <Select
+                items={[
+                  { value: "default", label: "Local Swarm manager" },
+                  ...servers.map((server) => ({
+                    value: server.id,
+                    label: `${server.name} (${server.ipAddress})`,
+                  })),
+                ]}
                 value={deploymentServerId}
                 onValueChange={(value) => {
                   if (value) setDeploymentServerId(value);
@@ -911,6 +918,13 @@ export function GeneralTab({
             <div className="space-y-2">
               <Label htmlFor="build-server">Build server</Label>
               <Select
+                items={[
+                  { value: "default", label: "Same as deployment server" },
+                  ...servers.map((server) => ({
+                    value: server.id,
+                    label: `${server.name} (${server.ipAddress})`,
+                  })),
+                ]}
                 value={buildServerId}
                 onValueChange={(value) => {
                   if (value) setBuildServerId(value);
@@ -939,6 +953,13 @@ export function GeneralTab({
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="build-registry">Build registry</Label>
                 <Select
+                  items={[
+                    { value: "none", label: "Automatic first organization registry" },
+                    ...(dockerRegistriesQuery.data || []).map((registry) => ({
+                      value: registry.id,
+                      label: registry.name,
+                    })),
+                  ]}
                   value={buildRegistryId || "none"}
                   onValueChange={(value) =>
                     setBuildRegistryId(value === "none" ? "" : (value ?? ""))
@@ -1010,6 +1031,14 @@ export function GeneralTab({
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="database-engine">Database engine</Label>
                   <Select
+                    items={[
+                      { value: "postgres", label: "PostgreSQL" },
+                      { value: "mysql", label: "MySQL" },
+                      { value: "mariadb", label: "MariaDB" },
+                      { value: "mongodb", label: "MongoDB" },
+                      { value: "redis", label: "Redis" },
+                      { value: "libsql", label: "libSQL" },
+                    ]}
                     value={databaseType}
                     onValueChange={(value) => {
                       const nextType = value as DatabaseType;
@@ -1040,6 +1069,13 @@ export function GeneralTab({
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="database-image">Image version</Label>
                   <Select
+                    items={[
+                      ...DATABASE_IMAGE_OPTIONS[databaseType].map((image) => ({
+                        value: image,
+                        label: image,
+                      })),
+                      { value: "__custom__", label: "Custom image" },
+                    ]}
                     value={useCustomDatabaseImage ? "__custom__" : dockerImage}
                     onValueChange={(value) => {
                       if (value === "__custom__") {
@@ -1305,6 +1341,10 @@ export function GeneralTab({
                     Deployment mode
                   </Label>
                   <Select
+                    items={[
+                      { value: "compose", label: "Docker Compose" },
+                      { value: "stack", label: "Docker Swarm Stack" },
+                    ]}
                     value={composeType}
                     onValueChange={(value) =>
                       setComposeType(value as ResourceComposeType)
@@ -1381,6 +1421,14 @@ export function GeneralTab({
                     </FieldDescription>
                   </FieldContent>
                   <Select
+                    items={[
+                      { value: "dockerfile", label: "Dockerfile" },
+                      { value: "railpack", label: "Railpack" },
+                      { value: "nixpacks", label: "Nixpacks" },
+                      { value: "heroku-buildpacks", label: "Heroku Buildpacks" },
+                      { value: "paketo-buildpacks", label: "Paketo Buildpacks" },
+                      { value: "static", label: "Static" },
+                    ]}
                     value={buildConfig.type}
                     onValueChange={(value) => {
                       const nextType = value as ApplicationBuildConfig["type"];
@@ -1575,6 +1623,13 @@ export function GeneralTab({
                 <div className="max-w-sm space-y-2">
                   <Label htmlFor="railpack-version">Railpack version</Label>
                   <Select
+                    items={[
+                      ...RAILPACK_VERSIONS.map((version) => ({
+                        value: version,
+                        label: version,
+                      })),
+                      { value: "custom", label: "Custom version" },
+                    ]}
                     value={
                       RAILPACK_VERSIONS.includes(
                         (buildConfig.railpackVersion ??
@@ -1652,6 +1707,10 @@ export function GeneralTab({
                 <div className="max-w-sm space-y-2">
                   <Label htmlFor="heroku-version">Heroku stack version</Label>
                   <Select
+                    items={[
+                      { value: "24", label: "Heroku-24" },
+                      { value: "26", label: "Heroku-26" },
+                    ]}
                     value={buildConfig.herokuVersion}
                     onValueChange={(value) => {
                       setBuildConfig({
@@ -2018,6 +2077,13 @@ export function GeneralTab({
                     Private registry (optional)
                   </Label>
                   <Select
+                    items={[
+                      { value: "none", label: "Public image / no registry" },
+                      ...(dockerRegistriesQuery.data || []).map((registry) => ({
+                        value: registry.id,
+                        label: registry.name,
+                      })),
+                    ]}
                     value={dockerRegistryId || "none"}
                     onValueChange={(value) =>
                       setDockerRegistryId(value === "none" ? "" : (value ?? ""))
@@ -2063,6 +2129,13 @@ export function GeneralTab({
                         Rollback registry (optional)
                       </Label>
                       <Select
+                        items={[
+                          { value: "none", label: "Use service credentials" },
+                          ...(dockerRegistriesQuery.data || []).map((registry) => ({
+                            value: registry.id,
+                            label: registry.name,
+                          })),
+                        ]}
                         value={rollbackRegistryId || "none"}
                         onValueChange={(value) =>
                           setRollbackRegistryId(
@@ -2123,6 +2196,23 @@ export function GeneralTab({
                   <div className="space-y-2">
                     <Label className="capitalize">{providerType} Account</Label>
                     <Select
+                      items={(gitProviders || [])
+                        .filter((p) => p.provider === providerType)
+                        .map((p) => {
+                          const config = JSON.parse(p.config);
+                          const isInstalled =
+                            p.provider === "github"
+                              ? !!config.githubInstallationId
+                              : p.provider === "bitbucket"
+                                ? true
+                                : !!config.accessToken;
+                          return {
+                            value: p.id,
+                            label: isInstalled
+                              ? p.name
+                              : `${p.name} (Not Installed/Authorized)`,
+                          };
+                        })}
                       value={githubAccount}
                       onValueChange={(value) => setGithubAccount(value ?? "")}
                       disabled={
@@ -2163,6 +2253,10 @@ export function GeneralTab({
                   <div className="space-y-2">
                     <Label>Repository</Label>
                     <Select
+                      items={(gitRepos || []).map((repo: any) => ({
+                        value: repo.fullName,
+                        label: repo.fullName,
+                      }))}
                       value={githubRepo}
                       onValueChange={(value) => setGithubRepo(value ?? "")}
                       disabled={
@@ -2198,6 +2292,10 @@ export function GeneralTab({
                     <div className="space-y-2">
                       <Label>Branch</Label>
                       <Select
+                        items={(gitBranches || []).map((branch: string) => ({
+                          value: branch,
+                          label: branch,
+                        }))}
                         value={githubBranch}
                         onValueChange={(value) => setGithubBranch(value ?? "")}
                         disabled={
@@ -2243,6 +2341,10 @@ export function GeneralTab({
                   <div className="space-y-2">
                     <Label>Trigger Type</Label>
                     <Select
+                      items={[
+                        { value: "On Push", label: "On Push" },
+                        { value: "On Tag", label: "On Tag" },
+                      ]}
                       value={githubTriggerType}
                       onValueChange={(value) =>
                         setGithubTriggerType(value ?? "On Push")
@@ -2371,6 +2473,13 @@ export function GeneralTab({
                         </Link>
                       </Label>
                       <Select
+                        items={[
+                          { value: "none", label: "No authentication" },
+                          ...(sshKeys || []).map((key) => ({
+                            value: key.id,
+                            label: key.name,
+                          })),
+                        ]}
                         value={gitSshKeyId}
                         onValueChange={(value) => setGitSshKeyId(value ?? "")}
                       >
@@ -2414,6 +2523,10 @@ export function GeneralTab({
                   <div className="space-y-2">
                     <Label>Trigger Type</Label>
                     <Select
+                      items={[
+                        { value: "push", label: "On Push" },
+                        { value: "tag", label: "On Tag" },
+                      ]}
                       value={gitTriggerType}
                       onValueChange={(value) =>
                         setGitTriggerType(value ?? "push")

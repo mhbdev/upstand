@@ -706,6 +706,10 @@ export function DomainsTab({
                     <Field>
                       <FieldLabel>Compose Service Target</FieldLabel>
                       <Select
+                        items={routingTargets.map((target) => ({
+                          value: target,
+                          label: target,
+                        }))}
                         value={field.state.value}
                         onValueChange={(val) =>
                           field.handleChange(val || undefined)
@@ -799,6 +803,20 @@ export function DomainsTab({
                         <Field>
                           <FieldLabel>SSL Certificate Type</FieldLabel>
                           <Select
+                            items={[
+                              {
+                                value: "letsencrypt",
+                                label: "Let's Encrypt Public Certificate",
+                              },
+                              {
+                                value: "internal",
+                                label: "Internal CA Self-Signed Certificate",
+                              },
+                              {
+                                value: "custom",
+                                label: "Uploaded Custom Certificate",
+                              },
+                            ]}
                             value={field.state.value}
                             onValueChange={(val) =>
                               field.handleChange(
@@ -828,6 +846,10 @@ export function DomainsTab({
                             <form.Field name="certificateId">
                               {(certificateField) => (
                                 <Select
+                                  items={certificates.map((certificate) => ({
+                                    value: certificate.id,
+                                    label: certificate.name,
+                                  }))}
                                   value={certificateField.state.value}
                                   onValueChange={(value) =>
                                     certificateField.handleChange(value || "")
@@ -885,6 +907,9 @@ export function DomainsTab({
                       <Field>
                         <FieldLabel>Redirect status</FieldLabel>
                         <Select
+                          items={(["301", "302", "307", "308"] as const).map(
+                            (status) => ({ value: status, label: status }),
+                          )}
                           value={field.state.value}
                           onValueChange={(value) =>
                             field.handleChange(

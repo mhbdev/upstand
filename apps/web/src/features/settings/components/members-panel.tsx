@@ -559,6 +559,14 @@ export function MembersPanel() {
                   <>
                     <div className="flex flex-wrap gap-2">
                       <Select
+                        items={[
+                          { value: "member", label: "Member" },
+                          { value: "admin", label: "Admin" },
+                          ...(customRolesQuery.data ?? []).map((role) => ({
+                            value: `custom:${role.id}`,
+                            label: role.name,
+                          })),
+                        ]}
                         value={
                           draft.customRoleId
                             ? `custom:${draft.customRoleId}`

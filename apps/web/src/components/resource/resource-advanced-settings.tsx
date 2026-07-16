@@ -328,6 +328,10 @@ export function ResourceAdvancedSettings({
                       }
                     />
                     <Select
+                      items={[
+                        { value: "tcp", label: "TCP" },
+                        { value: "udp", label: "UDP" },
+                      ]}
                       value={port.protocol}
                       onValueChange={(protocol) => {
                         if (protocol) {
@@ -533,6 +537,11 @@ export function ResourceAdvancedSettings({
                 Control how Swarm recovers failed tasks.
               </FieldDescription>
               <Select
+                items={[
+                  { value: "any", label: "Always" },
+                  { value: "on-failure", label: "On failure" },
+                  { value: "none", label: "Never" },
+                ]}
                 value={config.restartPolicy.condition}
                 onValueChange={(condition) => {
                   if (condition) {
@@ -823,6 +832,11 @@ export function ResourceAdvancedSettings({
                   }
                 />
                 <Select
+                  items={[
+                    { value: "pause", label: "Pause" },
+                    { value: "continue", label: "Continue" },
+                    { value: "rollback", label: "Rollback" },
+                  ]}
                   value={config.updateConfig.failureAction ?? "pause"}
                   onValueChange={(failureAction) =>
                     failureAction &&
@@ -845,6 +859,10 @@ export function ResourceAdvancedSettings({
                   </SelectContent>
                 </Select>
                 <Select
+                  items={[
+                    { value: "stop-first", label: "Stop first" },
+                    { value: "start-first", label: "Start first" },
+                  ]}
                   value={config.updateConfig.order ?? "stop-first"}
                   onValueChange={(order) =>
                     order &&
@@ -913,6 +931,10 @@ export function ResourceAdvancedSettings({
                   }
                 />
                 <Select
+                  items={[
+                    { value: "pause", label: "Pause" },
+                    { value: "continue", label: "Continue" },
+                  ]}
                   value={config.rollbackConfig.failureAction ?? "pause"}
                   onValueChange={(failureAction) =>
                     failureAction &&
@@ -931,6 +953,10 @@ export function ResourceAdvancedSettings({
                   </SelectContent>
                 </Select>
                 <Select
+                  items={[
+                    { value: "stop-first", label: "Stop first" },
+                    { value: "start-first", label: "Start first" },
+                  ]}
                   value={config.rollbackConfig.order ?? "stop-first"}
                   onValueChange={(order) =>
                     order &&

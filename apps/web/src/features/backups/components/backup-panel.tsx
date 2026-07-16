@@ -492,6 +492,10 @@ export function BackupPanel({
                     <Field>
                       <FieldLabel>Backup type</FieldLabel>
                       <Select
+                        items={[
+                          { value: "database", label: "Database dump" },
+                          { value: "volume", label: "Docker volume archive" },
+                        ]}
                         value={field.state.value}
                         onValueChange={(value) =>
                           field.handleChange(value as BackupKind)
@@ -525,6 +529,10 @@ export function BackupPanel({
                     <Field>
                       <FieldLabel>Destination</FieldLabel>
                       <Select
+                        items={destinations.map((destination) => ({
+                          value: destination.id,
+                          label: `${destination.name} (${destination.bucket})`,
+                        }))}
                         value={field.state.value}
                         onValueChange={(value) =>
                           field.handleChange(value || "")
@@ -669,6 +677,14 @@ export function BackupPanel({
                             <Field>
                               <FieldLabel>Engine</FieldLabel>
                               <Select
+                                items={[
+                                  { value: "postgres", label: "PostgreSQL" },
+                                  { value: "mysql", label: "MySQL" },
+                                  { value: "mariadb", label: "MariaDB" },
+                                  { value: "mongodb", label: "MongoDB" },
+                                  { value: "libsql", label: "libSQL" },
+                                  { value: "redis", label: "Redis" },
+                                ]}
                                 value={field.state.value}
                                 onValueChange={(value) =>
                                   field.handleChange(value as DatabaseEngine)
@@ -730,6 +746,16 @@ export function BackupPanel({
                               </FieldLabel>
                               {composeServices.length > 0 ? (
                                 <Select
+                                  items={[
+                                    {
+                                      value: "__resource_default__",
+                                      label: "Resource default",
+                                    },
+                                    ...composeServices.map((service) => ({
+                                      value: service,
+                                      label: service,
+                                    })),
+                                  ]}
                                   value={
                                     field.state.value || "__resource_default__"
                                   }
@@ -832,6 +858,10 @@ export function BackupPanel({
                             <Field>
                               <FieldLabel>Docker volume</FieldLabel>
                               <Select
+                                items={volumes.map((volume) => ({
+                                  value: volume,
+                                  label: volume,
+                                }))}
                                 value={field.state.value}
                                 onValueChange={(value) =>
                                   field.handleChange(value || "")

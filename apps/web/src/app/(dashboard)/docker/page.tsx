@@ -282,6 +282,13 @@ export default function DockerInventoryPage() {
         actions={
           <div className="flex items-center gap-2">
             <Select
+              items={[
+                { value: "local", label: "Local Docker Daemon" },
+                ...(serversQuery.data ?? []).map((server) => ({
+                  value: server.id,
+                  label: `${server.name} (${server.ipAddress})`,
+                })),
+              ]}
               value={serverId}
               onValueChange={(val) => {
                 setServerId(val ?? "local");
@@ -479,6 +486,18 @@ export default function DockerInventoryPage() {
                       placeholder="Filter by name, image, label..."
                     />
                     <Select
+                      items={[
+                        { value: "_all", label: "All States" },
+                        ...[
+                          "created",
+                          "running",
+                          "paused",
+                          "restarting",
+                          "removing",
+                          "exited",
+                          "dead",
+                        ].map((s) => ({ value: s, label: s })),
+                      ]}
                       value={state || "_all"}
                       onValueChange={(val) =>
                         setState(val === "_all" || !val ? "" : val)
@@ -1030,6 +1049,10 @@ export default function DockerInventoryPage() {
                         Target Container
                       </span>
                       <Select
+                        items={availableContainers.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                        }))}
                         value={containerId}
                         onValueChange={(val) => {
                           setContainerId(val ?? "");
@@ -1190,6 +1213,10 @@ export default function DockerInventoryPage() {
                 <div className="space-y-4">
                   <div className="mb-4 flex max-w-sm items-center gap-3">
                     <Select
+                      items={availableContainers.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                      }))}
                       value={containerId}
                       onValueChange={(val) => setContainerId(val ?? "")}
                     >

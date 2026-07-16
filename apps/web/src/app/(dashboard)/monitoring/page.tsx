@@ -394,6 +394,15 @@ export default function MonitoringPage() {
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Select
+              items={[
+                { value: "local", label: "Local Server" },
+                ...(serversQuery.data ?? [])
+                  .filter((server) => server.status === "ready")
+                  .map((server) => ({
+                    value: server.id,
+                    label: server.name,
+                  })),
+              ]}
               value={selectedServerId}
               onValueChange={(value) => value && setSelectedServerId(value)}
             >
@@ -415,6 +424,7 @@ export default function MonitoringPage() {
               </SelectContent>
             </Select>
             <Select
+              items={RANGE_OPTIONS}
               value={rangeKey}
               onValueChange={(value) => value && setRangeKey(value as RangeKey)}
             >

@@ -682,6 +682,10 @@ export default function WebServerDashboard(_props: {
                 <div className="space-y-2">
                   <Label htmlFor="web-backup-destination">Destination</Label>
                   <Select
+                    items={webBackupDestinations.map((destination) => ({
+                      value: destination.id,
+                      label: destination.name,
+                    }))}
                     value={webBackupDestinationId}
                     onValueChange={(value) => {
                       if (value) setWebBackupDestinationId(value);
@@ -1894,6 +1898,10 @@ export default function WebServerDashboard(_props: {
                         Protocol
                       </Label>
                       <Select
+                        items={[
+                          { value: "tcp", label: "TCP" },
+                          { value: "udp", label: "UDP" },
+                        ]}
                         value={port.protocol}
                         onValueChange={(val) =>
                           handleUpdatePort(idx, "protocol", val)

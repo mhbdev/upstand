@@ -247,6 +247,10 @@ function RequestsTable({
         </div>
         <div className="flex flex-wrap gap-2">
           <Select
+            items={STATUS_GROUPS.map((value) => ({
+              value,
+              label: value === "all" ? "All status" : value,
+            }))}
             value={logs.statusGroup}
             onValueChange={(value) => {
               logs.setStatusGroup(value as typeof logs.statusGroup);
@@ -265,6 +269,13 @@ function RequestsTable({
             </SelectContent>
           </Select>
           <Select
+            items={SORT_FIELDS.map((value) => ({
+              value,
+              label:
+                value === "duration"
+                  ? "Duration"
+                  : value[0].toUpperCase() + value.slice(1),
+            }))}
             value={logs.sortBy}
             onValueChange={(value) => {
               logs.setSortBy(value as typeof logs.sortBy);

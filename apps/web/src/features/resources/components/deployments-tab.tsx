@@ -297,6 +297,11 @@ export function DeploymentsTab({
             <div className="space-y-1">
               <Label htmlFor="schedule-job-type">Job type</Label>
               <Select
+                items={[
+                  { value: "command", label: "Container command" },
+                  { value: "deployment", label: "Deployment" },
+                  { value: "backup", label: "Backup schedule" },
+                ]}
                 value={scheduleJobType}
                 onValueChange={(value) => {
                   if (
@@ -322,6 +327,10 @@ export function DeploymentsTab({
               <div className="space-y-1">
                 <Label htmlFor="schedule-backup">Backup schedule</Label>
                 <Select
+                  items={(backupSchedulesQuery.data ?? []).map((backup) => ({
+                    value: backup.id,
+                    label: backup.name,
+                  }))}
                   value={backupScheduleId}
                   onValueChange={(value) => setBackupScheduleId(value ?? "")}
                 >

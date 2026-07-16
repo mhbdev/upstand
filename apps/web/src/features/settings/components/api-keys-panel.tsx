@@ -190,6 +190,7 @@ export function ApiKeysPanel() {
               Permission preset
             </Label>
             <Select
+              items={PRESETS}
               value={preset}
               disabled={advanced}
               onValueChange={(value) => {

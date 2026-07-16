@@ -133,6 +133,13 @@ export function FeatureAssignmentsSection({
                 <div className="w-full md:w-64">
                   <Field>
                     <Select
+                      items={[
+                        { value: "fallback", label: "None (First available fallback)" },
+                        ...providers.map((prov) => ({
+                          value: prov.id,
+                          label: `${prov.name} (${prov.model})`,
+                        })),
+                      ]}
                       value={value}
                       onValueChange={(val) =>
                         handleValueChange(feat.key, val || "fallback")

@@ -122,6 +122,10 @@ export default function AuditLogsPage() {
               />
             </div>
             <Select
+              items={ACTIONS.map((item) => ({
+                value: item,
+                label: item === "all" ? "All actions" : item,
+              }))}
               value={action}
               onValueChange={(value) => {
                 if (value) {
@@ -142,6 +146,10 @@ export default function AuditLogsPage() {
               </SelectContent>
             </Select>
             <Select
+              items={RESOURCE_TYPES.map((item) => ({
+                value: item,
+                label: item === "all" ? "All resources" : item,
+              }))}
               value={resourceType}
               onValueChange={(value) => {
                 if (value) {

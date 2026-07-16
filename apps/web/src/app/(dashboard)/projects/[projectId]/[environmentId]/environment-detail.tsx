@@ -269,6 +269,15 @@ function CreateAppDialog({
           <div className="space-y-2">
             <Label htmlFor="app-server">Target Server</Label>
             <Select
+              items={[
+                { value: "local", label: "Local Server (Leader)" },
+                ...(servers ?? [])
+                  .filter((srv: any) => srv.status === "ready")
+                  .map((srv: any) => ({
+                    value: srv.id,
+                    label: `${srv.name} (${srv.ipAddress})`,
+                  })),
+              ]}
               value={serverId}
               onValueChange={(value) => value && setServerId(value)}
             >
@@ -523,7 +532,18 @@ function CreateDbDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="db-type">Database Engine</Label>
-              <Select value={dbType} onValueChange={handleDbTypeChange}>
+              <Select
+                items={[
+                  { value: "postgres", label: "PostgreSQL" },
+                  { value: "mysql", label: "MySQL" },
+                  { value: "mariadb", label: "MariaDB" },
+                  { value: "mongodb", label: "MongoDB" },
+                  { value: "redis", label: "Redis" },
+                  { value: "libsql", label: "libSQL" },
+                ]}
+                value={dbType}
+                onValueChange={handleDbTypeChange}
+              >
                 <SelectTrigger id="db-type" className="border-border/40">
                   <SelectValue placeholder="Select Engine" />
                 </SelectTrigger>
@@ -540,6 +560,10 @@ function CreateDbDialog({
             <div className="space-y-2">
               <Label htmlFor="db-image">Image version</Label>
               <Select
+                items={DATABASE_IMAGE_OPTIONS[dbType].map((image) => ({
+                  value: image,
+                  label: image,
+                }))}
                 value={dockerImage}
                 onValueChange={(value) => {
                   if (value) {
@@ -617,6 +641,15 @@ function CreateDbDialog({
           <div className="space-y-2">
             <Label htmlFor="db-server">Target Server</Label>
             <Select
+              items={[
+                { value: "local", label: "Local Server (Leader)" },
+                ...(servers ?? [])
+                  .filter((srv: any) => srv.status === "ready")
+                  .map((srv: any) => ({
+                    value: srv.id,
+                    label: `${srv.name} (${srv.ipAddress})`,
+                  })),
+              ]}
               value={serverId}
               onValueChange={(value) => value && setServerId(value)}
             >
@@ -976,6 +1009,15 @@ function CreateComposeDialog({
           <div className="space-y-2">
             <Label htmlFor="comp-server">Target Server</Label>
             <Select
+              items={[
+                { value: "local", label: "Local Server (Leader)" },
+                ...(servers ?? [])
+                  .filter((srv: any) => srv.status === "ready")
+                  .map((srv: any) => ({
+                    value: srv.id,
+                    label: `${srv.name} (${srv.ipAddress})`,
+                  })),
+              ]}
               value={serverId}
               onValueChange={(value) => value && setServerId(value)}
             >
@@ -1007,6 +1049,10 @@ function CreateComposeDialog({
           <div className="space-y-2">
             <Label htmlFor="comp-type">Compose Format</Label>
             <Select
+              items={[
+                { value: "compose", label: "Standard Docker Compose" },
+                { value: "stack", label: "Docker Swarm Stack" },
+              ]}
               value={composeType}
               onValueChange={(val: any) => setComposeType(val)}
             >

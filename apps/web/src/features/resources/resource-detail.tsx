@@ -385,6 +385,13 @@ export default function ResourceDetail({
                   Filter by Container:
                 </Label>
                 <Select
+                  items={[
+                    { value: "all", label: "All Containers" },
+                    ...containerList.map((con: any) => ({
+                      value: con.id,
+                      label: `${con.name} (${con.id.substring(0, 7)})`,
+                    })),
+                  ]}
                   value={selectedLogContainerId}
                   onValueChange={(value) =>
                     setSelectedLogContainerId(value ?? "all")

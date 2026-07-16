@@ -280,6 +280,7 @@ export function MonitoringTab({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select
+            items={RANGE_OPTIONS}
             value={rangeKey}
             onValueChange={(value) => value && setRangeKey(value as RangeKey)}
           >

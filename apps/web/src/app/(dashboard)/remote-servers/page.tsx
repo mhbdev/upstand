@@ -580,6 +580,11 @@ export default function RemoteServersPage() {
             <div className="space-y-2">
               <Label htmlFor="serverType">Server Type</Label>
               <Select
+                items={[
+                  { value: "deploy", label: "Deploy Server" },
+                  { value: "build", label: "Build Server" },
+                  { value: "database", label: "DB Server" },
+                ]}
                 value={serverType}
                 onValueChange={(value) =>
                   value && setServerType(value as ServerType)
@@ -606,6 +611,10 @@ export default function RemoteServersPage() {
             <div className="space-y-2">
               <Label htmlFor="sshKeyId">Select an SSH Key</Label>
               <Select
+                items={(sshKeys ?? []).map((key) => ({
+                  value: key.id,
+                  label: `${key.name} (${key.algorithm})`,
+                }))}
                 value={sshKeyId}
                 onValueChange={(value) => setSshKeyId(value ?? "")}
               >
