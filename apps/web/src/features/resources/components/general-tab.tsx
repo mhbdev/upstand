@@ -954,7 +954,10 @@ export function GeneralTab({
                 <Label htmlFor="build-registry">Build registry</Label>
                 <Select
                   items={[
-                    { value: "none", label: "Automatic first organization registry" },
+                    {
+                      value: "none",
+                      label: "Automatic first organization registry",
+                    },
                     ...(dockerRegistriesQuery.data || []).map((registry) => ({
                       value: registry.id,
                       label: registry.name,
@@ -1425,8 +1428,14 @@ export function GeneralTab({
                       { value: "dockerfile", label: "Dockerfile" },
                       { value: "railpack", label: "Railpack" },
                       { value: "nixpacks", label: "Nixpacks" },
-                      { value: "heroku-buildpacks", label: "Heroku Buildpacks" },
-                      { value: "paketo-buildpacks", label: "Paketo Buildpacks" },
+                      {
+                        value: "heroku-buildpacks",
+                        label: "Heroku Buildpacks",
+                      },
+                      {
+                        value: "paketo-buildpacks",
+                        label: "Paketo Buildpacks",
+                      },
                       { value: "static", label: "Static" },
                     ]}
                     value={buildConfig.type}
@@ -2131,10 +2140,12 @@ export function GeneralTab({
                       <Select
                         items={[
                           { value: "none", label: "Use service credentials" },
-                          ...(dockerRegistriesQuery.data || []).map((registry) => ({
-                            value: registry.id,
-                            label: registry.name,
-                          })),
+                          ...(dockerRegistriesQuery.data || []).map(
+                            (registry) => ({
+                              value: registry.id,
+                              label: registry.name,
+                            }),
+                          ),
                         ]}
                         value={rollbackRegistryId || "none"}
                         onValueChange={(value) =>

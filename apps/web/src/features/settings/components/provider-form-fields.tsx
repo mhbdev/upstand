@@ -62,9 +62,9 @@ export function ProviderFormFields({
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-provider`}>Provider type</FieldLabel>
         <Select
-          items={(Object.entries(PROVIDER_LABELS) as [AIProvider, string][]).map(
-            ([value, label]) => ({ value, label }),
-          )}
+          items={(
+            Object.entries(PROVIDER_LABELS) as [AIProvider, string][]
+          ).map(([value, label]) => ({ value, label }))}
           value={values.provider}
           onValueChange={(value) => {
             if (value && isAIProvider(value)) {

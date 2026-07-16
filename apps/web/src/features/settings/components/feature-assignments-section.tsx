@@ -134,7 +134,10 @@ export function FeatureAssignmentsSection({
                   <Field>
                     <Select
                       items={[
-                        { value: "fallback", label: "None (First available fallback)" },
+                        {
+                          value: "fallback",
+                          label: "None (First available fallback)",
+                        },
                         ...providers.map((prov) => ({
                           value: prov.id,
                           label: `${prov.name} (${prov.model})`,

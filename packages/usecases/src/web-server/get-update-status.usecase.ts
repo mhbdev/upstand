@@ -149,12 +149,13 @@ export class GetUpdateStatusUseCase {
         channel === "canary"
           ? `https://api.github.com/repos/${repo}/releases?per_page=30`
           : `https://api.github.com/repos/${repo}/releases/latest`;
-      
+
       const headers: Record<string, string> = {
         Accept: "application/vnd.github+json",
         "User-Agent": "Upstand",
       };
-      const token = process.env.UPSTAND_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+      const token =
+        process.env.UPSTAND_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
@@ -169,7 +170,9 @@ export class GetUpdateStatusUseCase {
         });
 
         if (response.ok) {
-          const data = (await response.json()) as GitHubRelease | GitHubRelease[];
+          const data = (await response.json()) as
+            | GitHubRelease
+            | GitHubRelease[];
           const release = Array.isArray(data)
             ? data.find((candidate) =>
                 channel === "canary"
@@ -183,13 +186,16 @@ export class GetUpdateStatusUseCase {
               (asset) => asset.name === RELEASE_MANIFEST_ASSET,
             );
             if (manifestAsset?.browser_download_url) {
-              const manifestResponse = await fetch(manifestAsset.browser_download_url, {
-                cache: "no-store",
-                headers: {
-                  Accept: "application/json",
-                  "User-Agent": "Upstand",
+              const manifestResponse = await fetch(
+                manifestAsset.browser_download_url,
+                {
+                  cache: "no-store",
+                  headers: {
+                    Accept: "application/json",
+                    "User-Agent": "Upstand",
+                  },
                 },
-              });
+              );
               if (manifestResponse.ok) {
                 manifest = (await manifestResponse.json()) as ReleaseManifest;
               }
@@ -202,7 +208,8 @@ export class GetUpdateStatusUseCase {
         }
       } catch (apiErr: any) {
         log.warn({
-          message: "Failed to connect to GitHub API, checking redirect fallback",
+          message:
+            "Failed to connect to GitHub API, checking redirect fallback",
           err: apiErr.message,
         });
       }
@@ -210,7 +217,8 @@ export class GetUpdateStatusUseCase {
       // Fallback: If GitHub API failed, was rate-limited (e.g. 403/429), or returned no manifest, and we are on stable channel
       if ((!latestVersion || !manifest) && channel === "stable") {
         log.info({
-          message: "Attempting GitHub HTTP redirect fallback to check for updates...",
+          message:
+            "Attempting GitHub HTTP redirect fallback to check for updates...",
         });
         try {
           const redirectRes = await fetch(
@@ -220,7 +228,7 @@ export class GetUpdateStatusUseCase {
               headers: {
                 "User-Agent": "Upstand",
               },
-            }
+            },
           );
           const location = redirectRes.headers.get("location");
           if (location) {
@@ -250,9 +258,14 @@ export class GetUpdateStatusUseCase {
         }
       }
 
-      if (!latestVersion || !manifest || !isCompleteRelease(latestVersion, manifest, repo)) {
+      if (
+        !latestVersion ||
+        !manifest ||
+        !isCompleteRelease(latestVersion, manifest, repo)
+      ) {
         log.warn({
-          message: "Could not find a valid release or release manifest for update check.",
+          message:
+            "Could not find a valid release or release manifest for update check.",
           version: latestVersion,
         });
         return unavailableStatus(currentVersion, channel, checkedAt);
