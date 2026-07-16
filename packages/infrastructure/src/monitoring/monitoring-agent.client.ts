@@ -47,7 +47,7 @@ async function resolveMonitoringAgentTarget(
     return {
       baseUrl: fs.existsSync("/.dockerenv")
         ? "http://upstand-monitoring-agent:3001"
-        : "http://127.0.0.1:3001",
+        : "http://127.0.0.1:3005",
       token: settings.token,
     };
   }

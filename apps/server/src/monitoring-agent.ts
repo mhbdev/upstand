@@ -91,7 +91,7 @@ export async function initializeMonitoring(): Promise<void> {
           ? { NetworkMode: networkMode }
           : {
               PortBindings: {
-                "3001/tcp": [{ HostIp: "127.0.0.1", HostPort: "3001" }],
+                "3001/tcp": [{ HostIp: "127.0.0.1", HostPort: "3005" }],
               },
             }),
         Binds: [
