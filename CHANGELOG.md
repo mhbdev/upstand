@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.62 - 2026-07-16
+
+### Fixed
+
+- Forward remote Docker Unix-socket traffic explicitly in both directions across the verified SSH stream, including end-of-stream handling.
+
 ## 0.1.61 - 2026-07-16
 
 ### Fixed

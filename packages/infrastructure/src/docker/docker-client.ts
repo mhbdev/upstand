@@ -77,7 +77,10 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
       .once("ready", () => {
         client.exec("docker system dial-stdio", (error, stream) => {
           if (error) return fail();
-          socket.pipe(stream).pipe(socket);
+          socket.on("data", (chunk) => stream.write(chunk));
+          socket.once("end", () => stream.end());
+          stream.on("data", (chunk: Buffer) => socket.write(chunk));
+          stream.once("end", () => socket.end());
           stream.once("close", () => {
             client.end();
           });
