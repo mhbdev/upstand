@@ -4,6 +4,117 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.61 - 2026-07-16
+
+### Fixed
+
+- Route remote Docker API traffic through a local Unix socket backed by a verified SSH `docker system dial-stdio` stream, avoiding Bun's unsupported custom HTTP-agent path.
+
+## 0.1.60 - 2026-07-16
+
+### Fixed
+
+- Replace Dockerode's malformed SSH URL transport with an explicitly verified SSH transport for managed remote servers.
+
+## 0.1.59 - 2026-07-16
+
+### Fixed
+
+- Correct REST/OpenAPI route handling when the API host itself uses the `api` subdomain.
+- Ensure remote Docker clients do not inherit the control plane's local Docker socket.
+
+## 0.1.58 - 2026-07-16
+
+### Fixed
+
+- Correct remote Docker SSH connection setup and write verified `known_hosts` entries for Docker CLI operations.
+
+## 0.1.57 - 2026-07-16
+
+### Fixed
+
+- Accept ssh2's hexadecimal SHA-256 host-key digest while continuing to persist and verify OpenSSH-format fingerprints.
+- Remove a stale API-router import that blocked release type checking.
+
+## 0.1.56 - 2026-07-16
+
+### Changed
+
+- Balance the two-factor verification footer spacing.
+
+## 0.1.55 - 2026-07-16
+
+### Fixed
+
+- Require and submit the current password for two-factor enable and disable flows.
+- Read the session-bound two-factor step-up record correctly after verification.
+
+## 0.1.54 - 2026-07-16
+
+### Fixed
+
+- Preserve the rotated Better Auth session when recording two-factor step-up verification.
+
+## 0.1.53 - 2026-07-16
+
+### Fixed
+
+- Map external integration and network delivery failures to actionable client errors.
+
+## 0.1.52 - 2026-07-16
+
+### Fixed
+
+- Preserve existing S3 destination credentials when an update omits the secret fields.
+
+## 0.1.51 - 2026-07-16
+
+### Fixed
+
+- Authorize S3 destination updates against the owning organization.
+
+## 0.1.50 - 2026-07-16
+
+### Security
+
+- Redact S3 destination credentials from API responses and logs.
+
+## 0.1.49 - 2026-07-16
+
+### Fixed
+
+- Include the control-plane database connection variables required by web-server backups.
+
+## 0.1.48 - 2026-07-16
+
+### Added
+
+- Publish OpenAPI and Swagger UI endpoints for the supported API surface.
+
+### Changed
+
+- Refine typed resource navigation, resource domains, monitoring UX, and dashboard/runtime synchronization.
+
+### Fixed
+
+- Pin a compatible rclone release for S3-compatible backup and restore operations.
+
+## 0.1.47 - 2026-07-16
+
+### Fixed
+
+- Align dashboard sidebar gutters.
+
+## 0.1.46 - 2026-07-16
+
+### Added
+
+- Add the landing-page product comparison section.
+
+### Fixed
+
+- Harden managed provisioning and runtime deployment behavior.
+
 ## 0.1.45 - 2026-07-16
 
 ### Changed
