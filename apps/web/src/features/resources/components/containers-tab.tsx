@@ -261,8 +261,11 @@ export function ContainersTab({
                       </td>
                       <td className="p-3 text-center">
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="flex h-8 w-8 cursor-pointer items-center justify-center border-none bg-transparent p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground">
-                            <Settings className="size-4" />
+                          <DropdownMenuTrigger
+                            aria-label={`Actions for ${con.name}`}
+                            className="flex h-8 w-8 cursor-pointer items-center justify-center border-none bg-transparent p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          >
+                            <Settings className="size-4" aria-hidden="true" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
                             align="end"

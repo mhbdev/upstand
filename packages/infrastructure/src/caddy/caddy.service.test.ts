@@ -45,6 +45,24 @@ describe("Caddy domain configuration", () => {
     expect(caddyfile).not.toContain("http://app.example.com");
   });
 
+  test("ignores empty optional auth and redirect values from older generated routes", () => {
+    const mappings = parseDomainMappings(
+      JSON.stringify([
+        {
+          host: "generated.example.com",
+          port: 80,
+          redirectTo: "",
+          forwardAuth: { address: "", uri: "/verify", copyHeaders: [] },
+          basicAuth: { username: "", passwordHash: "" },
+        },
+      ]),
+    );
+
+    expect(mappings[0]).not.toHaveProperty("redirectTo");
+    expect(mappings[0]).not.toHaveProperty("forwardAuth");
+    expect(mappings[0]).not.toHaveProperty("basicAuth");
+  });
+
   test("preserves route order and compiles rewrites, Caddy snippets, and path stripping", () => {
     const caddyfile = generateCaddyfileContent({}, [
       {
