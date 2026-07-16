@@ -178,9 +178,15 @@ export function createAuth() {
           const isSuccess =
             !res || (res instanceof Response ? res.ok : !hasReturnedError);
           if (isSuccess) {
-            const session = await auth.api.getSession({
-              headers: ctx.request.headers,
-            });
+            // A successful TOTP verification rotates the session and stores
+            // that replacement in Better Auth's request context. Reading the
+            // request cookie here can still resolve the pre-verification
+            // session, leaving the new session without a step-up marker.
+            const session =
+              ctx.context.newSession ??
+              (await auth.api.getSession({
+                headers: ctx.request.headers,
+              }));
             if (session) {
               await recordStepUpVerification(session);
             }
