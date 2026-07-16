@@ -1,4 +1,4 @@
-import { protectedProcedure, publicProcedure, router } from "../index";
+import { publicProcedure, router } from "../index";
 import { aiRouter } from "./ai.router";
 import { apiKeyRouter } from "./api-key.router";
 import { applicationRouter } from "./application.router";
