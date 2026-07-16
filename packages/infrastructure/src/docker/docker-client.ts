@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -12,6 +13,7 @@ import {
 } from "@upstand/platform/ssh/host-key";
 import type { DockerInfrastructureResolverPort } from "@upstand/usecases/ports/docker";
 import Docker from "dockerode";
+import { Client } from "ssh2";
 import { CaddyService } from "../caddy/caddy.service";
 import { DockerService } from "./docker.service";
 
@@ -50,21 +52,50 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
   return new Docker({
     host: connection.host.replace(/^ssh:\/\//, ""),
     port: connection.port,
-    username: connection.username,
-    protocol: "ssh",
-    // docker-modem otherwise retains its default local Unix socket and never
-    // invokes the SSH transport, even when protocol is set to `ssh`.
+    protocol: "http",
+    // docker-modem otherwise retains its default local Unix socket.
     socketPath: undefined,
-    // dockerode's type definition omits sshOptions although the runtime
-    // supports it. Keep the cast local to this adapter.
-    ...({
-      sshOptions: {
+    agent: createRemoteDockerSshAgent(connection),
+  } as unknown as Docker.DockerOptions);
+}
+
+function createRemoteDockerSshAgent(connection: RemoteDockerConnection) {
+  const trustedFingerprint = connection.hostKeyFingerprint;
+  if (!trustedFingerprint) {
+    throw new Error("Remote Docker SSH host key is not trusted");
+  }
+  const agent = new http.Agent();
+  agent.createConnection = (_options, callback) => {
+    const client = new Client();
+    const fail = (error: Error) => {
+      client.end();
+      agent.destroy();
+      callback?.(error, null as unknown as import("node:stream").Duplex);
+    };
+    client
+      .once("ready", () => {
+        client.exec("docker system dial-stdio", (error, stream) => {
+          if (error) return fail(error);
+          callback?.(null, stream);
+          stream.once("close", () => {
+            client.end();
+            agent.destroy();
+          });
+          stream.once("error", fail);
+        });
+      })
+      .once("error", fail)
+      .connect({
+        host: connection.host.replace(/^ssh:\/\//, ""),
+        port: connection.port,
+        username: connection.username,
         privateKey: connection.privateKey,
         hostHash: "sha256",
-        hostVerifier: hostVerifierForFingerprint(connection.hostKeyFingerprint),
-      },
-    } as unknown as Record<string, unknown>),
-  });
+        hostVerifier: hostVerifierForFingerprint(trustedFingerprint),
+      });
+    client.once("end", () => agent.destroy());
+  };
+  return agent;
 }
 
 export function createRemoteDockerCliEnvironment(
