@@ -4,6 +4,18 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.65 - 2026-07-17
+
+### Added
+
+- Support multiple named AI provider configurations in UpGal settings and route them to specific operations (e.g., Chat agent vs Compose template generator).
+
+### Fixed
+
+- Ensure active organization is set in the auth store before dashboard redirect to prevent rendering race conditions.
+- Fix TS type error in remote Docker SSH proxy stream socket chunk handling.
+- Ensure Docker system dial-stdio EOF is propagated correctly to the local Unix socket.
+
 ## 0.1.62 - 2026-07-16
 
 ### Fixed

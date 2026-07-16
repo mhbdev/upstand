@@ -73,10 +73,15 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
     let targetStream: any = null;
 
     socket.on("data", (chunk) => {
+      const buf = Buffer.isBuffer(chunk)
+        ? chunk
+        : typeof chunk === "string"
+          ? Buffer.from(chunk)
+          : Buffer.from(chunk as any);
       if (streamReady && targetStream) {
-        targetStream.write(chunk);
+        targetStream.write(buf);
       } else {
-        bufferedChunks.push(chunk);
+        bufferedChunks.push(buf);
       }
     });
 
