@@ -10,6 +10,7 @@ import { DrizzleGitProviderRepository } from "./git-provider/drizzle-git-provide
 import { DrizzleMonitoringSettingsRepository } from "./monitoring/drizzle-monitoring-settings.repository";
 import { DrizzleNotificationChannelRepository } from "./notification/drizzle-notification-channel.repository";
 import { DrizzleNotificationDeliveryRepository } from "./notification/drizzle-notification-delivery.repository";
+import { DrizzleOutboxRepository } from "./outbox/drizzle-outbox.repository";
 import { DrizzlePreviewDeploymentRepository } from "./preview-deployment/drizzle-preview-deployment.repository";
 import { DrizzleProjectRepository } from "./project/drizzle-project.repository";
 import { DrizzleResourceRepository } from "./resource/drizzle-resource.repository";
@@ -50,6 +51,7 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly monitoringSettingsRepository: DrizzleMonitoringSettingsRepository;
   public readonly previewDeploymentRepository: DrizzlePreviewDeploymentRepository;
   public readonly scheduleRepository: DrizzleScheduleRepository;
+  public readonly outboxRepository: DrizzleOutboxRepository;
 
   constructor(private readonly executor: Executor) {
     this.auditLogRepository = new DrizzleAuditLogRepository(this.executor);
@@ -99,6 +101,7 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
       this.executor,
     );
     this.scheduleRepository = new DrizzleScheduleRepository(this.executor);
+    this.outboxRepository = new DrizzleOutboxRepository(this.executor);
   }
 
   async transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T> {

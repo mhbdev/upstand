@@ -107,6 +107,33 @@ class MockServerBuildSettingsRepository {
   }
 }
 
+class MockOutboxRepository {
+  public store: any[] = [];
+
+  async create(data: any) {
+    const item = {
+      id: data.id ?? `outbox-${this.store.length + 1}`,
+      status: "pending",
+      attempts: 0,
+      maxAttempts: 10,
+      availableAt: new Date(),
+      claimedAt: null,
+      publishedAt: null,
+      deadLetteredAt: null,
+      lastError: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...data,
+    };
+    this.store.push(item);
+    return item;
+  }
+
+  async createMany(data: any[]) {
+    return Promise.all(data.map((item) => this.create(item)));
+  }
+}
+
 const createMockUnitOfWork = () =>
   mockUnitOfWork({
     environmentRepository: new MockEnvironmentRepository(),
@@ -114,6 +141,7 @@ const createMockUnitOfWork = () =>
     webServerSettingsRepository: { findGlobal: async () => null } as any,
     serverBuildSettingsRepository: new MockServerBuildSettingsRepository(),
     deploymentRepository: new MockDeploymentRepository(),
+    outboxRepository: new MockOutboxRepository(),
     resourceRuntimeRepository: {
       upsert: async (resourceId: string, values: any) => ({
         resourceId,
@@ -277,19 +305,10 @@ describe("Resource Usecases", () => {
     });
   });
 
-  test("queues a resource deployment for the background worker", async () => {
+  test("commits a resource deployment and its outbox message together", async () => {
     const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
-    const queuedJobs: any[] = [];
-    let queueClosed = false;
-    const deployUseCase = new DeployResourceUseCase(uow as IUnitOfWork, () => ({
-      add: async (name, data, options) => {
-        queuedJobs.push({ name, data, options });
-      },
-      close: async () => {
-        queueClosed = true;
-      },
-    }));
+    const deployUseCase = new DeployResourceUseCase(uow as IUnitOfWork);
 
     uow.environmentRepository.store.push({
       id: "env-1",
@@ -306,28 +325,28 @@ describe("Resource Usecases", () => {
 
     const deployed = await deployUseCase.execute({ id: res.id });
     expect(deployed.status).toBe("queued");
+    const outboxMessage = uow.outboxRepository.store[0];
     expect(uow.deploymentRepository.store[0]).toMatchObject({
-      id: queuedJobs[0].data.deploymentId,
+      id: outboxMessage.payload.deploymentId,
       status: "queued",
     });
-    expect(queuedJobs).toHaveLength(1);
-    expect(queuedJobs[0].options.jobId).toBe(queuedJobs[0].data.deploymentId);
-    expect(queuedJobs[0].options.attempts).toBe(1);
-    expect(queueClosed).toBe(true);
+    expect(outboxMessage).toMatchObject({
+      id: uow.deploymentRepository.store[0].id,
+      type: "deployment.deploy",
+      status: "pending",
+      idempotencyKey: `deployment:${uow.deploymentRepository.store[0].id}`,
+    });
+    expect(outboxMessage.payload).toMatchObject({
+      resourceId: res.id,
+      deploymentId: uow.deploymentRepository.store[0].id,
+      serverId: "local",
+    });
   });
 
-  test("marks a deployment failed when Redis enqueueing fails", async () => {
+  test("does not publish a deployment before its transaction commits", async () => {
     const uow = createMockUnitOfWork();
     const createUseCase = new CreateResourceUseCase(uow as IUnitOfWork);
-    let queueClosed = false;
-    const deployUseCase = new DeployResourceUseCase(uow as IUnitOfWork, () => ({
-      add: async () => {
-        throw new Error("Redis unavailable");
-      },
-      close: async () => {
-        queueClosed = true;
-      },
-    }));
+    const deployUseCase = new DeployResourceUseCase(uow as IUnitOfWork);
 
     uow.environmentRepository.store.push({
       id: "env-1",
@@ -341,12 +360,9 @@ describe("Resource Usecases", () => {
       appName: "enqueue-failure",
     });
 
-    await expect(deployUseCase.execute({ id: resource.id })).rejects.toThrow(
-      "Redis unavailable",
-    );
-    expect(uow.deploymentRepository.store[0].status).toBe("failed");
-    expect(uow.resourceRepository.store[0].status).toBe("idle");
-    expect(queueClosed).toBe(true);
+    await deployUseCase.execute({ id: resource.id });
+    expect(uow.deploymentRepository.store[0].status).toBe("queued");
+    expect(uow.outboxRepository.store).toHaveLength(1);
   });
 
   test("controls a resource state via start/stop command", async () => {

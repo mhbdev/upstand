@@ -4,10 +4,7 @@ import {
   ValidationError,
 } from "@upstand/domain";
 import { z } from "zod";
-import {
-  type DeploymentQueueFactory,
-  QueueDeploymentUseCase,
-} from "../deployment/queue-deployment.usecase";
+import { QueueDeploymentUseCase } from "../deployment/queue-deployment.usecase";
 import type { DockerService } from "./docker-client";
 import { resolveDockerServiceForServer } from "./docker-client";
 
@@ -22,7 +19,6 @@ export class ControlResourceUseCase {
   constructor(
     private readonly uow: IUnitOfWork,
     private readonly dockerService: DockerService,
-    private readonly queueFactory?: DeploymentQueueFactory,
   ) {}
 
   async execute(input: ControlResourceInput): Promise<Resource> {
@@ -42,7 +38,7 @@ export class ControlResourceUseCase {
       resource.provider !== "raw" &&
       input.command !== "stop"
     ) {
-      return new QueueDeploymentUseCase(this.uow, this.queueFactory).execute({
+      return new QueueDeploymentUseCase(this.uow).execute({
         resourceId: resource.id,
         title: `${input.command === "restart" ? "Restart" : "Start"} resource`,
       });

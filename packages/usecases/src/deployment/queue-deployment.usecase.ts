@@ -4,9 +4,10 @@ import {
   type Resource,
   ValidationError,
 } from "@upstand/domain";
-import { redis } from "@upstand/redis";
-import { Queue } from "bullmq";
-import { getDeploymentQueueName } from "./deployment-queue-name";
+import {
+  type DeployOutboxPayload,
+  OUTBOX_COMMAND_TYPES,
+} from "../outbox/outbox-commands";
 
 export interface QueueDeploymentInput {
   resourceId: string;
@@ -14,27 +15,6 @@ export interface QueueDeploymentInput {
   previewDeploymentId?: string;
   sourceRevision?: string;
 }
-
-export interface DeploymentQueue {
-  add(
-    name: string,
-    data: {
-      resourceId: string;
-      deploymentId: string;
-      previewDeploymentId?: string;
-      sourceRevision?: string;
-    },
-    options: {
-      jobId: string;
-      attempts: number;
-      removeOnComplete: number;
-      removeOnFail: number;
-    },
-  ): Promise<unknown>;
-  close(): Promise<void>;
-}
-
-export type DeploymentQueueFactory = (queueName: string) => DeploymentQueue;
 
 export interface LocalDeploymentTarget {
   name: string;
@@ -50,22 +30,24 @@ const defaultLocalDeploymentTarget: LocalDeploymentTargetResolver =
     ip: "127.0.0.1",
   });
 
-const createDeploymentQueue: DeploymentQueueFactory = (queueName) =>
-  new Queue(queueName, { connection: redis as any });
-
 export class QueueDeploymentUseCase {
   constructor(
     private readonly uow: IUnitOfWork,
-    private readonly queueFactory: DeploymentQueueFactory = createDeploymentQueue,
     private readonly localTargetResolver: LocalDeploymentTargetResolver = defaultLocalDeploymentTarget,
   ) {}
 
   async execute(input: QueueDeploymentInput): Promise<Resource> {
-    const queued = await this.uow.transaction(async (tx) => {
+    return this.uow.transaction(async (tx) => {
       const resource = await tx.resourceRepository.findById(input.resourceId);
       if (!resource) {
         throw new ValidationError("Resource not found");
       }
+      const environment = await tx.environmentRepository.findById(
+        resource.environmentId,
+      );
+      const project = environment
+        ? await tx.projectRepository.findById(environment.projectId)
+        : null;
       if (
         input.sourceRevision &&
         !/^[0-9a-f]{7,64}$/i.test(input.sourceRevision)
@@ -144,61 +126,24 @@ export class QueueDeploymentUseCase {
         throw new Error("Failed to update resource with queued state");
       }
 
-      return {
+      const payload: DeployOutboxPayload = {
+        resourceId: updatedResource.id,
         deploymentId,
-        previousResourceStatus: resource.status,
         serverId,
-        updatedResource,
+        previewDeploymentId: input.previewDeploymentId,
+        sourceRevision: input.sourceRevision,
       };
-    });
-
-    const queueName = getDeploymentQueueName(queued.serverId);
-    const queue = this.queueFactory(queueName);
-    try {
-      await queue.add(
-        "deploy",
-        {
-          resourceId: queued.updatedResource.id,
-          deploymentId: queued.deploymentId,
-          previewDeploymentId: input.previewDeploymentId,
-          sourceRevision: input.sourceRevision,
-        },
-        {
-          jobId: queued.deploymentId,
-          attempts: 1,
-          removeOnComplete: 1_000,
-          removeOnFail: 1_000,
-        },
-      );
-      return queued.updatedResource;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.uow.transaction(async (tx) => {
-        const deployment = await tx.deploymentRepository.findById(
-          queued.deploymentId,
-        );
-        if (deployment?.status === "queued") {
-          await tx.deploymentRepository.updateById(queued.deploymentId, {
-            status: "failed",
-            logs: `${deployment.logs}\nUnable to enqueue deployment: ${message}\n`,
-          });
-        }
-
-        const resource = await tx.resourceRepository.findById(
-          queued.updatedResource.id,
-        );
-        if (resource) {
-          await tx.resourceRepository.updateById(resource.id, {
-            status:
-              resource.status === "queued"
-                ? queued.previousResourceStatus
-                : resource.status,
-          });
-        }
+      await tx.outboxRepository.create({
+        id: deploymentId,
+        type: OUTBOX_COMMAND_TYPES.deploy,
+        payload,
+        aggregateType: "deployment",
+        aggregateId: deploymentId,
+        organizationId: project?.organizationId ?? null,
+        idempotencyKey: `deployment:${deploymentId}`,
       });
-      throw error;
-    } finally {
-      await queue.close();
-    }
+
+      return updatedResource;
+    });
   }
 }

@@ -11,6 +11,7 @@ export * from "./git-provider/drizzle-git-provider.repository";
 export * from "./monitoring/drizzle-monitoring-settings.repository";
 export * from "./notification/drizzle-notification-channel.repository";
 export * from "./notification/drizzle-notification-delivery.repository";
+export * from "./outbox/drizzle-outbox.repository";
 export * from "./preview-deployment/drizzle-preview-deployment.repository";
 export * from "./project/drizzle-project.repository";
 export * from "./resource/drizzle-resource.repository";

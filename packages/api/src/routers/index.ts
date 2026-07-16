@@ -16,6 +16,7 @@ import { environmentRouter } from "./environment.router";
 import { gitProviderRouter } from "./git-provider.router";
 import { memberRouter } from "./member.router";
 import { notificationRouter } from "./notification.router";
+import { outboxRouter } from "./outbox.router";
 import { projectRouter } from "./project.router";
 import { resourceRouter } from "./resource.router";
 import { mountRouter, portRouter } from "./resource-config.router";
@@ -60,6 +61,7 @@ export const appRouter = router({
   dockerRegistry: dockerRegistryRouter,
   server: serverRouter,
   notification: notificationRouter,
+  outbox: outboxRouter,
   member: memberRouter,
   customRole: customRoleRouter,
   backup: backupRouter,
