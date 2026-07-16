@@ -27,7 +27,25 @@ export default function SignInForm({
           password: value.password,
         },
         {
-          onSuccess: () => {
+          onSuccess: async () => {
+            // Imperatively select the active organization before navigating so
+            // the dashboard layout sees it immediately without a reload.
+            try {
+              const { data: orgs } = await authClient.organization.list();
+              if (orgs && orgs.length > 0) {
+                const personal = orgs.find(
+                  (o) =>
+                    (o.metadata as { isPersonal?: boolean } | null)
+                      ?.isPersonal || o.name.toLowerCase() === "personal",
+                );
+                const target = personal || orgs[0];
+                await authClient.organization.setActive({
+                  organizationId: target.id,
+                });
+              }
+            } catch {
+              // Non-fatal: dashboard layout will handle org selection as fallback
+            }
             router.push("/dashboard");
             toast.success("Sign in successful");
           },

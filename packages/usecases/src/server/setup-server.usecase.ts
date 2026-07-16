@@ -76,8 +76,22 @@ export class SetupServerUseCase {
           if (err) return reject(err);
           let stdout = "";
           let stderr = "";
-          stream.on("close", (code: number | null) => {
+          let resolved = false;
+          let exitCode: number | null = null;
+          const done = (code: number | null) => {
+            if (resolved) return;
+            resolved = true;
             resolve({ code, stdout, stderr });
+            try {
+              stream.destroy();
+            } catch {}
+          };
+          stream.on("exit", (code: number | null) => {
+            exitCode = code;
+            setTimeout(() => done(code), 20);
+          });
+          stream.on("close", () => {
+            done(exitCode);
           });
           stream.on("error", reject);
           stream.on("data", (data: Buffer | string) => {

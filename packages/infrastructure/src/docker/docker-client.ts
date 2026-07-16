@@ -68,9 +68,22 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
   const socketPath = path.join(os.tmpdir(), `upstand-docker-${key}.sock`);
   fs.rmSync(socketPath, { force: true });
   const proxy = net.createServer((socket) => {
-    // Dockerode can write the HTTP request immediately after connecting. Keep
-    // it buffered until the SSH command stream is ready to receive it.
-    socket.pause();
+    const bufferedChunks: Buffer[] = [];
+    let streamReady = false;
+    let targetStream: any = null;
+
+    socket.on("data", (chunk) => {
+      if (streamReady && targetStream) {
+        targetStream.write(chunk);
+      } else {
+        bufferedChunks.push(chunk);
+      }
+    });
+
+    socket.on("end", () => {
+      if (targetStream) targetStream.end();
+    });
+
     const client = new Client();
     const fail = () => {
       client.end();
@@ -80,12 +93,21 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
       .once("ready", () => {
         client.exec("docker system dial-stdio", (error, stream) => {
           if (error) return fail();
-          socket.on("data", (chunk) => stream.write(chunk));
-          socket.once("end", () => stream.end());
-          stream.on("data", (chunk: Buffer) => socket.write(chunk));
-          stream.once("end", () => socket.end());
-          socket.resume();
+          targetStream = stream;
+          for (const chunk of bufferedChunks) {
+            stream.write(chunk);
+          }
+          bufferedChunks.length = 0;
+          streamReady = true;
+
+          stream.on("data", (chunk: Buffer) => {
+            socket.write(chunk);
+          });
+          stream.once("end", () => {
+            socket.end();
+          });
           stream.once("close", () => {
+            socket.end();
             client.end();
           });
           stream.once("error", fail);
