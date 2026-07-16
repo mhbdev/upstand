@@ -27,12 +27,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { TerminalDialogShell } from "@/components/shared/terminal-dialog-shell";
 import { authClient } from "@/lib/auth-client";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
-
-function apiUrl(path: string) {
-  return new URL(path, getServerUrl()).toString();
-}
 
 export function WebServerTerminalDialog({
   open,
@@ -102,7 +98,7 @@ export function WebServerTerminalDialog({
     setRequestingSession(true);
     setSessionReady(false);
     try {
-      const response = await fetch(apiUrl("/api/terminal/session"), {
+      const response = await fetch(getServerApiUrl("/api/terminal/session"), {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },

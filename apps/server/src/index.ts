@@ -135,6 +135,10 @@ const autoUpdateRuntime = new AutoUpdateRuntime();
 let shuttingDown = false;
 let caddyReady = false;
 
+function getDashboardUrl(path: string): string {
+  return new URL(path, env.CORS_ORIGIN).toString();
+}
+
 app.use(evlog());
 
 app.use("*", async (c, next) => {
@@ -2281,7 +2285,7 @@ app.get("/api/providers/github/setup", async (c) => {
     }
   }
 
-  return c.redirect(`${env.CORS_ORIGIN}/git-providers`, 307);
+  return c.redirect(getDashboardUrl("/git-providers"), 307);
 });
 
 app.get("/api/providers/gitlab/setup", async (c) => {
@@ -2331,7 +2335,10 @@ app.get("/api/providers/gitlab/setup", async (c) => {
 
     const configObj = JSON.parse(provider.config);
     const gitlabUrl = assertSafeProviderUrl(configObj.gitlabUrl);
-    const redirectUri = `${env.BETTER_AUTH_URL.replace(/\/api\/auth\/?$/, "")}/api/providers/gitlab/setup`;
+    const redirectUri = new URL(
+      "/api/providers/gitlab/setup",
+      env.BETTER_AUTH_URL,
+    ).toString();
 
     const res = await fetch(`${gitlabUrl}/oauth/token`, {
       method: "POST",
@@ -2375,7 +2382,7 @@ app.get("/api/providers/gitlab/setup", async (c) => {
     );
   }
 
-  return c.redirect(`${env.CORS_ORIGIN}/git-providers`, 307);
+  return c.redirect(getDashboardUrl("/git-providers"), 307);
 });
 
 app.get("/api/providers/gitea/setup", async (c) => {
@@ -2427,7 +2434,10 @@ app.get("/api/providers/gitea/setup", async (c) => {
 
     const configObj = JSON.parse(provider.config);
     const giteaUrl = assertSafeProviderUrl(configObj.giteaUrl);
-    const redirectUri = `${env.BETTER_AUTH_URL.replace(/\/api\/auth\/?$/, "")}/api/providers/gitea/setup`;
+    const redirectUri = new URL(
+      "/api/providers/gitea/setup",
+      env.BETTER_AUTH_URL,
+    ).toString();
 
     const res = await fetch(`${giteaUrl}/login/oauth/access_token`, {
       method: "POST",
@@ -2471,7 +2481,7 @@ app.get("/api/providers/gitea/setup", async (c) => {
     );
   }
 
-  return c.redirect(`${env.CORS_ORIGIN}/git-providers`, 307);
+  return c.redirect(getDashboardUrl("/git-providers"), 307);
 });
 
 app.use(

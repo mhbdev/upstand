@@ -12,12 +12,8 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { TerminalDialogShell } from "@/components/shared/terminal-dialog-shell";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
-
-function apiUrl(path: string) {
-  return new URL(path, getServerUrl()).toString();
-}
 
 export function DockerContainerTerminalDialog({
   open,
@@ -56,17 +52,20 @@ export function DockerContainerTerminalDialog({
     if (isLocal && !keyId) return toast.error("Choose an SSH key first");
     setConnecting(true);
     try {
-      const response = await fetch(apiUrl("/api/docker/terminal/session"), {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          serverId,
-          containerId: container.id,
-          ...(isLocal ? { sshKeyId: keyId } : {}),
-        }),
-      });
+      const response = await fetch(
+        getServerApiUrl("/api/docker/terminal/session"),
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            organizationId,
+            serverId,
+            containerId: container.id,
+            ...(isLocal ? { sshKeyId: keyId } : {}),
+          }),
+        },
+      );
       const data = (await response.json()) as {
         token?: string;
         error?: string;

@@ -50,7 +50,7 @@ import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { TerminalDialogShell } from "@/components/shared/terminal-dialog-shell";
 import { authClient } from "@/lib/auth-client";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 type ContainerItem = {
@@ -154,7 +154,9 @@ export function ContainersTab({
           resourceId: resource.id,
         });
         const response = await fetch(
-          `${getServerUrl()}/api/docker/containers/${encodeURIComponent(container.id)}/upload?${params.toString()}`,
+          getServerApiUrl(
+            `/api/docker/containers/${encodeURIComponent(container.id)}/upload?${params.toString()}`,
+          ),
           { method: "POST", body: formData, credentials: "include" },
         );
         const result = (await response.json()) as { error?: string };
@@ -498,7 +500,7 @@ function ContainerTerminalDialog({
     setConnecting(true);
     try {
       const response = await fetch(
-        new URL("/api/container-terminal/session", getServerUrl()),
+        getServerApiUrl("/api/container-terminal/session"),
         {
           method: "POST",
           credentials: "include",

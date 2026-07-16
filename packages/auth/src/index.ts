@@ -360,7 +360,9 @@ export function createAuth() {
             configuration.type === "email" || configuration.type === "resend"
               ? { ...configuration, toAddresses: [email] }
               : configuration;
-          const url = `${env.CORS_ORIGIN}/invitation?token=${encodeURIComponent(id)}`;
+          const invitationUrl = new URL("/invitation", env.CORS_ORIGIN);
+          invitationUrl.searchParams.set("token", id);
+          const url = invitationUrl.toString();
           await new NotificationTransportRegistry().send(
             recipientConfiguration,
             {

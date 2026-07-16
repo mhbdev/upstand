@@ -58,7 +58,7 @@ import {
 } from "@/components/dashboard/dashboard-page";
 import { DockerContainerTerminalDialog } from "@/components/docker-container-terminal-dialog";
 import { authClient } from "@/lib/auth-client";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 const kinds = [
@@ -210,7 +210,9 @@ export default function DockerInventoryPage() {
       });
       if (serverId !== "local") params.set("serverId", serverId);
       const response = await fetch(
-        `${getServerUrl()}/api/docker/volumes/${encodeURIComponent(volumeName)}/upload?${params.toString()}`,
+        getServerApiUrl(
+          `/api/docker/volumes/${encodeURIComponent(volumeName)}/upload?${params.toString()}`,
+        ),
         { method: "POST", body: formData, credentials: "include" },
       );
       const result = (await response.json()) as { error?: string };
@@ -243,7 +245,9 @@ export default function DockerInventoryPage() {
       });
       if (serverId !== "local") params.set("serverId", serverId);
       const response = await fetch(
-        `${getServerUrl()}/api/docker/containers/${encodeURIComponent(cId)}/upload?${params.toString()}`,
+        getServerApiUrl(
+          `/api/docker/containers/${encodeURIComponent(cId)}/upload?${params.toString()}`,
+        ),
         { method: "POST", body: formData, credentials: "include" },
       );
       const result = (await response.json()) as { error?: string };

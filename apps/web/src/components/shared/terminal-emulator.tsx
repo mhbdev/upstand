@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import "@xterm/xterm/css/xterm.css";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 
 interface TerminalEmulatorProps {
   token: string;
@@ -15,7 +15,7 @@ type TerminalControlMessage =
   | { type: "terminal.error"; message: string };
 
 function getTerminalSocketUrl(token: string): string {
-  const url = new URL("/api/terminal/connect", getServerUrl());
+  const url = new URL(getServerApiUrl("/api/terminal/connect"));
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   url.searchParams.set("token", token);
   return url.toString();

@@ -4,11 +4,11 @@ import {
   twoFactorClient,
 } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 export const authClient = createAuthClient({
   // better-auth derives its route-matching base from this URL's path, so the
   // public auth path must equal the server-side mount (/api/auth everywhere)
-  baseURL: new URL("/api/auth", getServerUrl()).toString(),
+  baseURL: getServerApiUrl("/api/auth"),
   plugins: [
     organizationClient(),
     twoFactorClient({

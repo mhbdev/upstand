@@ -15,7 +15,7 @@ import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
 import { SsoSignInForm } from "@/components/sso-sign-in-form";
 import { authClient } from "@/lib/auth-client";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -66,7 +66,7 @@ export default function LoginPage() {
     void setupAttempt;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
-    fetch(`${getServerUrl()}/api/setup/status`, {
+    fetch(getServerApiUrl("/api/setup/status"), {
       credentials: "include",
       signal: controller.signal,
     })

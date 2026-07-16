@@ -29,7 +29,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 type Provider = {
@@ -42,7 +42,7 @@ type Provider = {
 };
 
 async function ssoRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getServerUrl()}/api/auth${path}`, {
+  const response = await fetch(getServerApiUrl(`/api/auth${path}`), {
     ...init,
     credentials: "include",
     headers: { "content-type": "application/json", ...init?.headers },
@@ -143,9 +143,13 @@ export default function SsoSettingsPage() {
             samlConfig: {
               entryPoint: entryPoint.trim(),
               cert: certificate.trim(),
-              callbackUrl: `${getServerUrl()}/api/auth/sso/saml2/sp/acs/${providerId.trim()}`,
+              callbackUrl: getServerApiUrl(
+                `/api/auth/sso/saml2/sp/acs/${providerId.trim()}`,
+              ),
               spMetadata: {
-                entityID: `${getServerUrl()}/api/auth/sso/saml2/sp/metadata?providerId=${encodeURIComponent(providerId.trim())}`,
+                entityID: getServerApiUrl(
+                  `/api/auth/sso/saml2/sp/metadata?providerId=${encodeURIComponent(providerId.trim())}`,
+                ),
               },
             },
           }

@@ -45,7 +45,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 type ProviderType = "github" | "gitlab" | "bitbucket" | "gitea";
@@ -189,10 +189,12 @@ export default function GitProviders({
       getServerUrl().includes("127.0.0.1");
 
     const manifestData: Record<string, any> = {
-      redirect_url: `${getServerUrl()}/api/providers/github/setup?organizationId=${orgId}&userId=${session.user.id}`,
+      redirect_url: getServerApiUrl(
+        `/api/providers/github/setup?organizationId=${encodeURIComponent(orgId)}&userId=${encodeURIComponent(session.user.id)}`,
+      ),
       name: `Upstand-${new Date().toISOString().split("T")[0]}-${randomString()}`,
       url: origin,
-      callback_urls: [`${getServerUrl()}/api/providers/github/setup`],
+      callback_urls: [getServerApiUrl("/api/providers/github/setup")],
       public: false,
       request_oauth_on_install: true,
       default_permissions: {
@@ -206,7 +208,7 @@ export default function GitProviders({
 
     if (!isLocal) {
       manifestData.hook_attributes = {
-        url: `${getServerUrl()}/api/deploy/github`,
+        url: getServerApiUrl("/api/deploy/github"),
       };
     }
 
@@ -279,11 +281,11 @@ export default function GitProviders({
     state = providerId,
   ) => {
     if (provider === "gitlab") {
-      const redirectUri = `${getServerUrl()}/api/providers/gitlab/setup`;
+      const redirectUri = getServerApiUrl("/api/providers/gitlab/setup");
       return `${config.gitlabUrl}/oauth/authorize?client_id=${config.applicationId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}&scope=api%20read_user%20read_repository`;
     }
     if (provider === "gitea") {
-      const redirectUri = `${getServerUrl()}/api/providers/gitea/setup`;
+      const redirectUri = getServerApiUrl("/api/providers/gitea/setup");
       return `${config.giteaUrl}/login/oauth/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}`;
     }
     return "";

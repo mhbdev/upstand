@@ -28,6 +28,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
+import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 export default function ScimSettingsPage() {
@@ -131,9 +132,7 @@ export default function ScimSettingsPage() {
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
-                Endpoint:{" "}
-                {typeof window === "undefined" ? "" : window.location.origin}
-                /api/scim/v2.0/{organizationId}
+                Endpoint: {getServerApiUrl(`/api/scim/v2.0/${organizationId}`)}
               </p>
             </div>
           )}

@@ -1,38 +1,6 @@
-import { env } from "@upstand/env/web";
 import { headers } from "next/headers";
 import type { authClient } from "@/lib/auth-client";
-
-const PLACEHOLDER_HOST = /(?:^|\.)example\.invalid$/;
-
-function resolveApiOrigin(requestHeaders: Headers): string {
-  let configured: URL | undefined;
-  try {
-    configured = new URL(env.NEXT_PUBLIC_SERVER_URL);
-  } catch {
-    // The web environment is validated in production; keep this helper safe
-    // during a partially configured local start.
-  }
-
-  if (configured && !PLACEHOLDER_HOST.test(configured.hostname)) {
-    return configured.origin;
-  }
-
-  const forwardedHost = requestHeaders.get("x-forwarded-host");
-  const host = (forwardedHost || requestHeaders.get("host") || "localhost:3001")
-    .split(",")[0]
-    .trim();
-  const hostname = host.replace(/:\d+$/, "");
-  const apiHost = hostname.startsWith("app.")
-    ? `api.${hostname.slice("app.".length)}`
-    : hostname;
-  const forwardedProto = requestHeaders.get("x-forwarded-proto")?.split(",")[0];
-  const protocol =
-    forwardedProto ||
-    (hostname === "localhost" || hostname === "127.0.0.1" ? "http" : "https");
-  const port =
-    hostname === "localhost" || hostname === "127.0.0.1" ? ":3000" : "";
-  return `${protocol}://${apiHost}${port}`;
-}
+import { getServerUrlFromHeaders } from "@/lib/server-url";
 
 /**
  * Fetch the current session from the API while rendering a dashboard route.
@@ -48,7 +16,10 @@ export async function getServerSession(): Promise<
   const requestHeaders = await headers();
   const cookie = requestHeaders.get("cookie");
   const response = await fetch(
-    `${resolveApiOrigin(requestHeaders)}/api/auth/get-session`,
+    new URL(
+      "/api/auth/get-session",
+      `${getServerUrlFromHeaders(requestHeaders)}/`,
+    ),
     {
       headers: {
         ...(cookie ? { cookie } : {}),

@@ -59,7 +59,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { authClient } from "@/lib/auth-client";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 import {
   createBuildConfig,
@@ -264,10 +264,14 @@ export function GeneralTab({
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`/api/resources/${resource.id}/upload`, {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        getServerApiUrl(`/api/resources/${resource.id}/upload`),
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        },
+      );
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));

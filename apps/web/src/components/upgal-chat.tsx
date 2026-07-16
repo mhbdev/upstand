@@ -74,7 +74,7 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { UpGalToolOutput } from "@/components/upgal-tool-output";
-import { getServerUrl } from "@/lib/server-url";
+import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 type UpGalChatProps = {
@@ -296,7 +296,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
       new DefaultChatTransport<UpGalUIMessage>({
         // UpGal is served by the API origin in self-hosted deployments. Using
         // a relative URL sends the request to the dashboard instead.
-        api: `${getServerUrl()}/api/ai/chat`,
+        api: getServerApiUrl("/api/ai/chat"),
         credentials: "include",
       }),
     [],
