@@ -3,15 +3,20 @@ import { TRPCError } from "@trpc/server";
 import { createDb } from "@upstand/db";
 import { invitation, member } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
+import {
+  CUSTOM_ROLE_CAPABILITY_ACTIONS,
+  parseCapabilities,
+} from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { type PermissionAction, ROLE_PERMISSIONS } from "../permissions";
 
-const permissionActions = [
-  ...new Set(Object.values(ROLE_PERMISSIONS).flat()),
-] as [PermissionAction, ...PermissionAction[]];
+const permissionActions = CUSTOM_ROLE_CAPABILITY_ACTIONS as [
+  PermissionAction,
+  ...PermissionAction[],
+];
 const permissionsSchema = z.array(z.enum(permissionActions)).max(100);
 const baseInput = z.object({ organizationId: z.string().min(1) });
 
@@ -27,12 +32,15 @@ async function assertManager(userId: string, organizationId: string) {
 }
 
 function toView(row: typeof customRole.$inferSelect) {
-  let permissions: PermissionAction[] = [];
+  let value: unknown;
   try {
-    permissions = JSON.parse(row.permissions) as PermissionAction[];
+    value = JSON.parse(row.permissions);
   } catch {
-    permissions = [];
+    value = [];
   }
+  const permissions = parseCapabilities(value).filter((permission) =>
+    permissionActions.includes(permission),
+  );
   return { ...row, permissions };
 }
 

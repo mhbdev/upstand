@@ -3,7 +3,6 @@ import { AI_PROVIDERS } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import {
   generateComposeTemplate,
   getConversationForUser,
@@ -13,6 +12,7 @@ import {
 } from "../ai/upgal";
 import { UpGalPageContextSchema } from "../ai/upgal-page-context";
 import { protectedProcedure, router } from "../index";
+import { checkPermission } from "../permissions";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
 
@@ -24,7 +24,11 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:manage",
+      );
       return generateComposeTemplate(
         input.organizationId,
         ctx.scope,
@@ -35,7 +39,11 @@ export const aiRouter = router({
   settings: protectedProcedure
     .input(organizationInput)
     .query(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:view",
+      );
       const row = await ctx.scope
         .resolve(AIRepositoryToken)
         .findProviderConfig(input.organizationId);
@@ -61,10 +69,10 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(
+      await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        ["owner", "admin"],
+        "ai:manage",
       );
       const encrypted = input.apiKey ? encryptSecret(input.apiKey) : null;
       await ctx.scope.resolve(AIRepositoryToken).saveProviderConfig({
@@ -80,10 +88,10 @@ export const aiRouter = router({
   removeSettings: protectedProcedure
     .input(organizationInput)
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(
+      await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        ["owner", "admin"],
+        "ai:manage",
       );
       await ctx.scope
         .resolve(AIRepositoryToken)
@@ -101,10 +109,10 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(
+      await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        ["owner", "admin"],
+        "ai:manage",
       );
       return testUpGalProvider(input.organizationId, ctx.scope, {
         provider: input.provider,
@@ -123,10 +131,10 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(
+      await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        ["owner", "admin"],
+        "ai:manage",
       );
       return listProviderModels(input.organizationId, ctx.scope, {
         provider: input.provider,
@@ -138,7 +146,11 @@ export const aiRouter = router({
   conversations: protectedProcedure
     .input(organizationInput)
     .query(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:view",
+      );
       return listConversations(
         input.organizationId,
         ctx.session.user.id,
@@ -158,7 +170,11 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:view",
+      );
       const id = randomUUID();
       await ctx.scope.resolve(AIRepositoryToken).createConversation({
         id,
@@ -177,7 +193,11 @@ export const aiRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:view",
+      );
       const conversation = await getConversationForUser(
         input.conversationId,
         input.organizationId,
@@ -199,7 +219,11 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:manage",
+      );
       const repository = ctx.scope.resolve(AIRepositoryToken);
       const conversation = await repository.findConversation(
         input.conversationId,

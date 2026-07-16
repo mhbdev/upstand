@@ -2,7 +2,11 @@ import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import type { PermissionAction } from "@upstand/api/permissions";
+import {
+  type Capability,
+  CUSTOM_ROLE_CAPABILITY_ACTIONS,
+  capabilitiesForRole,
+} from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -30,52 +34,20 @@ import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 import { useMembersSettings } from "../hooks/use-members-settings";
 
-const MEMBER_CAPABILITIES: Array<[PermissionAction, string]> = [
-  ["project:view", "View projects"],
-  ["project:create", "Create projects"],
-  ["project:delete", "Delete projects"],
-  ["environment:view", "View environments"],
-  ["environment:create", "Create environments"],
-  ["environment:delete", "Delete environments"],
-  ["resource:view", "View resources"],
-  ["resource:create", "Create resources"],
-  ["resource:update", "Update resources"],
-  ["resource:delete", "Delete resources"],
-  ["ssh_key:view", "View SSH keys"],
-  ["ssh_key:create", "Create SSH keys"],
-  ["ssh_key:delete", "Delete SSH keys"],
-  ["git_provider:view", "View Git providers"],
-  ["git_provider:create", "Create Git providers"],
-  ["git_provider:delete", "Delete Git providers"],
-  ["s3_destination:view", "View backup destinations"],
-  ["s3_destination:create", "Create backup destinations"],
-  ["s3_destination:delete", "Delete backup destinations"],
-  ["backup:view", "View backup schedules and runs"],
-  ["backup:manage", "Manage backups and restores"],
-  ["docker_registry:view", "View registries"],
-  ["docker_registry:create", "Create registries"],
-  ["docker_registry:delete", "Delete registries"],
-  ["server:view", "View servers"],
-  ["server:create", "Create servers"],
-  ["server:delete", "Delete servers"],
-  ["notification:view", "View notifications"],
-  ["notification:create", "Create notifications"],
-  ["notification:update", "Update notifications"],
-  ["notification:delete", "Delete notifications"],
-];
+function capabilityLabel(capability: Capability): string {
+  const [resource, action] = capability.split(":");
+  const resourceLabel = resource.replaceAll("_", " ");
+  return `${action[0]?.toUpperCase() ?? action}${action.slice(1)} ${resourceLabel}`;
+}
 
-const DEFAULT_MEMBER_CAPABILITIES: PermissionAction[] = [
-  "project:view",
-  "environment:view",
-  "resource:view",
-  "resource:update",
-  "ssh_key:view",
-  "git_provider:view",
-  "s3_destination:view",
-  "backup:view",
-  "docker_registry:view",
-  "server:view",
-  "notification:view",
+const MEMBER_CAPABILITIES: Array<[Capability, string]> =
+  CUSTOM_ROLE_CAPABILITY_ACTIONS.map((capability) => [
+    capability,
+    capabilityLabel(capability),
+  ]);
+
+const DEFAULT_MEMBER_CAPABILITIES: Capability[] = [
+  ...capabilitiesForRole("member"),
 ];
 
 export function MembersPanel() {
@@ -118,7 +90,7 @@ export function MembersPanel() {
       string,
       {
         role: "member" | "admin";
-        permissions: PermissionAction[];
+        permissions: Capability[];
         customRoleId?: string | null;
       }
     >

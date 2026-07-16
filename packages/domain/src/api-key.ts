@@ -1,53 +1,25 @@
 import { z } from "zod";
+import {
+  API_KEY_CAPABILITY_ACTIONS,
+  type Capability,
+  isCapability,
+  MCP_READ_ONLY_TOOL_NAMES,
+  MCP_TOOL_CAPABILITIES,
+} from "./authorization";
 
 export const API_KEY_CONFIG_ID = "upstand" as const;
 
-export const API_KEY_PERMISSION_ACTIONS = [
-  "project:create",
-  "project:view",
-  "project:delete",
-  "environment:create",
-  "environment:view",
-  "environment:delete",
-  "resource:create",
-  "resource:view",
-  "resource:update",
-  "resource:delete",
-  "ssh_key:create",
-  "ssh_key:view",
-  "ssh_key:delete",
-  "git_provider:create",
-  "git_provider:view",
-  "git_provider:delete",
-  "s3_destination:create",
-  "s3_destination:view",
-  "s3_destination:update",
-  "s3_destination:delete",
-  "docker_registry:create",
-  "docker_registry:view",
-  "docker_registry:delete",
-  "server:create",
-  "server:view",
-  "server:delete",
-  "notification:create",
-  "notification:view",
-  "notification:update",
-  "notification:delete",
-  "deployment:view",
-  "deployment:manage",
-  "backup:view",
-  "backup:manage",
-  "swarm:view",
-  "swarm:manage",
-  "ai:view",
-  "ai:manage",
-] as const;
+export const API_KEY_PERMISSION_ACTIONS = API_KEY_CAPABILITY_ACTIONS;
 
-export type ApiKeyPermissionAction =
-  (typeof API_KEY_PERMISSION_ACTIONS)[number];
+export type ApiKeyPermissionAction = Capability;
+
+const apiKeyPermissionValues = [
+  ...API_KEY_PERMISSION_ACTIONS,
+  "*",
+] as unknown as [Capability | "*", ...(Capability | "*")[]];
 
 export const ApiKeyPermissionsSchema = z.object({
-  upstand: z.array(z.string().min(1)).default([]),
+  upstand: z.array(z.enum(apiKeyPermissionValues)).default([]),
   mcp: z.array(z.string().min(1)).default([]),
 });
 
@@ -96,7 +68,16 @@ export const API_KEY_PRESETS: Record<ApiKeyPreset, ApiKeyPermissions> = {
     ],
     mcp: ["read"],
   },
-  "mcp-read-only": { upstand: [], mcp: ["read"] },
+  "mcp-read-only": {
+    upstand: [
+      ...new Set(
+        MCP_READ_ONLY_TOOL_NAMES.map(
+          (toolName) => MCP_TOOL_CAPABILITIES[toolName],
+        ),
+      ),
+    ],
+    mcp: ["read"],
+  },
   "full-access": { upstand: ["*"], mcp: ["*"] },
 };
 
@@ -113,14 +94,16 @@ export function statementsToApiKeyPermissions(
   permissions: Record<string, string[]> | null | undefined,
 ): ApiKeyPermissions {
   return ApiKeyPermissionsSchema.parse({
-    upstand: permissions?.upstand ?? [],
+    upstand: (permissions?.upstand ?? []).filter(
+      (permission) => permission === "*" || isCapability(permission),
+    ),
     mcp: permissions?.mcp ?? [],
   });
 }
 
 export function hasApiKeyPermission(
   permissions: ApiKeyPermissions,
-  required: string,
+  required: Capability,
 ): boolean {
   return (
     permissions.upstand.includes("*") || permissions.upstand.includes(required)

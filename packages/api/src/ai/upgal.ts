@@ -7,9 +7,11 @@ import type { ServiceScope, TokenLike } from "@circulo-ai/di";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import {
   type AIProvider,
+  type Capability,
   type IAIRepository,
   type IUnitOfWork,
   type JsonValue,
+  MCP_TOOL_CAPABILITIES,
   type Resource,
   toJsonValue,
 } from "@upstand/domain";
@@ -297,6 +299,11 @@ export type UpGalUIMessage = UIMessage<
   InferUITools<UpGalTools>
 >;
 export type UpGalToolName = keyof UpGalTools & string;
+export const UPGAL_TOOL_CAPABILITIES = MCP_TOOL_CAPABILITIES satisfies Record<
+  UpGalToolName,
+  Capability
+>;
+
 type UpGalToolContext = { organizationId: string };
 
 export type UpGalExecutableTool<Input, Output> = Tool<

@@ -3,6 +3,7 @@
 export * from "./ai";
 export * from "./api-key";
 export * from "./audit-log";
+export * from "./authorization";
 export * from "./entities/backup";
 export * from "./entities/caddy-middleware";
 export * from "./entities/certificate";
