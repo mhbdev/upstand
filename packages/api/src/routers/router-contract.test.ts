@@ -38,7 +38,6 @@ describe("API router contract", () => {
     const record = root as Record<string, RouterNode>;
     const expectedRouters = [
       "healthCheck",
-      "privateData",
       "project",
       "environment",
       "resource",
@@ -81,7 +80,6 @@ describe("API router contract", () => {
     const paths = collectProcedurePaths(root);
 
     expect(paths).toContain("healthCheck");
-    expect(paths).toContain("privateData");
     expect(paths).toContain("project.create");
     expect(paths).toContain("resource.deploy");
     expect(paths).toContain("deployment.getQueue");
