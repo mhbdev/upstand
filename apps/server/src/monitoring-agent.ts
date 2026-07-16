@@ -98,6 +98,7 @@ export async function initializeMonitoring(): Promise<void> {
 
     const metricsConfig = {
       server: {
+        serverId: "local",
         refreshRate: 25,
         port: 3001,
         serverType: "Dokploy",
@@ -130,7 +131,7 @@ export async function initializeMonitoring(): Promise<void> {
         RestartPolicy: { Name: "always" },
         ...(networkMode ? { NetworkMode: networkMode } : {}),
         PortBindings: {
-          "3001/tcp": [{ HostPort: "3001" }],
+          "3001/tcp": [{ HostIp: "127.0.0.1", HostPort: "3001" }],
         },
         Binds: [
           "/var/run/docker.sock:/var/run/docker.sock:ro",

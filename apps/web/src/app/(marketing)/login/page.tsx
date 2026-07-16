@@ -42,11 +42,34 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [needsOwnerSetup, setNeedsOwnerSetup] = useState<boolean | null>(null);
-  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const [setupError, setSetupError] = useState(false);
+  const [setupAttempt, setSetupAttempt] = useState(0);
+  const [sessionTimedOut, setSessionTimedOut] = useState(false);
+  const {
+    data: session,
+    isPending: sessionPending,
+    error: sessionError,
+    refetch,
+  } = authClient.useSession();
+
+  useEffect(() => {
+    if (!sessionPending) {
+      setSessionTimedOut(false);
+      return;
+    }
+    const timeout = setTimeout(() => setSessionTimedOut(true), 8_000);
+    return () => clearTimeout(timeout);
+  }, [sessionPending]);
 
   useEffect(() => {
     let active = true;
-    fetch(`${getServerUrl()}/api/setup/status`, { credentials: "include" })
+    void setupAttempt;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
+    fetch(`${getServerUrl()}/api/setup/status`, {
+      credentials: "include",
+      signal: controller.signal,
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to check instance setup");
         return (await response.json()) as { needsOwnerSetup: boolean };
@@ -55,13 +78,29 @@ export default function LoginPage() {
         if (!active) return;
         setNeedsOwnerSetup(status.needsOwnerSetup);
       })
-      .catch((error) => {
-        if (active) toast.error(error.message);
+      .catch(() => {
+        if (active) {
+          setSetupError(true);
+          toast.error("Unable to check instance setup. Try again.");
+        }
       });
     return () => {
       active = false;
+      clearTimeout(timeout);
+      controller.abort();
     };
-  }, []);
+  }, [setupAttempt]);
+
+  const retrySetup = () => {
+    setSetupError(false);
+    setNeedsOwnerSetup(null);
+    setSetupAttempt((attempt) => attempt + 1);
+  };
+
+  const retrySession = () => {
+    setSessionTimedOut(false);
+    void refetch();
+  };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -97,7 +136,23 @@ export default function LoginPage() {
 
       <Card className="relative w-full max-w-md rounded-3xl border-border/70 bg-card/70 p-7 shadow-2xl shadow-primary/5 backdrop-blur-md sm:p-8">
         <CardContent className="space-y-8 p-0">
-          {sessionPending ? (
+          {sessionError || sessionTimedOut ? (
+            <div className="space-y-5 py-8 text-center">
+              <div className="space-y-2">
+                <h1 className="font-bold text-xl">Unable to reach Upstand</h1>
+                <p className="text-muted-foreground text-sm">
+                  We couldn’t check your session. Check the server connection
+                  and try again.
+                </p>
+              </div>
+              <Button className="w-full" onClick={retrySession}>
+                Try again
+              </Button>
+              <Button variant="outline" className="w-full" onClick={retrySetup}>
+                Check instance setup
+              </Button>
+            </div>
+          ) : sessionPending ? (
             <div className="flex flex-col items-center justify-center space-y-4 py-12">
               <Spinner />
               <p className="text-muted-foreground text-sm">
@@ -143,6 +198,19 @@ export default function LoginPage() {
                   {loading ? <Spinner className="mr-2" /> : "Sign Out"}
                 </Button>
               </div>
+            </div>
+          ) : setupError ? (
+            <div className="space-y-5 py-8 text-center">
+              <div className="space-y-2">
+                <h1 className="font-bold text-xl">Setup status unavailable</h1>
+                <p className="text-muted-foreground text-sm">
+                  The sign-in service is reachable, but instance setup could not
+                  be checked.
+                </p>
+              </div>
+              <Button className="w-full" onClick={retrySetup}>
+                Try again
+              </Button>
             </div>
           ) : needsOwnerSetup === null ? (
             <div className="flex flex-col items-center justify-center space-y-4 py-12">

@@ -256,6 +256,7 @@ export interface RemoteDockerConnectionPort {
   port: number;
   username: string;
   privateKey: string;
+  hostKeyFingerprint?: string;
 }
 
 export interface DockerInfrastructureResolverPort {

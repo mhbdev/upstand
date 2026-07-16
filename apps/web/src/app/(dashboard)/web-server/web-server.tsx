@@ -1073,29 +1073,34 @@ export default function WebServerDashboard(_props: {
                     <span className="font-semibold text-foreground">
                       {updateData?.currentVersion || "Loading…"}
                     </span>
-                    {updateData?.updateAvailable && updateData.canUpdate && (
-                      <Button
-                        size="xs"
-                        variant="default"
-                        className="cursor-pointer bg-indigo-600 font-semibold text-[10px] text-white hover:bg-indigo-700"
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Are you sure you want to update Upstand to ${updateData.latestVersion}? This will pull the latest version and update all services in the cluster.`,
-                            )
-                          ) {
-                            triggerUpdateMutation.mutate({
-                              version: updateData.latestVersion,
-                            });
-                          }
-                        }}
-                        disabled={triggerUpdateMutation.isPending}
-                      >
-                        {triggerUpdateMutation.isPending
-                          ? "Updating..."
-                          : `Update to ${updateData.latestVersion}`}
-                      </Button>
-                    )}
+                    {updateData?.updateAvailable &&
+                      updateData.canUpdate &&
+                      updateData.images && (
+                        <Button
+                          size="xs"
+                          variant="default"
+                          className="cursor-pointer bg-indigo-600 font-semibold text-[10px] text-white hover:bg-indigo-700"
+                          onClick={() => {
+                            const images = updateData.images;
+                            if (!images) return;
+                            if (
+                              confirm(
+                                `Are you sure you want to update Upstand to ${updateData.latestVersion}? This will pull the latest version and update all services in the cluster.`,
+                              )
+                            ) {
+                              triggerUpdateMutation.mutate({
+                                version: updateData.latestVersion,
+                                images,
+                              });
+                            }
+                          }}
+                          disabled={triggerUpdateMutation.isPending}
+                        >
+                          {triggerUpdateMutation.isPending
+                            ? "Updating..."
+                            : `Update to ${updateData.latestVersion}`}
+                        </Button>
+                      )}
                     {updateData?.channel && (
                       <span className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase tracking-wide">
                         {updateData.channel}

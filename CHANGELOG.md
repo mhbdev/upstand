@@ -4,6 +4,27 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.44 - 2026-07-16
+
+### Added
+
+- Add bounded login/session/setup retries and actionable timeout states (#54).
+- Add persisted SSH host-key fingerprints with fail-closed verification for server, Docker, terminal, and monitoring connections (#20, #21).
+- Add explicit audit-log capability checks and instance-owner protection for control-plane operations (#16, #17, #18).
+
+### Changed
+
+- Bind OAuth state to its provider, organization, user, purpose, and one-time Redis record; re-check authorization at callback time (#9).
+- Validate custom Git-provider URLs and bound HTTP requests against HTTPS, SSRF, redirects, timeouts, and response-size limits (#10).
+- Restrict custom-role and custom-permission delegation to the acting administrator's capabilities (#11).
+- Require `backup:manage` for resource backup mutations and instance-owner authorization for control-plane backups (#14, #15).
+- Verify release image digests again immediately before rollout and deploy exact immutable digests instead of mutable tags (#19).
+- Store two-factor step-up state as a short-lived, user/session-bound record instead of a reusable boolean marker (#7).
+
+### Fixed
+
+- Stop logging monitoring credentials and expose monitoring agents only through loopback with SSH forwarding (#21).
+
 ## 0.1.41 - 2026-07-15
 
 ### Changed

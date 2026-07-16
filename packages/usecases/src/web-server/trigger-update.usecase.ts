@@ -2,9 +2,15 @@ import { log } from "evlog";
 import { z } from "zod";
 import type { NotificationPublisher } from "../notification/publish-notification.usecase";
 import { getDockerInstance } from "../resource/docker-client";
+import { GetUpdateStatusUseCase } from "./get-update-status.usecase";
 
 export const TriggerUpdateInputSchema = z.object({
   version: z.string().min(1, "Version is required"),
+  images: z.object({
+    server: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
+    web: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
+    fumadocs: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
+  }),
 });
 
 export type TriggerUpdateInput = z.infer<typeof TriggerUpdateInputSchema>;
@@ -21,6 +27,18 @@ export class TriggerUpdateUseCase {
         "Updates must target a published semantic release or canary channel",
       );
     }
+    const verified = await new GetUpdateStatusUseCase().execute({
+      forceRefresh: true,
+    });
+    if (
+      verified.latestVersion !== version ||
+      !verified.images ||
+      JSON.stringify(verified.images) !== JSON.stringify(input.images)
+    ) {
+      throw new Error(
+        "The release manifest changed or the update plan expired. Check for updates again.",
+      );
+    }
     log.info({ message: `Triggering self-update to version ${version}...` });
 
     try {
@@ -33,7 +51,9 @@ export class TriggerUpdateUseCase {
           name === "upstand-server" ||
           name === "upstand-web" ||
           name === "upstand-fumadocs" ||
-          name.startsWith("upstand_")
+          name === "upstand_server" ||
+          name === "upstand_web" ||
+          name === "upstand_fumadocs"
         ) {
           const service = this.docker.getService(s.ID);
           const inspect = await service.inspect();
@@ -60,7 +80,12 @@ export class TriggerUpdateUseCase {
             baseImage = baseImage.slice(0, tagSeparator);
           }
 
-          const newImage = `${baseImage}:${version}`;
+          const imageName = name.includes("fumadocs")
+            ? "fumadocs"
+            : name.includes("web")
+              ? "web"
+              : "server";
+          const newImage = `${baseImage}@${input.images[imageName]}`;
           const currentEnv = (inspect.Spec.TaskTemplate.ContainerSpec.Env ??
             []) as string[];
           const nextEnv = currentEnv.some((entry) =>

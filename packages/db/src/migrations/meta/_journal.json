@@ -232,6 +232,13 @@
       "when": 1784194882242,
       "tag": "0032_transactional_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1784200000000,
+      "tag": "0033_ssh_host_key_fingerprints",
+      "breakpoints": true
     }
   ]
 }

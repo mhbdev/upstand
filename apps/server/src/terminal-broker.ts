@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { hostVerifierForFingerprint } from "@upstand/platform/ssh/host-key";
 import { Client, type ClientChannel } from "ssh2";
 
 type TerminalSession = {
@@ -9,6 +10,7 @@ type TerminalSession = {
   port: number;
   username: string;
   privateKey: string;
+  hostKeyFingerprint: string;
   command?: string;
   expiresAt: number;
 };
@@ -70,13 +72,18 @@ export class TerminalBroker {
 
     const client = new Client();
     await new Promise<void>((resolve, reject) => {
-      client.once("ready", resolve).once("error", reject).connect({
-        host: session.host,
-        port: session.port,
-        username: session.username,
-        privateKey: session.privateKey,
-        readyTimeout: 20_000,
-      });
+      client
+        .once("ready", resolve)
+        .once("error", reject)
+        .connect({
+          host: session.host,
+          port: session.port,
+          username: session.username,
+          privateKey: session.privateKey,
+          hostHash: "sha256",
+          hostVerifier: hostVerifierForFingerprint(session.hostKeyFingerprint),
+          readyTimeout: 20_000,
+        });
     });
 
     const channel = await new Promise<ClientChannel>((resolve, reject) => {

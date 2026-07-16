@@ -1,8 +1,8 @@
 import { AUDIT_ACTIONS, AUDIT_RESOURCE_TYPES } from "@upstand/domain";
 import { ListAuditLogsUseCaseToken } from "@upstand/usecases/tokens";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import { protectedProcedure, router } from "../index";
+import { checkPermission } from "../permissions";
 
 const inputSchema = z.object({
   organizationId: z.string().min(1),
@@ -18,7 +18,11 @@ const inputSchema = z.object({
 
 export const auditLogRouter = router({
   list: protectedProcedure.input(inputSchema).query(async ({ ctx, input }) => {
-    await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+    await checkPermission(
+      ctx.session.user.id,
+      input.organizationId,
+      "audit_log:view",
+    );
     return ctx.scope.resolve(ListAuditLogsUseCaseToken).execute({
       organizationId: input.organizationId,
       actorId: input.actorId,

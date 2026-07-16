@@ -6,6 +6,7 @@ import { customRole } from "@upstand/db/schema/custom-role";
 import { notificationChannel } from "@upstand/db/schema/notification";
 import {
   CUSTOM_ROLE_CAPABILITY_ACTIONS,
+  capabilitiesForRole,
   parseCapabilities,
 } from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
@@ -50,6 +51,7 @@ async function resolveRoleAssignment(
   role: "member" | "admin",
   permissions: PermissionAction[],
   customRoleId?: string | null,
+  actorRole?: string,
 ) {
   if (!customRoleId) {
     validatePermissions(role, permissions);
@@ -71,9 +73,21 @@ async function resolveRoleAssignment(
       code: "BAD_REQUEST",
       message: "Custom role not found",
     });
+  const selectedPermissions = parseStoredPermissions(selected.permissions);
+  const allowed = new Set(
+    actorRole === "owner"
+      ? permissionActions
+      : capabilitiesForRole(actorRole || "member"),
+  );
+  if (selectedPermissions.some((permission) => !allowed.has(permission))) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You cannot assign a custom role with elevated permissions",
+    });
+  }
   return {
     role: `custom:${selected.id}`,
-    permissions: parseStoredPermissions(selected.permissions),
+    permissions: selectedPermissions,
   };
 }
 
@@ -139,6 +153,7 @@ export const memberRouter = router({
         input.role,
         input.permissions,
         input.customRoleId,
+        actor.role,
       );
       const existing = await db
         .select({ id: member.id })
@@ -219,6 +234,7 @@ export const memberRouter = router({
         input.role,
         input.permissions,
         input.customRoleId,
+        actor.role,
       );
       const channel = await db
         .select({
@@ -292,6 +308,7 @@ export const memberRouter = router({
         input.role,
         input.permissions,
         input.customRoleId,
+        actor.role,
       );
       await db
         .update(member)

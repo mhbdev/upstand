@@ -20,6 +20,10 @@ import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { and, count, eq } from "drizzle-orm";
+import {
+  clearStepUpVerification,
+  recordStepUpVerification,
+} from "./step-up-auth";
 
 const memberPermissionField = {
   type: "string",
@@ -172,14 +176,19 @@ export function createAuth() {
               headers: ctx.request.headers,
             });
             if (session) {
-              await redis.set(
-                `2fa-verified:${session.session.id}`,
-                "true",
-                "EX",
-                60 * 60 * 24 * 30, // 30 days
-              );
+              await recordStepUpVerification(session);
             }
           }
+        }
+        if (
+          ctx.path.endsWith("/two-factor/disable") ||
+          ctx.path.endsWith("/two-factor/enable") ||
+          ctx.path.endsWith("/two-factor/generate-backup-codes")
+        ) {
+          const session = ctx.request
+            ? await auth.api.getSession({ headers: ctx.request.headers })
+            : null;
+          if (session) await clearStepUpVerification(session.session.id);
         }
       }),
       before: createAuthMiddleware(async (ctx) => {

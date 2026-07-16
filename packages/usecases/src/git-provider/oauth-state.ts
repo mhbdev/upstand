@@ -29,14 +29,15 @@ function sign(payload: string): string {
 
 export function createGitProviderOAuthState(
   providerId: string,
-  purpose: GitProviderOAuthStatePurpose = "provider-oauth",
+  purpose: GitProviderOAuthStatePurpose,
+  binding: { organizationId: string; userId: string },
 ): {
   state: string;
   expiresAt: number;
 } {
   const issuedAt = Math.floor(Date.now() / 1000);
   const nonce = randomBytes(24).toString("base64url");
-  const payload = `${STATE_VERSION}.${purpose}.${providerId}.${issuedAt}.${nonce}`;
+  const payload = `${STATE_VERSION}.${purpose}.${providerId}.${binding.organizationId}.${binding.userId}.${issuedAt}.${nonce}`;
   return {
     state: `${payload}.${sign(payload)}`,
     expiresAt: issuedAt + STATE_TTL_SECONDS,
@@ -46,13 +47,24 @@ export function createGitProviderOAuthState(
 export function parseGitProviderOAuthState(state: string): {
   providerId: string;
   purpose: GitProviderOAuthStatePurpose;
+  organizationId: string;
+  userId: string;
   nonce: string;
   expiresAt: number;
 } | null {
   const parts = state.split(".");
-  if (parts.length !== 6 || parts[0] !== STATE_VERSION) return null;
+  if (parts.length !== 8 || parts[0] !== STATE_VERSION) return null;
 
-  const [, purpose, providerId, issuedAtText, nonce, receivedSignature] = parts;
+  const [
+    ,
+    purpose,
+    providerId,
+    organizationId,
+    userId,
+    issuedAtText,
+    nonce,
+    receivedSignature,
+  ] = parts;
   if (
     purpose !== "provider-oauth" &&
     purpose !== "github-init" &&
@@ -60,7 +72,14 @@ export function parseGitProviderOAuthState(state: string): {
   ) {
     return null;
   }
-  if (!providerId || !nonce || !/^\d+$/.test(issuedAtText || "")) return null;
+  if (
+    !providerId ||
+    !organizationId ||
+    !userId ||
+    !nonce ||
+    !/^\d+$/.test(issuedAtText || "")
+  )
+    return null;
 
   const issuedAt = Number(issuedAtText);
   const expiresAt = issuedAt + STATE_TTL_SECONDS;
@@ -72,7 +91,7 @@ export function parseGitProviderOAuthState(state: string): {
     return null;
   }
 
-  const payload = parts.slice(0, 5).join(".");
+  const payload = parts.slice(0, 7).join(".");
   const expected = Buffer.from(sign(payload));
   const received = Buffer.from(receivedSignature || "");
   if (
@@ -82,7 +101,7 @@ export function parseGitProviderOAuthState(state: string): {
     return null;
   }
 
-  return { providerId, purpose, nonce, expiresAt };
+  return { providerId, purpose, organizationId, userId, nonce, expiresAt };
 }
 
 export function gitProviderOAuthStateKey(state: string): string {

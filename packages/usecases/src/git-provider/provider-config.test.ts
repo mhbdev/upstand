@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  assertSafeProviderUrl,
   redactGitProviderConfig,
   restoreGitProviderConfig,
+  validateGitProviderConfig,
 } from "./provider-config";
 
 describe("git provider response safety", () => {
@@ -44,5 +46,29 @@ describe("git provider response safety", () => {
     );
     expect(merged.accessToken).toBe("old-token");
     expect(merged.gitlabUrl).toBe("https://gitlab.example.com");
+  });
+});
+
+describe("Git provider URL validation", () => {
+  test("requires HTTPS and rejects local or private targets", () => {
+    expect(() => assertSafeProviderUrl("http://git.example.com")).toThrow();
+    expect(() => assertSafeProviderUrl("https://localhost")).toThrow();
+    expect(() => assertSafeProviderUrl("https://127.0.0.1")).toThrow();
+    expect(() => assertSafeProviderUrl("https://169.254.169.254")).toThrow();
+  });
+
+  test("accepts the supported public providers and validates custom config", () => {
+    expect(assertSafeProviderUrl("https://gitlab.com/")).toBe(
+      "https://gitlab.com",
+    );
+    expect(() =>
+      validateGitProviderConfig(
+        "gitea",
+        JSON.stringify({ giteaUrl: "https://code.example.com" }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateGitProviderConfig("gitea", JSON.stringify({})),
+    ).toThrow();
   });
 });

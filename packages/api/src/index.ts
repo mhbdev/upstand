@@ -1,4 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import { isStepUpAuthenticationSatisfied } from "@upstand/auth/step-up-auth";
 import {
   type AUDIT_ACTIONS,
   AUDIT_RESOURCE_TYPES,
@@ -371,17 +372,12 @@ export const twoFactorVerifiedProcedure = protectedProcedure.use(
     if (isApiKeyPrincipal(ctx.actor)) {
       return next();
     }
-    if (ctx.session.user.twoFactorEnabled) {
-      const verified = await redis.get(
-        `2fa-verified:${ctx.session.session.id}`,
-      );
-      if (verified !== "true") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "2FA verification required",
-          cause: "2FA_PENDING",
-        });
-      }
+    if (!(await isStepUpAuthenticationSatisfied(ctx.session))) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "2FA verification required",
+        cause: "2FA_PENDING",
+      });
     }
     return next();
   },

@@ -12,6 +12,7 @@ import { Skeleton } from "@upstand/ui/components/skeleton";
 import { cn } from "@upstand/ui/lib/utils";
 import type { User } from "better-auth";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 export type UserAvatarProps = {
   className?: string;
@@ -27,11 +28,30 @@ export function UserAvatar({
   fallback,
 }: UserAvatarProps) {
   const { authClient } = useAuth();
-  const { data: session, isPending: sessionPending } = useSession(authClient, {
+  const {
+    data: session,
+    isPending: sessionPending,
+    error: sessionError,
+  } = useSession(authClient, {
     enabled: !user && !isPending,
   });
+  const [sessionTimedOut, setSessionTimedOut] = useState(false);
 
-  if ((isPending || sessionPending) && !user) {
+  useEffect(() => {
+    if (!sessionPending) {
+      setSessionTimedOut(false);
+      return;
+    }
+    const timeout = setTimeout(() => setSessionTimedOut(true), 8_000);
+    return () => clearTimeout(timeout);
+  }, [sessionPending]);
+
+  if (
+    (isPending || sessionPending) &&
+    !user &&
+    !sessionError &&
+    !sessionTimedOut
+  ) {
     return <Skeleton className={cn("size-8", className)} />;
   }
 

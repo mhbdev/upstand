@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { IUnitOfWork, Server } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
+import { hostVerifierForFingerprint } from "@upstand/platform/ssh/host-key";
 import { log } from "evlog";
 import { Client } from "ssh2";
 import { z } from "zod";
@@ -35,6 +36,9 @@ export class SetupServerUseCase {
     if (!server.sshKeyId) {
       throw new Error("Server does not have an SSH Key configured");
     }
+    if (!server.sshHostKeyFingerprint) {
+      throw new Error("Trust the server SSH host key before provisioning it");
+    }
 
     const sshKey = await this.uow.sshKeyRepository.findById(server.sshKeyId);
     if (!sshKey) {
@@ -55,12 +59,13 @@ export class SetupServerUseCase {
       keyVersion: sshKey.privateKeyVersion,
     });
 
-    return this.runSetup(server, privateKey);
+    return this.runSetup(server, privateKey, server.sshHostKeyFingerprint);
   }
 
   private async runSetup(
     server: Server,
     privateKey: string,
+    hostKeyFingerprint: string,
   ): Promise<{ success: boolean; message: string }> {
     const conn = new Client();
     const plan = getServerProvisioningPlan(server.serverType);
@@ -96,13 +101,18 @@ export class SetupServerUseCase {
 
     try {
       await new Promise<void>((resolve, reject) => {
-        conn.on("ready", resolve).on("error", reject).connect({
-          host: server.ipAddress,
-          port: server.port,
-          username: server.username,
-          privateKey: privateKey,
-          readyTimeout: 20000,
-        });
+        conn
+          .on("ready", resolve)
+          .on("error", reject)
+          .connect({
+            host: server.ipAddress,
+            port: server.port,
+            username: server.username,
+            privateKey: privateKey,
+            hostHash: "sha256",
+            hostVerifier: hostVerifierForFingerprint(hostKeyFingerprint),
+            readyTimeout: 20000,
+          });
       });
 
       let sudo: string;
@@ -145,6 +155,7 @@ export class SetupServerUseCase {
         port: server.port,
         username: server.username,
         privateKey,
+        hostKeyFingerprint,
       });
       // systemctl can return before dockerd has finished creating its socket.
       // Give the daemon a short, bounded window to become ready before
@@ -330,6 +341,7 @@ export class SetupServerUseCase {
 
     const metricsConfig = {
       server: {
+        serverId: server.id,
         refreshRate: 25,
         port: 3001,
         serverType: "Remote",
@@ -359,7 +371,7 @@ export class SetupServerUseCase {
       "docker run -d " +
         `--name ${containerName} ` +
         "--restart always " +
-        "-p 3001:3001 " +
+        "-p 127.0.0.1:3001:3001 " +
         "-e DB_PATH=/data/monitoring.db " +
         `-e METRICS_CONFIG=${shellQuote(JSON.stringify(metricsConfig))} ` +
         "-v /var/run/docker.sock:/var/run/docker.sock:ro " +

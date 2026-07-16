@@ -477,6 +477,7 @@ export class UpdateResourceUseCase {
           port: server.port,
           username: server.username,
           privateKey,
+          hostKeyFingerprint: server.sshHostKeyFingerprint ?? undefined,
         };
         caddyService = createRemoteServices(connection).caddyService;
       }

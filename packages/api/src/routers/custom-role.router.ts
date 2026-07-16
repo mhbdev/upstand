@@ -5,6 +5,7 @@ import { invitation, member } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
 import {
   CUSTOM_ROLE_CAPABILITY_ACTIONS,
+  capabilitiesForRole,
   parseCapabilities,
 } from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
@@ -29,6 +30,23 @@ async function assertManager(userId: string, organizationId: string) {
     });
   }
   return actor;
+}
+
+function assertDelegablePermissions(
+  actorRole: string,
+  permissions: PermissionAction[],
+): void {
+  const allowed = new Set(
+    actorRole === "owner"
+      ? CUSTOM_ROLE_CAPABILITY_ACTIONS
+      : capabilitiesForRole(actorRole),
+  );
+  if (permissions.some((permission) => !allowed.has(permission))) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "A custom role cannot delegate permissions you do not hold",
+    });
+  }
 }
 
 function toView(row: typeof customRole.$inferSelect) {
@@ -66,7 +84,11 @@ export const customRoleRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertManager(ctx.session.user.id, input.organizationId);
+      const actor = await assertManager(
+        ctx.session.user.id,
+        input.organizationId,
+      );
+      assertDelegablePermissions(actor.role, input.permissions);
       const db = createDb();
       const [row] = await db
         .insert(customRole)
@@ -94,7 +116,13 @@ export const customRoleRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertManager(ctx.session.user.id, input.organizationId);
+      const actor = await assertManager(
+        ctx.session.user.id,
+        input.organizationId,
+      );
+      if (input.permissions) {
+        assertDelegablePermissions(actor.role, input.permissions);
+      }
       const db = createDb();
       const [row] = await db
         .update(customRole)

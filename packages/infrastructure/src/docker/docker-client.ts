@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
+import { hostVerifierForFingerprint } from "@upstand/platform/ssh/host-key";
 import type { DockerInfrastructureResolverPort } from "@upstand/usecases/ports/docker";
 import Docker from "dockerode";
 import { CaddyService } from "../caddy/caddy.service";
@@ -30,6 +31,7 @@ export interface RemoteDockerConnection {
   port: number;
   username: string;
   privateKey: string;
+  hostKeyFingerprint?: string;
 }
 
 /**
@@ -38,6 +40,9 @@ export interface RemoteDockerConnection {
  * SSH transport keeps the daemon socket private while retaining the Docker API.
  */
 export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
+  if (!connection.hostKeyFingerprint) {
+    throw new Error("Remote Docker SSH host key is not trusted");
+  }
   return new Docker({
     host: connection.host.startsWith("ssh://")
       ? connection.host
@@ -48,7 +53,11 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
     // dockerode's type definition omits sshOptions although the runtime
     // supports it. Keep the cast local to this adapter.
     ...({
-      sshOptions: { privateKey: connection.privateKey },
+      sshOptions: {
+        privateKey: connection.privateKey,
+        hostHash: "sha256",
+        hostVerifier: hostVerifierForFingerprint(connection.hostKeyFingerprint),
+      },
     } as unknown as Record<string, unknown>),
   });
 }
@@ -59,6 +68,9 @@ export function createRemoteDockerCliEnvironment(
   environment: Record<string, string | undefined>;
   cleanup: () => void;
 } {
+  if (!connection.hostKeyFingerprint) {
+    throw new Error("Remote Docker SSH host key is not trusted");
+  }
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "upstand-docker-"));
   const sshDirectory = path.join(home, ".ssh");
   const keyPath = path.join(sshDirectory, "id_deployment");
@@ -74,7 +86,7 @@ export function createRemoteDockerCliEnvironment(
       `Port ${connection.port}`,
       `User ${connection.username}`,
       `IdentityFile ${keyPath}`,
-      "StrictHostKeyChecking accept-new",
+      "StrictHostKeyChecking yes",
       "LogLevel ERROR",
       "",
     ].join("\n"),
@@ -121,6 +133,7 @@ export async function resolveDockerCliEnvironmentForServer(
     port: server.port,
     username: server.username,
     privateKey,
+    hostKeyFingerprint: server.sshHostKeyFingerprint ?? undefined,
   });
 }
 
@@ -161,6 +174,7 @@ export async function resolveDockerServiceForServer(
     port: server.port,
     username: server.username,
     privateKey,
+    hostKeyFingerprint: server.sshHostKeyFingerprint ?? undefined,
   };
 
   const remoteDocker = createRemoteDocker(connection);
@@ -225,6 +239,7 @@ export async function resolveServicesForResource(
     port: server.port,
     username: server.username,
     privateKey,
+    hostKeyFingerprint: server.sshHostKeyFingerprint ?? undefined,
   };
 
   const remoteDocker = createRemoteDocker(connection);

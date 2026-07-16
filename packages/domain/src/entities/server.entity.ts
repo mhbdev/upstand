@@ -18,6 +18,7 @@ export const ServerSchema = z.object({
   description: z.string().nullable().optional(),
   serverType: ServerTypeSchema,
   sshKeyId: z.string().nullable().optional(),
+  sshHostKeyFingerprint: z.string().nullable().optional(),
   ipAddress: z.string(),
   port: z.number(),
   username: z.string(),
@@ -37,6 +38,7 @@ export interface CreateServerDTO {
   description?: string | null;
   serverType: ServerType;
   sshKeyId?: string | null;
+  sshHostKeyFingerprint?: string | null;
   ipAddress: string;
   port: number;
   username: string;

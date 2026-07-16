@@ -63,6 +63,10 @@ export const gitProviderRouter = router({
       const state = createGitProviderOAuthState(
         provider.id,
         provider.provider === "github" ? "github-install" : "provider-oauth",
+        {
+          organizationId: provider.organizationId,
+          userId: ctx.session.user.id,
+        },
       );
       await redis.set(
         gitProviderOAuthStateKey(state.state),
@@ -83,7 +87,10 @@ export const gitProviderRouter = router({
         "git_provider:create",
       );
       const subject = `github-init:${input.organizationId}:${ctx.session.user.id}`;
-      const state = createGitProviderOAuthState(subject, "github-init");
+      const state = createGitProviderOAuthState(subject, "github-init", {
+        organizationId: input.organizationId,
+        userId: ctx.session.user.id,
+      });
       await redis.set(
         gitProviderOAuthStateKey(state.state),
         subject,

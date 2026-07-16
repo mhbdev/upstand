@@ -17,6 +17,12 @@ export const UpdateServerInputSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   serverType: ServerTypeSchema.optional(),
   sshKeyId: z.string().min(1).nullable().optional(),
+  sshHostKeyFingerprint: z
+    .string()
+    .trim()
+    .regex(/^SHA256:[A-Za-z0-9+/=]+$/)
+    .nullable()
+    .optional(),
   ipAddress: z.string().trim().min(1).max(255).optional(),
   port: z.number().int().min(1).max(65_535).optional(),
   username: z.string().trim().min(1).max(120).optional(),
@@ -62,6 +68,7 @@ export class UpdateServerUseCase {
     const { organizationId: _organizationId, id: _id, ...patch } = input;
     const provisioningChanged = [
       "sshKeyId",
+      "sshHostKeyFingerprint",
       "ipAddress",
       "port",
       "username",

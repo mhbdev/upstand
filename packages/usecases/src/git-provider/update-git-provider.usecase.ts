@@ -1,6 +1,9 @@
 import type { GitProvider, IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
-import { restoreGitProviderConfig } from "./provider-config";
+import {
+  restoreGitProviderConfig,
+  validateGitProviderConfig,
+} from "./provider-config";
 
 export const UpdateGitProviderInputSchema = z.object({
   id: z.string().min(1, "Git Provider ID is required"),
@@ -19,11 +22,16 @@ export class UpdateGitProviderUseCase {
     return this.uow.transaction(async (tx) => {
       const provider = await tx.gitProviderRepository.findById(input.id);
       if (!provider) return null;
+      const config =
+        input.config !== undefined
+          ? restoreGitProviderConfig(provider.config, input.config)
+          : provider.config;
+      validateGitProviderConfig(provider.provider, config);
       return tx.gitProviderRepository.updateById(input.id, {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.config !== undefined
           ? {
-              config: restoreGitProviderConfig(provider.config, input.config),
+              config,
             }
           : {}),
       });

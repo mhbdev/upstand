@@ -12,6 +12,12 @@ export const CreateServerInputSchema = z.object({
   description: z.string().optional().nullable(),
   serverType: ServerTypeSchema,
   sshKeyId: z.string().optional().nullable(),
+  sshHostKeyFingerprint: z
+    .string()
+    .trim()
+    .regex(/^SHA256:[A-Za-z0-9+/=]+$/)
+    .optional()
+    .nullable(),
   ipAddress: z.string().min(1, "IP address is required"),
   port: z.number().default(22),
   username: z.string().min(1, "Username is required").default("root"),
@@ -32,6 +38,7 @@ export class CreateServerUseCase {
         description: input.description || null,
         serverType: input.serverType,
         sshKeyId: input.sshKeyId || null,
+        sshHostKeyFingerprint: input.sshHostKeyFingerprint || null,
         ipAddress: input.ipAddress,
         port: input.port,
         username: input.username,

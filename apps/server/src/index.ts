@@ -44,6 +44,7 @@ import { closeRedis, pingRedis, redis } from "@upstand/redis";
 import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import {
   AccessLogCleanupScheduler,
+  assertSafeProviderUrl,
   BackupRunWorker,
   gitProviderOAuthStateKey,
   hashWebhookToken,
@@ -212,6 +213,16 @@ app.post("/api/terminal/session", async (c) => {
       409,
     );
   }
+  const controlPlaneFingerprint =
+    process.env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT;
+  if (!controlPlaneFingerprint) {
+    return c.json(
+      {
+        error: "Configure the trusted control-plane SSH host fingerprint first",
+      },
+      409,
+    );
+  }
 
   const privateKey = decryptSecret({
     ciphertext: key.privateKeyCiphertext,
@@ -227,6 +238,7 @@ app.post("/api/terminal/session", async (c) => {
     port: body.port && Number.isInteger(body.port) ? body.port : 22,
     username: body.username?.trim() || "root",
     privateKey,
+    hostKeyFingerprint: controlPlaneFingerprint,
   });
   return c.json({ token, expiresIn: 60 });
 });
@@ -280,6 +292,7 @@ app.post("/api/container-terminal/session", async (c) => {
   let port = 22;
   let username = "root";
   let privateKey: string;
+  let hostKeyFingerprint: string;
   if (resource.serverId && !["local", "manager"].includes(resource.serverId)) {
     const server = await uow.serverRepository.findById(resource.serverId);
     if (!server || server.organizationId !== body.organizationId) {
@@ -292,12 +305,19 @@ app.post("/api/container-terminal/session", async (c) => {
       ? await uow.sshKeyRepository.findById(server.sshKeyId)
       : null;
     if (!key) return c.json({ error: "Deployment server has no SSH key" }, 409);
+    if (!server.sshHostKeyFingerprint) {
+      return c.json(
+        { error: "Trust the deployment server SSH host key first" },
+        409,
+      );
+    }
     privateKey = decryptSecret({
       ciphertext: key.privateKeyCiphertext,
       iv: key.privateKeyIv,
       authTag: key.privateKeyAuthTag,
       keyVersion: key.privateKeyVersion,
     });
+    hostKeyFingerprint = server.sshHostKeyFingerprint;
   } else {
     if (!body.sshKeyId) {
       return c.json(
@@ -328,6 +348,17 @@ app.post("/api/container-terminal/session", async (c) => {
       authTag: key.privateKeyAuthTag,
       keyVersion: key.privateKeyVersion,
     });
+    hostKeyFingerprint =
+      process.env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT || "";
+    if (!hostKeyFingerprint) {
+      return c.json(
+        {
+          error:
+            "Configure the trusted control-plane SSH host fingerprint first",
+        },
+        409,
+      );
+    }
   }
 
   const token = terminalBroker.create({
@@ -338,6 +369,7 @@ app.post("/api/container-terminal/session", async (c) => {
     port,
     username,
     privateKey,
+    hostKeyFingerprint,
     command: `docker exec -it ${body.containerId} /bin/sh -lc 'exec /bin/sh || exec /bin/bash'`,
   });
   return c.json({ token, expiresIn: 60 });
@@ -380,6 +412,7 @@ app.post("/api/docker/terminal/session", async (c) => {
   let port: number;
   let username: string;
   let privateKey: string;
+  let hostKeyFingerprint: string;
 
   if (serverId) {
     const server = await uow.serverRepository.findById(serverId);
@@ -391,6 +424,12 @@ app.post("/api/docker/terminal/session", async (c) => {
     }
     if (!server.sshKeyId) {
       return c.json({ error: "Docker server has no SSH key configured" }, 409);
+    }
+    if (!server.sshHostKeyFingerprint) {
+      return c.json(
+        { error: "Trust the Docker server SSH host key first" },
+        409,
+      );
     }
     const key = await uow.sshKeyRepository.findById(server.sshKeyId);
     if (!key)
@@ -404,6 +443,7 @@ app.post("/api/docker/terminal/session", async (c) => {
       authTag: key.privateKeyAuthTag,
       keyVersion: key.privateKeyVersion,
     });
+    hostKeyFingerprint = server.sshHostKeyFingerprint;
   } else {
     if (!body.sshKeyId) {
       return c.json({ error: "An SSH key is required for local Docker" }, 400);
@@ -433,6 +473,17 @@ app.post("/api/docker/terminal/session", async (c) => {
       authTag: key.privateKeyAuthTag,
       keyVersion: key.privateKeyVersion,
     });
+    hostKeyFingerprint =
+      process.env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT || "";
+    if (!hostKeyFingerprint) {
+      return c.json(
+        {
+          error:
+            "Configure the trusted control-plane SSH host fingerprint first",
+        },
+        409,
+      );
+    }
   }
 
   const containers = await scope
@@ -466,6 +517,7 @@ app.post("/api/docker/terminal/session", async (c) => {
     port,
     username,
     privateKey,
+    hostKeyFingerprint,
     command: `docker exec -it ${body.containerId} /bin/sh -lc 'exec /bin/sh || exec /bin/bash'`,
   });
   return c.json({ token, expiresIn: 60 });
@@ -535,29 +587,94 @@ app.get(
 app.post("/api/monitoring/alerts", async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
     json?: {
+      serverId?: string;
       serverType?: string;
       type?: "CPU" | "Memory";
       value?: number;
       threshold?: number;
       message?: string;
       timestamp?: string;
-      token?: string;
+      nonce?: string;
+      signature?: string;
     };
   } | null;
 
-  if (!body?.json?.token) {
-    return c.json({ error: "Invalid payload: token is required" }, 400);
+  const alert = body?.json;
+  if (
+    !alert?.serverId ||
+    !alert.nonce ||
+    !alert.signature ||
+    !alert.timestamp ||
+    !alert.type
+  ) {
+    return c.json({ error: "Invalid monitoring alert signature payload" }, 400);
   }
 
-  const { token, type, value, threshold, message } = body.json;
+  const {
+    serverId,
+    serverType,
+    type,
+    value,
+    threshold,
+    message,
+    timestamp,
+    nonce,
+    signature,
+  } = alert;
 
   const scope = c.get("scope");
   const uow = scope.resolve(UnitOfWorkToken);
 
-  const settings = await uow.monitoringSettingsRepository.findByToken(token);
+  const settings =
+    await uow.monitoringSettingsRepository.findByServerId(serverId);
 
   if (!settings) {
-    return c.json({ error: "Unauthorized: Invalid metrics token" }, 401);
+    return c.json(
+      { error: "Unauthorized: Invalid monitoring alert source" },
+      401,
+    );
+  }
+
+  const alertTime = Date.parse(timestamp);
+  if (
+    !Number.isFinite(alertTime) ||
+    Math.abs(Date.now() - alertTime) > 5 * 60_000
+  ) {
+    return c.json({ error: "Monitoring alert signature expired" }, 401);
+  }
+  const canonical = [
+    serverId,
+    serverType ?? "",
+    type,
+    String(value ?? ""),
+    String(threshold ?? ""),
+    message ?? "",
+    timestamp,
+    nonce,
+  ].join("|");
+  const expectedSignature = createHmac("sha256", settings.token)
+    .update(canonical)
+    .digest("hex");
+  const receivedSignature = Buffer.from(signature, "utf8");
+  const expectedSignatureBytes = Buffer.from(expectedSignature, "utf8");
+  if (
+    receivedSignature.length !== expectedSignatureBytes.length ||
+    !timingSafeEqual(receivedSignature, expectedSignatureBytes)
+  ) {
+    return c.json(
+      { error: "Unauthorized: Invalid monitoring alert signature" },
+      401,
+    );
+  }
+  const acceptedNonce = await redis.set(
+    `monitoring-alert:${serverId}:${nonce}`,
+    "1",
+    "EX",
+    300,
+    "NX",
+  );
+  if (acceptedNonce !== "OK") {
+    return c.json({ error: "Monitoring alert has already been received" }, 401);
   }
 
   const serverRecord =
@@ -2038,6 +2155,12 @@ app.get("/api/providers/github/setup", async (c) => {
       400,
     );
   }
+  const callbackSession = await auth.api.getSession({
+    headers: c.req.raw.headers,
+  });
+  if (!callbackSession || callbackSession.user.id !== parsedState.userId) {
+    return c.json({ error: "OAuth state actor is no longer valid" }, 403);
+  }
 
   let action: "gh_init" | "gh_setup";
   let rest: string[];
@@ -2060,6 +2183,14 @@ app.get("/api/providers/github/setup", async (c) => {
     if (!organizationId) {
       return c.json({ error: "Missing organizationId in state" }, 400);
     }
+    if (organizationId !== parsedState.organizationId) {
+      return c.json({ error: "OAuth state organization mismatch" }, 403);
+    }
+    await checkPermission(
+      callbackSession.user.id,
+      organizationId,
+      "git_provider:create",
+    );
 
     try {
       const res = await fetch(
@@ -2122,6 +2253,14 @@ app.get("/api/providers/github/setup", async (c) => {
       if (!provider) {
         return c.text("Git Provider not found", 404);
       }
+      if (provider.organizationId !== parsedState.organizationId) {
+        return c.text("OAuth state organization mismatch", 403);
+      }
+      await checkPermission(
+        callbackSession.user.id,
+        provider.organizationId,
+        "git_provider:create",
+      );
 
       const configObj = JSON.parse(provider.config);
       configObj.githubInstallationId = installationId;
@@ -2151,7 +2290,7 @@ app.get("/api/providers/gitlab/setup", async (c) => {
   const scope = c.get("scope");
   try {
     const parsedState = parseGitProviderOAuthState(state);
-    if (!parsedState) {
+    if (parsedState?.purpose !== "provider-oauth") {
       return c.json({ error: "Invalid or expired OAuth state" }, 400);
     }
     const storedProviderId = await redis.eval(
@@ -2172,12 +2311,27 @@ app.get("/api/providers/gitlab/setup", async (c) => {
     if (!provider) {
       return c.text("Git Provider not found", 404);
     }
+    if (
+      provider.organizationId !== parsedState.organizationId ||
+      parsedState.userId !==
+        (await auth.api.getSession({ headers: c.req.raw.headers }))?.user.id
+    ) {
+      return c.text("OAuth state actor is no longer valid", 403);
+    }
+    await checkPermission(
+      parsedState.userId,
+      provider.organizationId,
+      "git_provider:create",
+    );
 
     const configObj = JSON.parse(provider.config);
+    const gitlabUrl = assertSafeProviderUrl(configObj.gitlabUrl);
     const redirectUri = `${env.BETTER_AUTH_URL.replace(/\/api\/auth\/?$/, "")}/api/providers/gitlab/setup`;
 
-    const res = await fetch(`${configObj.gitlabUrl}/oauth/token`, {
+    const res = await fetch(`${gitlabUrl}/oauth/token`, {
       method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
@@ -2230,7 +2384,7 @@ app.get("/api/providers/gitea/setup", async (c) => {
   const scope = c.get("scope");
   try {
     const parsedState = parseGitProviderOAuthState(state);
-    if (!parsedState) {
+    if (parsedState?.purpose !== "provider-oauth") {
       return c.json({ error: "Invalid or expired OAuth state" }, 400);
     }
     const storedProviderId = await redis.eval(
@@ -2251,12 +2405,29 @@ app.get("/api/providers/gitea/setup", async (c) => {
     if (!provider) {
       return c.text("Git Provider not found", 404);
     }
+    if (provider.organizationId !== parsedState.organizationId) {
+      return c.text("OAuth state organization mismatch", 403);
+    }
+    const currentSession = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (!currentSession || currentSession.user.id !== parsedState.userId) {
+      return c.text("OAuth state actor is no longer valid", 403);
+    }
+    await checkPermission(
+      currentSession.user.id,
+      provider.organizationId,
+      "git_provider:create",
+    );
 
     const configObj = JSON.parse(provider.config);
+    const giteaUrl = assertSafeProviderUrl(configObj.giteaUrl);
     const redirectUri = `${env.BETTER_AUTH_URL.replace(/\/api\/auth\/?$/, "")}/api/providers/gitea/setup`;
 
-    const res = await fetch(`${configObj.giteaUrl}/login/oauth/access_token`, {
+    const res = await fetch(`${giteaUrl}/login/oauth/access_token`, {
       method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",

@@ -448,6 +448,7 @@ export class DeploymentWorker {
             port: server.port,
             username: server.username,
             privateKey,
+            hostKeyFingerprint: server.sshHostKeyFingerprint ?? undefined,
           };
           const remote = createRemoteServices(connection);
           remoteCliCleanup = remote.cli.cleanup;
@@ -493,6 +494,7 @@ export class DeploymentWorker {
           port: buildServer.port,
           username: buildServer.username,
           privateKey,
+          hostKeyFingerprint: buildServer.sshHostKeyFingerprint ?? undefined,
         };
         const remoteBuild = createRemoteServices(connection);
         buildCliCleanup = remoteBuild.cli.cleanup;

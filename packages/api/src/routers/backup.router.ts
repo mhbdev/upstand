@@ -30,6 +30,7 @@ import {
 import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
+import { requireInstanceOwnerContext } from "../instance-access";
 import { checkPermission, type PermissionAction } from "../permissions";
 
 async function assertResourcePermission(
@@ -64,11 +65,12 @@ async function assertResourcePermission(
 }
 
 async function assertOrganizationPermission(
-  ctx: { session: { user: { id: string } } },
-  organizationId: string,
+  ctx: { session: { user: { id: string } }; actor?: { kind: string } | null },
+  _organizationId: string,
   permission: PermissionAction,
 ): Promise<void> {
-  await checkPermission(ctx.session.user.id, organizationId, permission);
+  await requireInstanceOwnerContext(ctx);
+  await checkPermission(ctx.session.user.id, _organizationId, permission);
 }
 
 async function assertWebServerSchedulePermission(
@@ -298,7 +300,7 @@ export const backupRouter = router({
   createSchedule: twoFactorVerifiedProcedure
     .input(CreateBackupScheduleInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertResourcePermission(ctx, input.resourceId, "resource:update");
+      await assertResourcePermission(ctx, input.resourceId, "backup:manage");
       try {
         const result = await ctx.scope
           .resolve(CreateBackupScheduleUseCaseToken)
@@ -333,11 +335,7 @@ export const backupRouter = router({
           message: "Backup schedule has no resource",
         });
       }
-      await assertResourcePermission(
-        ctx,
-        schedule.resourceId,
-        "resource:update",
-      );
+      await assertResourcePermission(ctx, schedule.resourceId, "backup:manage");
       try {
         const result = await ctx.scope
           .resolve(UpdateBackupScheduleUseCaseToken)
@@ -372,11 +370,7 @@ export const backupRouter = router({
           message: "Backup schedule has no resource",
         });
       }
-      await assertResourcePermission(
-        ctx,
-        schedule.resourceId,
-        "resource:update",
-      );
+      await assertResourcePermission(ctx, schedule.resourceId, "backup:manage");
       try {
         const result = await ctx.scope
           .resolve(DeleteBackupScheduleUseCaseToken)
@@ -413,11 +407,7 @@ export const backupRouter = router({
           message: "Backup schedule has no resource",
         });
       }
-      await assertResourcePermission(
-        ctx,
-        schedule.resourceId,
-        "resource:update",
-      );
+      await assertResourcePermission(ctx, schedule.resourceId, "backup:manage");
       try {
         return await ctx.scope
           .resolve(TriggerBackupRunUseCaseToken)
@@ -450,7 +440,7 @@ export const backupRouter = router({
           message: "Backup run has no resource",
         });
       }
-      await assertResourcePermission(ctx, run.resourceId, "resource:update");
+      await assertResourcePermission(ctx, run.resourceId, "backup:manage");
       try {
         await ctx.scope.resolve(RestoreBackupRunUseCaseToken).execute(input);
         return { restored: true };

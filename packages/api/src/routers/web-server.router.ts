@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import type { IUnitOfWork } from "@upstand/domain";
 import {
   AccessLogCleanupCronSchema,
@@ -26,7 +25,7 @@ import { z } from "zod";
 
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
-import { checkPermission } from "../permissions";
+import { requireInstanceOwnerContext } from "../instance-access";
 
 async function queueDockerCleanupNotification(
   publisher: NotificationPublisher,
@@ -96,16 +95,9 @@ const UPSTAND_REDIS_SERVICE = "upstand_redis";
 
 async function requireActiveOrganizationPermission(
   ctx: any,
-  permission: Parameters<typeof checkPermission>[2],
+  _permission: string,
 ): Promise<void> {
-  const organizationId = ctx.session.session.activeOrganizationId;
-  if (!organizationId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Select an active organization before using server operations",
-    });
-  }
-  await checkPermission(ctx.session.user.id, organizationId, permission);
+  await requireInstanceOwnerContext(ctx);
 }
 
 async function getRunningServiceContainer(serviceName: string) {
@@ -383,12 +375,8 @@ async function getSecurityAudit(uow: IUnitOfWork) {
 export const webServerRouter = router({
   securityAudit: twoFactorVerifiedProcedure
     .input(z.object({ organizationId: z.string().min(1) }))
-    .query(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:view",
-      );
+    .query(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       try {
         return await getSecurityAudit(ctx.scope.resolve(UnitOfWorkToken));
       } catch (error) {
@@ -575,12 +563,8 @@ export const webServerRouter = router({
         confirm: z.literal("CLEANUP"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:delete",
-      );
+    .mutation(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       const uow = ctx.scope.resolve(UnitOfWorkToken);
       try {
         await uow.transaction(async (tx) => {
@@ -614,12 +598,8 @@ export const webServerRouter = router({
         confirm: z.literal("CLEANUP"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:delete",
-      );
+    .mutation(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       const { exec } = await import("node:child_process");
       const { promisify } = await import("node:util");
       const execAsync = promisify(exec);
@@ -641,12 +621,8 @@ export const webServerRouter = router({
         confirm: z.literal("CLEANUP"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:delete",
-      );
+    .mutation(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       const { exec } = await import("node:child_process");
       const { promisify } = await import("node:util");
       const execAsync = promisify(exec);
@@ -668,12 +644,8 @@ export const webServerRouter = router({
         confirm: z.literal("CLEANUP"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:delete",
-      );
+    .mutation(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       const { exec } = await import("node:child_process");
       const { promisify } = await import("node:util");
       const execAsync = promisify(exec);
@@ -695,12 +667,8 @@ export const webServerRouter = router({
         confirm: z.literal("CLEANUP"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:delete",
-      );
+    .mutation(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       const { exec } = await import("node:child_process");
       const { promisify } = await import("node:util");
       const execAsync = promisify(exec);
@@ -722,12 +690,8 @@ export const webServerRouter = router({
         confirm: z.literal("CLEANUP"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:delete",
-      );
+    .mutation(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       const { exec } = await import("node:child_process");
       const { promisify } = await import("node:util");
       const execAsync = promisify(exec);
@@ -749,12 +713,8 @@ export const webServerRouter = router({
         confirm: z.literal("CLEANUP"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:delete",
-      );
+    .mutation(async ({ ctx }) => {
+      await requireInstanceOwnerContext(ctx);
       const { exec } = await import("node:child_process");
       const { promisify } = await import("node:util");
       const execAsync = promisify(exec);

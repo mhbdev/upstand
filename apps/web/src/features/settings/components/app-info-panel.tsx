@@ -96,7 +96,13 @@ export function AppInfoPanel() {
               <Button
                 size="sm"
                 disabled={update.isPending}
-                onClick={() => update.mutate({ version: data.latestVersion })}
+                onClick={() =>
+                  data.images &&
+                  update.mutate({
+                    version: data.latestVersion,
+                    images: data.images,
+                  })
+                }
               >
                 {update.isPending
                   ? "Updating…"

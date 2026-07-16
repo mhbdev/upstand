@@ -9,6 +9,7 @@ export interface UpdateStatusResult {
   channel: "stable" | "canary" | "source";
   canUpdate: boolean;
   checkedAt: string;
+  images: { server: string; web: string; fumadocs: string } | null;
 }
 
 const RELEASE_MANIFEST_ASSET = "upstand-release-manifest.json";
@@ -70,6 +71,7 @@ function unavailableStatus(
     channel,
     canUpdate: channel !== "source",
     checkedAt,
+    images: null,
   };
 }
 
@@ -204,6 +206,15 @@ export class GetUpdateStatusUseCase {
       }
 
       const latestVersion = release.tag_name;
+      const images = new Map(
+        (manifest.images ?? []).map((image) => [image.name, image]),
+      );
+      const verifiedImages = Object.fromEntries(
+        REQUIRED_IMAGES.map((name) => [
+          name,
+          (images.get(name)?.digest || "").toLowerCase(),
+        ]),
+      ) as UpdateStatusResult["images"];
 
       const updateAvailable =
         compareVersions(latestVersion, currentVersion) > 0;
@@ -215,6 +226,7 @@ export class GetUpdateStatusUseCase {
         channel,
         canUpdate: channel !== "source",
         checkedAt,
+        images: verifiedImages,
       };
 
       cachedStatus = {

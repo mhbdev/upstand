@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"time"
 
@@ -25,7 +24,7 @@ func main() {
 	token := cfg.Server.Token
 	METRICS_URL_CALLBACK := cfg.Server.UrlCallback
 	log.Printf("Environment variables:")
-	log.Printf("METRICS_CONFIG: %s", os.Getenv("METRICS_CONFIG"))
+	log.Printf("Monitoring configuration loaded")
 
 	if token == "" || METRICS_URL_CALLBACK == "" {
 		log.Fatal("token and urlCallback are required in the configuration")

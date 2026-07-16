@@ -36,7 +36,8 @@ export class AutoUpdateRuntime {
       if (
         status.channel === "stable" &&
         status.updateAvailable &&
-        status.canUpdate
+        status.canUpdate &&
+        status.images
       ) {
         log.info({
           message: `Automatic update found ${status.latestVersion}; starting rollout`,
@@ -44,7 +45,7 @@ export class AutoUpdateRuntime {
         });
         await scope
           .resolve(TriggerUpdateUseCaseToken)
-          .execute({ version: status.latestVersion });
+          .execute({ version: status.latestVersion, images: status.images });
       }
     } catch (error) {
       log.error({

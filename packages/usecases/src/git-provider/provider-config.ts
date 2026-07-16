@@ -1,6 +1,79 @@
+import { isIP } from "node:net";
 import type { GitProvider } from "@upstand/domain";
 
 const REDACTED = "[configured]";
+
+const PRIVATE_HOST =
+  /^(localhost|.*\.localhost|.*\.local|metadata\.google\.internal)$/i;
+const TRUSTED_PUBLIC_HOSTS = new Set([
+  "api.github.com",
+  "github.com",
+  "api.bitbucket.org",
+  "gitlab.com",
+  "gitea.com",
+]);
+
+export function assertSafeProviderUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Git provider URL is invalid");
+  }
+  if (url.protocol !== "https:") {
+    throw new Error("Git provider URLs must use HTTPS");
+  }
+  if (url.username || url.password || url.pathname.includes("\\")) {
+    throw new Error(
+      "Git provider URL contains unsupported credentials or path",
+    );
+  }
+  const host = url.hostname.toLowerCase();
+  if (PRIVATE_HOST.test(host)) {
+    throw new Error("Git provider URL points to a private or local host");
+  }
+  if (isIP(host)) {
+    throw new Error("Git provider URLs must use a verified hostname");
+  }
+  const allowlisted = (process.env.UPSTAND_GIT_PROVIDER_ALLOWED_HOSTS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    allowlisted.length &&
+    !allowlisted.includes(host) &&
+    !TRUSTED_PUBLIC_HOSTS.has(host)
+  ) {
+    throw new Error("Git provider host is not in the operator allowlist");
+  }
+  return url.origin;
+}
+
+export function validateGitProviderConfig(
+  provider: string,
+  config: string,
+): void {
+  let parsed: Record<string, unknown>;
+  try {
+    const value = JSON.parse(config);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error();
+    }
+    parsed = value as Record<string, unknown>;
+  } catch {
+    throw new Error("Git provider configuration must be valid JSON");
+  }
+  const urlKey =
+    provider === "gitlab"
+      ? "gitlabUrl"
+      : provider === "gitea"
+        ? "giteaUrl"
+        : null;
+  if (urlKey && typeof parsed[urlKey] !== "string") {
+    throw new Error(`Git provider configuration requires ${urlKey}`);
+  }
+  if (urlKey) assertSafeProviderUrl(parsed[urlKey] as string);
+}
 
 const isSecretKey = (key: string): boolean =>
   /(secret|token|password|private.?key|pem|api.?key)/i.test(key);

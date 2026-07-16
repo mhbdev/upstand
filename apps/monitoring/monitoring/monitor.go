@@ -2,6 +2,10 @@ package monitoring
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -72,13 +77,15 @@ type SystemMetrics struct {
 }
 
 type AlertPayload struct {
-	ServerType string  `json:"ServerType"`
-	Type       string  `json:"Type"`
-	Value      float64 `json:"Value"`
-	Threshold  float64 `json:"Threshold"`
-	Message    string  `json:"Message"`
-	Timestamp  string  `json:"Timestamp"`
-	Token      string  `json:"Token"`
+	ServerID   string  `json:"serverId"`
+	ServerType string  `json:"serverType"`
+	Type       string  `json:"type"`
+	Value      float64 `json:"value"`
+	Threshold  float64 `json:"threshold"`
+	Message    string  `json:"message"`
+	Timestamp  string  `json:"timestamp"`
+	Nonce      string  `json:"nonce"`
+	Signature  string  `json:"signature"`
 }
 
 func getRealOS() string {
@@ -260,14 +267,16 @@ func CheckThresholds(metrics database.ServerMetric) error {
 
 	if cpuThreshold > 0 && metrics.CPU > cpuThreshold {
 		alert := AlertPayload{
+			ServerID:   cfg.Server.ServerID,
 			ServerType: cfg.Server.ServerType,
 			Type:       "CPU",
 			Value:      metrics.CPU,
 			Threshold:  cpuThreshold,
 			Message:    fmt.Sprintf("CPU usage (%.2f%%) exceeded threshold (%.2f%%)", metrics.CPU, cpuThreshold),
 			Timestamp:  metrics.Timestamp,
-			Token:      metricsToken,
+			Nonce:      newAlertNonce(),
 		}
+		alert.Signature = signAlert(alert, metricsToken)
 		if err := sendAlert(callbackURL, alert); err != nil {
 			return fmt.Errorf("failed to send CPU alert: %v", err)
 		}
@@ -275,20 +284,47 @@ func CheckThresholds(metrics database.ServerMetric) error {
 
 	if memThreshold > 0 && metrics.MemUsed > memThreshold {
 		alert := AlertPayload{
+			ServerID:   cfg.Server.ServerID,
 			ServerType: cfg.Server.ServerType,
 			Type:       "Memory",
 			Value:      metrics.MemUsed,
 			Threshold:  memThreshold,
 			Message:    fmt.Sprintf("Memory usage (%.2f%%) exceeded threshold (%.2f%%)", metrics.MemUsed, memThreshold),
 			Timestamp:  metrics.Timestamp,
-			Token:      metricsToken,
+			Nonce:      newAlertNonce(),
 		}
+		alert.Signature = signAlert(alert, metricsToken)
 		if err := sendAlert(callbackURL, alert); err != nil {
 			return fmt.Errorf("failed to send memory alert: %v", err)
 		}
 	}
 
 	return nil
+}
+
+func newAlertNonce() string {
+	value := make([]byte, 16)
+	if _, err := rand.Read(value); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(value)
+}
+
+func signAlert(payload AlertPayload, secret string) string {
+	canonical := fmt.Sprintf(
+		"%s|%s|%s|%s|%s|%s|%s|%s",
+		payload.ServerID,
+		payload.ServerType,
+		payload.Type,
+		strconv.FormatFloat(payload.Value, 'f', -1, 64),
+		strconv.FormatFloat(payload.Threshold, 'f', -1, 64),
+		payload.Message,
+		payload.Timestamp,
+		payload.Nonce,
+	)
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(canonical))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func sendAlert(callbackURL string, payload AlertPayload) error {

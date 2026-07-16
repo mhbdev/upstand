@@ -20,6 +20,7 @@ export const server = pgTable("server", {
   sshKeyId: text("ssh_key_id").references(() => sshKey.id, {
     onDelete: "set null",
   }),
+  sshHostKeyFingerprint: text("ssh_host_key_fingerprint"),
   ipAddress: text("ip_address").notNull(),
   port: integer("port").notNull().default(22),
   username: text("username").notNull().default("root"),
