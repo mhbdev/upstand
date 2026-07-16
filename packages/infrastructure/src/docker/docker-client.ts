@@ -1,11 +1,15 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
-import { hostVerifierForFingerprint } from "@upstand/platform/ssh/host-key";
+import {
+  hostVerifierForFingerprint,
+  verifyHostKeyFingerprint,
+} from "@upstand/platform/ssh/host-key";
 import type { DockerInfrastructureResolverPort } from "@upstand/usecases/ports/docker";
 import Docker from "dockerode";
 import { CaddyService } from "../caddy/caddy.service";
@@ -44,9 +48,7 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
   return new Docker({
-    host: connection.host.startsWith("ssh://")
-      ? connection.host
-      : `ssh://${connection.host}`,
+    host: connection.host.replace(/^ssh:\/\//, ""),
     port: connection.port,
     username: connection.username,
     protocol: "ssh",
@@ -79,6 +81,11 @@ export function createRemoteDockerCliEnvironment(
     mode: 0o600,
   });
   fs.writeFileSync(
+    path.join(sshDirectory, "known_hosts"),
+    getTrustedKnownHostsEntry(connection),
+    { mode: 0o600 },
+  );
+  fs.writeFileSync(
     path.join(sshDirectory, "config"),
     [
       "Host upstand-deployment",
@@ -100,6 +107,41 @@ export function createRemoteDockerCliEnvironment(
     },
     cleanup: () => fs.rmSync(home, { recursive: true, force: true }),
   };
+}
+
+function getTrustedKnownHostsEntry(connection: RemoteDockerConnection): string {
+  const trustedFingerprint = connection.hostKeyFingerprint;
+  if (!trustedFingerprint) {
+    throw new Error("Remote Docker SSH host key is not trusted");
+  }
+
+  const scan = spawnSync(
+    "ssh-keyscan",
+    ["-T", "10", "-p", String(connection.port), connection.host],
+    { encoding: "utf8", timeout: 12_000 },
+  );
+
+  if (scan.error || scan.status !== 0) {
+    throw new Error(
+      `Could not read the SSH host key for ${connection.host}:${connection.port}`,
+    );
+  }
+
+  for (const line of scan.stdout.split("\n")) {
+    const [host, algorithm, encodedKey] = line.trim().split(/\s+/, 3);
+    if (!host || !algorithm || !encodedKey) continue;
+    const fingerprint = `SHA256:${createHash("sha256")
+      .update(Buffer.from(encodedKey, "base64"))
+      .digest("base64")
+      .replace(/=+$/, "")}`;
+    if (verifyHostKeyFingerprint(trustedFingerprint, fingerprint)) {
+      return `upstand-deployment ${algorithm} ${encodedKey}\n`;
+    }
+  }
+
+  throw new Error(
+    `The SSH host key for ${connection.host}:${connection.port} does not match its trusted fingerprint`,
+  );
 }
 
 export async function resolveDockerCliEnvironmentForServer(

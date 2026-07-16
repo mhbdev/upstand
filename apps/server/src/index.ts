@@ -2505,7 +2505,10 @@ app.get("/api/docs/assets/:asset", async (c) => {
 // REST compatibility routes for any remaining /api path.
 app.all("/api/*", async (c) => {
   return createOpenApiFetchHandler({
-    endpoint: "/api",
+    // Keep the trailing slash: the adapter removes its endpoint using a
+    // string replacement, and `/api` would otherwise match the `api`
+    // subdomain before it reaches the request path.
+    endpoint: "/api/",
     req: c.req.raw,
     router: openApiRouter,
     createContext: () => createContext({ context: c as any }),
