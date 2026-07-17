@@ -1,3 +1,5 @@
+<img width="1919" height="907" alt="image" src="https://github.com/user-attachments/assets/2e8c01ec-6f43-4c1a-b172-a5bdbaba8556" />
+
 # Upstand
 
 Upstand is a self-hostable control plane for deploying applications and databases, managing Docker resources, configuring Caddy, and operating remote servers from one web interface. It is a Bun/TypeScript monorepo built with Next.js, Hono, tRPC, Drizzle, PostgreSQL, Redis, Docker Swarm, and Better Auth.
