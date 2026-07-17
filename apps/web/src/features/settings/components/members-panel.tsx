@@ -332,68 +332,74 @@ export function MembersPanel() {
             )}
 
             <form.Field name="role">
-              {(field) => (
-                <Field>
-                  <FieldLabel>Role</FieldLabel>
-                  <Select
-                    items={[
-                      { value: "member", label: "Member" },
-                      { value: "admin", label: "Admin" },
-                      ...(customRolesQuery.data ?? []).map((role) => ({
-                        value: `custom:${role.id}`,
-                        label: `${role.name} (Custom)`,
-                      })),
-                      {
-                        value: "create-custom",
-                        label: "Create custom role...",
-                      },
-                    ]}
-                    value={field.state.value}
-                    onValueChange={(val) => handleRoleChange(val ?? "")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      {(customRolesQuery.data ?? []).map((role) => (
-                        <SelectItem key={role.id} value={`custom:${role.id}`}>
-                          <div className="flex w-full items-center justify-between gap-4">
-                            <span>{role.name}</span>
-                            <button
-                              type="button"
-                              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                if (
-                                  confirm(
-                                    `Are you sure you want to delete the custom role "${role.name}"? Active members with this role will be degraded to the Member role.`,
-                                  )
-                                ) {
-                                  removeCustomRole.mutate({
-                                    organizationId,
-                                    id: role.id,
-                                  });
-                                }
-                              }}
-                            >
-                              <HugeiconsIcon
-                                icon={Delete02Icon}
-                                className="size-3.5"
-                              />
-                            </button>
-                          </div>
+              {(field) => {
+                const roleItems = [
+                  { value: "member", label: "Member" },
+                  { value: "admin", label: "Admin" },
+                  ...(customRolesQuery.data ?? []).map((role) => ({
+                    value: `custom:${role.id}`,
+                    label: `${role.name} (Custom)`,
+                  })),
+                  {
+                    value: "create-custom",
+                    label: "Create custom role...",
+                  },
+                ];
+                const selectedRoleLabel =
+                  roleItems.find((item) => item.value === field.state.value)
+                    ?.label ?? "Select a role";
+                return (
+                  <Field>
+                    <FieldLabel>Role</FieldLabel>
+                    <Select
+                      items={roleItems}
+                      value={field.state.value}
+                      onValueChange={(val) => handleRoleChange(val ?? "")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>{selectedRoleLabel}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="member">Member</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        {(customRolesQuery.data ?? []).map((role) => (
+                          <SelectItem key={role.id} value={`custom:${role.id}`}>
+                            <div className="flex w-full items-center justify-between gap-4">
+                              <span>{role.name}</span>
+                              <button
+                                type="button"
+                                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  if (
+                                    confirm(
+                                      `Are you sure you want to delete the custom role "${role.name}"? Active members with this role will be degraded to the Member role.`,
+                                    )
+                                  ) {
+                                    removeCustomRole.mutate({
+                                      organizationId,
+                                      id: role.id,
+                                    });
+                                  }
+                                }}
+                              >
+                                <HugeiconsIcon
+                                  icon={Delete02Icon}
+                                  className="size-3.5"
+                                />
+                              </button>
+                            </div>
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="create-custom">
+                          Create custom role...
                         </SelectItem>
-                      ))}
-                      <SelectItem value="create-custom">
-                        Create custom role...
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                );
+              }}
             </form.Field>
 
             <form.Subscribe selector={(state) => state.values.role}>
@@ -593,7 +599,15 @@ export function MembersPanel() {
                         }}
                       >
                         <SelectTrigger className="w-32">
-                          <SelectValue />
+                          <SelectValue>
+                            {draft.customRoleId
+                              ? (customRolesQuery.data?.find(
+                                  (r) => r.id === draft.customRoleId,
+                                )?.name ?? draft.role)
+                              : draft.role === "admin"
+                                ? "Admin"
+                                : "Member"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="member">Member</SelectItem>

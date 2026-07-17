@@ -73,7 +73,9 @@ export function ProviderFormFields({
           }}
         >
           <SelectTrigger id={`${idPrefix}-provider`} className="w-full">
-            <SelectValue placeholder="Select a provider" />
+            <SelectValue placeholder="Select a provider">
+              {PROVIDER_LABELS[values.provider] ?? "Select a provider"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {(Object.entries(PROVIDER_LABELS) as [AIProvider, string][]).map(

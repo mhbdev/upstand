@@ -117,6 +117,20 @@ export function FeatureAssignmentsSection({
             );
             const value = currentAssignment?.providerConfigId || "fallback";
 
+            const allItems = [
+              {
+                value: "fallback",
+                label: "None (First available fallback)",
+              },
+              ...providers.map((prov) => ({
+                value: prov.id,
+                label: `${prov.name} (${prov.model})`,
+              })),
+            ];
+            const selectedLabel =
+              allItems.find((item) => item.value === value)?.label ??
+              "Select provider";
+
             return (
               <div
                 key={feat.key}
@@ -133,16 +147,7 @@ export function FeatureAssignmentsSection({
                 <div className="w-full md:w-64">
                   <Field>
                     <Select
-                      items={[
-                        {
-                          value: "fallback",
-                          label: "None (First available fallback)",
-                        },
-                        ...providers.map((prov) => ({
-                          value: prov.id,
-                          label: `${prov.name} (${prov.model})`,
-                        })),
-                      ]}
+                      items={allItems}
                       value={value}
                       onValueChange={(val) =>
                         handleValueChange(feat.key, val || "fallback")
@@ -150,7 +155,9 @@ export function FeatureAssignmentsSection({
                       disabled={isPending}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select provider" />
+                        <SelectValue placeholder="Select provider">
+                          {selectedLabel}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="fallback">
