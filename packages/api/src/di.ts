@@ -142,6 +142,7 @@ import {
   ListResourceTagsUseCase,
   ListTagsUseCase,
   ListTemplatesUseCase,
+  PruneDockerResourcesUseCase,
   PublishNotificationUseCase,
   RandomizeComposeUseCase,
   RebuildDatabaseUseCase,
@@ -275,6 +276,7 @@ import {
   ListTagsUseCaseToken,
   ListTemplatesUseCaseToken,
   NotificationTransportToken,
+  PruneDockerResourcesUseCaseToken,
   PublishNotificationUseCaseToken,
   RandomizeComposeUseCaseToken,
   RebuildDatabaseUseCaseToken,
@@ -652,6 +654,14 @@ services.addTransient(
   GetDockerInventoryUseCaseToken,
   (c) =>
     new GetDockerInventoryUseCase(
+      c.resolve(UnitOfWorkToken),
+      c.resolve(DockerReadOnlyServiceToken),
+    ),
+);
+services.addTransient(
+  PruneDockerResourcesUseCaseToken,
+  (c) =>
+    new PruneDockerResourcesUseCase(
       c.resolve(UnitOfWorkToken),
       c.resolve(DockerReadOnlyServiceToken),
     ),

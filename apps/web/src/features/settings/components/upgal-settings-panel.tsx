@@ -50,7 +50,7 @@ export function UpGalSettingsPanel({
       <Card className="border-border bg-card/50">
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
           <div className="flex flex-col gap-1">
-            <CardTitle className="text-sm font-semibold">
+            <CardTitle className="font-semibold text-sm">
               AI Providers
             </CardTitle>
             <CardDescription>
@@ -74,11 +74,11 @@ export function UpGalSettingsPanel({
               Loading providers…
             </div>
           ) : providers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center border border-dashed border-border/60 rounded-lg py-10 px-4 text-center">
-              <p className="text-sm font-medium text-foreground/80 mb-1">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-border/60 border-dashed px-4 py-10 text-center">
+              <p className="mb-1 font-medium text-foreground/80 text-sm">
                 No AI providers configured
               </p>
-              <p className="text-xs text-muted-foreground max-w-sm mb-4">
+              <p className="mb-4 max-w-sm text-muted-foreground text-xs">
                 Add an AI provider (OpenAI, Anthropic, Google, etc.) to enable
                 UpGal agentic capabilities.
               </p>

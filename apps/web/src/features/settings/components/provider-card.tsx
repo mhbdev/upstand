@@ -63,11 +63,11 @@ export function ProviderCard({
             <span className="font-semibold text-foreground text-sm">
               {provider.name}
             </span>
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary text-xs">
               {PROVIDER_NAMES[provider.provider]}
             </span>
             {provider.baseUrl ? (
-              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-medium text-[10px] text-muted-foreground">
                 Custom URL
               </span>
             ) : null}
@@ -80,7 +80,7 @@ export function ProviderCard({
               </code>
             </div>
             {provider.baseUrl ? (
-              <div className="truncate max-w-[300px]">
+              <div className="max-w-[300px] truncate">
                 <span className="font-medium text-foreground/75">
                   Endpoint:{" "}
                 </span>

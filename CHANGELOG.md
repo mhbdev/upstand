@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.69 - 2026-07-17
+
+### Added
+
+- Add `prune_docker_resources` tool to UpGal, enabling users to prune unused Docker resources (unused images, unattached volumes, builder cache, stopped containers, network/system, or all) on local or remote servers.
+- The tool requires explicit user confirmation/approval before executing any destructive operations.
+
 ## 0.1.68 - 2026-07-17
 
 ### Fixed

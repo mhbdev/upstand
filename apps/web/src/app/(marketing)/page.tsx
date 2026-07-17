@@ -747,7 +747,7 @@ function ComparisonSection() {
                   <TableHead
                     key={platform.key}
                     className={cn(
-                      "sticky top-16 z-20 bg-card px-5 py-5 align-bottom relative overflow-hidden",
+                      "relative sticky top-16 z-20 overflow-hidden bg-card px-5 py-5 align-bottom",
                       platform.className,
                     )}
                   >

@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { DockerCleanupService } from "./docker-cleanup.service";
 import { DockerReadOnlyService } from "./docker-readonly.service";
 
 describe("Docker explorer image controls", () => {
@@ -128,5 +129,59 @@ describe("Docker explorer image controls", () => {
       blockWriteBytes: 40,
       pids: 3,
     });
+  });
+
+  test("prunes local docker resources via DockerCleanupService", async () => {
+    const runMock = mock(() =>
+      Promise.resolve({ action: "images", output: ["images pruned local"] }),
+    );
+    DockerCleanupService.prototype.run = runMock;
+
+    const service = new DockerReadOnlyService({} as never);
+    const result = await service.prune(
+      { kind: "local", name: "Local Docker" },
+      "images",
+    );
+
+    expect(result.success).toBeTrue();
+    expect(result.output).toEqual(["images pruned local"]);
+    expect(runMock).toHaveBeenCalledWith("images");
+  });
+
+  test("prunes remote docker resources via executeRemote", async () => {
+    const service = new DockerReadOnlyService({} as never);
+    const executedCommands: string[] = [];
+    service["executeRemote"] = mock(async (_target, cmd) => {
+      executedCommands.push(cmd);
+      return `${cmd} success`;
+    });
+
+    const result = await service.prune(
+      {
+        kind: "remote",
+        name: "Remote Server",
+        host: "192.168.1.1",
+        port: 22,
+        username: "root",
+        privateKey: "key",
+      },
+      "all",
+    );
+
+    expect(result.success).toBeTrue();
+    expect(result.output).toEqual([
+      "containers: docker container prune --force success",
+      "images: docker image prune --all --force success",
+      "volumes: docker volume prune --all --force success",
+      "builder: docker builder prune --all --force success",
+      "system: docker system prune --all --force success",
+    ]);
+    expect(executedCommands).toEqual([
+      "docker container prune --force",
+      "docker image prune --all --force",
+      "docker volume prune --all --force",
+      "docker builder prune --all --force",
+      "docker system prune --all --force",
+    ]);
   });
 });

@@ -96,7 +96,7 @@ export function FeatureAssignmentsSection({
   return (
     <Card className="border-border bg-card/50">
       <CardHeader>
-        <CardTitle className="text-sm font-semibold">
+        <CardTitle className="font-semibold text-sm">
           AI Feature Routing
         </CardTitle>
         <CardDescription>
@@ -107,7 +107,7 @@ export function FeatureAssignmentsSection({
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {providers.length === 0 ? (
-          <p className="text-muted-foreground text-xs italic py-2">
+          <p className="py-2 text-muted-foreground text-xs italic">
             Add at least one AI provider above to route features.
           </p>
         ) : (
@@ -134,9 +134,9 @@ export function FeatureAssignmentsSection({
             return (
               <div
                 key={feat.key}
-                className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-border/40 pb-5 last:border-b-0 last:pb-0"
+                className="flex flex-col gap-3 border-border/40 border-b pb-5 last:border-b-0 last:pb-0 md:flex-row md:items-center md:justify-between"
               >
-                <div className="flex flex-col gap-0.5 max-w-lg">
+                <div className="flex max-w-lg flex-col gap-0.5">
                   <span className="font-medium text-foreground text-sm">
                     {feat.label}
                   </span>

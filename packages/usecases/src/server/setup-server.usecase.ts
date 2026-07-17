@@ -281,7 +281,7 @@ export class SetupServerUseCase {
 
     const configuredMonitoringImage =
       process.env.UPSTAND_MONITORING_IMAGE?.trim();
-    let monitoringImage =
+    const monitoringImage =
       configuredMonitoringImage || "upstand-monitoring-agent";
     let remoteTarPath: string | undefined;
     let remoteSrcPath: string | undefined;

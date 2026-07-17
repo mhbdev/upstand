@@ -125,6 +125,10 @@ export const GetAccountStatusUseCaseToken =
   createToken<UseCases.GetAccountStatusUseCase>("GetAccountStatusUseCase");
 export const GetDockerInventoryUseCaseToken =
   createToken<UseCases.GetDockerInventoryUseCase>("GetDockerInventoryUseCase");
+export const PruneDockerResourcesUseCaseToken =
+  createToken<UseCases.PruneDockerResourcesUseCase>(
+    "PruneDockerResourcesUseCase",
+  );
 export const CreateSshKeyUseCaseToken =
   createToken<UseCases.CreateSshKeyUseCase>("CreateSshKeyUseCase");
 export const GetSshKeysUseCaseToken =

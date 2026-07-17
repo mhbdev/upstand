@@ -35,6 +35,7 @@ import type {
   GetResourceStatsUseCase,
   GetResourcesUseCase,
   GetServersUseCase,
+  PruneDockerResourcesUseCase,
 } from "@upstand/usecases";
 import { validateTemplateComposeFile } from "@upstand/usecases";
 import {
@@ -53,6 +54,7 @@ import {
   GetResourceStatsUseCaseToken,
   GetResourcesUseCaseToken,
   GetServersUseCaseToken,
+  PruneDockerResourcesUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
 import {
@@ -207,6 +209,11 @@ export const UPGAL_TOOL_METADATA = [
     "Permanently delete a project and its environments after approval. This cannot be undone.",
     true,
   ],
+  [
+    "prune_docker_resources",
+    "Prune unused Docker resources (images, volumes, containers, builder, system, or all) on a server after approval.",
+    true,
+  ],
 ] as const;
 
 export type UpGalTools = {
@@ -293,6 +300,10 @@ export type UpGalTools = {
   delete_project: UpGalExecutableTool<
     z.infer<typeof idSchema>,
     Awaited<ReturnType<DeleteProjectUseCase["execute"]>>
+  >;
+  prune_docker_resources: UpGalExecutableTool<
+    z.infer<typeof pruneDockerSchema>,
+    Awaited<ReturnType<PruneDockerResourcesUseCase["execute"]>>
   >;
 };
 export type UpGalUIMessage = UIMessage<
@@ -444,6 +455,26 @@ const dockerLogsSchema = dockerTargetSchema.extend({
     .max(5)
     .optional()
     .describe("Only return Docker log lines classified at these levels."),
+});
+const pruneDockerSchema = z.object({
+  serverId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Server ID to prune; omit or use 'local' for the local engine."),
+  type: z
+    .enum(["images", "volumes", "containers", "builder", "system", "all"])
+    .describe(
+      "The type of Docker resource to prune. 'images' removes unused images, 'volumes' removes unattached volumes, 'all' prunes everything.",
+    ),
+});
+const pruneDockerOutputSchema = z.object({
+  success: z
+    .boolean()
+    .describe("Whether the prune operation completed successfully."),
+  output: z
+    .array(z.string())
+    .describe("Detailed output from each pruned resource class."),
 });
 const toolContextSchema = z.object({
   organizationId: z
@@ -993,6 +1024,16 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
       },
       projectOutputSchema.nullable(),
     ),
+    prune_docker_resources: mutationTool(
+      "Prune unused Docker resources (unused images, unattached volumes, builder, system, or all). This requires approval.",
+      pruneDockerSchema,
+      async (input) =>
+        run(PruneDockerResourcesUseCaseToken).execute({
+          organizationId: context.organizationId,
+          ...input,
+        }),
+      pruneDockerOutputSchema,
+    ),
   };
 }
 
@@ -1465,6 +1506,7 @@ export async function createUpGalResponse(
       control_resource: { organizationId: context.organizationId },
       delete_resource: { organizationId: context.organizationId },
       delete_project: { organizationId: context.organizationId },
+      prune_docker_resources: { organizationId: context.organizationId },
     },
     stopWhen: stepCountIs(12),
     runtimeContext: context,

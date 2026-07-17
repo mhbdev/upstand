@@ -205,6 +205,13 @@ export type DockerResourceCommand =
   | "remove-volume"
   | "remove-network"
   | "remove-image";
+export type DockerPruneType =
+  | "images"
+  | "volumes"
+  | "containers"
+  | "builder"
+  | "system"
+  | "all";
 
 export interface DockerReadOnlyPort {
   controlContainer(
@@ -217,6 +224,10 @@ export interface DockerReadOnlyPort {
     resourceId: string,
     command: DockerResourceCommand,
   ): Promise<{ success: true }>;
+  prune(
+    target: DockerInspectionTarget,
+    type: DockerPruneType,
+  ): Promise<{ success: true; output: string[] }>;
   getInfo(target: DockerInspectionTarget): Promise<DockerInfo>;
   getHostTime(
     target: DockerInspectionTarget,

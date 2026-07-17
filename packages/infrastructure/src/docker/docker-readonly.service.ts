@@ -11,6 +11,7 @@ import type {
   DockerInspectionTarget,
   DockerLogRequest,
   DockerNetwork,
+  DockerPruneType,
   DockerResourceCommand,
   DockerServiceSummary,
   DockerVolume,
@@ -18,6 +19,7 @@ import type {
 import { filterDockerLogs } from "@upstand/usecases/resource/docker-log-filter";
 import type Docker from "dockerode";
 import { Client } from "ssh2";
+import { DockerCleanupService } from "./docker-cleanup.service";
 import { getDockerInstance } from "./docker-client";
 
 const VOLUME_HELPER_IMAGE = "alpine:3.20";
@@ -148,6 +150,36 @@ export class DockerReadOnlyService {
       await this.executeRemote(target, `docker ${action} ${resourceId}`);
     }
     return { success: true };
+  }
+
+  async prune(
+    target: DockerInspectionTarget,
+    type: DockerPruneType,
+  ): Promise<{ success: true; output: string[] }> {
+    const actionArgs: Record<Exclude<DockerPruneType, "all">, string> = {
+      images: "docker image prune --all --force",
+      volumes: "docker volume prune --all --force",
+      containers: "docker container prune --force",
+      builder: "docker builder prune --all --force",
+      system: "docker system prune --all --force",
+    };
+    const parsedActions =
+      type === "all"
+        ? (["containers", "images", "volumes", "builder", "system"] as const)
+        : [type];
+
+    if (target.kind === "local") {
+      const cleanupService = new DockerCleanupService();
+      const result = await cleanupService.run(type);
+      return { success: true, output: result.output };
+    }
+    const output: string[] = [];
+    for (const action of parsedActions) {
+      const cmd = actionArgs[action];
+      const result = await this.executeRemote(target, cmd);
+      output.push(`${action}: ${result.trim()}`);
+    }
+    return { success: true, output };
   }
 
   async getInfo(target: DockerInspectionTarget): Promise<DockerInfo> {

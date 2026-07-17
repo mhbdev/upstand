@@ -1,5 +1,5 @@
-import { TRPCError } from "@trpc/server";
 import { describe, expect, test } from "bun:test";
+import { TRPCError } from "@trpc/server";
 import { handleUseCaseError } from "./errors";
 
 describe("use-case error mapping", () => {
