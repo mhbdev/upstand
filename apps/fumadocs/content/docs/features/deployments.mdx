@@ -1,0 +1,101 @@
+---
+title: Applications, Compose Stacks & Databases
+description: Learn how workloads are built, queued, deployed, and managed across your infrastructure.
+---
+
+Upstand orchestrates your services by dividing them into three distinct resource categories: Applications, Compose projects, and Databases.
+
+---
+
+## 1. Application Deployments
+
+Applications build from Git repositories (GitHub, GitLab, Bitbucket, Gitea, or generic URLs) or deploy directly from pre-built container registry images.
+
+### Serialization & Concurrency
+- **Build Queues**: Each server node hosts an isolated build queue (`deployments-queue-<nodeId>`).
+- **Resource Locking**: Redis locks serialize builds per resource to prevent overlapping builds from conflicting.
+- **Dynamic Concurrency**: Deployment workers adapt concurrency dynamically based on host node CPU/RAM, subscribing to Redis Pub/Sub events (`upstand:server:concurrency`).
+- **Webhook Deployments**: Git pushes trigger automatic builds, recording the provider commit SHA for historical auditability.
+
+### Application Builders
+
+Upstand supports multiple modern build systems:
+
+<Tabs items={['Dockerfile', 'Nixpacks / Railpack', 'Buildpacks', 'Static']}>
+  <Tab value="Dockerfile">
+    - **BuildKit Secrets**: Inject sensitive build variables as ephemeral secret mounts:
+      ```json
+      { "NPM_TOKEN": "secret_npm_token_here" }
+      ```
+      In your `Dockerfile`, consume them using:
+      ```dockerfile
+      RUN --mount=type=secret,id=NPM_TOKEN npm install
+      ```
+      This ensures tokens do not leak into final image layers.
+    - Custom build context paths, targets, and caching controls are supported.
+  </Tab>
+  <Tab value="Nixpacks / Railpack">
+    - Zero-config build systems that automatically detect project types (Node.js, Go, Python, Rust, PHP, Ruby) and build them efficiently.
+    - Specify a pinned Railpack version or select from the Nixpacks registry.
+  </Tab>
+  <Tab value="Buildpacks">
+    - Supports both Heroku and Paketo Cloud Native Buildpacks (CNB) to generate standardized OCI-compliant container images.
+  </Tab>
+  <Tab value="Static">
+    - Serves front-end assets directly.
+    - Custom publish directories and single-page-application (SPA) fallback behaviors.
+    - Offers automated validation with `sslip.io` hostname generation.
+  </Tab>
+</Tabs>
+
+---
+
+## 2. Database Provisioning
+
+Databases run as Docker Swarm services with persistent named volumes (`upstand-db-data-<id>`) bound to standard data directories.
+
+### Supported Engines
+Upstand natively configures connection strings, environment details, and security for:
+- **PostgreSQL**
+- **MySQL**
+- **MariaDB**
+- **MongoDB**
+- **Redis**
+- **libSQL (sqld)**: Exposes independent HTTP (port 8080), gRPC (port 5001), and admin dashboard (port 5000) published ports. When credentials are saved, Upstand derives the `SQLD_HTTP_AUTH` basic-auth token dynamically without displaying it in plain text.
+
+### Operations & Diagnostics
+- **Reload**: Gracefully restarts the database container.
+- **Rebuild**: Explicitly deletes the managed database volume and recreates a fresh container. *Warning: Back up your data before triggering a rebuild.*
+- **Diagnostics**: Runs engine-specific check commands inside the container (e.g. version checks, connectivity status) and displays bounded log outputs. Arbitrary user command strings are rejected for security.
+
+---
+
+## 3. Compose Projects & Swarm Stacks
+
+Deploy multi-container applications from raw YAML configurations or repository-hosted Compose files.
+
+- **Compose Mode**: Runs workloads using standard `docker compose up --detach`. Better suited for single-node development testing.
+- **Stack Mode**: Deploys services using `docker stack deploy` on Docker Swarm.
+- **Mode Conversion**: Automatically converts Compose configurations to Swarm-compatible Stack files:
+  - Removes fixed `container_name` fields.
+  - Maps `restart: always` to Swarm's `deploy.restart_policy` settings.
+- **Name Randomization**: Replaces service, network, volume, config, and secret names with randomized hashes. Essential when deploying the same Compose template multiple times in the same cluster to avoid name clashes.
+
+---
+
+## 4. Scheduled Jobs
+
+Schedules are resource-scoped, permission-checked, and managed via the **Deployments → Scheduled jobs** interface:
+
+- **Command Jobs**: Execute specific cron commands inside the running resource container.
+- **Deployment Jobs**: Queue a standard build/deployment operation on a cron schedule.
+- **Backup Jobs**: Trigger the resource's S3 backup workflow.
+- **Run Now**: Instantly enqueues the job (even if disabled) into the worker queues.
+
+---
+
+## 5. Rollback Procedures
+
+- **Swarm Rollback**: Restores the previous Docker service specification from the Docker Swarm history.
+- **Git Rollback**: Re-deploys a historical Git commit SHA directly from your deployment history logs.
+- **Rollback Registry**: Encrypted Docker registry credentials for private images are sent securely only to the target node during rolling updates or rollbacks.

@@ -105,7 +105,7 @@ export function DockerContainerTerminalDialog({
       emptyMessage="Click Connect to start an interactive terminal session"
       onTerminalClose={disconnect}
       controls={
-        <>
+        <div className="flex flex-wrap items-center gap-3">
           {isLocal ? (
             <Select
               items={keys.map((key) => ({
@@ -115,7 +115,7 @@ export function DockerContainerTerminalDialog({
               value={keyId}
               onValueChange={(value) => setKeyId(value ?? "")}
             >
-              <SelectTrigger className="min-w-0 flex-1 sm:min-w-64 sm:flex-none">
+              <SelectTrigger className="w-full min-w-0 sm:w-64">
                 <SelectValue placeholder="SSH key" />
               </SelectTrigger>
               <SelectContent>
@@ -128,7 +128,7 @@ export function DockerContainerTerminalDialog({
             </Select>
           ) : null}
           <Button
-            className="flex-1 sm:flex-none"
+            className="w-full sm:w-auto"
             onClick={connect}
             disabled={connecting || token !== null}
           >
@@ -139,14 +139,14 @@ export function DockerContainerTerminalDialog({
                 : "Connect"}
           </Button>
           <Button
-            className="flex-1 sm:flex-none"
+            className="w-full sm:w-auto"
             variant="outline"
             onClick={disconnect}
             disabled={token === null}
           >
             Disconnect
           </Button>
-        </>
+        </div>
       }
     />
   );

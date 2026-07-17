@@ -1,18 +1,9 @@
 {
-  "title": "Upstand documentation",
+  "title": "Upstand Documentation",
   "pages": [
-    "index",
     "getting-started",
-    "self-hosting",
-    "resources",
-    "routing-and-certificates",
-    "integrations-and-operations",
-    "upgal",
-    "code-editors-and-logs",
-    "remote-servers",
-    "deployments",
-    "docker-swarm",
-    "updates",
-    "troubleshooting"
+    "features",
+    "operations",
+    "reference"
   ]
 }

@@ -1,0 +1,9 @@
+{
+  "title": "Core Features",
+  "pages": [
+    "deployments",
+    "routing",
+    "servers",
+    "terminal-logs"
+  ]
+}

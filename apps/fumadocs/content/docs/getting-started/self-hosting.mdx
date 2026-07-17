@@ -1,0 +1,101 @@
+---
+title: Production Self-Hosting
+description: Learn how to provision a secure production environment using the Upstand installer.
+---
+
+This guide outlines the production installation process, environment variable options, system prerequisites, and the security model for Upstand.
+
+---
+
+## Server Prerequisites
+
+Prepare a fresh Linux Virtual Machine matching these requirements:
+
+1. **Host OS**: Ubuntu 22.04 LTS or Debian 12 (Bookworm) is recommended.
+2. **Hardware**: At least 2 vCPUs, 4 GB of RAM, and 30 GB of SSD storage.
+3. **DNS Configuration**: Configure two A records pointing to your server's public IP:
+   - `app.example.com` (for the dashboard UI)
+   - `api.example.com` (for the Hono/tRPC API server)
+4. **Firewall Rules**:
+   - Open public TCP **80** and **443** for Caddy HTTPS certificate generation.
+   - For multi-node Swarms, restrict TCP **2377** (cluster management), TCP/UDP **7946** (node communication), and UDP **4789** (overlay network ingress) to your internal cluster network.
+
+---
+
+## Installation Modes
+
+The Upstand installer support two compilation strategies:
+
+- **Release Images (Recommended)**: Pulls immutable pre-built images from the GitHub Container Registry (`ghcr.io`). Highly recommended for production stability and repeatability.
+- **GitHub Source Build**: Clones the public `@upstand` repository directly onto your manager and builds the Docker images locally. Best for evaluation or testing local patches.
+
+---
+
+## Installation Walkthrough
+
+<Steps>
+  <Step>
+    ### Prepare the environment variables
+    
+    Before running the installer, export your target domains and production image digests.
+    
+    ```bash
+    export BETTER_AUTH_URL=https://api.example.com
+    export CORS_ORIGIN=https://app.example.com
+    export NEXT_PUBLIC_SERVER_URL=https://api.example.com
+    
+    # Specify the image digests to pin for your rollout
+    export UPSTAND_SERVER_IMAGE=ghcr.io/mhbdev/upstand-server@sha256:<digest>
+    export UPSTAND_MONITORING_IMAGE=ghcr.io/mhbdev/upstand-monitoring@sha256:<digest>
+    export UPSTAND_WEB_IMAGE=ghcr.io/mhbdev/upstand-web@sha256:<digest>
+    export UPSTAND_DOCS_IMAGE=ghcr.io/mhbdev/upstand-fumadocs@sha256:<digest>
+    ```
+  </Step>
+
+  <Step>
+    ### Run the installation script
+    
+    Execute the bootstrap command to download and run the installer:
+    
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash
+    ```
+  </Step>
+
+  <Step>
+    ### Verify the service statuses
+    
+    Once the installer finishes, verify that all services are running and reporting ready:
+    
+    ```bash
+    # Check Swarm stack state
+    docker stack services upstand
+    
+    # Query API health status
+    curl -fsS https://api.example.com/health/ready
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Configuration & Storage Layout
+
+The installer isolates configuration from secrets to protect credentials:
+
+- **/etc/upstand/.env**: Stores non-secret environment variables, origins, and image digests. Pinned with mode `0600`.
+- **/etc/upstand/secrets/**: Stores sensitive credentials (Postgres passwords, Redis keys, SSH keys, encryption keys) as individual `0600` files. Injected directly into containers as Docker Secrets.
+
+> [!CAUTION]
+> **Secret Key Management:** Ensure you back up `/etc/upstand/` securely. The cluster master key (`SSH_KEY_ENCRYPTION_KEY_V1`) is used to encrypt remote server credentials at rest; losing it makes stored SSH keys and AI provider keys unrecoverable.
+
+---
+
+## Outage Resilience & Rate Limiting
+
+To maintain uptime, the Hono API integrates an in-process rate-limiting fallback that activates if Redis is down:
+
+- **Redis Online**: Employs a distributed sliding window rate limiter in Redis.
+- **Redis Offline Fallback**: Switches to a local, memory-bounded token bucket limiter.
+- **Emergency Limits**: Unauthenticated endpoints allow up to 20 requests/min; sensitive mutation routes allow 15/min; authenticated reads allow 30/min per active identity.
+- The `/health/ready` endpoint flags whether this local fallback mode is currently active.

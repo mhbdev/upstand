@@ -81,6 +81,10 @@ function formatBytes(bytes: number, decimals = 2) {
   return `${Number.parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
 }
 
+function stripAnsi(str: string) {
+  return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+}
+
 export default function DockerInventoryPage() {
   const { data: organization } = authClient.useActiveOrganization();
   const organizationId = organization?.id || "";
@@ -1199,7 +1203,7 @@ export default function DockerInventoryPage() {
                     >
                       {typeof inventoryQuery.data === "string" &&
                       inventoryQuery.data
-                        ? inventoryQuery.data
+                        ? stripAnsi(inventoryQuery.data)
                         : containerId || serviceName
                           ? "Querying logs or no logs match current filters..."
                           : "Choose a container or input a service name above to inspect logs."}

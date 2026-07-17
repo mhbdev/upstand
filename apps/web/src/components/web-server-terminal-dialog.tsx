@@ -157,8 +157,8 @@ export function WebServerTerminalDialog({
             else void connect();
           }}
         >
-          <FieldGroup className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(9rem,0.32fr)_7rem_auto]">
-            <Field className="col-span-2 lg:col-span-1">
+          <FieldGroup className="grid grid-cols-2 gap-4">
+            <Field className="col-span-2">
               <FieldLabel htmlFor="control-plane-ssh-key">SSH key</FieldLabel>
               <Select
                 items={keys.map((key) => ({
@@ -203,7 +203,7 @@ export function WebServerTerminalDialog({
               </Select>
             </Field>
 
-            <Field>
+            <Field className="col-span-2 sm:col-span-1">
               <FieldLabel htmlFor="control-plane-username">Username</FieldLabel>
               <InputGroup data-disabled={Boolean(token)}>
                 <InputGroupAddon>
@@ -220,7 +220,7 @@ export function WebServerTerminalDialog({
               </InputGroup>
             </Field>
 
-            <Field>
+            <Field className="col-span-2 sm:col-span-1">
               <FieldLabel htmlFor="control-plane-port">Port</FieldLabel>
               <InputGroup data-disabled={Boolean(token)}>
                 <InputGroupInput
@@ -236,11 +236,11 @@ export function WebServerTerminalDialog({
               </InputGroup>
             </Field>
 
-            <Field className="col-span-2 justify-end lg:col-span-1">
+            <Field className="col-span-2 flex justify-end pt-2">
               <FieldLabel className="sr-only">Session action</FieldLabel>
               <Button
                 type="submit"
-                className="w-full lg:min-w-28"
+                className="w-full sm:w-fit sm:min-w-32"
                 variant={
                   token ? (sessionReady ? "destructive" : "outline") : "default"
                 }

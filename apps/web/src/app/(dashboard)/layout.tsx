@@ -152,13 +152,13 @@ function DashboardSidebarGroup({
   }
 
   return (
-    <Collapsible defaultOpen className="group/collapsible">
+    <Collapsible defaultOpen className="group">
       <SidebarGroup className="p-0">
         <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between px-3 py-1.5 font-bold text-[10px] text-muted-foreground/60 uppercase tracking-wider transition-colors hover:text-foreground">
           <span>{group.title}</span>
           <HugeiconsIcon
             icon={ArrowRight01Icon}
-            className="size-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+            className="size-3.5 transition-transform duration-200 group-data-open:rotate-90"
           />
         </CollapsibleTrigger>
         <CollapsibleContent>{content}</CollapsibleContent>

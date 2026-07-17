@@ -35,7 +35,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         >
           {children}
         </AuthProvider>
-        <ReactQueryDevtools />
+        {/* <ReactQueryDevtools /> */}
       </QueryClientProvider>
       <Toaster richColors />
     </ThemeProvider>

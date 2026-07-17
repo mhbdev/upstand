@@ -1,0 +1,81 @@
+---
+title: UpGal AI Operations Assistant
+description: Learn how to configure, secure, and extend UpGal, the built-in AI platform operator.
+---
+
+**UpGal** is an organization-scoped AI operator integrated into the Upstand dashboard. It assists operators by automating infrastructure inspection and safely applying mutations with human oversight.
+
+---
+
+## 1. Provider Setup
+
+Configure your LLM provider by navigating to **Settings → UpGal Settings** (restricted to organization owners and admins):
+
+<Steps>
+  <Step>
+    ### Choose a Provider
+    Select from OpenAI, Anthropic, Google Gemini, OpenRouter, or a custom OpenAI-compatible AI Gateway.
+  </Step>
+
+  <Step>
+    ### Configure API Details
+    Enter your API credentials, along with optional custom Base URLs. Upstand encrypts API keys at rest; the browser only receives provider metadata and configuration statuses.
+  </Step>
+
+  <Step>
+    ### Fetch Catalog Models
+    Click **Load models** to pull the list of compatible LLMs dynamically from the provider's endpoint, or type in a custom Model ID.
+  </Step>
+
+  <Step>
+    ### Test the Connection
+    Click **Test connection** to validate the key and endpoint credentials using your unsaved changes. Once successful, save your configuration.
+  </Step>
+</Steps>
+
+---
+
+## 2. Execution Loop & Safeguards
+
+UpGal executes on the server using Vercel AI SDK's `ToolLoopAgent` and streams real-time tool states, messages, and approval prompts to the dashboard:
+
+- **12-Step Loop Limit**: Runs are capped at 12 sequential tool execution loops to prevent runaway API spend or infinite loops.
+- **Request-Scoped DI**: Uses the same request container lifecycle as standard HTTP endpoints, ensuring strict tenant isolation.
+- **Auto-run (Read-only)**: Inspection tools (e.g. listing resources, viewing container statistics, tailing logs) run automatically after verifying tenant permission.
+- **Approval Gates (Mutations)**: Destructive or mutative actions (creating projects, deploying apps, stopping services, deleting resources) require explicit user approval.
+
+```mermaid
+sequenceDiagram
+    participant User as Administrator
+    participant UI as Dashboard Chat
+    participant Agent as UpGal Agent
+    participant UseCase as Domain Use Case
+    
+    User->>UI: "Deploy my app"
+    UI->>Agent: Send message (authenticated context)
+    Agent->>UI: Requesting Approval to deploy "app-123"
+    User->>UI: Clicks "Approve" button
+    UI->>Agent: Approve token response
+    Agent->>UseCase: Call deploy()
+    UseCase->>UI: Stream success response
+```
+
+---
+
+## 3. Templates AI Draft Generator
+
+The **Templates** page integrates an AI template drafter. 
+
+- **No Auto-Save**: Generates raw Compose YAML based on a prompt without saving or deploying anything.
+- **Security Sanitization**: Generated Compose drafts strictly reject privileged mode, host namespace access, host filesystem bind mounts, Docker socket mounts, system capabilities, and device mappings.
+- **Manual Review**: Operators must inspect the CodeMirror draft, then explicitly save and trigger 2FA-secured deployments.
+
+---
+
+## 4. Model Context Protocol (MCP) Integration
+
+UpGal exposes a JSON-RPC Model Context Protocol endpoint at `/api/mcp` for external LLM integrations:
+
+- **API Authentication**: Access requires an Organization API Key (`upk_...`) with MCP scopes.
+- **Supported Methods**: Standard MCP actions: `initialize`, `tools/list`, and `tools/call`.
+- **Enforced Security**: MCP calls run with the same authorization context as the dashboard. Read-only queries execute instantly, while mutative commands return an "approval-required" payload that must be completed inside the dashboard UI.

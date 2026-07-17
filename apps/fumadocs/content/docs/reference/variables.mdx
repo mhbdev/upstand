@@ -1,0 +1,46 @@
+---
+title: Environment Variables Reference
+description: Complete reference of all validated configuration variables used by Upstand.
+---
+
+Upstand strictly validates all configuration variables on startup using Zod schemas defined in `packages/env`.
+
+---
+
+## Required Control Plane Variables
+
+These variables are required for the Hono API server and worker runtimes to boot:
+
+- **`DATABASE_URL`**: The PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/db`).
+- **`REDIS_URL`**: The Redis connection URI (e.g. `redis://:password@host:6379`).
+- **`BETTER_AUTH_SECRET`**: Random secret key used by Better Auth to hash tokens and secure sessions.
+- **`BETTER_AUTH_URL`**: The canonical URL of your auth API (e.g. `https://api.example.com`).
+- **`CORS_ORIGIN`**: The allowed origin for dashboard requests (e.g. `https://app.example.com`).
+- **`NEXT_PUBLIC_SERVER_URL`**: The public-facing HTTP origin of the Hono API (e.g. `https://api.example.com`).
+- **`SSH_KEY_ENCRYPTION_KEY_V1`**: A secure 32-byte key (base64 encoded) used to encrypt remote server SSH keys and AI provider keys at rest.
+
+---
+
+## Production Security Variables
+
+- **`TRUSTED_PROXY_CIDRS`**: Subnet CIDR strings representing trusted reverse proxy networks (e.g., `10.0.0.0/24`). The API only trusts headers like `X-Forwarded-For` from IPs within these CIDRs. Never include client-facing subnets.
+
+---
+
+## Update and Channel Settings
+
+- **`UPSTAND_VERSION`**: Pinned release tag (e.g. `v1.6.69`) displayed on the dashboard.
+- **`UPSTAND_AUTO_UPDATE`**: Set to `true` to enable automated release checks and background rolling updates. Defaults to `false`.
+- **`UPSTAND_SERVER_IMAGE`**: Immutable digest of the API server image.
+- **`UPSTAND_MONITORING_IMAGE`**: Immutable digest of the monitoring service image.
+- **`UPSTAND_WEB_IMAGE`**: Immutable digest of the Next.js web console image.
+- **`UPSTAND_DOCS_IMAGE`**: Immutable digest of the documentation service image.
+
+---
+
+## Location of Secrets
+
+During production installations via `install.sh`, variables are split based on sensitivity:
+
+- **Non-sensitive settings**: Placed in `/etc/upstand/.env` (mode `0600`).
+- **Sensitive credentials**: Managed as Docker Secrets and written under `/etc/upstand/secrets/` (mode `0600` individual files).
