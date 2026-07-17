@@ -132,20 +132,25 @@ describe("Docker explorer image controls", () => {
   });
 
   test("prunes local docker resources via DockerCleanupService", async () => {
+    const originalRun = DockerCleanupService.prototype.run;
     const runMock = mock(() =>
       Promise.resolve({ action: "images" as const, output: ["images pruned local"] }),
     );
     DockerCleanupService.prototype.run = runMock;
 
-    const service = new DockerReadOnlyService({} as never);
-    const result = await service.prune(
-      { kind: "local", name: "Local Docker" },
-      "images",
-    );
+    try {
+      const service = new DockerReadOnlyService({} as never);
+      const result = await service.prune(
+        { kind: "local", name: "Local Docker" },
+        "images",
+      );
 
-    expect(result.success).toBeTrue();
-    expect(result.output).toEqual(["images pruned local"]);
-    expect(runMock).toHaveBeenCalledWith("images");
+      expect(result.success).toBeTrue();
+      expect(result.output).toEqual(["images pruned local"]);
+      expect(runMock).toHaveBeenCalledWith("images");
+    } finally {
+      DockerCleanupService.prototype.run = originalRun;
+    }
   });
 
   test("prunes remote docker resources via executeRemote", async () => {
