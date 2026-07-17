@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.70 - 2026-07-17
+
+### Changed
+
+- Docs updated
+
 ## 0.1.69 - 2026-07-17
 
 ### Added
@@ -296,7 +302,6 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 - Delete legacy standalone routes for `/settings/branding`, `/settings/custom-roles`, and `/settings/api-keys` that have been migrated into the settings modal.
 
 ## 0.1.33 - 2026-07-14
-
 
 ### Changed
 
