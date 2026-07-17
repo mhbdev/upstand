@@ -470,7 +470,7 @@ const pruneDockerSchema = z.object({
 });
 const pruneDockerOutputSchema = z.object({
   success: z
-    .boolean()
+    .literal(true)
     .describe("Whether the prune operation completed successfully."),
   output: z
     .array(z.string())

@@ -133,7 +133,7 @@ describe("Docker explorer image controls", () => {
 
   test("prunes local docker resources via DockerCleanupService", async () => {
     const runMock = mock(() =>
-      Promise.resolve({ action: "images", output: ["images pruned local"] }),
+      Promise.resolve({ action: "images" as const, output: ["images pruned local"] }),
     );
     DockerCleanupService.prototype.run = runMock;
 

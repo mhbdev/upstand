@@ -659,6 +659,7 @@ export const MCP_TOOL_CAPABILITIES = {
   control_resource: "resource:update",
   delete_resource: "resource:delete",
   delete_project: "project:delete",
+  prune_docker_resources: "server:update",
 } as const satisfies Record<string, Capability>;
 
 export const MCP_READ_ONLY_TOOL_NAMES = [
