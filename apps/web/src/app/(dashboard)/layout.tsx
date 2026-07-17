@@ -173,13 +173,11 @@ function DashboardSidebar({ pathname }: { pathname: string }) {
 
   return (
     <Sidebar collapsible="icon">
-      <div className="px-2">
-        <OrganizationSwitcher className="min-h-[55px] w-full border-none p-[11.5px]" />
-      </div>
+      <OrganizationSwitcher className="min-h-13.75 w-full border-none p-[11.5px]" />
 
       <Separator />
 
-      <SidebarContent className="group-data-[collapsible=icon]:!overflow-auto space-y-4 px-2 py-2">
+      <SidebarContent className="group-data-[collapsible=icon]:overflow-auto! space-y-4 px-2 py-2">
         {NAVIGATION_GROUPS.map((group) => (
           <DashboardSidebarGroup
             key={group.title}
