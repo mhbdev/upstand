@@ -4,6 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.68 - 2026-07-17
+
+### Fixed
+
+- Fix all `<Select>` trigger components not showing the correct human-readable label when the dropdown is closed, by explicitly passing the resolved label as `SelectValue` children instead of relying on base-ui's dynamic `items` prop lookup.
+- Fix `UpGal AI Settings` feature routing selects, provider type selector in Add/Edit Provider dialogs, and member role selects in the Members panel all showing raw values (IDs or keys) instead of their proper display labels.
+- Fix `members-panel.tsx` custom role `SelectItem` rendering complex JSX (including a delete button) bleeding into the trigger display when that role was selected.
+
 ## 0.1.67 - 2026-07-17
 
 ### Fixed
