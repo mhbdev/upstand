@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import type {
   NotificationChannelView,
   NotificationDelivery,
@@ -74,17 +75,13 @@ import {
   Send,
   Users,
 } from "@/components/huge-icons";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const addNotificationTarget = defineUpGalTarget({
-  id: "add-notification-channel",
-  label: "Add notification button",
-  description: "Opens the form for adding a notification channel.",
-  kind: "button",
-  action: "open_dialog",
-});
+const addNotificationTarget = getUpGalTargetDefinition(
+  "add-notification-channel",
+);
 
 type NotificationChannelDto = Omit<
   NotificationChannelView,

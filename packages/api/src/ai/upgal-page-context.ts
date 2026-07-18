@@ -1,24 +1,21 @@
 import { z } from "zod";
 import { internalPathSchema, uiTargetIdSchema } from "./tools/ui-schemas";
 
+export const upGalUiTargetSchema = z.object({
+  id: uiTargetIdSchema,
+  label: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(400).optional(),
+  kind: z.enum(["button", "field", "dialog", "navigation", "other"]),
+  path: internalPathSchema.optional(),
+  action: z.enum(["spotlight", "focus", "open_dialog", "submit"]).optional(),
+});
+
+export type UpGalPageUiTarget = z.infer<typeof upGalUiTargetSchema>;
+
 export const UpGalPageContextSchema = z.object({
   path: z.string().trim().min(1).max(512),
   title: z.string().trim().min(1).max(200).optional(),
-  uiTargets: z
-    .array(
-      z.object({
-        id: uiTargetIdSchema,
-        label: z.string().trim().min(1).max(160),
-        description: z.string().trim().max(400).optional(),
-        kind: z.enum(["button", "field", "dialog", "navigation", "other"]),
-        path: internalPathSchema.optional(),
-        action: z
-          .enum(["spotlight", "focus", "open_dialog", "submit"])
-          .optional(),
-      }),
-    )
-    .max(100)
-    .optional(),
+  uiTargets: z.array(upGalUiTargetSchema).max(100).optional(),
 });
 
 export type UpGalPageContext = z.infer<typeof UpGalPageContextSchema>;

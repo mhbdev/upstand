@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { guideUpstandSchema, upGalUiStepSchema } from "./ui-tools";
+import {
+  guideUpstandSchema,
+  normalizeUpGalUiSteps,
+  upGalUiStepSchema,
+} from "./ui-tools";
 
 describe("UpGal UI action schemas", () => {
   test("accepts a generic multi-step walkthrough", () => {
@@ -54,5 +58,69 @@ describe("UpGal UI action schemas", () => {
         })),
       }),
     ).toThrow();
+  });
+
+  test("adds one route transition before an off-page dialog walkthrough", () => {
+    const plan = guideUpstandSchema.parse({
+      steps: [
+        {
+          type: "open_dialog",
+          target: "create-ssh-key",
+          description: "Open the SSH key creation dialog.",
+        },
+        {
+          type: "focus",
+          target: "ssh-key-public-key",
+          description: "Focus on the public key field.",
+        },
+      ],
+    });
+
+    const normalized = normalizeUpGalUiSteps(plan.steps, {
+      path: "/projects",
+    });
+
+    expect(normalized).toEqual([
+      {
+        type: "navigate",
+        path: "/ssh-keys",
+        description: "Open Add SSH Key button on /ssh-keys before continuing.",
+      },
+      ...plan.steps,
+    ]);
+  });
+
+  test("resolves legacy SSH field references from the global catalog", () => {
+    const normalized = normalizeUpGalUiSteps(
+      [
+        {
+          type: "focus",
+          target: "public-key-input",
+          description: "Focus on the public key field.",
+        },
+      ],
+      { path: "/projects" },
+    );
+
+    expect(normalized[0]).toEqual({
+      type: "navigate",
+      path: "/ssh-keys",
+      description: "Open SSH public key field on /ssh-keys before continuing.",
+    });
+  });
+
+  test("does not navigate for a sidebar target that is available everywhere", () => {
+    const normalized = normalizeUpGalUiSteps(
+      [
+        {
+          type: "spotlight",
+          target: "navigation-ssh-keys",
+          description: "Point to SSH Keys in the sidebar.",
+        },
+      ],
+      { path: "/projects" },
+    );
+
+    expect(normalized).toHaveLength(1);
   });
 });

@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import {
   DEFAULT_TAG_COLOR,
   type TagColor,
@@ -43,30 +44,13 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const createTagTarget = defineUpGalTarget({
-  id: "create-tag",
-  label: "New tag button",
-  description: "Opens the form for creating an organization tag.",
-  kind: "button",
-  action: "open_dialog",
-});
-const tagNameTarget = defineUpGalTarget({
-  id: "tag-name",
-  label: "Tag name field",
-  description: "Enter the shared label name.",
-  kind: "field",
-});
-const createTagSubmitTarget = defineUpGalTarget({
-  id: "create-tag-submit",
-  label: "Create tag button",
-  description: "Saves the tag after reviewing its name and color.",
-  kind: "button",
-  action: "submit",
-});
+const createTagTarget = getUpGalTargetDefinition("create-tag");
+const tagNameTarget = getUpGalTargetDefinition("tag-name");
+const createTagSubmitTarget = getUpGalTargetDefinition("create-tag-submit");
 
 export default function TagsPage() {
   const { data: organization } = authClient.useActiveOrganization();

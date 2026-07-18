@@ -11,6 +11,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import type { ServerType } from "@upstand/domain";
 import {
   Alert,
@@ -56,17 +57,11 @@ import {
   StatusBadge,
   type StatusTone,
 } from "@/components/dashboard/status-badge";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const createServerTarget = defineUpGalTarget({
-  id: "create-server",
-  label: "Create Server button",
-  description: "Opens the form for adding a remote server.",
-  kind: "button",
-  action: "open_dialog",
-});
+const createServerTarget = getUpGalTargetDefinition("create-server");
 
 export default function RemoteServersPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();

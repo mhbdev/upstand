@@ -1,28 +1,17 @@
 "use client";
 
+import type {
+  UpGalUiTargetAction,
+  UpGalUiTargetDefinition,
+  UpGalUiTargetKind,
+} from "@upstand/api/ai/upgal-ui-targets";
 import { cloneElement, type ReactElement } from "react";
 
-export type UpGalTargetKind =
-  | "button"
-  | "field"
-  | "dialog"
-  | "navigation"
-  | "other";
-export type UpGalTargetAction =
-  | "spotlight"
-  | "focus"
-  | "open_dialog"
-  | "submit";
+export type UpGalTargetKind = UpGalUiTargetKind;
+export type UpGalTargetAction = UpGalUiTargetAction;
 export type UpGalInternalPath = `/${string}`;
-
-export type UpGalTargetDefinition<Id extends string = string> = {
-  id: Id;
-  label: string;
-  description?: string;
-  kind: UpGalTargetKind;
-  action?: UpGalTargetAction;
-  path?: UpGalInternalPath;
-};
+export type UpGalTargetDefinition<Id extends string = string> =
+  UpGalUiTargetDefinition<Id>;
 
 type UpGalTargetAttributes = {
   "data-upgal-target": string;

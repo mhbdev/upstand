@@ -4,6 +4,15 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.77 - 2026-07-18
+
+### Fixed
+
+- Make UpGal walkthrough planning route-aware across the complete UI target catalog, including navigation and dialog-only controls from other pages.
+- Recover older SSH field target references and automatically navigate legacy plans before locating their live targets.
+- Keep highlighted controls above the guide dimming layer while preserving the chat overlay as the highest-priority surface.
+- Prevent same-route guide redirects and improve conditional SSH-key guidance with explicit mode-switch targets.
+
 ## 0.1.76 - 2026-07-18
 
 ### Fixed

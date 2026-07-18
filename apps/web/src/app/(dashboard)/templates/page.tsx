@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import type { Template } from "@upstand/domain";
 import {
   Alert,
@@ -79,7 +80,7 @@ import {
   WandSparkles,
 } from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { downloadText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
@@ -98,13 +99,7 @@ const PROMPT_PRESETS = [
 ];
 
 type EditorMode = "library" | "studio";
-const createTemplateTarget = defineUpGalTarget({
-  id: "create-template",
-  label: "New template button",
-  description: "Opens the template editor for creating a reusable blueprint.",
-  kind: "button",
-  action: "open_dialog",
-});
+const createTemplateTarget = getUpGalTargetDefinition("create-template");
 type TemplateRecord = Omit<Template, "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
