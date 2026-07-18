@@ -2,6 +2,7 @@
 
 import { Button } from "@upstand/ui/components/button";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import { useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
@@ -31,17 +32,22 @@ export function SsoSignInForm({ disabled = false }: { disabled?: boolean }) {
       <div className="text-center text-muted-foreground text-xs">
         or continue with organization SSO
       </div>
-      <Input
-        type="email"
-        autoComplete="email"
-        placeholder="you@example.com"
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-        disabled={disabled || pending}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") void signIn();
-        }}
-      />
+      <div className="space-y-1.5">
+        <Label htmlFor="sso-email">Work email</Label>
+        <Input
+          id="sso-email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          disabled={disabled || pending}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void signIn();
+          }}
+        />
+      </div>
       <Button
         variant="outline"
         className="w-full"
