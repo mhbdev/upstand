@@ -55,7 +55,13 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { Textarea } from "@upstand/ui/components/textarea";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
+import type { HugeIcon } from "@/components/huge-icons";
 import {
   Bell,
   CircleDot,
@@ -66,13 +72,7 @@ import {
   Radio,
   Send,
   Users,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import {
-  DashboardPage,
-  DashboardPageHeader,
-} from "@/components/dashboard/dashboard-page";
+} from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -114,7 +114,7 @@ type ConfigurationField = {
 
 type ProviderDefinition = {
   label: string;
-  icon: LucideIcon;
+  icon: HugeIcon;
   fields: ConfigurationField[];
 };
 

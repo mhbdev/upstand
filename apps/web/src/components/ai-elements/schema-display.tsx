@@ -7,9 +7,9 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
-import { ChevronRightIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import { createContext, useContext, useMemo } from "react";
+import { ChevronRightIcon } from "@/components/huge-icons";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

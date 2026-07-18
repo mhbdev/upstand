@@ -41,14 +41,6 @@ import {
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
 import type { ChatStatus, FileUIPart, SourceDocumentUIPart } from "ai";
-import {
-  CornerDownLeftIcon,
-  ImageIcon,
-  Monitor,
-  PlusIcon,
-  SquareIcon,
-  XIcon,
-} from "lucide-react";
 import { nanoid } from "nanoid";
 import type {
   ChangeEvent,
@@ -73,6 +65,14 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  CornerDownLeftIcon,
+  ImageIcon,
+  Monitor,
+  PlusIcon,
+  SquareIcon,
+  XIcon,
+} from "@/components/huge-icons";
 
 // ============================================================================
 // Helpers

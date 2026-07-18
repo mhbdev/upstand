@@ -43,14 +43,6 @@ import {
   TableHeader,
   TableRow,
 } from "@upstand/ui/components/table";
-import {
-  Activity,
-  CheckCircle2,
-  Copy,
-  Download,
-  Eye,
-  RefreshCw,
-} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -65,6 +57,14 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import {
+  Activity,
+  CheckCircle2,
+  Copy,
+  Download,
+  Eye,
+  RefreshCw,
+} from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { copyText, downloadJson } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";

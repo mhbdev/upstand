@@ -4,7 +4,6 @@ import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
-import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import {
   createContext,
@@ -15,6 +14,12 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  CheckIcon,
+  CopyIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from "@/components/huge-icons";
 
 interface EnvironmentVariablesContextType {
   showValues: boolean;

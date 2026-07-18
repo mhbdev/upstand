@@ -20,17 +20,6 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
-import {
-  Activity,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Cpu,
-  Database,
-  HardDrive,
-  MemoryStick,
-  Network,
-  Server,
-} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -44,6 +33,17 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import {
+  Activity,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Cpu,
+  Database,
+  HardDrive,
+  MemoryStick,
+  Network,
+  Server,
+} from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 

@@ -7,8 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@upstand/ui/components/dropdown-menu";
-import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { Moon, Sun } from "@/components/huge-icons";
 
 export function ModeToggle() {
   const { setTheme } = useTheme();

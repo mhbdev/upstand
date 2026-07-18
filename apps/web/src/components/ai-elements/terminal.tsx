@@ -3,7 +3,6 @@
 import { Button } from "@upstand/ui/components/button";
 import { cn } from "@upstand/ui/lib/utils";
 import Ansi from "ansi-to-react";
-import { CheckIcon, CopyIcon, TerminalIcon, Trash2Icon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import {
   createContext,
@@ -14,6 +13,12 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  CheckIcon,
+  CopyIcon,
+  TerminalIcon,
+  Trash2Icon,
+} from "@/components/huge-icons";
 
 interface TerminalContextType {
   output: string;

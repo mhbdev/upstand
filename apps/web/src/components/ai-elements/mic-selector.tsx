@@ -15,7 +15,6 @@ import {
   PopoverTrigger,
 } from "@upstand/ui/components/popover";
 import { cn } from "@upstand/ui/lib/utils";
-import { ChevronsUpDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -26,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ChevronsUpDownIcon } from "@/components/huge-icons";
 
 const deviceIdRegex = /\(([\da-fA-F]{4}:[\da-fA-F]{4})\)$/;
 

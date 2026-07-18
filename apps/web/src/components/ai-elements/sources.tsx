@@ -6,8 +6,8 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
-import { BookIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
+import { BookIcon, ChevronDownIcon } from "@/components/huge-icons";
 
 export type SourcesProps = ComponentProps<"div">;
 

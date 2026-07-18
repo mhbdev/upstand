@@ -9,6 +9,8 @@ import {
 import { Separator } from "@upstand/ui/components/separator";
 import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Check,
   Clock,
@@ -18,9 +20,7 @@ import {
   Hash,
   Pause,
   Play,
-} from "lucide-react";
-import { type ComponentProps, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+} from "@/components/huge-icons";
 import { CodeSurface } from "@/components/shared/code-editor";
 import { copyText, downloadText } from "@/lib/browser";
 

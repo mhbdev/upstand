@@ -27,6 +27,13 @@ import {
   TableHeader,
   TableRow,
 } from "@upstand/ui/components/table";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
+import { DockerContainerTerminalDialog } from "@/components/docker-container-terminal-dialog";
 import {
   Activity,
   ArrowDown,
@@ -49,14 +56,7 @@ import {
   Terminal,
   Trash2,
   Upload,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import {
-  DashboardPage,
-  DashboardPageHeader,
-} from "@/components/dashboard/dashboard-page";
-import { DockerContainerTerminalDialog } from "@/components/docker-container-terminal-dialog";
+} from "@/components/huge-icons";
 import {
   uploadArchive,
   validateArchiveDestination,
@@ -634,6 +634,7 @@ export default function DockerInventoryPage() {
                                         });
                                       }}
                                       title="Start Container"
+                                      aria-label={`Start container ${c.name}`}
                                     >
                                       <Play className="size-3.5 text-emerald-500" />
                                     </Button>
@@ -653,6 +654,7 @@ export default function DockerInventoryPage() {
                                         });
                                       }}
                                       title="Stop Container"
+                                      aria-label={`Stop container ${c.name}`}
                                     >
                                       <Square className="size-3.5 text-zinc-400" />
                                     </Button>
@@ -670,6 +672,7 @@ export default function DockerInventoryPage() {
                                         });
                                       }}
                                       title="Restart Container"
+                                      aria-label={`Restart container ${c.name}`}
                                     >
                                       <RotateCw className="size-3.5 text-amber-500" />
                                     </Button>
@@ -684,12 +687,14 @@ export default function DockerInventoryPage() {
                                         })
                                       }
                                       title="Terminal Console"
+                                      aria-label={`Open terminal for container ${c.name}`}
                                     >
                                       <Terminal className="size-3.5 text-sky-500" />
                                     </Button>
                                     <label
                                       className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                       title="Upload Tar Archive"
+                                      aria-label={`Upload tar archive to container ${c.name}`}
                                     >
                                       <Upload className="size-3.5" />
                                       <input
@@ -724,6 +729,7 @@ export default function DockerInventoryPage() {
                                         }
                                       }}
                                       title="Force Remove"
+                                      aria-label={`Force remove container ${c.name}`}
                                     >
                                       <Trash2 className="size-3.5" />
                                     </Button>
@@ -797,6 +803,7 @@ export default function DockerInventoryPage() {
                                     }
                                   }}
                                   title="Remove Image"
+                                  aria-label={`Remove image ${img.id}`}
                                 >
                                   <Trash2 className="size-3.5" />
                                 </Button>
@@ -859,6 +866,7 @@ export default function DockerInventoryPage() {
                                   <label
                                     className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                     title="Upload Tar Archive"
+                                    aria-label={`Upload tar archive to volume ${v.name}`}
                                   >
                                     <Upload className="size-3.5" />
                                     <input
@@ -893,6 +901,7 @@ export default function DockerInventoryPage() {
                                       }
                                     }}
                                     title="Remove Volume"
+                                    aria-label={`Remove volume ${v.name}`}
                                   >
                                     <Trash2 className="size-3.5" />
                                   </Button>
@@ -981,6 +990,7 @@ export default function DockerInventoryPage() {
                                     }
                                   }}
                                   title="Remove Network"
+                                  aria-label={`Remove network ${net.name}`}
                                 >
                                   <Trash2 className="size-3.5" />
                                 </Button>

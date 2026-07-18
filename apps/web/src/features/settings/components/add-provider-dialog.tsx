@@ -11,9 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Loader2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 import {
   ProviderFormFields,

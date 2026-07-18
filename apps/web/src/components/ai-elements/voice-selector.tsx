@@ -21,6 +21,8 @@ import {
 } from "@upstand/ui/components/dialog";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { cn } from "@upstand/ui/lib/utils";
+import type { ComponentProps, ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
 import {
   CircleSmallIcon,
   MarsIcon,
@@ -31,9 +33,7 @@ import {
   TransgenderIcon,
   VenusAndMarsIcon,
   VenusIcon,
-} from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
-import { createContext, useCallback, useContext, useMemo } from "react";
+} from "@/components/huge-icons";
 
 interface VoiceSelectorContextValue {
   value: string | undefined;

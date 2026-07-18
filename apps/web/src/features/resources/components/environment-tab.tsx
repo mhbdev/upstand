@@ -10,9 +10,9 @@ import {
 } from "@upstand/ui/components/card";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
-import { Code, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Code, Eye, EyeOff, Plus, Trash2 } from "@/components/huge-icons";
 
 interface EnvironmentTabProps {
   resource: any;

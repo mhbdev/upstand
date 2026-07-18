@@ -18,12 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
-import { ChevronLeft, ChevronRight, FileClock, Search } from "lucide-react";
 import { useState } from "react";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileClock,
+  Search,
+} from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 

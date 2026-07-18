@@ -44,10 +44,10 @@ import {
   TableHeader,
   TableRow,
 } from "@upstand/ui/components/table";
-import { Pencil, Trash2, WandSparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
+import { Pencil, Trash2, WandSparkles } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 type DomainMapping = {

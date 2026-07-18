@@ -8,6 +8,8 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
+import type { ComponentProps, HTMLAttributes } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckIcon,
   CopyIcon,
@@ -15,9 +17,7 @@ import {
   GitCommitIcon,
   MinusIcon,
   PlusIcon,
-} from "lucide-react";
-import type { ComponentProps, HTMLAttributes } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+} from "@/components/huge-icons";
 
 export type CommitProps = ComponentProps<typeof Collapsible>;
 

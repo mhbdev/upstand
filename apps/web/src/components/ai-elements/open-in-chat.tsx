@@ -10,13 +10,13 @@ import {
   DropdownMenuTrigger,
 } from "@upstand/ui/components/dropdown-menu";
 import { cn } from "@upstand/ui/lib/utils";
+import type { ComponentProps } from "react";
+import { createContext, useContext, useMemo } from "react";
 import {
   ChevronDownIcon,
   ExternalLinkIcon,
   MessageCircleIcon,
-} from "lucide-react";
-import type { ComponentProps } from "react";
-import { createContext, useContext, useMemo } from "react";
+} from "@/components/huge-icons";
 
 const providers = {
   chatgpt: {

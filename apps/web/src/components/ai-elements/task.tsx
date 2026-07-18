@@ -6,8 +6,8 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
-import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import type { ComponentProps } from "react";
+import { ChevronDownIcon, SearchIcon } from "@/components/huge-icons";
 
 export type TaskItemFileProps = ComponentProps<"div">;
 

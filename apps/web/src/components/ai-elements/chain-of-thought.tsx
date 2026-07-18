@@ -8,10 +8,10 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
-import type { LucideIcon } from "lucide-react";
-import { BrainIcon, ChevronDownIcon, DotIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, memo, useContext, useMemo } from "react";
+import type { HugeIcon } from "@/components/huge-icons";
+import { BrainIcon, ChevronDownIcon, DotIcon } from "@/components/huge-icons";
 
 interface ChainOfThoughtContextValue {
   isOpen: boolean;
@@ -102,7 +102,7 @@ export const ChainOfThoughtHeader = memo(
 );
 
 export type ChainOfThoughtStepProps = ComponentProps<"div"> & {
-  icon?: LucideIcon;
+  icon?: HugeIcon;
   label: ReactNode;
   description?: ReactNode;
   status?: "complete" | "active" | "pending";

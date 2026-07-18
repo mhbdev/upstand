@@ -34,6 +34,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import {
   Activity,
   CheckCircle,
@@ -46,13 +52,7 @@ import {
   Terminal,
   Trash2,
   XCircle,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import {
-  DashboardPage,
-  DashboardPageHeader,
-} from "@/components/dashboard/dashboard-page";
+} from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";

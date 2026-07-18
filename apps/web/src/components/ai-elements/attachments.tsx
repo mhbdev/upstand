@@ -8,6 +8,8 @@ import {
 } from "@upstand/ui/components/hover-card";
 import { cn } from "@upstand/ui/lib/utils";
 import type { FileUIPart, SourceDocumentUIPart } from "ai";
+import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
 import {
   FileTextIcon,
   GlobeIcon,
@@ -16,9 +18,7 @@ import {
   PaperclipIcon,
   VideoIcon,
   XIcon,
-} from "lucide-react";
-import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
-import { createContext, useCallback, useContext, useMemo } from "react";
+} from "@/components/huge-icons";
 
 // ============================================================================
 // Types

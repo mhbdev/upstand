@@ -20,13 +20,13 @@ import {
   CardTitle,
 } from "@upstand/ui/components/card";
 import { Input } from "@upstand/ui/components/input";
-import { Copy, KeyRound, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { Copy, KeyRound, RotateCw, Trash2 } from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl } from "@/lib/server-url";
@@ -128,6 +128,7 @@ export default function ScimSettingsPage() {
                   variant="outline"
                   size="icon"
                   onClick={() => void copyToken()}
+                  aria-label="Copy SCIM token"
                 >
                   <Copy className="size-4" />
                 </Button>

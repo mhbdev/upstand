@@ -8,8 +8,8 @@ import {
 } from "@upstand/ui/components/collapsible";
 import { ScrollArea } from "@upstand/ui/components/scroll-area";
 import { cn } from "@upstand/ui/lib/utils";
-import { ChevronDownIcon, PaperclipIcon } from "lucide-react";
 import type { ComponentProps } from "react";
+import { ChevronDownIcon, PaperclipIcon } from "@/components/huge-icons";
 
 export interface QueueMessagePart {
   type: string;

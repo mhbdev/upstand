@@ -3,10 +3,10 @@
 import { Button } from "@upstand/ui/components/button";
 import { cn } from "@upstand/ui/lib/utils";
 import type { UIMessage } from "ai";
-import { ArrowDownIcon, DownloadIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useCallback } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { ArrowDownIcon, DownloadIcon } from "@/components/huge-icons";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 

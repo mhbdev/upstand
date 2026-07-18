@@ -13,8 +13,8 @@ import {
 } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
 import type { ToolUIPart } from "ai";
-import { ChevronDownIcon, Code } from "lucide-react";
 import type { ComponentProps } from "react";
+import { ChevronDownIcon, Code } from "@/components/huge-icons";
 
 import { getStatusBadge } from "./tool";
 
