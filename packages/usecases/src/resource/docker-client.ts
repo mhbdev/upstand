@@ -6,10 +6,10 @@ import type {
   DockerContainerControlPort,
   DockerDatabaseDeploymentPort,
   DockerDeploymentPort,
+  DockerInfrastructureResolverPort,
   DockerResourceControlPort,
   DockerResourceReadPort,
   DockerServerStatsPort,
-  DockerInfrastructureResolverPort,
   DockerServicePort,
   RemoteDockerConnectionPort,
 } from "../ports/docker";
