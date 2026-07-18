@@ -2814,7 +2814,6 @@
     "variables": {
       "main_domain": "${domain}",
       "monitoring_token": "${password:32}",
-      "callback_url": "http://dokploy:3000/api/trpc/notification.receiveNotification",
       "server_type": "Dokploy",
       "refresh_rate": "30",
       "retention_days": "7",
