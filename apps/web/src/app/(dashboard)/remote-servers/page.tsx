@@ -17,7 +17,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@upstand/ui/components/alert";
-import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -47,10 +46,16 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import {
+  StatusBadge,
+  type StatusTone,
+} from "@/components/dashboard/status-badge";
 import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -79,6 +84,10 @@ export default function RemoteServersPage() {
   const [editingServerId, setEditingServerId] = useState<string | null>(null);
   const [setupServerId, setSetupServerId] = useState<string | null>(null);
   const [inspectServerId, setInspectServerId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const { data: servers, refetch } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
@@ -111,7 +120,8 @@ export default function RemoteServersPage() {
   const deleteMutation = useMutation({
     ...trpc.server.delete.mutationOptions(),
     onSuccess: () => {
-      toast.success("Server deleted successfully!");
+      toast.success("Remote Server deleted");
+      setDeleteTarget(null);
       refetch();
     },
     onError: (err) => {
@@ -202,10 +212,8 @@ export default function RemoteServersPage() {
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this remote server?")) {
-      deleteMutation.mutate({ id });
-    }
+  const handleDelete = (id: string, name: string) => {
+    setDeleteTarget({ id, name });
   };
 
   const handleSetup = (id: string) => {
@@ -251,12 +259,12 @@ export default function RemoteServersPage() {
     setupMutation.reset();
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeTone = (status: string): StatusTone => {
     switch (status) {
       case "ready":
-        return "default";
+        return "success";
       case "setting_up":
-        return "secondary";
+        return "info";
       case "failed":
         return "destructive";
       default:
@@ -306,12 +314,10 @@ export default function RemoteServersPage() {
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <CardTitle className="truncate">{srv.name}</CardTitle>
-                        <Badge
-                          variant={getStatusBadgeVariant(srv.status)}
-                          className="capitalize"
-                        >
-                          {srv.status.replace("_", " ")}
-                        </Badge>
+                        <StatusBadge
+                          label={srv.status.replace("_", " ")}
+                          tone={getStatusBadgeTone(srv.status)}
+                        />
                       </div>
                       <CardDescription className="line-clamp-2">
                         {srv.description || "Remote deployment environment"}
@@ -332,7 +338,7 @@ export default function RemoteServersPage() {
                         variant="ghost"
                         size="icon"
                         aria-label={`Delete ${srv.name}`}
-                        onClick={() => handleDelete(srv.id)}
+                        onClick={() => handleDelete(srv.id, srv.name)}
                         className="size-8 text-destructive hover:text-destructive"
                       >
                         <HugeiconsIcon icon={Delete02Icon} />
@@ -420,29 +426,24 @@ export default function RemoteServersPage() {
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-border/60 border-dashed bg-card/10 p-12 text-center">
-          <HugeiconsIcon
-            icon={ServerStack01Icon}
-            className="mx-auto size-12 text-muted-foreground/50"
-          />
-          <h2 className="mt-4 font-semibold text-foreground text-lg">
-            No Remote Servers
-          </h2>
-          <p className="mt-2 max-w-sm text-muted-foreground text-sm">
-            Provision independent Docker environments through secure SSH. Each
-            server owns its Swarm, network, workloads, and routing.
-          </p>
-          <Button
-            onClick={() => {
-              resetForm();
-              setDialogOpen(true);
-            }}
-            className="mt-6 gap-2"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Add Server
-          </Button>
-        </div>
+        <PageEmpty
+          icon={ServerStack01Icon}
+          title="No remote servers yet"
+          description="Add a remote server to deploy resources, run builds, and inspect infrastructure from Upstand."
+          action={
+            <UpGalTarget definition={createServerTarget}>
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setDialogOpen(true);
+                }}
+              >
+                <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+                Create server
+              </Button>
+            </UpGalTarget>
+          }
+        />
       )}
 
       <Dialog
@@ -814,6 +815,18 @@ export default function RemoteServersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={`Delete ${deleteTarget?.name ?? "Remote Server"}?`}
+        description={`${deleteTarget?.name ?? "This remote server"} will be removed from the organization. Existing workloads on the host are not deleted. This action cannot be undone.`}
+        actionLabel="Delete Server"
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id });
+        }}
+      />
     </DashboardPage>
   );
 }

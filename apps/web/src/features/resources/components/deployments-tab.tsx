@@ -29,6 +29,7 @@ import {
 import { cn } from "@upstand/ui/lib/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import { Eye, History, Play, RefreshCw, Trash2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
@@ -40,6 +41,14 @@ type DeploymentItem = {
   createdAt: string;
   sourceRevision?: string | null;
 };
+
+type PendingAction =
+  | { type: "clear-history"; label: string }
+  | { type: "cancel-queued"; label: string; serverId: string; jobId: string }
+  | { type: "kill-build"; label: string; deploymentId: string }
+  | { type: "delete-schedule"; label: string; id: string }
+  | { type: "rollback"; label: string; deploymentId: string }
+  | { type: "remove-deployment"; label: string; deploymentId: string };
 
 interface DeploymentsTabProps {
   resource: any;
@@ -67,6 +76,9 @@ export function DeploymentsTab({
     "command" | "deployment" | "backup"
   >("command");
   const [backupScheduleId, setBackupScheduleId] = useState("");
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
+    null,
+  );
 
   const schedulesQuery = useQuery({
     ...trpc.schedule.list.queryOptions({ resourceId: resource.id }),
@@ -101,6 +113,7 @@ export function DeploymentsTab({
     onSuccess: () => {
       void schedulesQuery.refetch();
       toast.success("Schedule deleted");
+      setPendingAction(null);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -133,6 +146,7 @@ export function DeploymentsTab({
     onSuccess: () => {
       void refetchDeployments();
       toast.success("Queued deployment cancelled");
+      setPendingAction(null);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -140,6 +154,7 @@ export function DeploymentsTab({
     ...trpc.deployment.killBuild.mutationOptions(),
     onSuccess: () => {
       toast.success("Build cancellation requested");
+      setPendingAction(null);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -149,6 +164,7 @@ export function DeploymentsTab({
       void variables;
       void refetchDeployments();
       toast.success("Deployment removed from history");
+      setPendingAction(null);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -157,6 +173,7 @@ export function DeploymentsTab({
     onSuccess: () => {
       void refetchDeployments();
       toast.success("Completed deployment history cleared");
+      setPendingAction(null);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -170,6 +187,7 @@ export function DeploymentsTab({
           ? "Historical revision queued for redeployment"
           : "Swarm service rolled back",
       );
+      setPendingAction(null);
     },
     onError: (error) => toast.error(error.message),
   });
@@ -177,10 +195,6 @@ export function DeploymentsTab({
   const triggerDeployment = () => {
     toast.info("Building and deploying resource...");
     deployResource({ id: resource.id });
-  };
-
-  const clearDeployments = () => {
-    clearHistoryMutation.mutate({ resourceId: resource.id });
   };
 
   return (
@@ -217,7 +231,12 @@ export function DeploymentsTab({
               Deploy Now
             </Button>
             <Button
-              onClick={clearDeployments}
+              onClick={() =>
+                setPendingAction({
+                  type: "clear-history",
+                  label: "completed deployment history",
+                })
+              }
               variant="outline"
               className="gap-2 border-border/40"
             >
@@ -226,7 +245,9 @@ export function DeploymentsTab({
             <Button
               onClick={() => {
                 if (!queuedDeployment) return;
-                cancelDeploymentMutation.mutate({
+                setPendingAction({
+                  type: "cancel-queued",
+                  label: queuedDeployment.title,
                   serverId: resource.serverId ?? "local",
                   jobId: queuedDeployment.id,
                 });
@@ -244,11 +265,12 @@ export function DeploymentsTab({
                 const active = deployList.find(
                   (deployment) => deployment.status === "running",
                 );
-                if (
-                  active &&
-                  window.confirm("Stop the active build and deployment?")
-                ) {
-                  killBuildMutation.mutate({ deploymentId: active.id });
+                if (active) {
+                  setPendingAction({
+                    type: "kill-build",
+                    label: active.title,
+                    deploymentId: active.id,
+                  });
                 }
               }}
               variant="outline"
@@ -427,13 +449,13 @@ export function DeploymentsTab({
                       variant="ghost"
                       size="sm"
                       className="text-destructive"
-                      onClick={() => {
-                        if (
-                          window.confirm(`Delete schedule '${schedule.name}'?`)
-                        ) {
-                          deleteScheduleMutation.mutate({ id: schedule.id });
-                        }
-                      }}
+                      onClick={() =>
+                        setPendingAction({
+                          type: "delete-schedule",
+                          label: schedule.name,
+                          id: schedule.id,
+                        })
+                      }
                       disabled={deleteScheduleMutation.isPending}
                     >
                       <Trash2 className="size-4" />
@@ -503,20 +525,13 @@ export function DeploymentsTab({
                       <td className="p-3 text-center">
                         {dep.status === "success" && canRollback ? (
                           <Button
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  supportsHistoricalRollback
-                                    ? `Redeploy this Git-backed ${resource.type === "compose" ? "Compose resource" : "application"} from the selected historical commit?`
-                                    : "Roll back this Swarm service to its previous service specification?",
-                                )
-                              ) {
-                                rollbackMutation.mutate({
-                                  id: resource.id,
-                                  deploymentId: dep.id,
-                                });
-                              }
-                            }}
+                            onClick={() =>
+                              setPendingAction({
+                                type: "rollback",
+                                label: dep.id,
+                                deploymentId: dep.id,
+                              })
+                            }
                             variant="outline"
                             size="sm"
                             className="h-7 gap-1 text-xs"
@@ -530,17 +545,13 @@ export function DeploymentsTab({
                         ) : dep.status === "failed" ||
                           dep.status === "success" ? (
                           <Button
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  "Remove this deployment from history?",
-                                )
-                              ) {
-                                removeDeploymentMutation.mutate({
-                                  deploymentId: dep.id,
-                                });
-                              }
-                            }}
+                            onClick={() =>
+                              setPendingAction({
+                                type: "remove-deployment",
+                                label: dep.id,
+                                deploymentId: dep.id,
+                              })
+                            }
                             variant="ghost"
                             size="sm"
                             className="h-7 gap-1 text-destructive text-xs"
@@ -607,6 +618,88 @@ export function DeploymentsTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={pendingAction !== null}
+        onOpenChange={(open) => !open && setPendingAction(null)}
+        title={
+          pendingAction?.type === "clear-history"
+            ? "Clear deployment history?"
+            : pendingAction?.type === "cancel-queued"
+              ? "Cancel queued deployment?"
+              : pendingAction?.type === "kill-build"
+                ? "Stop active build?"
+                : pendingAction?.type === "delete-schedule"
+                  ? "Delete schedule?"
+                  : pendingAction?.type === "rollback"
+                    ? supportsHistoricalRollback
+                      ? "Redeploy historical revision?"
+                      : "Roll back service?"
+                    : "Remove deployment from history?"
+        }
+        description={
+          <>
+            This action affects <strong>{pendingAction?.label}</strong>. Please
+            confirm that you want to continue.
+          </>
+        }
+        actionLabel={
+          pendingAction?.type === "clear-history"
+            ? "Clear history"
+            : pendingAction?.type === "cancel-queued"
+              ? "Cancel deployment"
+              : pendingAction?.type === "kill-build"
+                ? "Stop build"
+                : pendingAction?.type === "delete-schedule"
+                  ? "Delete schedule"
+                  : pendingAction?.type === "rollback"
+                    ? supportsHistoricalRollback
+                      ? "Redeploy revision"
+                      : "Roll back service"
+                    : "Remove deployment"
+        }
+        pending={
+          clearHistoryMutation.isPending ||
+          cancelDeploymentMutation.isPending ||
+          killBuildMutation.isPending ||
+          deleteScheduleMutation.isPending ||
+          rollbackMutation.isPending ||
+          removeDeploymentMutation.isPending
+        }
+        onConfirm={() => {
+          if (!pendingAction) return;
+          switch (pendingAction.type) {
+            case "clear-history":
+              clearHistoryMutation.mutate({ resourceId: resource.id });
+              break;
+            case "cancel-queued":
+              cancelDeploymentMutation.mutate({
+                serverId: pendingAction.serverId,
+                jobId: pendingAction.jobId,
+              });
+              break;
+            case "kill-build":
+              killBuildMutation.mutate({
+                deploymentId: pendingAction.deploymentId,
+              });
+              break;
+            case "delete-schedule":
+              deleteScheduleMutation.mutate({ id: pendingAction.id });
+              break;
+            case "rollback":
+              rollbackMutation.mutate({
+                id: resource.id,
+                deploymentId: pendingAction.deploymentId,
+              });
+              break;
+            case "remove-deployment":
+              removeDeploymentMutation.mutate({
+                deploymentId: pendingAction.deploymentId,
+              });
+              break;
+          }
+        }}
+      />
     </>
   );
 }

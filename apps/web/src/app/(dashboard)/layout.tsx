@@ -197,7 +197,7 @@ function DashboardSidebar({ pathname }: { pathname: string }) {
 
       <Separator />
 
-      <SidebarContent className="group-data-[collapsible=icon]:overflow-auto! space-y-4 px-2 py-2">
+      <SidebarContent className="group-data-[collapsible=icon]:overflow-auto! flex flex-col gap-4 px-2 py-2">
         {NAVIGATION_GROUPS.map((group) => (
           <DashboardSidebarGroup
             key={group.title}

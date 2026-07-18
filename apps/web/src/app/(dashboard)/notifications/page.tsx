@@ -57,6 +57,7 @@ import { Switch } from "@upstand/ui/components/switch";
 import { Textarea } from "@upstand/ui/components/textarea";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -556,6 +557,10 @@ export default function NotificationsPage() {
   const [provider, setProvider] = useState<NotificationProviderType>("slack");
   const [name, setName] = useState("");
   const [events, setEvents] = useState<NotificationEventType[]>([]);
+  const [removeTarget, setRemoveTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [values, setValues] = useState<Record<string, string>>(() =>
     providerValues("slack"),
   );
@@ -597,6 +602,7 @@ export default function NotificationsPage() {
     ...trpc.notification.remove.mutationOptions(),
     onSuccess: () => {
       toast.success("Notification channel removed");
+      setRemoveTarget(null);
       refetch();
     },
     onError: (error) =>
@@ -814,10 +820,9 @@ export default function NotificationsPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => {
-                    if (confirm(`Remove ${channel.name}?`))
-                      removeChannel.mutate({ id: channel.id });
-                  }}
+                  onClick={() =>
+                    setRemoveTarget({ id: channel.id, name: channel.name })
+                  }
                   disabled={removeChannel.isPending}
                 >
                   Remove
@@ -996,6 +1001,18 @@ export default function NotificationsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title={`Remove ${removeTarget?.name ?? "notification channel"}?`}
+        description={`${removeTarget?.name ?? "This notification channel"} will stop receiving operational alerts. This action cannot be undone.`}
+        actionLabel="Remove Channel"
+        pending={removeChannel.isPending}
+        onConfirm={() => {
+          if (removeTarget) removeChannel.mutate({ id: removeTarget.id });
+        }}
+      />
     </DashboardPage>
   );
 }

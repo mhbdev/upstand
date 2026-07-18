@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -36,13 +35,14 @@ import {
 } from "@upstand/ui/components/tabs";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { StatusBadge } from "@/components/dashboard/status-badge";
 import {
   Activity,
-  CheckCircle,
   Clock,
   Copy,
   RefreshCw,
@@ -51,7 +51,6 @@ import {
   Settings,
   Terminal,
   Trash2,
-  XCircle,
 } from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
@@ -69,6 +68,11 @@ export default function DeploymentsPage() {
   const [dirtyConcurrency, setDirtyConcurrency] = useState<
     Record<string, boolean>
   >({});
+  const [cancelTarget, setCancelTarget] = useState<{
+    serverId: string;
+    jobId: string;
+    label: string;
+  } | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Queries
@@ -162,6 +166,7 @@ export default function DeploymentsPage() {
     ...trpc.deployment.cancelDeploymentJob.mutationOptions(),
     onSuccess: () => {
       toast.success("Deployment cancelled successfully");
+      setCancelTarget(null);
       refetchQueue();
       refetchDeployments();
     },
@@ -186,10 +191,8 @@ export default function DeploymentsPage() {
     });
   };
 
-  const handleCancelJob = (serverId: string, jobId: string) => {
-    if (confirm("Are you sure you want to cancel this deployment?")) {
-      cancelJobMutation.mutate({ serverId, jobId });
-    }
+  const handleCancelJob = (serverId: string, jobId: string, label: string) => {
+    setCancelTarget({ serverId, jobId, label });
   };
 
   // Filter deployments
@@ -206,36 +209,24 @@ export default function DeploymentsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "success":
-        return (
-          <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25">
-            <CheckCircle className="size-3" />
-            Success
-          </Badge>
-        );
+        return <StatusBadge label="Success" tone="success" />;
       case "running":
-        return (
-          <Badge className="animate-pulse gap-1 border-blue-500/30 bg-blue-500/15 text-blue-500 hover:bg-blue-500/25">
-            <Activity className="size-3" />
-            Running
-          </Badge>
-        );
+        return <StatusBadge label="Running" tone="info" />;
       case "queued":
-        return (
-          <Badge className="gap-1 border-amber-500/30 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25">
-            <Clock className="size-3" />
-            Queued
-          </Badge>
-        );
+        return <StatusBadge label="Queued" tone="warning" />;
       case "failed":
-        return (
-          <Badge className="gap-1 border-rose-500/30 bg-rose-500/15 text-rose-500 hover:bg-rose-500/25">
-            <XCircle className="size-3" />
-            Failed
-          </Badge>
-        );
+        return <StatusBadge label="Failed" tone="destructive" />;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <StatusBadge label={status} tone="outline" />;
     }
+  };
+
+  const getQueueStateBadge = (state: string) => {
+    if (state === "active") return <StatusBadge label="Active" tone="info" />;
+    if (state === "waiting") {
+      return <StatusBadge label="Waiting" tone="warning" />;
+    }
+    return <StatusBadge label={state} tone="secondary" />;
   };
 
   return (
@@ -425,19 +416,7 @@ export default function DeploymentsPage() {
                           <TableCell className="max-w-[180px] truncate">
                             {job.label}
                           </TableCell>
-                          <TableCell>
-                            <Badge
-                              className={
-                                job.state === "active"
-                                  ? "animate-pulse border-blue-500/30 bg-blue-500/15 text-blue-500"
-                                  : job.state === "waiting"
-                                    ? "border-amber-500/30 bg-amber-500/15 text-amber-500"
-                                    : "border-gray-500/30 bg-gray-500/15 text-gray-500"
-                              }
-                            >
-                              {job.state}
-                            </Badge>
-                          </TableCell>
+                          <TableCell>{getQueueStateBadge(job.state)}</TableCell>
                           <TableCell className="text-muted-foreground text-xs">
                             {new Date(job.addedAt).toLocaleTimeString()}
                           </TableCell>
@@ -446,9 +425,9 @@ export default function DeploymentsPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() =>
-                                handleCancelJob(job.serverId, job.id)
+                                handleCancelJob(job.serverId, job.id, job.label)
                               }
-                              className="size-8 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+                              className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={cancelJobMutation.isPending}
                             >
                               <Trash2 className="size-4" />
@@ -605,6 +584,27 @@ export default function DeploymentsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={cancelTarget !== null}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+        title="Cancel deployment?"
+        description={
+          <>
+            This will cancel <strong>{cancelTarget?.label}</strong> and remove
+            it from the deployment queue. This action cannot be undone.
+          </>
+        }
+        actionLabel="Cancel deployment"
+        pending={cancelJobMutation.isPending}
+        onConfirm={() => {
+          if (!cancelTarget) return;
+          cancelJobMutation.mutate({
+            serverId: cancelTarget.serverId,
+            jobId: cancelTarget.jobId,
+          });
+        }}
+      />
     </DashboardPage>
   );
 }

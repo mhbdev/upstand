@@ -47,6 +47,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import { Pencil, Trash2, WandSparkles } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
@@ -253,6 +254,9 @@ export function DomainsTab({
   const [editingDomainIndex, setEditingDomainIndex] = useState<number | null>(
     null,
   );
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(
+    null,
+  );
   const domainVersion = resource?.domains ?? "";
   const validateDomain = useMutation({
     ...trpc.domain.validate.mutationOptions(),
@@ -439,14 +443,13 @@ export function DomainsTab({
   };
 
   const deleteDomain = (idx: number) => {
-    if (!confirm("Are you sure you want to remove this domain mapping?"))
-      return;
     const updated = domainList.filter((_, i) => i !== idx);
     updateResource(
       { id: resource.id, domains: JSON.stringify(updated) },
       {
         onSuccess: () => {
           toast.success("Domain mapping removed");
+          setPendingDeleteIndex(null);
         },
       },
     );
@@ -508,322 +511,418 @@ export function DomainsTab({
   };
 
   return (
-    <Card className="border border-border/40 bg-card/20">
-      <CardHeader>
-        <CardTitle className="font-semibold text-lg">Domains & HTTPS</CardTitle>
-        <CardDescription className="text-muted-foreground text-sm">
-          Route a public hostname to a service on the overlay network. HTTPS
-          uses Caddy Automatic HTTPS and Let's Encrypt.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5 border-border/20 border-t pt-4">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <div>
-            <p className="font-medium text-sm">Public routes</p>
-            <p className="font-normal text-muted-foreground text-xs">
-              Add hostnames and route them to this resource's internal service.
-            </p>
+    <>
+      <Card className="border border-border/40 bg-card/20">
+        <CardHeader>
+          <CardTitle className="font-semibold text-lg">
+            Domains & HTTPS
+          </CardTitle>
+          <CardDescription className="text-muted-foreground text-sm">
+            Route a public hostname to a service on the overlay network. HTTPS
+            uses Caddy Automatic HTTPS and Let's Encrypt.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5 border-border/20 border-t pt-4">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <p className="font-medium text-sm">Public routes</p>
+              <p className="font-normal text-muted-foreground text-xs">
+                Add hostnames and route them to this resource's internal
+                service.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={generateSslipDomain}
+                disabled={isUpdatingResource}
+              >
+                <WandSparkles className="mr-2 size-4" />
+                Generate sslip.io
+              </Button>
+              <Button type="button" onClick={openAddDomain}>
+                <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+                Add domain
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={generateSslipDomain}
-              disabled={isUpdatingResource}
-            >
-              <WandSparkles className="mr-2 size-4" />
-              Generate sslip.io
-            </Button>
-            <Button type="button" onClick={openAddDomain}>
-              <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
-              Add domain
-            </Button>
-          </div>
-        </div>
 
-        {domainList.length > 0 ? (
-          <div className="overflow-x-auto rounded-xl border border-border/20">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/20 text-muted-foreground text-xs uppercase">
-                  <TableHead>Hostname</TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Security</TableHead>
-                  <TableHead className="w-40 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {domainList.map((item, idx) => (
-                  <TableRow key={`${item.host}:${item.path}`}>
-                    <TableCell>
-                      <div className="flex min-w-48 flex-col gap-1">
-                        <span className="font-medium text-primary">
-                          {item.host}
-                        </span>
-                        <span className="font-normal text-muted-foreground text-xs">
-                          {item.stripPath
-                            ? "Path prefix removed"
-                            : "Path preserved"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="min-w-28 font-mono text-xs">
-                      <div>{item.path}</div>
-                      {item.internalPath !== "/" && (
-                        <div className="font-normal text-muted-foreground">
-                          → {item.internalPath}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="min-w-40 font-mono text-muted-foreground text-xs">
-                      {item.serviceName || resource?.appName || resource?.name
-                        ? `${item.serviceName || resource?.appName || resource?.name}:${item.port}`
-                        : item.port}
-                    </TableCell>
-                    <TableCell className="min-w-32">
-                      <Badge variant={item.https ? "default" : "secondary"}>
-                        {item.https
-                          ? item.certificateType === "internal"
-                            ? "HTTPS / Internal CA"
-                            : "HTTPS / Let’s Encrypt"
-                          : "HTTP only"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        onClick={() => validateHost(item.host)}
-                        variant="ghost"
-                        size="sm"
-                        disabled={validateDomain.isPending}
-                      >
-                        DNS check
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => editDomain(idx)}
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Edit ${item.host}${item.path}`}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => deleteDomain(idx)}
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Delete ${item.host}${item.path}`}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TableCell>
+          {domainList.length > 0 ? (
+            <div className="overflow-x-auto rounded-xl border border-border/20">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/20 text-muted-foreground text-xs uppercase">
+                    <TableHead>Hostname</TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Security</TableHead>
+                    <TableHead className="w-40 text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-muted-foreground text-sm">
-            No external domains linked.
-          </div>
-        )}
-      </CardContent>
+                </TableHeader>
+                <TableBody>
+                  {domainList.map((item, idx) => (
+                    <TableRow key={`${item.host}:${item.path}`}>
+                      <TableCell>
+                        <div className="flex min-w-48 flex-col gap-1">
+                          <span className="font-medium text-primary">
+                            {item.host}
+                          </span>
+                          <span className="font-normal text-muted-foreground text-xs">
+                            {item.stripPath
+                              ? "Path prefix removed"
+                              : "Path preserved"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="min-w-28 font-mono text-xs">
+                        <div>{item.path}</div>
+                        {item.internalPath !== "/" && (
+                          <div className="font-normal text-muted-foreground">
+                            → {item.internalPath}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-40 font-mono text-muted-foreground text-xs">
+                        {item.serviceName || resource?.appName || resource?.name
+                          ? `${item.serviceName || resource?.appName || resource?.name}:${item.port}`
+                          : item.port}
+                      </TableCell>
+                      <TableCell className="min-w-32">
+                        <Badge variant={item.https ? "default" : "secondary"}>
+                          {item.https
+                            ? item.certificateType === "internal"
+                              ? "HTTPS / Internal CA"
+                              : "HTTPS / Let’s Encrypt"
+                            : "HTTP only"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          onClick={() => validateHost(item.host)}
+                          variant="ghost"
+                          size="sm"
+                          disabled={validateDomain.isPending}
+                        >
+                          DNS check
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => editDomain(idx)}
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Edit ${item.host}${item.path}`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setPendingDeleteIndex(idx)}
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Delete ${item.host}${item.path}`}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              No external domains linked.
+            </div>
+          )}
+        </CardContent>
 
-      <Dialog open={domainDialogOpen} onOpenChange={setDomainDialogOpen}>
-        <DialogContent className="max-h-[min(90dvh,56rem)] w-[calc(100%-1rem)] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingDomainIndex !== null
-                ? "Edit domain route"
-                : "Link domain hostname"}
-            </DialogTitle>
-            <DialogDescription>
-              Assign a hostname and path rule to route traffic from public ports
-              to the container overlay port.
-            </DialogDescription>
-          </DialogHeader>
+        <Dialog open={domainDialogOpen} onOpenChange={setDomainDialogOpen}>
+          <DialogContent className="max-h-[min(90dvh,56rem)] w-[calc(100%-1rem)] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {editingDomainIndex !== null
+                  ? "Edit domain route"
+                  : "Link domain hostname"}
+              </DialogTitle>
+              <DialogDescription>
+                Assign a hostname and path rule to route traffic from public
+                ports to the container overlay port.
+              </DialogDescription>
+            </DialogHeader>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
-            <FieldGroup>
-              <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-                <form.Field
-                  name="host"
-                  validators={{
-                    onChange: z.string().min(1, "Hostname is required"),
-                  }}
-                >
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor={field.name}>
-                        Domain Hostname
-                      </FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        placeholder="app.example.com…"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                form.handleSubmit();
+              }}
+            >
+              <FieldGroup>
+                <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                  <form.Field
+                    name="host"
+                    validators={{
+                      onChange: z.string().min(1, "Hostname is required"),
+                    }}
+                  >
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Domain Hostname
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          placeholder="app.example.com…"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
 
-                <form.Field name="port">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor={field.name}>Target Port</FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        type="number"
-                        placeholder="80"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) =>
-                          field.handleChange(Number(e.target.value))
-                        }
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
-              </div>
+                  <form.Field name="port">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Target Port
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          type="number"
+                          placeholder="80"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) =>
+                            field.handleChange(Number(e.target.value))
+                          }
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
 
-              {resource.type === "compose" && (
-                <form.Field name="serviceName">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel>Compose Service Target</FieldLabel>
-                      <Select
-                        items={routingTargets.map((target) => ({
-                          value: target,
-                          label: target,
-                        }))}
-                        value={field.state.value}
-                        onValueChange={(val) =>
-                          field.handleChange(val || undefined)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a Compose service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {routingTargets.map((target) => (
-                            <SelectItem key={target} value={target}>
-                              {target}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  )}
-                </form.Field>
-              )}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <form.Field name="path">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor={field.name}>
-                        Public Path Prefix
-                      </FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        placeholder="/"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
-
-                <form.Field name="internalPath">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor={field.name}>
-                        Internal Path Target
-                      </FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        placeholder="/"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
-              </div>
-
-              <form.Field name="stripPath">
-                {(field) => (
-                  <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
-                    <Switch
-                      checked={field.state.value}
-                      onCheckedChange={(val) => field.handleChange(val)}
-                    />{" "}
-                    Strip Path Prefix before passing request downstream.
-                  </label>
+                {resource.type === "compose" && (
+                  <form.Field name="serviceName">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Compose Service Target</FieldLabel>
+                        <Select
+                          items={routingTargets.map((target) => ({
+                            value: target,
+                            label: target,
+                          }))}
+                          value={field.state.value}
+                          onValueChange={(val) =>
+                            field.handleChange(val || undefined)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a Compose service" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {routingTargets.map((target) => (
+                              <SelectItem key={target} value={target}>
+                                {target}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    )}
+                  </form.Field>
                 )}
-              </form.Field>
 
-              <form.Field name="https">
-                {(field) => (
-                  <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
-                    <Switch
-                      checked={field.state.value}
-                      onCheckedChange={(val) => field.handleChange(val)}
-                    />{" "}
-                    Force HTTPS Redirection.
-                  </label>
-                )}
-              </form.Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="path">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Public Path Prefix
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          placeholder="/"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
 
-              <form.Subscribe selector={(state) => state.values.https}>
-                {(https) =>
-                  https ? (
-                    <form.Field name="certificateType">
+                  <form.Field name="internalPath">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor={field.name}>
+                          Internal Path Target
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          placeholder="/"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+
+                <form.Field name="stripPath">
+                  {(field) => (
+                    <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                      <Switch
+                        checked={field.state.value}
+                        onCheckedChange={(val) => field.handleChange(val)}
+                      />{" "}
+                      Strip Path Prefix before passing request downstream.
+                    </label>
+                  )}
+                </form.Field>
+
+                <form.Field name="https">
+                  {(field) => (
+                    <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                      <Switch
+                        checked={field.state.value}
+                        onCheckedChange={(val) => field.handleChange(val)}
+                      />{" "}
+                      Force HTTPS Redirection.
+                    </label>
+                  )}
+                </form.Field>
+
+                <form.Subscribe selector={(state) => state.values.https}>
+                  {(https) =>
+                    https ? (
+                      <form.Field name="certificateType">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel>SSL Certificate Type</FieldLabel>
+                            <Select
+                              items={[
+                                {
+                                  value: "letsencrypt",
+                                  label: "Let's Encrypt Public Certificate",
+                                },
+                                {
+                                  value: "internal",
+                                  label: "Internal CA Self-Signed Certificate",
+                                },
+                                {
+                                  value: "custom",
+                                  label: "Uploaded Custom Certificate",
+                                },
+                              ]}
+                              value={field.state.value}
+                              onValueChange={(val) =>
+                                field.handleChange(
+                                  (val || "letsencrypt") as
+                                    | "letsencrypt"
+                                    | "internal"
+                                    | "custom",
+                                )
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="letsencrypt">
+                                  Let's Encrypt Public Certificate
+                                </SelectItem>
+                                <SelectItem value="internal">
+                                  Internal CA Self-Signed Certificate
+                                </SelectItem>
+                                <SelectItem value="custom">
+                                  Uploaded Custom Certificate
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {field.state.value === "custom" && (
+                              <form.Field name="certificateId">
+                                {(certificateField) => (
+                                  <Select
+                                    items={certificates.map((certificate) => ({
+                                      value: certificate.id,
+                                      label: certificate.name,
+                                    }))}
+                                    value={certificateField.state.value}
+                                    onValueChange={(value) =>
+                                      certificateField.handleChange(value || "")
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select a certificate" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {certificates.map((certificate) => (
+                                        <SelectItem
+                                          key={certificate.id}
+                                          value={certificate.id}
+                                        >
+                                          {certificate.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              </form.Field>
+                            )}
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null
+                  }
+                </form.Subscribe>
+
+                <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="font-medium text-sm">
+                    Redirect & security policy
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                    <form.Field name="redirectTo">
                       {(field) => (
                         <Field>
-                          <FieldLabel>SSL Certificate Type</FieldLabel>
-                          <Select
-                            items={[
-                              {
-                                value: "letsencrypt",
-                                label: "Let's Encrypt Public Certificate",
-                              },
-                              {
-                                value: "internal",
-                                label: "Internal CA Self-Signed Certificate",
-                              },
-                              {
-                                value: "custom",
-                                label: "Uploaded Custom Certificate",
-                              },
-                            ]}
+                          <FieldLabel htmlFor={field.name}>
+                            Redirect target (optional)
+                          </FieldLabel>
+                          <Input
+                            id={field.name}
+                            name={field.name}
+                            placeholder="https://www.example.com{uri} or /new-path…"
                             value={field.state.value}
-                            onValueChange={(val) =>
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                          />
+                          <FieldError errors={field.state.meta.errors} />
+                        </Field>
+                      )}
+                    </form.Field>
+                    <form.Field name="redirectStatus">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel>Redirect status</FieldLabel>
+                          <Select
+                            items={(["301", "302", "307", "308"] as const).map(
+                              (status) => ({ value: status, label: status }),
+                            )}
+                            value={field.state.value}
+                            onValueChange={(value) =>
                               field.handleChange(
-                                (val || "letsencrypt") as
-                                  | "letsencrypt"
-                                  | "internal"
-                                  | "custom",
+                                value as "301" | "302" | "307" | "308",
                               )
                             }
                           >
@@ -831,278 +930,207 @@ export function DomainsTab({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="letsencrypt">
-                                Let's Encrypt Public Certificate
-                              </SelectItem>
-                              <SelectItem value="internal">
-                                Internal CA Self-Signed Certificate
-                              </SelectItem>
-                              <SelectItem value="custom">
-                                Uploaded Custom Certificate
-                              </SelectItem>
+                              {(["301", "302", "307", "308"] as const).map(
+                                (status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {status}
+                                  </SelectItem>
+                                ),
+                              )}
                             </SelectContent>
                           </Select>
-                          {field.state.value === "custom" && (
-                            <form.Field name="certificateId">
-                              {(certificateField) => (
-                                <Select
-                                  items={certificates.map((certificate) => ({
-                                    value: certificate.id,
-                                    label: certificate.name,
-                                  }))}
-                                  value={certificateField.state.value}
-                                  onValueChange={(value) =>
-                                    certificateField.handleChange(value || "")
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select a certificate" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {certificates.map((certificate) => (
-                                      <SelectItem
-                                        key={certificate.id}
-                                        value={certificate.id}
-                                      >
-                                        {certificate.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
-                            </form.Field>
-                          )}
                         </Field>
                       )}
                     </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-
-              <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                <p className="font-medium text-sm">
-                  Redirect & security policy
-                </p>
-                <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-                  <form.Field name="redirectTo">
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <form.Field name="forwardAuth.address">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor={field.name}>
+                            Forward-auth endpoint (optional)
+                          </FieldLabel>
+                          <Input
+                            id={field.name}
+                            name={field.name}
+                            type="url"
+                            placeholder="https://auth.example.com/verify…"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                          />
+                          <FieldError errors={field.state.meta.errors} />
+                        </Field>
+                      )}
+                    </form.Field>
+                    <form.Field name="forwardAuth.uri">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor={field.name}>Auth URI</FieldLabel>
+                          <Input
+                            id={field.name}
+                            name={field.name}
+                            placeholder="/verify"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                          />
+                          <FieldError errors={field.state.meta.errors} />
+                        </Field>
+                      )}
+                    </form.Field>
+                  </div>
+                  <form.Field name="forwardAuth.copyHeaders">
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor={field.name}>
-                          Redirect target (optional)
+                          Forwarded auth headers (comma separated)
                         </FieldLabel>
                         <Input
                           id={field.name}
                           name={field.name}
-                          placeholder="https://www.example.com{uri} or /new-path…"
-                          value={field.state.value}
+                          placeholder="X-User, X-Email…"
+                          value={(field.state.value ?? []).join(", ")}
                           onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Field name="redirectStatus">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel>Redirect status</FieldLabel>
-                        <Select
-                          items={(["301", "302", "307", "308"] as const).map(
-                            (status) => ({ value: status, label: status }),
-                          )}
-                          value={field.state.value}
-                          onValueChange={(value) =>
+                          onChange={(e) =>
                             field.handleChange(
-                              value as "301" | "302" | "307" | "308",
+                              e.target.value
+                                .split(",")
+                                .map((header) => header.trim())
+                                .filter(Boolean),
                             )
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(["301", "302", "307", "308"] as const).map(
-                              (status) => (
-                                <SelectItem key={status} value={status}>
-                                  {status}
-                                </SelectItem>
-                              ),
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field name="forwardAuth.address">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>
-                          Forward-auth endpoint (optional)
-                        </FieldLabel>
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          type="url"
-                          placeholder="https://auth.example.com/verify…"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
                         />
                         <FieldError errors={field.state.meta.errors} />
                       </Field>
                     )}
                   </form.Field>
-                  <form.Field name="forwardAuth.uri">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>Auth URI</FieldLabel>
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          placeholder="/verify"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </Field>
-                    )}
-                  </form.Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <form.Field name="basicAuth.username">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor={field.name}>
+                            Basic-auth username (optional)
+                          </FieldLabel>
+                          <Input
+                            id={field.name}
+                            name={field.name}
+                            autoComplete="username"
+                            placeholder="admin"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                          />
+                          <FieldError errors={field.state.meta.errors} />
+                        </Field>
+                      )}
+                    </form.Field>
+                    <form.Field name="basicAuth.passwordHash">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor={field.name}>
+                            Caddy password hash (optional)
+                          </FieldLabel>
+                          <Input
+                            id={field.name}
+                            name={field.name}
+                            autoComplete="off"
+                            spellCheck={false}
+                            placeholder="$2a$14$…"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                          />
+                          <FieldError errors={field.state.meta.errors} />
+                        </Field>
+                      )}
+                    </form.Field>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <form.Field name="securityHeaders.hsts">
+                      {(field) => (
+                        <label className="flex items-center gap-2 text-xs">
+                          <Switch
+                            checked={field.state.value}
+                            onCheckedChange={field.handleChange}
+                          />
+                          HSTS
+                        </label>
+                      )}
+                    </form.Field>
+                    <form.Field name="securityHeaders.nosniff">
+                      {(field) => (
+                        <label className="flex items-center gap-2 text-xs">
+                          <Switch
+                            checked={field.state.value}
+                            onCheckedChange={field.handleChange}
+                          />
+                          No sniff
+                        </label>
+                      )}
+                    </form.Field>
+                    <form.Field name="securityHeaders.frameDeny">
+                      {(field) => (
+                        <label className="flex items-center gap-2 text-xs">
+                          <Switch
+                            checked={field.state.value}
+                            onCheckedChange={field.handleChange}
+                          />
+                          Frame deny
+                        </label>
+                      )}
+                    </form.Field>
+                  </div>
                 </div>
-                <form.Field name="forwardAuth.copyHeaders">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor={field.name}>
-                        Forwarded auth headers (comma separated)
-                      </FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        placeholder="X-User, X-Email…"
-                        value={(field.state.value ?? []).join(", ")}
-                        onBlur={field.handleBlur}
-                        onChange={(e) =>
-                          field.handleChange(
-                            e.target.value
-                              .split(",")
-                              .map((header) => header.trim())
-                              .filter(Boolean),
-                          )
-                        }
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field name="basicAuth.username">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>
-                          Basic-auth username (optional)
-                        </FieldLabel>
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          autoComplete="username"
-                          placeholder="admin"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <form.Field name="basicAuth.passwordHash">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>
-                          Caddy password hash (optional)
-                        </FieldLabel>
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          autoComplete="off"
-                          spellCheck={false}
-                          placeholder="$2a$14$…"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <form.Field name="securityHeaders.hsts">
-                    {(field) => (
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={field.state.value}
-                          onCheckedChange={field.handleChange}
-                        />
-                        HSTS
-                      </label>
-                    )}
-                  </form.Field>
-                  <form.Field name="securityHeaders.nosniff">
-                    {(field) => (
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={field.state.value}
-                          onCheckedChange={field.handleChange}
-                        />
-                        No sniff
-                      </label>
-                    )}
-                  </form.Field>
-                  <form.Field name="securityHeaders.frameDeny">
-                    {(field) => (
-                      <label className="flex items-center gap-2 text-xs">
-                        <Switch
-                          checked={field.state.value}
-                          onCheckedChange={field.handleChange}
-                        />
-                        Frame deny
-                      </label>
-                    )}
-                  </form.Field>
-                </div>
-              </div>
-            </FieldGroup>
+              </FieldGroup>
 
-            <DialogFooter className="mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDomainDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <form.Subscribe
-                selector={(state) => ({
-                  canSubmit: state.canSubmit,
-                })}
-              >
-                {({ canSubmit }) => (
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit || isUpdatingResource}
-                  >
-                    {editingDomainIndex !== null
-                      ? "Save Changes"
-                      : "Link Domain"}
-                  </Button>
-                )}
-              </form.Subscribe>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </Card>
+              <DialogFooter className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDomainDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <form.Subscribe
+                  selector={(state) => ({
+                    canSubmit: state.canSubmit,
+                  })}
+                >
+                  {({ canSubmit }) => (
+                    <Button
+                      type="submit"
+                      disabled={!canSubmit || isUpdatingResource}
+                    >
+                      {editingDomainIndex !== null
+                        ? "Save Changes"
+                        : "Link Domain"}
+                    </Button>
+                  )}
+                </form.Subscribe>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </Card>
+      <ConfirmActionDialog
+        open={pendingDeleteIndex !== null}
+        onOpenChange={(open) => !open && setPendingDeleteIndex(null)}
+        title="Remove domain mapping?"
+        description={
+          <>
+            This will remove{" "}
+            <strong>{domainList[pendingDeleteIndex ?? -1]?.host}</strong> from
+            this resource&apos;s routing configuration. This action cannot be
+            undone.
+          </>
+        }
+        actionLabel="Remove mapping"
+        pending={isUpdatingResource}
+        onConfirm={() => {
+          if (pendingDeleteIndex !== null) deleteDomain(pendingDeleteIndex);
+        }}
+      />
+    </>
   );
 }
