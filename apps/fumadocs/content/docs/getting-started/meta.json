@@ -1,8 +1,4 @@
 {
   "title": "Getting Started",
-  "pages": [
-    "index",
-    "self-hosting",
-    "updates"
-  ]
+  "pages": ["index", "self-hosting", "updates"]
 }

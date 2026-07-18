@@ -134,7 +134,10 @@ describe("Docker explorer image controls", () => {
   test("prunes local docker resources via DockerCleanupService", async () => {
     const originalRun = DockerCleanupService.prototype.run;
     const runMock = mock(() =>
-      Promise.resolve({ action: "images" as const, output: ["images pruned local"] }),
+      Promise.resolve({
+        action: "images" as const,
+        output: ["images pruned local"],
+      }),
     );
     DockerCleanupService.prototype.run = runMock;
 
@@ -156,6 +159,7 @@ describe("Docker explorer image controls", () => {
   test("prunes remote docker resources via executeRemote", async () => {
     const service = new DockerReadOnlyService({} as never);
     const executedCommands: string[] = [];
+    // biome-ignore lint/complexity/useLiteralKeys: The private transport is intentionally replaced in this unit test.
     service["executeRemote"] = mock(async (_target, cmd) => {
       executedCommands.push(cmd);
       return `${cmd} success`;

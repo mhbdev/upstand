@@ -65,6 +65,13 @@ function caddySettingsWithDefaults(settings: CaddySettings = {}) {
   if (effectiveSettings.httpPort === effectiveSettings.httpsPort) {
     throw new Error("Caddy HTTP and HTTPS listener ports must be different");
   }
+  if (
+    [effectiveSettings.httpPort, effectiveSettings.httpsPort].includes(2019)
+  ) {
+    throw new Error(
+      "Caddy HTTP and HTTPS listener ports cannot use the private admin API port 2019",
+    );
+  }
 
   return effectiveSettings;
 }
@@ -103,7 +110,7 @@ function parseCaddyEnvironment(value?: string): string[] {
   });
 }
 
-function validateGlobalOptions(value: string | null): void {
+function validateManagedDirectives(value: string | null | undefined): void {
   if (!value) return;
   const forbidden = value.match(/^\s*(admin|http_port|https_port)\b/im)?.[1];
   if (forbidden) {
@@ -380,7 +387,13 @@ export function generateCaddyfileContent(
   certificates: CaddyCertificate[] = [],
 ): string {
   const effectiveSettings = caddySettingsWithDefaults(settings);
-  validateGlobalOptions(effectiveSettings.globalCaddyfile);
+  validateManagedDirectives(effectiveSettings.globalCaddyfile);
+  validateManagedDirectives(effectiveSettings.caddySnippets);
+  for (const middleware of parseCaddyMiddlewares(
+    effectiveSettings.caddyMiddlewares,
+  )) {
+    validateManagedDirectives(middleware.body);
+  }
   const routes = getRoutes(resources, certificates);
   const groupedRoutes = new Map<string, CaddyRoute[]>();
 

@@ -83,6 +83,11 @@ import {
   extractApplicationArchive,
 } from "./application-archive";
 import { AutoUpdateRuntime } from "./auto-update-runtime";
+import {
+  containerBelongsToResource,
+  isValidContainerIdentifier,
+  matchesContainerIdentifier,
+} from "./container-ownership";
 import { DeploymentRuntime } from "./deployment-runtime";
 import { ScheduledDockerCleanup } from "./docker-cleanup-scheduler";
 import { initializeMonitoring } from "./monitoring-agent";
@@ -277,7 +282,8 @@ app.post("/api/container-terminal/session", async (c) => {
       400,
     );
   }
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(body.containerId)) {
+  const containerId = body.containerId;
+  if (!isValidContainerIdentifier(containerId)) {
     return c.json({ error: "Invalid container identifier" }, 400);
   }
 
@@ -302,6 +308,44 @@ app.post("/api/container-terminal/session", async (c) => {
     );
   } catch {
     return c.json({ error: "Resource terminal permission is required" }, 403);
+  }
+  const targetServerId =
+    resource.serverId && !["local", "manager"].includes(resource.serverId)
+      ? resource.serverId
+      : "local";
+  let containers: unknown;
+  try {
+    containers = await scope.resolve(GetDockerInventoryUseCaseToken).execute({
+      organizationId: body.organizationId,
+      serverId: targetServerId,
+      kind: "containers",
+      tail: 150,
+    });
+  } catch {
+    return c.json(
+      { error: "Unable to verify the selected container on its Docker target" },
+      409,
+    );
+  }
+  const selectedContainer = Array.isArray(containers)
+    ? containers.find((container) => {
+        if (
+          typeof container !== "object" ||
+          container === null ||
+          typeof (container as { id?: unknown }).id !== "string" ||
+          !Array.isArray((container as { labels?: unknown }).labels)
+        ) {
+          return false;
+        }
+        const candidate = container as { id: string; labels: string[] };
+        return (
+          matchesContainerIdentifier(containerId, candidate.id) &&
+          containerBelongsToResource(candidate, resource)
+        );
+      })
+    : undefined;
+  if (!selectedContainer) {
+    return c.json({ error: "Container is not part of this resource" }, 404);
   }
   let host = "127.0.0.1";
   let port = 22;
@@ -406,7 +450,7 @@ app.post("/api/docker/terminal/session", async (c) => {
   if (!body?.organizationId || !body.containerId) {
     return c.json({ error: "Organization and container are required" }, 400);
   }
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(body.containerId)) {
+  if (!isValidContainerIdentifier(body.containerId)) {
     return c.json({ error: "Invalid container identifier" }, 400);
   }
 

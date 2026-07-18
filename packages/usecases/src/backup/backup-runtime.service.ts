@@ -287,6 +287,7 @@ export class BackupRuntimeService {
         postgresContainer,
         "sh",
         "-ec",
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: Shell parameter expansion is intentional.
         'pg_dump -Fc -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-upstand}"',
       ],
       "rclone",
@@ -368,6 +369,7 @@ export class BackupRuntimeService {
         postgresContainer,
         "sh",
         "-ec",
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: Shell parameter expansion is intentional.
         'psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-upstand}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();"',
       ]);
       await pipeProcesses(
@@ -380,6 +382,7 @@ export class BackupRuntimeService {
           postgresContainer,
           "sh",
           "-ec",
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: Shell parameter expansion is intentional.
           'pg_restore -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-upstand}" --clean --if-exists --no-owner',
         ],
       );

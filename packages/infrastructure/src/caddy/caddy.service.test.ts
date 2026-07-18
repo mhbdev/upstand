@@ -409,12 +409,25 @@ describe("Caddy domain configuration", () => {
     expect(() =>
       generateCaddyfileContent({ globalCaddyfile: "admin :2019" }),
     ).toThrow("managed by Upstand");
+    expect(() =>
+      generateCaddyfileContent({ caddySnippets: "admin :2019" }),
+    ).toThrow("managed by Upstand");
+    expect(() =>
+      generateCaddyfileContent({
+        caddyMiddlewares: JSON.stringify([
+          { name: "unsafe", body: "admin :2019" },
+        ]),
+      }),
+    ).toThrow("managed by Upstand");
   });
 
   test("keeps HTTP and HTTPS listeners distinct", () => {
     expect(() =>
       generateCaddyfileContent({ httpPort: 8443, httpsPort: 8443 }),
     ).toThrow("must be different");
+    expect(() => generateCaddyfileContent({ httpPort: 2019 })).toThrow(
+      "private admin API port",
+    );
   });
 
   test("enables structured access logs only when requested", () => {

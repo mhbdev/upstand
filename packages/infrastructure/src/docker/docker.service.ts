@@ -47,6 +47,31 @@ import { log } from "evlog";
 import yaml from "yaml";
 import { getDockerInstance } from "./docker-client";
 
+export function redactCommandOutput(
+  output: string,
+  secrets: readonly string[],
+): string {
+  return [...new Set(secrets)]
+    .filter((secret) => secret.length > 0)
+    .sort((first, second) => second.length - first.length)
+    .reduce(
+      (redacted, secret) => redacted.replaceAll(secret, "[REDACTED]"),
+      output,
+    );
+}
+
+function getUrlRedactions(value: string): string[] {
+  const redactions = [value];
+  try {
+    const url = new URL(value);
+    if (url.username) redactions.push(decodeURIComponent(url.username));
+    if (url.password) redactions.push(decodeURIComponent(url.password));
+  } catch {
+    // SSH-style clone URLs are not URL-parsable; the full value is still redacted.
+  }
+  return redactions;
+}
+
 export class DockerService {
   private readonly docker: Docker;
   private readonly commandEnvironment: Record<string, string | undefined>;
@@ -662,6 +687,7 @@ export class DockerService {
         ],
         onLog,
         gitEnvironment,
+        { redactions: getUrlRedactions(cloneUrl) },
       );
 
       if (sourceRevision) {
@@ -707,13 +733,17 @@ export class DockerService {
             "docker",
             [
               "login",
-              "-u",
+              "--username",
               registryInfo.username,
-              "-p",
-              registryInfo.password,
+              "--password-stdin",
               registryInfo.url,
             ],
             onLog,
+            undefined,
+            {
+              stdin: `${registryInfo.password}\n`,
+              redactions: [registryInfo.password],
+            },
           );
         }
         onLog(`Pushing image to registry: ${registryInfo.imageTag}...\n`);
@@ -839,6 +869,7 @@ export class DockerService {
         ],
         onLog,
         sshEnvironment,
+        { redactions: getUrlRedactions(cloneUrl) },
       );
       if (sourceRevision) {
         await this.checkoutSourceRevision(
@@ -1028,6 +1059,7 @@ export class DockerService {
         Object.keys(buildSecrets).length
           ? { ...process.env, DOCKER_BUILDKIT: "1", ...buildSecrets }
           : undefined,
+        { redactions: Object.values(buildSecrets) },
       );
     } finally {
       if (config.dockerCleanupCache) {
@@ -1072,6 +1104,7 @@ export class DockerService {
       ],
       onLog,
       buildEnvironment,
+      { redactions: Object.values(envVars) },
     );
 
     const builderName = `upstand-railpack-${createHash("sha256")
@@ -1129,7 +1162,9 @@ export class DockerService {
       buildArgs.push(clonePath);
 
       onLog(`Building Railpack v${version} image ${imageName}...\n`);
-      await this.runCommandAsync("docker", buildArgs, onLog, buildEnvironment);
+      await this.runCommandAsync("docker", buildArgs, onLog, buildEnvironment, {
+        redactions: Object.values(envVars),
+      });
     } finally {
       await this.runCommandAsync(
         "docker",
@@ -1161,6 +1196,7 @@ export class DockerService {
       buildArgs,
       onLog,
       this.getBuildEnvironment(envVars),
+      { redactions: Object.values(envVars) },
     );
 
     if (!publishDirectory) {
@@ -2078,6 +2114,7 @@ export class DockerService {
     args: string[],
     onLog: (log: string) => void,
     env?: NodeJS.ProcessEnv,
+    options: { stdin?: string; redactions?: readonly string[] } = {},
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -2090,6 +2127,8 @@ export class DockerService {
           ...(env ?? {}),
         },
       });
+
+      if (options.stdin !== undefined) p.stdin.end(options.stdin);
 
       const cancellationTimer = this.cancellationKey
         ? setInterval(() => {
@@ -2111,11 +2150,11 @@ export class DockerService {
       };
 
       p.stdout.on("data", (data) => {
-        onLog(data.toString());
+        onLog(redactCommandOutput(data.toString(), options.redactions ?? []));
       });
 
       p.stderr.on("data", (data) => {
-        onLog(data.toString());
+        onLog(redactCommandOutput(data.toString(), options.redactions ?? []));
       });
 
       p.on("close", (code) => {
@@ -2125,11 +2164,7 @@ export class DockerService {
           } else if (code === 0) {
             resolve();
           } else {
-            reject(
-              new Error(
-                `Command '${cmd} ${args.join(" ")}' failed with exit code ${code}`,
-              ),
-            );
+            reject(new Error(`Command '${cmd}' failed with exit code ${code}`));
           }
         });
       });

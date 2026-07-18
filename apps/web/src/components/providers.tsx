@@ -3,7 +3,6 @@
 import { organizationPlugin } from "@better-auth-ui/core/plugins";
 import { AuthProvider } from "@better-auth-ui/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "@upstand/ui/components/sonner";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";

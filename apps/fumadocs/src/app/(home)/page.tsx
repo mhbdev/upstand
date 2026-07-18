@@ -1,14 +1,13 @@
-import Link from "next/link";
-import { 
-  ServerIcon, 
-  CpuIcon, 
-  ShieldCheckIcon, 
-  TerminalIcon, 
-  NetworkIcon, 
-  BotIcon, 
-  DatabaseIcon, 
-  ArrowRightIcon 
+import {
+  ArrowRightIcon,
+  BotIcon,
+  CpuIcon,
+  DatabaseIcon,
+  NetworkIcon,
+  ServerIcon,
+  TerminalIcon,
 } from "lucide-react";
+import Link from "next/link";
 
 export default function HomePage() {
   return (
@@ -18,23 +17,25 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="mx-auto flex max-w-5xl flex-col items-center px-6 pt-20 pb-16 text-center lg:pt-32">
-        <div className="inline-flex items-center gap-2 rounded-full border bg-fd-secondary/50 px-3 py-1 text-sm font-medium text-fd-primary backdrop-blur-md">
-          <span className="flex size-2 rounded-full bg-indigo-500 animate-pulse" />
+        <div className="inline-flex items-center gap-2 rounded-full border bg-fd-secondary/50 px-3 py-1 font-medium text-fd-primary text-sm backdrop-blur-md">
+          <span className="flex size-2 animate-pulse rounded-full bg-indigo-500" />
           Self-Hostable PaaS Control Plane
         </div>
-        
-        <h1 className="mt-8 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 bg-clip-text text-5xl font-extrabold tracking-tight text-transparent dark:from-indigo-400 dark:via-violet-400 dark:to-indigo-300 sm:text-7xl">
+
+        <h1 className="mt-8 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 bg-clip-text font-extrabold text-5xl text-transparent tracking-tight sm:text-7xl dark:from-indigo-400 dark:via-violet-400 dark:to-indigo-300">
           Upstand
         </h1>
-        
-        <p className="mt-6 max-w-2xl text-lg text-fd-muted-foreground sm:text-xl">
-          Deploy applications, compose stacks, and databases to Docker Swarm with a unified, secure control plane and AI-driven operations assistant.
+
+        <p className="mt-6 max-w-2xl text-fd-muted-foreground text-lg sm:text-xl">
+          Deploy applications, compose stacks, and databases to Docker Swarm
+          with a unified, secure control plane and AI-driven operations
+          assistant.
         </p>
 
         <div className="mt-10 flex flex-wrap justify-center gap-4">
           <Link
             href="/docs"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-fd-primary px-6 py-3 font-semibold text-fd-primary-foreground shadow-lg shadow-indigo-500/10 transition-transform duration-200 hover:scale-[1.02] hover:bg-fd-primary/95"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-fd-primary px-6 py-3 font-semibold text-fd-primary-foreground shadow-indigo-500/10 shadow-lg transition-transform duration-200 hover:scale-[1.02] hover:bg-fd-primary/95"
           >
             Explore Docs
             <ArrowRightIcon className="size-4" />
@@ -52,19 +53,20 @@ export default function HomePage() {
 
       {/* Features Grid */}
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
+        <h2 className="text-center font-bold text-3xl tracking-tight sm:text-4xl">
           Everything you need to orchestrate workloads
         </h2>
-        
+
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Card 1 */}
           <div className="group rounded-2xl border bg-fd-secondary/35 p-6 backdrop-blur-sm transition-all duration-200 hover:border-indigo-500/40 hover:bg-fd-secondary/50">
             <div className="inline-flex rounded-xl bg-indigo-500/10 p-3 text-indigo-500">
               <CpuIcon className="size-6" />
             </div>
-            <h3 className="mt-4 text-xl font-bold">App Deployments</h3>
-            <p className="mt-2 text-sm text-fd-muted-foreground">
-              Build from Git, Nixpacks, Railpacks, or Dockerfile. Automated queue serialization and concurrency management.
+            <h3 className="mt-4 font-bold text-xl">App Deployments</h3>
+            <p className="mt-2 text-fd-muted-foreground text-sm">
+              Build from Git, Nixpacks, Railpacks, or Dockerfile. Automated
+              queue serialization and concurrency management.
             </p>
           </div>
 
@@ -73,9 +75,10 @@ export default function HomePage() {
             <div className="inline-flex rounded-xl bg-violet-500/10 p-3 text-violet-500">
               <DatabaseIcon className="size-6" />
             </div>
-            <h3 className="mt-4 text-xl font-bold">Databases</h3>
-            <p className="mt-2 text-sm text-fd-muted-foreground">
-              Deploy Postgres, MySQL, MongoDB, Redis, and libSQL with persistent named volumes and encrypted credentials.
+            <h3 className="mt-4 font-bold text-xl">Databases</h3>
+            <p className="mt-2 text-fd-muted-foreground text-sm">
+              Deploy Postgres, MySQL, MongoDB, Redis, and libSQL with persistent
+              named volumes and encrypted credentials.
             </p>
           </div>
 
@@ -84,9 +87,10 @@ export default function HomePage() {
             <div className="inline-flex rounded-xl bg-indigo-500/10 p-3 text-indigo-500">
               <NetworkIcon className="size-6" />
             </div>
-            <h3 className="mt-4 text-xl font-bold">Domains & Caddy</h3>
-            <p className="mt-2 text-sm text-fd-muted-foreground">
-              Zero-downtime reloads, automatic TLS with Let's Encrypt, security headers, redirects, and basic/forward authentication.
+            <h3 className="mt-4 font-bold text-xl">Domains & Caddy</h3>
+            <p className="mt-2 text-fd-muted-foreground text-sm">
+              Zero-downtime reloads, automatic TLS with Let's Encrypt, security
+              headers, redirects, and basic/forward authentication.
             </p>
           </div>
 
@@ -95,9 +99,10 @@ export default function HomePage() {
             <div className="inline-flex rounded-xl bg-violet-500/10 p-3 text-violet-500">
               <ServerIcon className="size-6" />
             </div>
-            <h3 className="mt-4 text-xl font-bold">Remote Servers</h3>
-            <p className="mt-2 text-sm text-fd-muted-foreground">
-              Provision external Docker hosts over SSH. Manage Swarm managers, workers, drain states, and token rotations.
+            <h3 className="mt-4 font-bold text-xl">Remote Servers</h3>
+            <p className="mt-2 text-fd-muted-foreground text-sm">
+              Provision external Docker hosts over SSH. Manage Swarm managers,
+              workers, drain states, and token rotations.
             </p>
           </div>
 
@@ -106,9 +111,10 @@ export default function HomePage() {
             <div className="inline-flex rounded-xl bg-indigo-500/10 p-3 text-indigo-500">
               <TerminalIcon className="size-6" />
             </div>
-            <h3 className="mt-4 text-xl font-bold">Owner Terminal & Logs</h3>
-            <p className="mt-2 text-sm text-fd-muted-foreground">
-              Owner-only Web SSH terminals, custom log reviewer (buffers, download, levels), and CodeMirror editor surfaces.
+            <h3 className="mt-4 font-bold text-xl">Owner Terminal & Logs</h3>
+            <p className="mt-2 text-fd-muted-foreground text-sm">
+              Owner-only Web SSH terminals, custom log reviewer (buffers,
+              download, levels), and CodeMirror editor surfaces.
             </p>
           </div>
 
@@ -117,9 +123,10 @@ export default function HomePage() {
             <div className="inline-flex rounded-xl bg-violet-500/10 p-3 text-violet-500">
               <BotIcon className="size-6" />
             </div>
-            <h3 className="mt-4 text-xl font-bold">UpGal AI Assistant</h3>
-            <p className="mt-2 text-sm text-fd-muted-foreground">
-              AI operator running ToolLoopAgent, scoped organization security, explicit user approval UI, and MCP access.
+            <h3 className="mt-4 font-bold text-xl">UpGal AI Assistant</h3>
+            <p className="mt-2 text-fd-muted-foreground text-sm">
+              AI operator running ToolLoopAgent, scoped organization security,
+              explicit user approval UI, and MCP access.
             </p>
           </div>
         </div>
@@ -127,10 +134,10 @@ export default function HomePage() {
 
       {/* Tech Stack Banner */}
       <section className="mx-auto max-w-5xl px-6 py-20 text-center">
-        <h3 className="text-sm font-semibold tracking-wider uppercase text-fd-muted-foreground">
+        <h3 className="font-semibold text-fd-muted-foreground text-sm uppercase tracking-wider">
           Built with Modern Technologies
         </h3>
-        <div className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-4 text-lg font-medium text-fd-muted-foreground">
+        <div className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-4 font-medium text-fd-muted-foreground text-lg">
           <span>Next.js 16</span>
           <span>•</span>
           <span>Hono</span>

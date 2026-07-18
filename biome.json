@@ -27,7 +27,9 @@
       "!**/wrangler.jsonc",
       "!**/.source",
       "!**/.agents",
-      "!**/convex/_generated"
+      "!**/convex/_generated",
+      "!packages/usecases/src/template/catalog.json",
+      "!apps/fumadocs/public/images/terminal_view.svg"
     ]
   },
   "formatter": {

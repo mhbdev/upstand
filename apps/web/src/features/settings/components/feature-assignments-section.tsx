@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import { Field, FieldLabel } from "@upstand/ui/components/field";
+import { Field } from "@upstand/ui/components/field";
 import {
   Select,
   SelectContent,
