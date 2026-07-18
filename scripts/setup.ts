@@ -82,6 +82,38 @@ function databasePassword(databaseUrl: string | undefined): string | undefined {
   }
 }
 
+function databaseUrlWithPassword(
+  databaseUrl: string | undefined,
+  password: string | undefined,
+): string | undefined {
+  if (!databaseUrl || !password) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(databaseUrl);
+    url.password = password;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function replaceEnvValue(
+  contents: string,
+  name: string,
+  value: string,
+): string {
+  const lines = contents.split(/\r?\n/);
+  const lineIndex = lines.findIndex((line) => line.startsWith(`${name}=`));
+  if (lineIndex === -1) {
+    lines.push(`${name}=${value}`);
+  } else {
+    lines[lineIndex] = `${name}=${value}`;
+  }
+  return lines.join("\n");
+}
+
 function sqlString(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
@@ -158,17 +190,32 @@ async function main(): Promise<void> {
 
   const env = { ...process.env };
   const rootEnv = await Bun.file(path.join(root, ".env")).text();
-  const serverEnv = await Bun.file(path.join(serverDirectory, ".env")).text();
+  const serverEnvPath = path.join(serverDirectory, ".env");
+  const serverEnv = await Bun.file(serverEnvPath).text();
   const configuredPassword = readEnvValue(rootEnv, "POSTGRES_PASSWORD");
-  const serverPassword = databasePassword(
-    readEnvValue(serverEnv, "DATABASE_URL"),
-  );
+  const serverDatabaseUrl = readEnvValue(serverEnv, "DATABASE_URL");
+  const serverPassword = databasePassword(serverDatabaseUrl);
   const postgresPassword =
     rootEnvCreated && !serverEnvCreated
       ? (serverPassword ?? configuredPassword)
       : (configuredPassword ?? serverPassword);
   if (postgresPassword) {
     env.POSTGRES_PASSWORD = postgresPassword;
+  }
+
+  const migrationDatabaseUrl = databaseUrlWithPassword(
+    serverDatabaseUrl,
+    postgresPassword,
+  );
+  if (migrationDatabaseUrl) {
+    env.DATABASE_URL = migrationDatabaseUrl;
+    if (serverPassword !== postgresPassword) {
+      await Bun.write(
+        serverEnvPath,
+        replaceEnvValue(serverEnv, "DATABASE_URL", migrationDatabaseUrl),
+      );
+      console.log("Synchronized the local application database password.");
+    }
   }
 
   console.log("Starting local PostgreSQL and Redis services...");
