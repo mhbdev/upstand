@@ -42,6 +42,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -399,24 +400,17 @@ export default function S3Destinations(_props: {
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-border/60 border-dashed bg-card/10 p-12 text-center">
-          <HugeiconsIcon
-            icon={Database01Icon}
-            className="mx-auto size-12 text-muted-foreground/50"
-          />
-          <h2 className="mt-4 font-semibold text-foreground text-lg">
-            No S3 Destinations
-          </h2>
-          <p className="mt-2 max-w-sm text-muted-foreground text-sm">
-            Add S3-compatible destinations (AWS S3, Cloudflare R2, Wasabi,
-            DigitalOcean Spaces, etc.) to store secure and automated backups of
-            your applications.
-          </p>
-          <Button onClick={handleOpenAdd} className="mt-6 gap-2">
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Add Destination
-          </Button>
-        </div>
+        <PageEmpty
+          icon={Database01Icon}
+          title="No S3 destinations yet"
+          description="Add an S3-compatible destination such as AWS S3, Cloudflare R2, Wasabi, or DigitalOcean Spaces for backups."
+          action={
+            <Button onClick={handleOpenAdd}>
+              <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+              Add destination
+            </Button>
+          }
+        />
       )}
 
       {/* Add / Edit Dialog */}

@@ -34,6 +34,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
@@ -255,23 +256,17 @@ export default function DockerRegistryPage() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-border/60 border-dashed bg-card/10 p-12 text-center">
-          <HugeiconsIcon
-            icon={Database01Icon}
-            className="mx-auto size-12 text-muted-foreground/50"
-          />
-          <h2 className="mt-4 font-semibold text-foreground text-lg">
-            No External Registries
-          </h2>
-          <p className="mt-2 max-w-sm text-muted-foreground text-sm">
-            Add custom Docker registries (such as GHCR, Amazon ECR, self-hosted
-            registries, etc.) to configure deployment pipelines.
-          </p>
-          <Button onClick={openCreate} className="mt-6 gap-2">
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Add Registry
-          </Button>
-        </div>
+        <PageEmpty
+          icon={Database01Icon}
+          title="No Docker registries yet"
+          description="Add a registry such as GHCR, Amazon ECR, or a self-hosted registry to configure deployment pipelines."
+          action={
+            <Button onClick={openCreate}>
+              <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+              Add external registry
+            </Button>
+          }
+        />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

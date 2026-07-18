@@ -41,6 +41,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import type { authClient } from "@/lib/auth-client";
@@ -365,30 +366,25 @@ export default function SSHKeys(_props: {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-border/40 border-dashed bg-card/10 p-12 text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center bg-primary/10 text-primary">
-            <HugeiconsIcon icon={Key01Icon} className="size-6" />
-          </div>
-          <h3 className="mb-1 font-semibold text-foreground text-lg">
-            No SSH Keys Found
-          </h3>
-          <p className="mb-6 max-w-sm text-muted-foreground text-sm">
-            Add an SSH Key to reuse it across different git providers,
-            deployments, and servers.
-          </p>
-          <UpGalTarget definition={createSshKeyTarget}>
-            <Button
-              variant="outline"
-              onClick={() => {
-                resetForm();
-                setAddKeyMode("generate");
-                setAddKeyOpen(true);
-              }}
-            >
-              Create first key
-            </Button>
-          </UpGalTarget>
-        </div>
+        <PageEmpty
+          icon={Key01Icon}
+          title="No SSH keys yet"
+          description="Add an SSH key to reuse it across Git providers, deployments, and servers."
+          action={
+            <UpGalTarget definition={createSshKeyTarget}>
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setAddKeyMode("generate");
+                  setAddKeyOpen(true);
+                }}
+              >
+                <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+                Add SSH key
+              </Button>
+            </UpGalTarget>
+          }
+        />
       )}
 
       <Dialog

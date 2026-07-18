@@ -33,11 +33,11 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import {
   Activity,
   Clock,
   RefreshCw,
-  Search,
   Server,
   Settings,
   Terminal,
@@ -218,6 +218,14 @@ export default function DeploymentsPage() {
         }
       />
 
+      <PageToolbar
+        search={searchQuery}
+        searchPlaceholder="Search deployments…"
+        onSearchChange={setSearchQuery}
+        onClearSearch={() => setSearchQuery("")}
+        hasActiveFilters={Boolean(searchQuery)}
+      />
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="border-b pb-px">
           <TabsList className="mb-4">
@@ -239,7 +247,7 @@ export default function DeploymentsPage() {
         {/* Tab 1: History */}
         <TabsContent value="history" className="space-y-4">
           <Card className="border-muted/40 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardHeader className="pb-4">
               <div>
                 <CardTitle className="font-semibold text-lg">
                   Deployment History
@@ -247,15 +255,6 @@ export default function DeploymentsPage() {
                 <CardDescription>
                   All deployments executed across the server infrastructure.
                 </CardDescription>
-              </div>
-              <div className="relative w-72">
-                <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-                <Input
-                  placeholder="Filter deployments..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 pl-9"
-                />
               </div>
             </CardHeader>
             <CardContent>

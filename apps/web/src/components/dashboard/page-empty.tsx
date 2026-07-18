@@ -7,6 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@upstand/ui/components/empty";
+import { cn } from "@upstand/ui/lib/utils";
 import type { ReactNode } from "react";
 
 export function PageEmpty({
@@ -14,14 +15,16 @@ export function PageEmpty({
   title,
   description,
   action,
+  className,
 }: {
   icon?: IconSvgElement;
   title: string;
   description: string;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <Empty>
+    <Empty className={cn(className)}>
       <EmptyHeader>
         {icon ? (
           <EmptyMedia variant="icon">
