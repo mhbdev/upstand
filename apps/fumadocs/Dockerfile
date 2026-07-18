@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache bun install --ignore-scri
 COPY --from=pruner /out/full/ ./
 
 ENV NODE_ENV=production
-RUN cd apps/fumadocs && bun run postinstall
+RUN cd apps/fumadocs && bun run generate
 RUN cd apps/fumadocs && node node_modules/next/dist/bin/next build
 RUN mkdir -p apps/fumadocs/public
 
