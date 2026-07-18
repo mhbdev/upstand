@@ -6,8 +6,9 @@
     "build": "next build --webpack",
     "dev": "next dev --port=4000",
     "start": "next start",
-    "check-types": "fumadocs-mdx && next typegen && tsc --noEmit",
-    "postinstall": "fumadocs-mdx",
+    "check-types": "bun scripts/check-types.ts",
+    "generate": "fumadocs-mdx",
+    "postinstall": "bun run generate",
     "lint": "biome check .",
     "format": "biome format --write"
   },

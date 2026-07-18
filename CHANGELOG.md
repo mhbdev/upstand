@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.78 - 2026-07-18
+
+### Fixed
+
+- Make Fumadocs source generation deterministic during type checks by preventing the asynchronous Next MDX plugin from racing with generated collection files.
+- Use the same explicit Fumadocs generation command for local postinstall setup and the documentation image build.
+
 ## 0.1.77 - 2026-07-18
 
 ### Fixed
