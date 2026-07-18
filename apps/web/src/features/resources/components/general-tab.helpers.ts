@@ -2,6 +2,7 @@ import {
   type ApplicationBuildConfig,
   ApplicationBuildConfigSchema,
 } from "@upstand/domain";
+import { z } from "zod";
 
 export const RAILPACK_VERSIONS = [
   "0.15.4",
@@ -27,6 +28,61 @@ export type ResourceProvider =
 
 export type DatabaseCredentials = Record<string, string>;
 
+const ResourceCredentialsSchema = z
+  .object({
+    provider: z.string().optional(),
+    registryId: z.string().optional(),
+    buildRegistryId: z.string().optional(),
+    rollbackActive: z.boolean().optional(),
+    rollbackRegistryId: z.string().optional(),
+    autoDeploy: z.boolean().optional(),
+    githubAccount: z.string().optional(),
+    repository: z.string().optional(),
+    branch: z.string().optional(),
+    composePath: z.string().optional(),
+    triggerType: z.string().optional(),
+    watchPaths: z.array(z.string()).optional(),
+    enableSubmodules: z.boolean().optional(),
+    repositoryUrl: z.string().optional(),
+    sshKeyId: z.string().optional(),
+    composeFile: z.string().optional(),
+  })
+  .catchall(z.unknown());
+const DeploymentSnapshotSchema = z.object({
+  id: z.string().optional(),
+  status: z.string().optional(),
+  title: z.string().optional(),
+  logs: z.string().optional(),
+  createdAt: z.string().optional(),
+  sourceRevision: z.string().nullable().optional(),
+});
+const DeploymentSnapshotsSchema = z.array(DeploymentSnapshotSchema);
+
+export type ResourceCredentials = z.infer<typeof ResourceCredentialsSchema>;
+export type DeploymentSnapshot = z.infer<typeof DeploymentSnapshotSchema>;
+
+export function toStringRecord(
+  value: Record<string, unknown>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+export function parseJsonObject(
+  value: string | null | undefined,
+): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return z.record(z.string(), z.unknown()).parse(parsed);
+  } catch {
+    return {};
+  }
+}
+
 const defaultDockerfileBuildConfig = (): ApplicationBuildConfig => ({
   type: "dockerfile",
   buildPath: ".",
@@ -50,20 +106,23 @@ export function parseApplicationBuildConfig(
 
 export function parseResourceCredentials(
   value: string | null | undefined,
-): Record<string, any> | null {
+): ResourceCredentials | null {
   if (!value) return null;
   try {
-    return JSON.parse(value);
+    const parsed: unknown = JSON.parse(value);
+    return ResourceCredentialsSchema.parse(parsed);
   } catch {
     return null;
   }
 }
 
-export function parseDeployments(value: string | null | undefined): any[] {
+export function parseDeployments(
+  value: string | null | undefined,
+): DeploymentSnapshot[] {
   if (!value) return [];
   try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(value);
+    return DeploymentSnapshotsSchema.parse(parsed);
   } catch {
     return [];
   }

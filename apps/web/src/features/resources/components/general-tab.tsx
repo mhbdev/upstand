@@ -58,7 +58,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
+import { uploadArchive, validateArchiveFile } from "@/lib/archive-upload";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 import {
@@ -68,6 +70,7 @@ import {
   parseResourceCredentials,
   RAILPACK_VERSIONS,
   type ResourceProvider,
+  toStringRecord,
 } from "./general-tab.helpers";
 
 interface GeneralTabProps {
@@ -256,36 +259,33 @@ export function GeneralTab({
   void isUploading;
 
   const handleUploadDropFile = async (file: File) => {
+    const fileError = validateArchiveFile(file, {
+      extensions: [".zip", ".tar", ".gz", ".tgz"],
+    });
+    if (fileError) {
+      toast.error(fileError);
+      return;
+    }
+
     setIsUploading(true);
     const toastId = toast.loading(
       "Uploading and extracting project archive...",
     );
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch(
-        getServerApiUrl(`/api/resources/${resource.id}/upload`),
-        {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        },
-      );
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(
-          errData.error || `Upload failed with status ${response.status}`,
-        );
-      }
+      await uploadArchive({
+        url: getServerApiUrl(`/api/resources/${resource.id}/upload`),
+        file,
+      });
 
       toast.success("Archive uploaded and deployment triggered!", {
         id: toastId,
       });
       window.location.reload();
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`, { id: toastId });
+    } catch (err: unknown) {
+      toast.error(
+        `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        { id: toastId },
+      );
     } finally {
       setIsUploading(false);
     }
@@ -406,8 +406,21 @@ export function GeneralTab({
         }
       }
       if (config) {
-        if (config.provider) {
-          setProviderType(config.provider);
+        const provider = config.provider;
+        if (
+          provider &&
+          [
+            "docker",
+            "github",
+            "gitlab",
+            "bitbucket",
+            "gitea",
+            "git",
+            "raw",
+            "drop",
+          ].includes(provider)
+        ) {
+          setProviderType(provider as ResourceProvider);
         }
         setDockerRegistryId(config.registryId ?? "");
         setBuildRegistryId(
@@ -457,7 +470,7 @@ export function GeneralTab({
           setRawComposeFile(config.composeFile ?? "");
         }
         if (resource.type === "database") {
-          setDatabaseCredentials(config);
+          setDatabaseCredentials(toStringRecord(config));
         }
       }
     }
@@ -819,10 +832,11 @@ export function GeneralTab({
                     size="icon"
                     aria-label="Copy webhook URL"
                     onClick={() => {
-                      void navigator.clipboard.writeText(
+                      void copyText(
                         `${webhookBaseUrl}/api/deploy/${webhookToken}`,
-                      );
-                      toast.success("Webhook URL copied");
+                      )
+                        .then(() => toast.success("Webhook URL copied"))
+                        .catch(() => toast.error("Failed to copy webhook URL"));
                     }}
                   >
                     <Copy className="size-4" />
@@ -2032,7 +2046,7 @@ export function GeneralTab({
               {providerType === "drop" && (
                 <div className="flex flex-col gap-3 pt-2">
                   <Label>Source Archive (ZIP or Tarball)</Label>
-                  <div
+                  <label
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2046,19 +2060,17 @@ export function GeneralTab({
                       }
                     }}
                     className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-border/40 border-dashed bg-muted/20 p-8 text-center transition-colors hover:border-primary/50 hover:bg-muted/30"
-                    onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = ".zip,.tar,.gz,.tgz";
-                      input.onchange = async (e: any) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          await handleUploadDropFile(file);
-                        }
-                      };
-                      input.click();
-                    }}
                   >
+                    <input
+                      type="file"
+                      accept=".zip,.tar,.gz,.tgz"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        if (file) void handleUploadDropFile(file);
+                        event.currentTarget.value = "";
+                      }}
+                    />
                     <Upload className="mb-2 size-8 animate-pulse text-muted-foreground" />
                     <p className="font-medium text-foreground text-sm">
                       Drag & drop your archive file here, or click to select
@@ -2066,7 +2078,7 @@ export function GeneralTab({
                     <p className="mt-1 text-muted-foreground text-xs">
                       Supports .zip, .tar.gz, .tgz (Max 50MB)
                     </p>
-                  </div>
+                  </label>
                 </div>
               )}
 

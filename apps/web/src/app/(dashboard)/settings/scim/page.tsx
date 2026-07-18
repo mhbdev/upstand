@@ -28,6 +28,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
@@ -71,7 +72,7 @@ export default function ScimSettingsPage() {
 
   const copyToken = async () => {
     if (!newToken) return;
-    await navigator.clipboard.writeText(newToken);
+    await copyText(newToken);
     toast.success("SCIM token copied");
   };
 

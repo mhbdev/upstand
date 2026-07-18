@@ -66,6 +66,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
+import { copyText, downloadJson } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 const STATUS_GROUPS = ["all", "1xx", "2xx", "3xx", "4xx", "5xx"] as const;
@@ -161,19 +162,10 @@ function AccessLogDetail({
   if (!entry) return null;
   const json = JSON.stringify(entry.raw, null, 2);
   const copyIp = async () => {
-    await navigator.clipboard.writeText(entry.remoteIp);
+    await copyText(entry.remoteIp);
     toast.success("Client IP copied");
   };
-  const download = () => {
-    const url = URL.createObjectURL(
-      new Blob([json], { type: "application/json" }),
-    );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `request-${entry.id}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
+  const download = () => downloadJson(entry.raw, `request-${entry.id}.json`);
   return (
     <Sheet open={Boolean(entry)} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">

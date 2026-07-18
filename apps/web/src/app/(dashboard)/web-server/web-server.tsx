@@ -62,6 +62,7 @@ import {
 } from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 interface PortMapping {
@@ -502,7 +503,7 @@ export default function WebServerDashboard(_props: {
     const text = type === "caddy" ? caddyLogs : serverLogs;
     if (!text) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       if (type === "caddy") {
         setCaddyLogsCopied(true);
         setTimeout(() => setCaddyLogsCopied(false), 2000);
@@ -1062,10 +1063,9 @@ export default function WebServerDashboard(_props: {
                       size="icon"
                       className="size-5 hover:bg-muted/20"
                       onClick={() => {
-                        navigator.clipboard.writeText(
-                          info?.settings?.serverIp || "",
-                        );
-                        toast.success("IP copied to clipboard");
+                        void copyText(info?.settings?.serverIp || "")
+                          .then(() => toast.success("IP copied to clipboard"))
+                          .catch(() => toast.error("Failed to copy IP"));
                       }}
                       disabled={!info?.settings?.serverIp}
                     >

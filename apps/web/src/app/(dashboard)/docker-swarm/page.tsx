@@ -82,6 +82,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 type SwarmNode = {
@@ -313,7 +314,7 @@ export default function DockerSwarmPage() {
 
   const copyCommand = async (command: string) => {
     try {
-      await navigator.clipboard.writeText(command);
+      await copyText(command);
       toast.success("Join command copied to clipboard.");
     } catch {
       toast.error("The browser could not access the clipboard.");

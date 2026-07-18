@@ -22,6 +22,7 @@ import {
 import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CodeSurface } from "@/components/shared/code-editor";
+import { copyText, downloadText } from "@/lib/browser";
 
 // Log parser and style rules
 export type LogType = "error" | "warning" | "success" | "info" | "debug";
@@ -336,8 +337,13 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
           : log.message,
       )
       .join("\n");
-    navigator.clipboard.writeText(text);
-    toast.success("Logs copied to clipboard");
+    void copyText(text)
+      .then(() => toast.success("Logs copied to clipboard"))
+      .catch((error: unknown) =>
+        toast.error(
+          error instanceof Error ? error.message : "Could not copy logs",
+        ),
+      );
   };
 
   const handleDownload = () => {
@@ -348,13 +354,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
           : log.message,
       )
       .join("\n");
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `container-${containerId}-logs.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadText(text, `container-${containerId}-logs.txt`);
   };
 
   return (
