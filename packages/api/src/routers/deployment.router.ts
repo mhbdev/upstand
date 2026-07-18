@@ -1,7 +1,8 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { redis } from "@upstand/redis";
-import { getDeploymentQueueName, getDockerInstance } from "@upstand/usecases";
+import { getDeploymentQueueName } from "@upstand/usecases";
 import {
+  GetDeploymentServerSettingsUseCaseToken,
   GetDeploymentsUseCaseToken,
   GetQueueUseCaseToken,
   GetRequestsUseCaseToken,
@@ -121,71 +122,10 @@ export const deploymentRouter = router({
         input.organizationId,
         "server:view",
       );
-      const uow = ctx.scope.resolve(UnitOfWorkToken);
       try {
-        // 1. Fetch current Swarm nodes
-        const dInstance = getDockerInstance();
-
-        const nodes: any[] = [];
-        try {
-          const info = await dInstance.info();
-          if (info.Swarm && info.Swarm.LocalNodeState === "active") {
-            const list = await dInstance.listNodes();
-            for (const n of list) {
-              nodes.push({
-                id: n.ID,
-                hostname: n.Description?.Hostname || n.ID,
-                ip: n.Status?.Addr || "127.0.0.1",
-                isLeader: n.ManagerStatus?.Leader || false,
-              });
-            }
-          }
-        } catch {}
-
-        // If Swarm is inactive, fallback to local node representation
-        if (nodes.length === 0) {
-          nodes.push({
-            id: "local",
-            hostname: "Dokploy Server",
-            ip: "127.0.0.1",
-            isLeader: true,
-          });
-        }
-
-        // 2. Fetch DB configurations
-        const dbSettings = await uow.serverBuildSettingsRepository.findMany();
-        const settingsMap = new Map(dbSettings.map((s) => [s.id, s]));
-
-        // Registered remote servers are also independent deployment/build
-        // queues. Surface them alongside Swarm nodes so their concurrency is
-        // configurable from the same operational page.
-        const remoteServers = await uow.serverRepository.findByOrganizationId(
-          input.organizationId,
-        );
-        for (const server of remoteServers) {
-          if (nodes.some((node) => node.id === server.id)) continue;
-          nodes.push({
-            id: server.id,
-            hostname: server.name,
-            ip: server.ipAddress,
-            isLeader: false,
-            status: server.status,
-            serverType: server.serverType,
-          });
-        }
-
-        // 3. Merge
-        return nodes.map((node) => {
-          const dbSetting = settingsMap.get(node.id);
-          return {
-            id: node.id,
-            hostname: dbSetting?.hostname || node.hostname,
-            ip: dbSetting?.ip || node.ip,
-            concurrency: dbSetting?.concurrency || (node.isLeader ? 2 : 1),
-            status: node.status || "ready",
-            serverType: node.serverType || "swarm",
-          };
-        });
+        return await ctx.scope
+          .resolve(GetDeploymentServerSettingsUseCaseToken)
+          .execute(input.organizationId);
       } catch (error) {
         handleUseCaseError(error);
       }

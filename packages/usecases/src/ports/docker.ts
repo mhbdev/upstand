@@ -214,6 +214,16 @@ export type DockerPruneType =
   | "all";
 
 export interface DockerInventoryReaderPort {
+  listSwarmNodes(target: DockerInspectionTarget): Promise<
+    Array<{
+      id: string;
+      hostname: string;
+      ip: string;
+      isLeader: boolean;
+      status?: string;
+      serverType?: string;
+    }>
+  >;
   getInfo(target: DockerInspectionTarget): Promise<DockerInfo>;
   getHostTime(
     target: DockerInspectionTarget,

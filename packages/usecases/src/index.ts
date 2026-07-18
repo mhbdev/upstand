@@ -22,6 +22,7 @@ export * from "./deployment/deployment-queue-name";
 // Deployments & Queues
 export * from "./deployment/deployment-worker";
 export * from "./deployment/docker-image-webhook";
+export * from "./deployment/get-deployment-server-settings.usecase";
 export * from "./deployment/get-deployments.usecase";
 export * from "./deployment/get-queue.usecase";
 export * from "./deployment/get-requests.usecase";
