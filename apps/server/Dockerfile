@@ -1,50 +1,21 @@
 FROM buildpacksio/pack:0.39.1 AS buildpacks
 FROM docker/buildx-bin:0.16.2 AS buildx
 
+FROM oven/bun:1.3.14 AS pruner
+WORKDIR /repo
+COPY . .
+RUN bunx turbo@2.10.5 prune server --docker --out-dir /out
+
 FROM oven/bun:1.3.14 AS builder
 WORKDIR /app
 ENV SKIP_ENV_VALIDATION=1
 
-# Copy monorepo configuration files to fetch dependencies
-COPY package.json bun.lock tsconfig.json ./
-COPY apps/server/package.json ./apps/server/
-COPY apps/web/package.json ./apps/web/
-COPY apps/fumadocs/package.json ./apps/fumadocs/
-COPY packages/db/package.json ./packages/db/
-COPY packages/env/package.json ./packages/env/
-COPY packages/api/package.json ./packages/api/
-COPY packages/auth/package.json ./packages/auth/
-COPY packages/config/package.json ./packages/config/
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/redis/package.json ./packages/redis/
-COPY packages/repositories/package.json ./packages/repositories/
-COPY packages/domain/package.json ./packages/domain/
-COPY packages/usecases/package.json ./packages/usecases/
-COPY packages/infrastructure/package.json ./packages/infrastructure/
-COPY packages/platform/package.json ./packages/platform/
-
-# Install all dependencies without running postinstall scripts (which require source files)
+COPY --from=pruner /out/json/ ./
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --ignore-scripts --frozen-lockfile
+COPY --from=pruner /out/full/ ./
 
-# Copy codebase
-COPY apps/server ./apps/server
-COPY packages/db ./packages/db
-COPY packages/env ./packages/env
-COPY packages/api ./packages/api
-COPY packages/auth ./packages/auth
-COPY packages/config ./packages/config
-COPY packages/ui ./packages/ui
-COPY packages/redis ./packages/redis
-COPY packages/repositories ./packages/repositories
-COPY packages/domain ./packages/domain
-COPY packages/usecases ./packages/usecases
-COPY packages/infrastructure ./packages/infrastructure
-COPY packages/platform ./packages/platform
-
-# Compile the Hono application
 RUN cd apps/server && bun run build
 
-# Runner stage
 FROM oven/bun:1.3.14-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -53,7 +24,6 @@ ARG TARGETARCH
 ARG NIXPACKS_VERSION=1.41.0
 ARG UPSTAND_RCLONE_VERSION=1.74.4
 
-# Install system dependencies needed by deployment worker and rclone testing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
@@ -66,9 +36,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# The distro rclone package is an old development build whose S3 streaming
-# uploads are incompatible with some S3-compatible providers, including R2.
-# Pin the official release so backup and restore behavior is reproducible.
 RUN case "$TARGETARCH" in \
       amd64) RCLONE_ARCH="amd64" ;; \
       arm64) RCLONE_ARCH="arm64" ;; \
@@ -82,9 +49,6 @@ RUN case "$TARGETARCH" in \
     && rm -rf /tmp/rclone /tmp/rclone.zip \
     && rclone version
 
-# Nixpacks is pinned at image-build time, so production deployments never run a
-# mutable installer. Railpack is intentionally downloaded per configured release
-# by the worker because an application can select its own Railpack version.
 RUN case "$TARGETARCH" in \
       amd64) NIXPACKS_TARGET="x86_64-unknown-linux-musl" ;; \
       arm64) NIXPACKS_TARGET="aarch64-unknown-linux-musl" ;; \
@@ -101,40 +65,13 @@ COPY --from=buildpacks /usr/local/bin/pack /usr/local/bin/pack
 COPY --from=buildx /buildx /usr/libexec/docker/cli-plugins/docker-buildx
 RUN chmod 0755 /usr/libexec/docker/cli-plugins/docker-buildx && docker buildx version
 
-# Copy configurations and lockfile
-COPY package.json bun.lock ./
-COPY apps/server/package.json ./apps/server/
-COPY apps/web/package.json ./apps/web/
-COPY apps/fumadocs/package.json ./apps/fumadocs/
-COPY packages/db/package.json ./packages/db/
-COPY packages/env/package.json ./packages/env/
-COPY packages/api/package.json ./packages/api/
-COPY packages/auth/package.json ./packages/auth/
-COPY packages/config/package.json ./packages/config/
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/redis/package.json ./packages/redis/
-COPY packages/repositories/package.json ./packages/repositories/
-COPY packages/domain/package.json ./packages/domain/
-COPY packages/usecases/package.json ./packages/usecases/
-COPY packages/infrastructure/package.json ./packages/infrastructure/
-COPY packages/platform/package.json ./packages/platform/
-
-# Fumadocs owns a workspace postinstall hook. It must have its source config
-# available while Bun installs production dependencies, even though it is not
-# included in the final server command.
-COPY apps/fumadocs ./apps/fumadocs
-COPY packages/infrastructure ./packages/infrastructure
-COPY packages/platform ./packages/platform
-
-# Install production dependencies with their platform-specific install steps.
-# This is required by ssh2's optional native CPU-feature module used for remote
-# server provisioning; the lockfile remains frozen for reproducibility.
+# The pruned json tree contains only the server dependency closure.
+COPY --from=pruner /out/json/ ./
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production --frozen-lockfile
 
-# Copy the built output from builder stage
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/packages/db/src/migrations ./packages/db/src/migrations
-COPY apps/server/docker-entrypoint.sh ./apps/server/docker-entrypoint.sh
+COPY --from=pruner /out/full/apps/server/docker-entrypoint.sh ./apps/server/docker-entrypoint.sh
 RUN chmod 0755 ./apps/server/docker-entrypoint.sh
 
 ENV PORT=3000
