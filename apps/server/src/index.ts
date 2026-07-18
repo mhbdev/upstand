@@ -30,7 +30,7 @@ import {
   setApiKeyRateLimitHeaders,
 } from "@upstand/api/api-key-auth";
 import { type ApiBindings, createContext } from "@upstand/api/context";
-import { serviceProvider } from "@upstand/api/di";
+import { getServiceProvider } from "@upstand/api/di";
 import { checkPermission } from "@upstand/api/permissions";
 import { appRouter } from "@upstand/api/routers/index";
 import { auth } from "@upstand/auth";
@@ -134,14 +134,14 @@ type AppEnv = EvlogVariables & {
 const app = new Hono<AppEnv>();
 const deploymentRuntime = new DeploymentRuntime();
 const outboxRuntime = new OutboxRuntime();
-const notificationWorker = new NotificationDeliveryWorker(
-  () => serviceProvider,
+const notificationWorker = new NotificationDeliveryWorker(() =>
+  getServiceProvider(),
 );
-const backupWorker = new BackupRunWorker(() => serviceProvider);
-const backupScheduler = serviceProvider.resolve(BackupSchedulerToken);
-const generalScheduler = serviceProvider.resolve(GeneralSchedulerToken);
-const accessLogCleanupScheduler = new AccessLogCleanupScheduler(
-  () => serviceProvider,
+const backupWorker = new BackupRunWorker(() => getServiceProvider());
+const backupScheduler = getServiceProvider().resolve(BackupSchedulerToken);
+const generalScheduler = getServiceProvider().resolve(GeneralSchedulerToken);
+const accessLogCleanupScheduler = new AccessLogCleanupScheduler(() =>
+  getServiceProvider(),
 );
 const scheduledDockerCleanup = new ScheduledDockerCleanup();
 const autoUpdateRuntime = new AutoUpdateRuntime();
@@ -155,7 +155,7 @@ function getDashboardUrl(path: string): string {
 app.use(evlog());
 
 app.use("*", async (c, next) => {
-  const scope = serviceProvider.createScope();
+  const scope = getServiceProvider().createScope();
   c.set("scope", scope);
   try {
     await next();
@@ -2608,7 +2608,7 @@ app.get("/", (c) => {
 });
 
 // Initialize Caddy Web Server on Startup
-const caddyInitScope = serviceProvider.createScope();
+const caddyInitScope = getServiceProvider().createScope();
 const getCaddySettingsUseCase = caddyInitScope.resolve(
   GetWebServerSettingsUseCaseToken,
 );
