@@ -86,6 +86,7 @@ import {
   extractApplicationArchive,
 } from "./application-archive";
 import { AutoUpdateRuntime } from "./auto-update-runtime";
+import { createBackupRunHandler } from "./backup-runtime";
 import {
   containerBelongsToResource,
   isValidContainerIdentifier,
@@ -146,7 +147,9 @@ const notificationWorker = new NotificationDeliveryWorker(
     }
   },
 );
-const backupWorker = new BackupRunWorker(() => getServiceProvider());
+const backupWorker = new BackupRunWorker(
+  createBackupRunHandler(() => getServiceProvider()),
+);
 const backupScheduler = getServiceProvider().resolve(BackupSchedulerToken);
 const generalScheduler = getServiceProvider().resolve(GeneralSchedulerToken);
 const accessLogCleanupScheduler = new AccessLogCleanupScheduler(() =>
