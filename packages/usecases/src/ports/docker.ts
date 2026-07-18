@@ -213,21 +213,7 @@ export type DockerPruneType =
   | "system"
   | "all";
 
-export interface DockerReadOnlyPort {
-  controlContainer(
-    target: DockerInspectionTarget,
-    containerId: string,
-    command: DockerContainerCommand,
-  ): Promise<{ success: true }>;
-  controlResource(
-    target: DockerInspectionTarget,
-    resourceId: string,
-    command: DockerResourceCommand,
-  ): Promise<{ success: true }>;
-  prune(
-    target: DockerInspectionTarget,
-    type: DockerPruneType,
-  ): Promise<{ success: true; output: string[] }>;
+export interface DockerInventoryReaderPort {
   getInfo(target: DockerInspectionTarget): Promise<DockerInfo>;
   getHostTime(
     target: DockerInspectionTarget,
@@ -248,6 +234,32 @@ export interface DockerReadOnlyPort {
     target: DockerInspectionTarget,
     containerId: string,
   ): Promise<DockerContainerStats>;
+}
+
+export interface DockerContainerControllerPort {
+  controlContainer(
+    target: DockerInspectionTarget,
+    containerId: string,
+    command: DockerContainerCommand,
+  ): Promise<{ success: true }>;
+}
+
+export interface DockerResourceControllerPort {
+  controlResource(
+    target: DockerInspectionTarget,
+    resourceId: string,
+    command: DockerResourceCommand,
+  ): Promise<{ success: true }>;
+}
+
+export interface DockerPrunePort {
+  prune(
+    target: DockerInspectionTarget,
+    type: DockerPruneType,
+  ): Promise<{ success: true; output: string[] }>;
+}
+
+export interface DockerArchiveTransferPort {
   uploadArchiveToVolume(
     target: DockerInspectionTarget,
     volumeName: string,

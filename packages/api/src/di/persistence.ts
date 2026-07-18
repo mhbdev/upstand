@@ -19,7 +19,23 @@ export function registerPersistence(services: ServiceCollection) {
     () => new dependencies.DockerService(),
   );
   services.addSingleton(
-    dependencies.DockerReadOnlyServiceToken,
+    dependencies.DockerInventoryReaderToken,
+    () => new dependencies.DockerReadOnlyService(),
+  );
+  services.addSingleton(
+    dependencies.DockerContainerControllerToken,
+    () => new dependencies.DockerReadOnlyService(),
+  );
+  services.addSingleton(
+    dependencies.DockerResourceControllerToken,
+    () => new dependencies.DockerReadOnlyService(),
+  );
+  services.addSingleton(
+    dependencies.DockerPruneToken,
+    () => new dependencies.DockerReadOnlyService(),
+  );
+  services.addSingleton(
+    dependencies.DockerArchiveTransferToken,
     () => new dependencies.DockerReadOnlyService(),
   );
   services.addSingleton(

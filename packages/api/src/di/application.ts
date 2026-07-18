@@ -319,7 +319,10 @@ export function registerApplicationFeatures(services: ServiceCollection) {
     (c) =>
       new dependencies.GetDockerInventoryUseCase(
         c.resolve(dependencies.UnitOfWorkToken),
-        c.resolve(dependencies.DockerReadOnlyServiceToken),
+        c.resolve(dependencies.DockerInventoryReaderToken),
+        c.resolve(dependencies.DockerContainerControllerToken),
+        c.resolve(dependencies.DockerResourceControllerToken),
+        c.resolve(dependencies.DockerArchiveTransferToken),
       ),
   );
   services.addTransient(
@@ -327,7 +330,7 @@ export function registerApplicationFeatures(services: ServiceCollection) {
     (c) =>
       new dependencies.PruneDockerResourcesUseCase(
         c.resolve(dependencies.UnitOfWorkToken),
-        c.resolve(dependencies.DockerReadOnlyServiceToken),
+        c.resolve(dependencies.DockerPruneToken),
       ),
   );
 
