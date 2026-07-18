@@ -12,3 +12,4 @@ export {
 } from "./monitoring/monitoring-agent.client";
 export { NotificationTransportRegistry } from "./notification/notification-transport";
 export { BullMqOutboxJobPublisher } from "./outbox/bullmq-outbox-job-publisher";
+export { createServerProvisioningPort } from "./provisioning/server-provisioning";

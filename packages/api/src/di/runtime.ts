@@ -130,6 +130,7 @@ export function registerRuntime(services: ServiceCollection) {
     (c) =>
       new dependencies.SetupServerUseCase(
         c.resolve(dependencies.UnitOfWorkToken),
+        dependencies.createServerProvisioningPort(),
       ),
   );
   services.addTransient(

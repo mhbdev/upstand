@@ -22,6 +22,7 @@ export * from "./deployment/deployment-queue-name";
 // Deployments & Queues
 export * from "./deployment/deployment-worker";
 export * from "./deployment/docker-image-webhook";
+export * from "./deployment/get-deployment-server-settings.usecase";
 export * from "./deployment/get-deployments.usecase";
 export * from "./deployment/get-queue.usecase";
 export * from "./deployment/get-requests.usecase";
@@ -63,6 +64,7 @@ export * from "./outbox/outbox-publisher";
 export * from "./ports/caddy";
 export * from "./ports/docker";
 export * from "./ports/monitoring";
+export * from "./ports/server-provisioning";
 export * from "./project/create-project.usecase";
 export * from "./project/delete-project.usecase";
 export * from "./project/duplicate-project.usecase";

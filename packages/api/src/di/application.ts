@@ -308,6 +308,14 @@ export function registerApplicationFeatures(services: ServiceCollection) {
       ),
   );
   services.addTransient(
+    dependencies.GetDeploymentServerSettingsUseCaseToken,
+    (c) =>
+      new dependencies.GetDeploymentServerSettingsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerInventoryReaderToken),
+      ),
+  );
+  services.addTransient(
     dependencies.GetAccountStatusUseCaseToken,
     (c) =>
       new dependencies.GetAccountStatusUseCase(
