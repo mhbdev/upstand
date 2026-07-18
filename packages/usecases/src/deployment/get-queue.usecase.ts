@@ -21,6 +21,26 @@ export interface QueueJobResult {
 export class GetQueueUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
+  async executeForOrganization(
+    organizationId: string,
+  ): Promise<QueueJobResult[]> {
+    const projects =
+      await this.uow.projectRepository.findByOrganizationId(organizationId);
+    const projectIds = new Set(projects.map((project) => project.id));
+    const environments = await this.uow.environmentRepository.findMany();
+    const environmentIds = new Set(
+      environments
+        .filter((environment) => projectIds.has(environment.projectId))
+        .map((environment) => environment.id),
+    );
+    const resources = await this.uow.resourceRepository.findMany();
+    return this.execute(
+      resources
+        .filter((resource) => environmentIds.has(resource.environmentId))
+        .map((resource) => resource.id),
+    );
+  }
+
   async execute(resourceIds?: readonly string[]): Promise<QueueJobResult[]> {
     // 1. Determine all active queues (servers)
     const servers = await this.uow.serverBuildSettingsRepository.findMany();
