@@ -1,8 +1,8 @@
-import * as dependencies from "./dependencies";
-import { resolveDockerServiceForServer } from "@upstand/usecases/resource/docker-client";
-import { QueueDeploymentUseCase } from "@upstand/usecases/deployment/queue-deployment.usecase";
 import { TriggerBackupRunUseCase } from "@upstand/usecases/backup/trigger-backup-run.usecase";
+import { QueueDeploymentUseCase } from "@upstand/usecases/deployment/queue-deployment.usecase";
+import { resolveDockerServiceForServer } from "@upstand/usecases/resource/docker-client";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
+import * as dependencies from "./dependencies";
 
 type ServiceCollection = InstanceType<typeof dependencies.ServiceCollection>;
 type ServiceProviderFactory = () => ReturnType<ServiceCollection["build"]>;

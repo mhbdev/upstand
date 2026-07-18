@@ -6,6 +6,7 @@ import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
 import { getInstallationToken } from "../git-provider/github-client";
+import type { NotificationPublisher } from "../notification/publish-notification.usecase";
 import { getDatabaseEnvironment } from "../resource/database-environment";
 import type { DockerService } from "../resource/docker-client";
 import { createRemoteServices } from "../resource/docker-client";
@@ -16,7 +17,6 @@ import {
   assertDeploymentServerSupportsResource,
 } from "../server/server-role";
 import type { CaddyService } from "../web-server/caddy.service";
-import type { NotificationPublisher } from "../notification/publish-notification.usecase";
 import { buildRegistryImageTag } from "./build-registry";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 import { ResourceLock } from "./resource-lock";
