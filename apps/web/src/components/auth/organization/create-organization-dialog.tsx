@@ -63,11 +63,11 @@ export function CreateOrganizationDialog({
             <Label htmlFor="org-name">Name</Label>
             <Input
               id="org-name"
+              name="organizationName"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Acme Corporation"
               autoComplete="off"
-              autoFocus
             />
           </div>
           <DialogFooter className="gap-2 pt-2">

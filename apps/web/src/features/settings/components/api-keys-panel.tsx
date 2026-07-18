@@ -159,6 +159,8 @@ export function ApiKeysPanel() {
               </Label>
               <Input
                 id="key-name"
+                name="name"
+                autoComplete="off"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="CI deployment key"
@@ -174,7 +176,9 @@ export function ApiKeysPanel() {
               </Label>
               <Input
                 id="key-expiration"
+                name="expiresInDays"
                 type="number"
+                autoComplete="off"
                 min={1}
                 max={365}
                 value={expiresInDays}
