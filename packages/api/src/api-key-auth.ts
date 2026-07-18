@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { auth } from "@upstand/auth";
 import {
   API_KEY_CONFIG_ID,
   API_KEY_ROUTE_CAPABILITIES,
@@ -10,6 +9,7 @@ import {
   isCapability,
   statementsToApiKeyPermissions,
 } from "@upstand/domain";
+import { auth } from "./auth";
 
 export type ApiKeyPrincipal = {
   kind: "api-key";

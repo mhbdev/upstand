@@ -1,10 +1,10 @@
-import { isStepUpAuthenticationSatisfied } from "@upstand/auth/step-up-auth";
+import { stepUp } from "../auth";
 import { protectedProcedure, router } from "../index";
 
 export const authRouter = router({
   isSession2faVerified: protectedProcedure.query(async ({ ctx }) => {
     return {
-      verified: await isStepUpAuthenticationSatisfied(ctx.session),
+      verified: await stepUp.isStepUpAuthenticationSatisfied(ctx.session),
     };
   }),
 });

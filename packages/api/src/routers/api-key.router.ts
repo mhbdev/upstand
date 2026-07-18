@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { auth } from "@upstand/auth";
 import {
   API_KEY_CONFIG_ID,
   API_KEY_PRESETS,
@@ -9,6 +8,7 @@ import {
 } from "@upstand/domain";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
+import { auth } from "../auth";
 import {
   protectedProcedure,
   router,
