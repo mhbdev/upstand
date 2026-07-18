@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.81 - 2026-07-19
+
+### Fixed
+
+- Explicitly fetch `origin/master` on the GitHub Actions runner before checking release ancestry to prevent race-condition build failures when the tag triggers the runner before master is fully visible.
+
 ## 0.1.80 - 2026-07-19
 
 ### Fixed
