@@ -18,6 +18,26 @@ export interface DeploymentHistoryResult {
 export class GetDeploymentsUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
+  async executeForOrganization(
+    organizationId: string,
+  ): Promise<DeploymentHistoryResult[]> {
+    const projects =
+      await this.uow.projectRepository.findByOrganizationId(organizationId);
+    const projectIds = new Set(projects.map((project) => project.id));
+    const environments = await this.uow.environmentRepository.findMany();
+    const environmentIds = new Set(
+      environments
+        .filter((environment) => projectIds.has(environment.projectId))
+        .map((environment) => environment.id),
+    );
+    const resources = await this.uow.resourceRepository.findMany();
+    return this.execute(
+      resources
+        .filter((resource) => environmentIds.has(resource.environmentId))
+        .map((resource) => resource.id),
+    );
+  }
+
   async execute(
     resourceIds?: readonly string[],
   ): Promise<DeploymentHistoryResult[]> {

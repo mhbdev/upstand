@@ -75,26 +75,7 @@ export const deploymentRouter = router({
       );
       const useCase = ctx.scope.resolve(GetDeploymentsUseCaseToken);
       try {
-        const projects = await ctx.scope
-          .resolve(UnitOfWorkToken)
-          .projectRepository.findByOrganizationId(input.organizationId);
-        const projectIds = new Set(projects.map((project) => project.id));
-        const environments = await ctx.scope
-          .resolve(UnitOfWorkToken)
-          .environmentRepository.findMany();
-        const environmentIds = new Set(
-          environments
-            .filter((environment) => projectIds.has(environment.projectId))
-            .map((environment) => environment.id),
-        );
-        const resources = await ctx.scope
-          .resolve(UnitOfWorkToken)
-          .resourceRepository.findMany();
-        return await useCase.execute(
-          resources
-            .filter((resource) => environmentIds.has(resource.environmentId))
-            .map((resource) => resource.id),
-        );
+        return await useCase.executeForOrganization(input.organizationId);
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -110,26 +91,7 @@ export const deploymentRouter = router({
       );
       const useCase = ctx.scope.resolve(GetQueueUseCaseToken);
       try {
-        const projects = await ctx.scope
-          .resolve(UnitOfWorkToken)
-          .projectRepository.findByOrganizationId(input.organizationId);
-        const projectIds = new Set(projects.map((project) => project.id));
-        const environments = await ctx.scope
-          .resolve(UnitOfWorkToken)
-          .environmentRepository.findMany();
-        const environmentIds = new Set(
-          environments
-            .filter((environment) => projectIds.has(environment.projectId))
-            .map((environment) => environment.id),
-        );
-        const resources = await ctx.scope
-          .resolve(UnitOfWorkToken)
-          .resourceRepository.findMany();
-        return await useCase.execute(
-          resources
-            .filter((resource) => environmentIds.has(resource.environmentId))
-            .map((resource) => resource.id),
-        );
+        return await useCase.executeForOrganization(input.organizationId);
       } catch (error) {
         handleUseCaseError(error);
       }
