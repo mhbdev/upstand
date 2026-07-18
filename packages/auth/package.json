@@ -16,14 +16,8 @@
   "dependencies": {
     "@better-auth/api-key": "catalog:",
     "@better-auth/sso": "1.6.23",
-    "@upstand/db": "workspace:*",
     "@upstand/domain": "workspace:*",
-    "@upstand/env": "workspace:*",
-    "@upstand/infrastructure": "workspace:*",
-    "@upstand/redis": "workspace:*",
-    "@upstand/usecases": "workspace:*",
-    "better-auth": "catalog:",
-    "drizzle-orm": "catalog:"
+    "better-auth": "catalog:"
   },
   "devDependencies": {
     "@upstand/config": "workspace:*",

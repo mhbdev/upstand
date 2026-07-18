@@ -320,3 +320,4 @@ export {
   UpdateWebServerSettingsUseCaseToken,
   ValidateDomainUseCaseToken,
 } from "@upstand/usecases/tokens";
+export { notificationTransport as AuthNotificationTransport } from "../auth";

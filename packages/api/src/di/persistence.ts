@@ -40,7 +40,7 @@ export function registerPersistence(services: ServiceCollection) {
   );
   services.addSingleton(
     dependencies.NotificationTransportToken,
-    () => new dependencies.NotificationTransportRegistry(),
+    () => dependencies.AuthNotificationTransport,
   );
 
   // 2. Repositories (scoped per request)

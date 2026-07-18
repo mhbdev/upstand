@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { auth } from "@upstand/auth";
 import { createDb } from "@upstand/db";
 import { member, organization, user } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
@@ -12,6 +11,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
+import { auth } from "../auth";
 import {
   protectedProcedure,
   router,

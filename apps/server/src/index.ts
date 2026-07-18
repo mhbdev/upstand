@@ -30,11 +30,11 @@ import {
   authenticateApiKey,
   setApiKeyRateLimitHeaders,
 } from "@upstand/api/api-key-auth";
+import { auth } from "@upstand/api/auth";
 import { type ApiBindings, createContext } from "@upstand/api/context";
 import { getServiceProvider } from "@upstand/api/di";
 import { checkPermission } from "@upstand/api/permissions";
 import { appRouter } from "@upstand/api/routers/index";
-import { auth } from "@upstand/auth";
 import { db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
 import { scimProvider } from "@upstand/db/schema/scim";

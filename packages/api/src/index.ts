@@ -1,5 +1,4 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { isStepUpAuthenticationSatisfied } from "@upstand/auth/step-up-auth";
 import {
   type AUDIT_ACTIONS,
   AUDIT_RESOURCE_TYPES,
@@ -18,6 +17,7 @@ import {
   isApiKeyPrincipal,
   setApiKeyRateLimitHeaders,
 } from "./api-key-auth";
+import { stepUp } from "./auth";
 import { resolveClientIp } from "./client-ip";
 import type { Context } from "./context";
 import { RateLimiter } from "./rate-limit";
@@ -373,7 +373,7 @@ export const twoFactorVerifiedProcedure = protectedProcedure.use(
     if (isApiKeyPrincipal(ctx.actor)) {
       return next();
     }
-    if (!(await isStepUpAuthenticationSatisfied(ctx.session))) {
+    if (!(await stepUp.isStepUpAuthenticationSatisfied(ctx.session))) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "2FA verification required",

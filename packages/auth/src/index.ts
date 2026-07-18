@@ -1,38 +1,60 @@
-import { randomUUID } from "node:crypto";
 import { apiKey } from "@better-auth/api-key";
 import { sso } from "@better-auth/sso";
-import { createDb } from "@upstand/db";
-import * as schema from "@upstand/db/schema/auth";
-import { notificationChannel } from "@upstand/db/schema/notification";
 import {
-  NotificationChannelSchema,
   ORGANIZATION_ROLE_STATEMENTS,
   ORGANIZATION_STATEMENT,
 } from "@upstand/domain";
-import { env } from "@upstand/env/server";
-import { NotificationTransportRegistry } from "@upstand/infrastructure";
-import { redis } from "@upstand/redis";
-import { decryptNotificationConfiguration } from "@upstand/usecases";
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { twoFactor } from "better-auth/plugins/two-factor";
-import { and, count, eq } from "drizzle-orm";
-import {
-  clearStepUpVerification,
-  recordStepUpVerification,
-} from "./step-up-auth";
+import type { StepUpAuth } from "./step-up-auth";
+
+type BetterAuthOptions = Parameters<typeof betterAuth>[0];
+
+export type AuthDatabase = NonNullable<BetterAuthOptions["database"]>;
+export type AuthSecondaryStorage = NonNullable<
+  BetterAuthOptions["secondaryStorage"]
+>;
+
+export interface AuthConfiguration {
+  corsOrigin: string;
+  betterAuthUrl: string;
+  secret: string;
+  nodeEnv: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
+}
+
+export interface AuthCallbacks {
+  createPersonalOrganization(user: { id: string }): Promise<void>;
+  canCreateInitialAccount(): Promise<boolean>;
+  isPersonalOrganization(organizationId: string): Promise<boolean>;
+  isSsoEnforced(email: string): Promise<boolean>;
+  sendInvitationEmail(input: {
+    id: string;
+    email: string;
+    role: string;
+    organization: { id: string; name: string };
+    invitation: Record<string, unknown>;
+  }): Promise<void>;
+  applyInvitationPermissions(input: {
+    permissions: string | null | undefined;
+    memberId: string;
+  }): Promise<void>;
+}
 
 const memberPermissionField = {
   type: "string",
   required: false,
 } as const;
 
-function getSharedCookieDomain(): string | undefined {
-  const dashboardHost = new URL(env.CORS_ORIGIN).hostname;
-  const apiHost = new URL(env.BETTER_AUTH_URL).hostname;
+function getSharedCookieDomain(
+  configuration: AuthConfiguration,
+): string | undefined {
+  const dashboardHost = new URL(configuration.corsOrigin).hostname;
+  const apiHost = new URL(configuration.betterAuthUrl).hostname;
   if (dashboardHost === apiHost) return undefined;
 
   // Protected pages are rendered by the dashboard hostname while sessions are
@@ -50,16 +72,20 @@ const organizationRoles = {
   ),
 };
 
-export function createAuth() {
-  const db = createDb();
-  const sharedCookieDomain = getSharedCookieDomain();
+export function createAuth(options: {
+  database: AuthDatabase;
+  secondaryStorage: AuthSecondaryStorage;
+  configuration: AuthConfiguration;
+  callbacks: AuthCallbacks;
+  stepUp: StepUpAuth;
+}) {
+  const { database, secondaryStorage, configuration, callbacks, stepUp } =
+    options;
+  const sharedCookieDomain = getSharedCookieDomain(configuration);
 
-  return betterAuth({
-    database: drizzleAdapter(db, {
-      provider: "pg",
-      schema: schema,
-    }),
-    trustedOrigins: [env.CORS_ORIGIN, env.BETTER_AUTH_URL],
+  const auth = betterAuth({
+    database,
+    trustedOrigins: [configuration.corsOrigin, configuration.betterAuthUrl],
     emailAndPassword: {
       enabled: true,
       // The dashboard's local bootstrap and normal sign-up flow expect the
@@ -81,15 +107,15 @@ export function createAuth() {
     },
     socialProviders: {
       google:
-        env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        configuration.googleClientId && configuration.googleClientSecret
           ? {
-              clientId: env.GOOGLE_CLIENT_ID,
-              clientSecret: env.GOOGLE_CLIENT_SECRET,
+              clientId: configuration.googleClientId,
+              clientSecret: configuration.googleClientSecret,
             }
           : undefined,
     },
-    secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL,
+    secret: configuration.secret,
+    baseURL: configuration.betterAuthUrl,
     session: {
       // Keep sessions short-lived and rotate the token on a daily activity
       // boundary. Database persistence provides recovery if Redis is rebuilt.
@@ -98,7 +124,7 @@ export function createAuth() {
       storeSessionInDatabase: true,
     },
     advanced: {
-      useSecureCookies: env.NODE_ENV === "production",
+      useSecureCookies: configuration.nodeEnv === "production",
       crossSubDomainCookies: sharedCookieDomain
         ? {
             enabled: true,
@@ -107,7 +133,7 @@ export function createAuth() {
         : undefined,
       defaultCookieAttributes: {
         sameSite: "lax",
-        secure: env.NODE_ENV === "production",
+        secure: configuration.nodeEnv === "production",
         httpOnly: true,
       },
     },
@@ -117,48 +143,11 @@ export function createAuth() {
       max: 100,
       storage: "secondary-storage",
     },
-    secondaryStorage: {
-      get: async (key: string) => {
-        return (await redis.get(key)) || null;
-      },
-      set: async (key: string, value: string, ttl?: number) => {
-        if (ttl) {
-          await redis.set(key, value, "EX", ttl);
-        } else {
-          await redis.set(key, value);
-        }
-      },
-      delete: async (key: string) => {
-        await redis.del(key);
-      },
-    },
+    secondaryStorage,
     databaseHooks: {
       user: {
         create: {
-          after: async (user) => {
-            const orgId = randomUUID();
-            const slug = `personal-${user.id.slice(0, 8)}`;
-
-            await db.transaction(async (tx) => {
-              // 1. Create the Personal Organization
-              await tx.insert(schema.organization).values({
-                id: orgId,
-                name: "Personal Organization",
-                slug: slug,
-                createdAt: new Date(),
-                metadata: JSON.stringify({ isPersonal: true }),
-              });
-
-              // 2. Assign the user as the owner of the organization
-              await tx.insert(schema.member).values({
-                id: randomUUID(),
-                organizationId: orgId,
-                userId: user.id,
-                role: "owner",
-                createdAt: new Date(),
-              });
-            });
-          },
+          after: async (user) => callbacks.createPersonalOrganization(user),
         },
       },
     },
@@ -188,7 +177,7 @@ export function createAuth() {
                 headers: ctx.request.headers,
               }));
             if (session) {
-              await recordStepUpVerification(session);
+              await stepUp.recordStepUpVerification(session);
             }
           }
         }
@@ -200,7 +189,7 @@ export function createAuth() {
           const session = ctx.request
             ? await auth.api.getSession({ headers: ctx.request.headers })
             : null;
-          if (session) await clearStepUpVerification(session.session.id);
+          if (session) await stepUp.clearStepUpVerification(session.session.id);
         }
       }),
       before: createAuthMiddleware(async (ctx) => {
@@ -210,10 +199,7 @@ export function createAuth() {
         // migration 0015 is the race-safe enforcement; this hook returns a
         // useful API error before the database has to reject the request.
         if (ctx.path.endsWith("/sign-up/email")) {
-          const result = await db.select({ value: count() }).from(schema.user);
-          const userCount = result[0]?.value ?? 0;
-
-          if (userCount > 0) {
+          if (!(await callbacks.canCreateInitialAccount())) {
             return ctx.json(
               {
                 error:
@@ -233,28 +219,11 @@ export function createAuth() {
           const organizationId = body.organizationId as string | undefined;
           if (!organizationId) return;
 
-          const org = await db
-            .select()
-            .from(schema.organization)
-            .where(eq(schema.organization.id, organizationId))
-            .limit(1)
-            .then((r) => r[0]);
-
-          if (org?.metadata) {
-            try {
-              const metadata = JSON.parse(org.metadata) as {
-                isPersonal?: boolean;
-              };
-              if (metadata.isPersonal) {
-                return ctx.json(
-                  { error: "Cannot delete personal organization" },
-                  { status: 400 },
-                );
-              }
-            } catch {
-              // Ignore malformed legacy metadata; deletion authorization is
-              // still enforced by the organization permission checks.
-            }
+          if (await callbacks.isPersonalOrganization(organizationId)) {
+            return ctx.json(
+              { error: "Cannot delete personal organization" },
+              { status: 400 },
+            );
           }
         }
 
@@ -273,33 +242,7 @@ export function createAuth() {
           const email = typeof body.email === "string" ? body.email.trim() : "";
           if (!email) return;
 
-          const enforced = await db
-            .select({ metadata: schema.organization.metadata })
-            .from(schema.user)
-            .innerJoin(schema.member, eq(schema.member.userId, schema.user.id))
-            .innerJoin(
-              schema.organization,
-              eq(schema.organization.id, schema.member.organizationId),
-            )
-            .innerJoin(
-              schema.ssoProvider,
-              and(
-                eq(schema.ssoProvider.organizationId, schema.organization.id),
-                eq(schema.ssoProvider.domainVerified, true),
-              ),
-            )
-            .where(eq(schema.user.email, email.toLowerCase()))
-            .limit(20);
-
-          const isEnforced = enforced.some((row) => {
-            try {
-              const metadata = row.metadata ? JSON.parse(row.metadata) : {};
-              return metadata.ssoEnforced === true;
-            } catch {
-              return false;
-            }
-          });
-          if (isEnforced) {
+          if (await callbacks.isSsoEnforced(email)) {
             return ctx.json(
               {
                 error:
@@ -342,49 +285,20 @@ export function createAuth() {
           organization,
           invitation,
         }) => {
-          const channelId = (invitation as Record<string, unknown>)
-            .emailChannelId as string | undefined;
-          if (!channelId) return;
-          const channel = await db
-            .select()
-            .from(notificationChannel)
-            .where(eq(notificationChannel.id, channelId))
-            .limit(1)
-            .then((rows) => rows[0]);
-          if (!channel || channel.organizationId !== organization.id) {
-            throw new Error("Invitation email provider was not found");
-          }
-          if (channel.provider !== "email" && channel.provider !== "resend") {
-            throw new Error(
-              "Invitation email provider must be Email or Resend",
-            );
-          }
-          const configuration = decryptNotificationConfiguration(
-            NotificationChannelSchema.parse(channel),
-          );
-          const recipientConfiguration =
-            configuration.type === "email" || configuration.type === "resend"
-              ? { ...configuration, toAddresses: [email] }
-              : configuration;
-          const invitationUrl = new URL("/invitation", env.CORS_ORIGIN);
-          invitationUrl.searchParams.set("token", id);
-          const url = invitationUrl.toString();
-          await new NotificationTransportRegistry().send(
-            recipientConfiguration,
-            {
-              title: `Invitation to join ${organization.name}`,
-              message: `You have been invited to join ${organization.name} as ${role}.\n\nAccept your invitation: ${url}`,
-            },
-          );
+          await callbacks.sendInvitationEmail({
+            id,
+            email,
+            role,
+            organization: { id: organization.id, name: organization.name },
+            invitation: invitation as Record<string, unknown>,
+          });
         },
         organizationHooks: {
           afterAcceptInvitation: async ({ invitation, member }) => {
-            if (invitation.permissions) {
-              await db
-                .update(schema.member)
-                .set({ permissions: invitation.permissions })
-                .where(eq(schema.member.id, member.id));
-            }
+            await callbacks.applyInvitationPermissions({
+              permissions: invitation.permissions,
+              memberId: member.id,
+            });
           },
         },
       }),
@@ -447,6 +361,6 @@ export function createAuth() {
       }),
     ],
   });
-}
 
-export const auth = createAuth();
+  return auth;
+}

@@ -1,5 +1,3 @@
-import { redis } from "@upstand/redis";
-
 const STEP_UP_TTL_SECONDS = 15 * 60;
 const STEP_UP_VERSION = 1;
 
@@ -17,34 +15,58 @@ type StepUpRecord = {
   purpose: "sensitive-operations";
 };
 
+export interface StepUpStorage {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
+  del(key: string): Promise<unknown>;
+}
+
+export interface StepUpAuth {
+  recordStepUpVerification(session: StepUpSession): Promise<void>;
+  clearStepUpVerification(sessionId: string): Promise<void>;
+  isStepUpAuthenticationSatisfied(session: StepUpSession): Promise<boolean>;
+}
+
 export function stepUpKey(sessionId: string): string {
   return `2fa-verified:${sessionId}`;
 }
 
-export async function recordStepUpVerification(
-  session: StepUpSession,
-): Promise<void> {
-  const now = Math.floor(Date.now() / 1000);
-  const record: StepUpRecord = {
-    version: STEP_UP_VERSION,
-    userId: session.user.id,
-    sessionId: session.session.id,
-    verifiedAt: now,
-    expiresAt: now + STEP_UP_TTL_SECONDS,
-    purpose: "sensitive-operations",
-  };
-  await redis.set(
-    stepUpKey(session.session.id),
-    JSON.stringify(record),
-    "EX",
-    STEP_UP_TTL_SECONDS,
-  );
-}
+export function createStepUpAuth(storage: StepUpStorage): StepUpAuth {
+  return {
+    async recordStepUpVerification(session) {
+      const now = Math.floor(Date.now() / 1000);
+      const record: StepUpRecord = {
+        version: STEP_UP_VERSION,
+        userId: session.user.id,
+        sessionId: session.session.id,
+        verifiedAt: now,
+        expiresAt: now + STEP_UP_TTL_SECONDS,
+        purpose: "sensitive-operations",
+      };
+      await storage.set(
+        stepUpKey(session.session.id),
+        JSON.stringify(record),
+        "EX",
+        STEP_UP_TTL_SECONDS,
+      );
+    },
 
-export async function clearStepUpVerification(
-  sessionId: string,
-): Promise<void> {
-  await redis.del(stepUpKey(sessionId));
+    async clearStepUpVerification(sessionId) {
+      await storage.del(stepUpKey(sessionId));
+    },
+
+    async isStepUpAuthenticationSatisfied(session) {
+      const twoFactorEnabled = session.user.twoFactorEnabled === true;
+      if (!twoFactorEnabled) return true;
+      const verificationValue = await storage.get(
+        stepUpKey(session.session.id),
+      );
+      return isStepUpVerificationValid(twoFactorEnabled, verificationValue, {
+        userId: session.user.id,
+        sessionId: session.session.id,
+      });
+    },
+  };
 }
 
 export function isStepUpVerificationValid(
@@ -69,16 +91,4 @@ export function isStepUpVerificationValid(
   } catch {
     return false;
   }
-}
-
-export async function isStepUpAuthenticationSatisfied(
-  session: StepUpSession,
-): Promise<boolean> {
-  const twoFactorEnabled = session.user.twoFactorEnabled === true;
-  if (!twoFactorEnabled) return true;
-  const verificationValue = await redis.get(stepUpKey(session.session.id));
-  return isStepUpVerificationValid(twoFactorEnabled, verificationValue, {
-    userId: session.user.id,
-    sessionId: session.session.id,
-  });
 }

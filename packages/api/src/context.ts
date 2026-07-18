@@ -1,11 +1,11 @@
 import type { ServiceScope } from "@circulo-ai/di";
-import { auth } from "@upstand/auth";
 import type { Context as HonoContext } from "hono";
 import {
   type ApiKeyPrincipal,
   authenticateApiKey,
   setApiKeyRateLimitHeaders,
 } from "./api-key-auth";
+import { auth } from "./auth";
 
 export type SessionActor = {
   kind: "session";

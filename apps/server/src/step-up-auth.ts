@@ -1,8 +1,13 @@
-export type { StepUpSession } from "@upstand/auth/step-up-auth";
-export {
-  clearStepUpVerification,
-  isStepUpAuthenticationSatisfied,
+import { stepUp } from "@upstand/api/auth";
+import {
   isStepUpVerificationValid,
-  recordStepUpVerification,
+  type StepUpSession,
   stepUpKey,
 } from "@upstand/auth/step-up-auth";
+
+export type { StepUpSession };
+export { isStepUpVerificationValid, stepUpKey };
+export const isStepUpAuthenticationSatisfied =
+  stepUp.isStepUpAuthenticationSatisfied;
+export const recordStepUpVerification = stepUp.recordStepUpVerification;
+export const clearStepUpVerification = stepUp.clearStepUpVerification;
