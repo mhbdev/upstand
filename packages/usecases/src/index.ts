@@ -140,7 +140,6 @@ export * from "./swarm/rotate-swarm-join-token.usecase";
 export * from "./swarm/update-swarm-node.usecase";
 export * from "./tag/tag.usecases";
 export * from "./template/native-catalog";
-export * from "./template/starter-templates";
 export * from "./template/template.usecases";
 export * from "./web-server/access-log-cleanup-scheduler";
 export * from "./web-server/caddy-access-logs";

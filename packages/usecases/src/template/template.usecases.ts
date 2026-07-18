@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { IUnitOfWork, Resource, Template } from "@upstand/domain";
+import type {
+  IUnitOfWork,
+  Resource,
+  Template,
+  TemplatePage,
+} from "@upstand/domain";
 import {
   DEFAULT_RESOURCE_ADVANCED_CONFIG,
   serializeResourceAdvancedConfig,
@@ -24,6 +29,8 @@ const TemplateTagsSchema = z
 export const ListTemplatesInputSchema = z.object({
   organizationId: z.string().min(1),
   search: z.string().trim().max(120).optional(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(48).default(12),
 });
 
 export const CreateTemplateInputSchema = z.object({
@@ -147,11 +154,13 @@ export class ListTemplatesUseCase {
 
   execute(
     input: z.infer<typeof ListTemplatesInputSchema>,
-  ): Promise<Template[]> {
-    return this.uow.templateRepository.findByOrganizationId(
-      input.organizationId,
-      input.search,
-    );
+  ): Promise<TemplatePage> {
+    return this.uow.templateRepository.findPageByOrganizationId({
+      organizationId: input.organizationId,
+      search: input.search,
+      page: input.page,
+      pageSize: input.pageSize,
+    });
   }
 }
 

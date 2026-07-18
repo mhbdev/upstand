@@ -10,6 +10,7 @@ export type NativeTemplateMetadata = {
   logo: string;
   links: Record<string, string | undefined>;
   tags: string[];
+  logoUrl?: string;
 };
 
 export type NativeTemplate = NativeTemplateMetadata & {
@@ -18,7 +19,7 @@ export type NativeTemplate = NativeTemplateMetadata & {
   source: "builtin";
 };
 
-type RawTemplate = Omit<NativeTemplateMetadata, "links"> & {
+type RawTemplate = Omit<NativeTemplateMetadata, "links" | "logoUrl"> & {
   links: Record<string, string | undefined>;
   composeFile: string;
   variables: Record<string, string>;
@@ -127,10 +128,21 @@ export function listNativeTemplates(search?: string): NativeTemplateMetadata[] {
       );
     })
     .sort((left, right) => left.name.localeCompare(right.name))
-    .map(
-      ({ composeFile: _composeFile, variables: _variables, ...metadata }) =>
-        metadata,
+    .map(({ composeFile: _composeFile, variables: _variables, ...metadata }) =>
+      toNativeTemplateMetadata(metadata),
     );
+}
+
+export const NATIVE_TEMPLATE_ASSET_BASE_URL =
+  "https://raw.githubusercontent.com/Dokploy/templates/canary/blueprints";
+
+function toNativeTemplateMetadata(
+  template: Omit<RawTemplate, "composeFile" | "variables">,
+): NativeTemplateMetadata {
+  return {
+    ...template,
+    logoUrl: `${NATIVE_TEMPLATE_ASSET_BASE_URL}/${encodeURIComponent(template.id)}/${encodeURIComponent(template.logo)}`,
+  };
 }
 
 export function getNativeTemplate(templateId: string): NativeTemplate {
@@ -140,6 +152,7 @@ export function getNativeTemplate(templateId: string): NativeTemplate {
   const variables = renderVariables(template.variables);
   return {
     ...template,
+    ...toNativeTemplateMetadata(template),
     variables,
     composeFile: normalizeRelativeMounts(
       renderValue(template.composeFile, variables),

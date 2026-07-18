@@ -15,9 +15,7 @@ export default async function ProjectPage({ params }: PageProps) {
   let session = null;
   try {
     session = await getServerSession();
-  } catch (error) {
-    console.error("Failed to fetch session on server side:", error);
-  }
+  } catch {}
 
   if (!session?.user) {
     redirect("/login");

@@ -4,9 +4,10 @@ import {
   type CreateTemplateDTO,
   type ITemplateRepository,
   type Template,
+  type TemplatePage,
   TemplateSchema,
 } from "@upstand/domain";
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, asc, eq, ilike, or } from "drizzle-orm";
 import { BaseRepository } from "../shared/base.repository";
 import type { Executor } from "../shared/types";
 
@@ -53,8 +54,48 @@ export class DrizzleTemplateRepository
           ),
         )
       : eq(template.organizationId, organizationId);
-    const rows = await this.executor.select().from(template).where(where);
+    const rows = await this.executor
+      .select()
+      .from(template)
+      .where(where)
+      .orderBy(asc(template.name));
     return rows.map(toTemplate);
+  }
+
+  async findPageByOrganizationId(input: {
+    organizationId: string;
+    search?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<TemplatePage> {
+    const where = input.search
+      ? and(
+          eq(template.organizationId, input.organizationId),
+          or(
+            ilike(template.name, `%${input.search}%`),
+            ilike(template.description, `%${input.search}%`),
+            ilike(template.tags, `%${input.search}%`),
+          ),
+        )
+      : eq(template.organizationId, input.organizationId);
+    const offset = (input.page - 1) * input.pageSize;
+    const [rows, total] = await Promise.all([
+      this.executor
+        .select()
+        .from(template)
+        .where(where)
+        .orderBy(asc(template.name))
+        .limit(input.pageSize)
+        .offset(offset),
+      this.count(where),
+    ]);
+    return {
+      items: rows.map(toTemplate),
+      total,
+      page: input.page,
+      pageSize: input.pageSize,
+      pageCount: Math.max(1, Math.ceil(total / input.pageSize)),
+    };
   }
 
   async create(data: CreateTemplateDTO): Promise<Template> {

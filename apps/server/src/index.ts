@@ -16,6 +16,7 @@ import {
   createUpGalTools,
   executeUpGalReadTool,
   getConversationForUser,
+  getUpGalToolNamesForUser,
   isUpGalToolName,
   saveIncomingMessages,
   UPGAL_TOOL_CAPABILITIES,
@@ -2017,6 +2018,10 @@ app.post("/api/ai/chat", async (c) => {
     conversationId,
     runId: randomUUID(),
     scope: c.get("scope"),
+    allowedToolNames: await getUpGalToolNamesForUser(
+      session.user.id,
+      body.organizationId,
+    ),
   };
   const tools = createUpGalTools(context);
   let messages: UpGalUIMessage[];

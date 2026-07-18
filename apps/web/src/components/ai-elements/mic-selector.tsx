@@ -73,7 +73,6 @@ export const useAudioDevices = () => {
           : "Failed to get audio devices";
 
       setError(message);
-      console.error("Error getting audio devices:", message);
     } finally {
       setLoading(false);
     }
@@ -110,7 +109,6 @@ export const useAudioDevices = () => {
           : "Failed to get audio devices";
 
       setError(message);
-      console.error("Error getting audio devices:", message);
     } finally {
       setLoading(false);
     }

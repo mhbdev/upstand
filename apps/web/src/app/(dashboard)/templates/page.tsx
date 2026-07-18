@@ -59,7 +59,6 @@ import {
   ArrowLeft,
   Boxes,
   Check,
-  ChevronRight,
   Code2,
   Download,
   FilePlus2,
@@ -108,6 +107,8 @@ type DeployableTemplate = Pick<
 > & {
   source: "custom" | "builtin";
   version?: string;
+  logoUrl?: string;
+  links?: Record<string, string | undefined>;
 };
 
 function slug(value: string): string {
@@ -132,6 +133,8 @@ export default function TemplatesPage() {
 
   const [mode, setMode] = useState<EditorMode>("library");
   const [search, setSearch] = useState("");
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [templatePage, setTemplatePage] = useState(1);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
@@ -160,17 +163,20 @@ export default function TemplatesPage() {
     ...trpc.template.list.queryOptions({
       organizationId,
       search: search.trim() || undefined,
+      page: templatePage,
+      pageSize: 12,
     }),
     enabled: Boolean(organizationId),
   });
   const catalog = useQuery({
     ...trpc.template.catalog.queryOptions({
       search: search.trim() || undefined,
+      page: catalogPage,
+      pageSize: 12,
     }),
     enabled: Boolean(organizationId),
     staleTime: 15 * 60 * 1000,
   });
-  const starters = useQuery({ ...trpc.template.starters.queryOptions() });
   const projects = useQuery({
     ...trpc.project.list.queryOptions({ organizationId }),
     enabled: Boolean(organizationId),
@@ -203,7 +209,9 @@ export default function TemplatesPage() {
     setMode("studio");
   };
 
-  const openEditor = (template: NonNullable<typeof templates.data>[number]) => {
+  const openEditor = (
+    template: NonNullable<typeof templates.data>["items"][number],
+  ) => {
     setEditingId(template.id);
     setName(template.name);
     setDescription(template.description ?? "");
@@ -270,9 +278,9 @@ export default function TemplatesPage() {
 
   const selectedTemplate: DeployableTemplate | undefined =
     deployingSource === "builtin"
-      ? catalog.data?.find((template) => template.id === deployingId)
+      ? catalog.data?.items.find((template) => template.id === deployingId)
       : (() => {
-          const template = templates.data?.find(
+          const template = templates.data?.items.find(
             (candidate) => candidate.id === deployingId,
           );
           return template
@@ -324,16 +332,6 @@ export default function TemplatesPage() {
     );
   };
 
-  const applyStarter = (starter: NonNullable<typeof starters.data>[number]) => {
-    setEditingId(null);
-    setName(starter.name);
-    setDescription(starter.description);
-    setTags(starter.tags.join(", "));
-    setComposeFile(starter.composeFile);
-    setGeneratedModel(null);
-    setMode("studio");
-  };
-
   const submitEditor = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!organizationId) return toast.error("Select an organization first");
@@ -378,12 +376,12 @@ export default function TemplatesPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <MetricCard
           label="Saved templates"
-          value={templates.data?.length ?? 0}
+          value={templates.data?.total ?? 0}
           icon={<Boxes />}
         />
         <MetricCard
           label="Built-in catalog"
-          value={catalog.data?.length ?? 0}
+          value={catalog.data?.total ?? 0}
           icon={<FilePlus2 />}
         />
         <MetricCard
@@ -684,7 +682,7 @@ export default function TemplatesPage() {
               <div>
                 <CardTitle>Built-in catalog</CardTitle>
                 <CardDescription className="mt-1">
-                  {catalog.data?.length ?? 0} maintained open-source blueprints,
+                  {catalog.data?.total ?? 0} maintained open-source templates,
                   imported locally and ready to deploy without an external
                   catalog.
                 </CardDescription>
@@ -705,21 +703,22 @@ export default function TemplatesPage() {
                   <AlertCircle />
                   <AlertTitle>Catalog unavailable</AlertTitle>
                   <AlertDescription>
-                    The built-in catalog could not be loaded. Saved and starter
-                    templates remain available; reload the page to retry.
+                    The built-in catalog could not be loaded. Saved templates
+                    remain available; reload the page to retry.
                   </AlertDescription>
                 </Alert>
-              ) : catalog.data?.length ? (
+              ) : catalog.data?.items.length ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {catalog.data.map((template) => (
+                  {catalog.data.items.map((template) => (
                     <article
                       key={template.id}
                       className="flex min-w-0 flex-col gap-3 rounded-xl border bg-muted/10 p-4 transition-colors hover:border-primary/35 hover:bg-primary/[0.025]"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background text-primary">
-                          <Code2 className="size-4" />
-                        </div>
+                        <TemplateLogo
+                          name={template.name}
+                          src={template.logoUrl}
+                        />
                         <div className="min-w-0">
                           <h3 className="truncate font-medium">
                             {template.name}
@@ -741,9 +740,22 @@ export default function TemplatesPage() {
                         ))}
                       </div>
                       <div className="mt-auto flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-muted-foreground">
-                          {template.version}
-                        </span>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="text-[11px] text-muted-foreground">
+                            {template.version}
+                          </span>
+                          {template.links?.github && (
+                            <a
+                              href={template.links.github}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Open ${template.name} on GitHub`}
+                              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <GithubMark />
+                            </a>
+                          )}
+                        </div>
                         <Button
                           size="sm"
                           onClick={() => {
@@ -769,58 +781,14 @@ export default function TemplatesPage() {
                   </EmptyHeader>
                 </Empty>
               )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Starter blueprints</CardTitle>
-              <CardDescription>
-                Use a reviewed starting point, then customize it in the studio
-                before saving.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {(starters.data ?? []).map((starter) => (
-                <div
-                  key={starter.id}
-                  className="group flex min-w-0 flex-col gap-3 rounded-xl border bg-muted/15 p-4 transition-colors hover:border-primary/35 hover:bg-primary/[0.025]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Code2 className="size-4" />
-                      </div>
-                      <p className="truncate font-medium">{starter.name}</p>
-                    </div>
-                    <Badge variant="secondary" className="shrink-0">
-                      Starter
-                    </Badge>
-                  </div>
-                  <p className="line-clamp-2 min-h-10 text-muted-foreground text-xs leading-relaxed">
-                    {starter.description}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {starter.tags.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="text-[10px]"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-auto"
-                    onClick={() => applyStarter(starter)}
-                  >
-                    Use starter <ChevronRight data-icon="inline-end" />
-                  </Button>
-                </div>
-              ))}
+              {catalog.data && catalog.data.pageCount > 1 && (
+                <Pagination
+                  page={catalog.data.page}
+                  pageCount={catalog.data.pageCount}
+                  total={catalog.data.total}
+                  onPageChange={setCatalogPage}
+                />
+              )}
             </CardContent>
           </Card>
 
@@ -836,7 +804,11 @@ export default function TemplatesPage() {
                 <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setCatalogPage(1);
+                    setTemplatePage(1);
+                  }}
                   placeholder="Search templates"
                   className="pl-9"
                   aria-label="Search templates"
@@ -848,9 +820,9 @@ export default function TemplatesPage() {
                 <div className="flex items-center justify-center gap-2 py-14 text-muted-foreground text-sm">
                   <Loader2 className="size-4 animate-spin" /> Loading catalog…
                 </div>
-              ) : templates.data?.length ? (
+              ) : templates.data?.items.length ? (
                 <div className="grid gap-3 lg:grid-cols-2">
-                  {templates.data.map((template) => (
+                  {templates.data.items.map((template) => (
                     <article
                       key={template.id}
                       className="group flex min-w-0 flex-col rounded-xl border p-4 transition-colors hover:border-primary/35"
@@ -948,7 +920,7 @@ export default function TemplatesPage() {
                     <EmptyDescription>
                       {search
                         ? "Try another search term."
-                        : "Create a template, use a starter, or import a Compose file to get started."}
+                        : "Create a template or import a Compose file to get started."}
                     </EmptyDescription>
                   </EmptyHeader>
                   {!search && (
@@ -959,6 +931,14 @@ export default function TemplatesPage() {
                     </EmptyContent>
                   )}
                 </Empty>
+              )}
+              {templates.data && templates.data.pageCount > 1 && (
+                <Pagination
+                  page={templates.data.page}
+                  pageCount={templates.data.pageCount}
+                  total={templates.data.total}
+                  onPageChange={setTemplatePage}
+                />
               )}
             </CardContent>
           </Card>
@@ -1074,6 +1054,83 @@ function MetricCard({
   );
 }
 
+function TemplateLogo({ name, src }: { name: string; src?: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-background text-primary">
+      {src && !failed ? (
+        // biome-ignore lint/performance/noImgElement: Catalog logos are external repository assets and need a native fallback on load failure.
+        <img
+          src={src}
+          alt={`${name} logo`}
+          width={36}
+          height={36}
+          loading="lazy"
+          className="size-8 object-contain"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <Code2 className="size-4" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
+function GithubMark() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="size-4 fill-current"
+      role="img"
+    >
+      <title>GitHub</title>
+      <path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.26c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.83 1.24 1.83 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.77.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.62-2.81 5.64-5.49 5.94.43.37.81 1.1.81 2.22v3.28c0 .32.22.69.83.57A12 12 0 0 0 12 .5" />
+    </svg>
+  );
+}
+
+function Pagination({
+  page,
+  pageCount,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <nav
+      aria-label="Template catalog pages"
+      className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4"
+    >
+      <p className="text-muted-foreground text-xs">
+        Page {page} of {pageCount} · {total} total
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Previous
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={page >= pageCount}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+    </nav>
+  );
+}
+
 function ChecklistItem({ done, label }: { done: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -1155,115 +1212,177 @@ function DeployDialog({
         <DialogHeader>
           <DialogTitle>Deploy {template.name}</DialogTitle>
           <DialogDescription>
-            Create a resource from this blueprint and queue its first
-            deployment.
+            Create a new resource from this template. The template stays
+            unchanged and the first deployment is queued after validation.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
-            label="Project"
-            value={projectId || "_none"}
-            onValueChange={(value) =>
-              onProjectChange(value === "_none" ? "" : value)
-            }
-            items={projects.map((project) => ({
-              value: project.id,
-              label: project.name,
-            }))}
-            placeholder="Select project"
-          />
-          <SelectField
-            label="Environment"
-            value={environmentId || "_none"}
-            disabled={!projectId}
-            onValueChange={(value) =>
-              onEnvironmentChange(value === "_none" ? "" : value)
-            }
-            items={environments.map((environment) => ({
-              value: environment.id,
-              label: environment.name,
-            }))}
-            placeholder="Select environment"
-          />
-          <div className="space-y-2">
-            <Label htmlFor="deploy-resource-name">Resource name</Label>
-            <Input
-              id="deploy-resource-name"
-              value={resourceName}
-              onChange={(event) => onResourceNameChange(event.target.value)}
-              maxLength={120}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="deploy-app-name">App name</Label>
-            <Input
-              id="deploy-app-name"
-              value={appName}
-              onChange={(event) => onAppNameChange(event.target.value)}
-              maxLength={120}
-            />
-            <p className="text-muted-foreground text-xs">
-              Used as the resource’s stable Compose app key.
+        <div className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4">
+          <TemplateLogo name={template.name} src={template.logoUrl} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">{template.name}</p>
+              <Badge variant="secondary">
+                {template.source === "builtin" ? "Built-in" : "Organization"}
+              </Badge>
+              {template.version && (
+                <span className="text-muted-foreground text-xs">
+                  v{template.version}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 line-clamp-2 text-muted-foreground text-xs">
+              {template.description || "Compose template"}
             </p>
           </div>
-          <SelectField
-            label="Deployment target"
-            value={serverId || "_automatic"}
-            onValueChange={(value) =>
-              onServerChange(value === "_automatic" ? "" : value)
-            }
-            items={servers.map((server) => ({
-              value: server.id,
-              label: `${server.name} (${server.serverType})`,
-            }))}
-            placeholder="Automatic"
-            allowEmptyLabel="Automatic (recommended)"
-            emptyValue="_automatic"
-          />
-          <SelectField
-            label="Build target"
-            value={buildServerId || "_automatic"}
-            onValueChange={(value) =>
-              onBuildServerChange(value === "_automatic" ? "" : value)
-            }
-            items={servers
-              .filter(
-                (server) =>
-                  server.serverType === "build" ||
-                  server.serverType === "deploy",
-              )
-              .map((server) => ({ value: server.id, label: server.name }))}
-            placeholder="Automatic"
-            allowEmptyLabel="Automatic"
-            emptyValue="_automatic"
-          />
-          <SelectField
-            label="Compose mode"
-            value={composeType}
-            onValueChange={(value) =>
-              onComposeTypeChange(value as "stack" | "compose")
-            }
-            items={[
-              { value: "stack", label: "Docker Swarm stack" },
-              { value: "compose", label: "Docker Compose" },
-            ]}
-            placeholder="Select mode"
-          />
-          <label className="flex items-start gap-3 rounded-xl border p-3 text-sm sm:mt-6">
-            <input
-              type="checkbox"
-              checked={randomize}
-              onChange={(event) => onRandomizeChange(event.target.checked)}
-              className="mt-0.5"
-            />
-            <span>
-              <span className="block font-medium">Isolate names</span>
-              <span className="text-muted-foreground text-xs">
-                Randomize service, network, and volume names to avoid
-                collisions.
-              </span>
-            </span>
-          </label>
+          {template.links?.github && (
+            <a
+              href={template.links.github}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Open ${template.name} source on GitHub`}
+            >
+              <GithubMark />
+            </a>
+          )}
+        </div>
+        <div className="space-y-5">
+          <section className="space-y-3">
+            <div>
+              <h3 className="font-medium text-sm">1. Choose a destination</h3>
+              <p className="mt-1 text-muted-foreground text-xs">
+                Select the project and environment that will own the new
+                resource.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Project"
+                value={projectId || "_none"}
+                onValueChange={(value) =>
+                  onProjectChange(value === "_none" ? "" : value)
+                }
+                items={projects.map((project) => ({
+                  value: project.id,
+                  label: project.name,
+                }))}
+                placeholder="Select project"
+              />
+              <SelectField
+                label="Environment"
+                value={environmentId || "_none"}
+                disabled={!projectId}
+                onValueChange={(value) =>
+                  onEnvironmentChange(value === "_none" ? "" : value)
+                }
+                items={environments.map((environment) => ({
+                  value: environment.id,
+                  label: environment.name,
+                }))}
+                placeholder="Select environment"
+              />
+            </div>
+          </section>
+          <Separator />
+          <section className="space-y-3">
+            <div>
+              <h3 className="font-medium text-sm">2. Name the resource</h3>
+              <p className="mt-1 text-muted-foreground text-xs">
+                These names identify the resource and its stable Compose app key
+                in the dashboard.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="deploy-resource-name">Resource name</Label>
+                <Input
+                  id="deploy-resource-name"
+                  value={resourceName}
+                  onChange={(event) => onResourceNameChange(event.target.value)}
+                  maxLength={120}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deploy-app-name">App name</Label>
+                <Input
+                  id="deploy-app-name"
+                  value={appName}
+                  onChange={(event) => onAppNameChange(event.target.value)}
+                  maxLength={120}
+                />
+              </div>
+            </div>
+          </section>
+          <Separator />
+          <section className="space-y-3">
+            <div>
+              <h3 className="font-medium text-sm">3. Configure runtime</h3>
+              <p className="mt-1 text-muted-foreground text-xs">
+                Leave targets automatic unless this stack needs a specific
+                server role.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Deployment target"
+                value={serverId || "_automatic"}
+                onValueChange={(value) =>
+                  onServerChange(value === "_automatic" ? "" : value)
+                }
+                items={servers.map((server) => ({
+                  value: server.id,
+                  label: `${server.name} (${server.serverType})`,
+                }))}
+                placeholder="Automatic"
+                allowEmptyLabel="Automatic (recommended)"
+                emptyValue="_automatic"
+              />
+              <SelectField
+                label="Build target"
+                value={buildServerId || "_automatic"}
+                onValueChange={(value) =>
+                  onBuildServerChange(value === "_automatic" ? "" : value)
+                }
+                items={servers
+                  .filter(
+                    (server) =>
+                      server.serverType === "build" ||
+                      server.serverType === "deploy",
+                  )
+                  .map((server) => ({ value: server.id, label: server.name }))}
+                placeholder="Automatic"
+                allowEmptyLabel="Automatic"
+                emptyValue="_automatic"
+              />
+              <SelectField
+                label="Compose mode"
+                value={composeType}
+                onValueChange={(value) =>
+                  onComposeTypeChange(value as "stack" | "compose")
+                }
+                items={[
+                  { value: "stack", label: "Docker Swarm stack" },
+                  { value: "compose", label: "Docker Compose" },
+                ]}
+                placeholder="Select mode"
+              />
+              <label className="flex items-start gap-3 rounded-xl border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={randomize}
+                  onChange={(event) => onRandomizeChange(event.target.checked)}
+                  className="mt-0.5 accent-primary"
+                />
+                <span>
+                  <span className="block font-medium">Isolate names</span>
+                  <span className="text-muted-foreground text-xs">
+                    Avoid service, network, and volume collisions when the
+                    template is deployed more than once.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </section>
         </div>
         <DialogFooter className="flex-wrap items-center justify-between border-t pt-4 sm:justify-between">
           <p className="text-muted-foreground text-xs">

@@ -4,6 +4,22 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.72 - 2026-07-18
+
+### Added
+
+- Add server-side search and pagination to the organization and built-in template catalogs.
+- Add permission-scoped UpGal tools for templates, resource configuration, monitoring status and metrics, and rich audit-log search.
+- Add dedicated monitoring and audit-log documentation with tutorials, examples, diagrams, and cross-references.
+
+### Changed
+
+- Remove Starter blueprints from the Templates dashboard and documentation.
+- Improve template cards with repository logos, GitHub links, source metadata, and robust logo fallbacks.
+- Rework the template deployment dialog into a clear destination, naming, runtime, and review hierarchy.
+- Align dashboard chat capabilities with the active user's organization permissions; mutations remain approval-gated.
+- Remove direct `console.*` usage from source and document the production validation baseline.
+
 ## 0.1.71 - 2026-07-18
 
 ### Added

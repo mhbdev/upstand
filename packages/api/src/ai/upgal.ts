@@ -14,6 +14,7 @@ import {
   type IUnitOfWork,
   type JsonValue,
   MCP_TOOL_CAPABILITIES,
+  parseResourceAdvancedConfig,
   type Resource,
   toJsonValue,
 } from "@upstand/domain";
@@ -26,6 +27,7 @@ import type {
   DeleteProjectUseCase,
   DeleteResourceUseCase,
   DeployResourceUseCase,
+  DeployTemplateUseCase,
   GetAccountStatusUseCase,
   GetDeploymentsUseCase,
   GetDockerInventoryUseCase,
@@ -34,17 +36,27 @@ import type {
   GetResourceLogsUseCase,
   GetResourceStatsUseCase,
   GetResourcesUseCase,
+  GetServerMonitoringStatusUseCase,
   GetServersUseCase,
+  ListAuditLogsUseCase,
   PruneDockerResourcesUseCase,
 } from "@upstand/usecases";
-import { validateTemplateComposeFile } from "@upstand/usecases";
+import {
+  CreateTemplateInputSchema,
+  DeployTemplateInputSchema,
+  getNativeTemplate,
+  listNativeTemplates,
+  validateTemplateComposeFile,
+} from "@upstand/usecases";
 import {
   ControlResourceUseCaseToken,
   CreateEnvironmentUseCaseToken,
   CreateProjectUseCaseToken,
+  CreateTemplateUseCaseToken,
   DeleteProjectUseCaseToken,
   DeleteResourceUseCaseToken,
   DeployResourceUseCaseToken,
+  DeployTemplateUseCaseToken,
   GetAccountStatusUseCaseToken,
   GetDeploymentsUseCaseToken,
   GetDockerInventoryUseCaseToken,
@@ -53,7 +65,10 @@ import {
   GetResourceLogsUseCaseToken,
   GetResourceStatsUseCaseToken,
   GetResourcesUseCaseToken,
+  GetServerHistoricalMetricsUseCaseToken,
+  GetServerMonitoringStatusUseCaseToken,
   GetServersUseCaseToken,
+  ListAuditLogsUseCaseToken,
   PruneDockerResourcesUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
@@ -73,6 +88,7 @@ import {
 } from "ai";
 import { log } from "evlog";
 import { z } from "zod";
+import { checkPermission } from "../permissions";
 import type { UpGalInstructionContext } from "./upgal-instructions";
 import {
   buildUpGalInstructions,
@@ -85,6 +101,7 @@ export type UpGalContext = UpGalInstructionContext & {
   conversationId: string;
   runId: string;
   scope: ServiceScope;
+  allowedToolNames?: readonly UpGalToolName[];
 };
 
 function redactResource(
@@ -113,6 +130,16 @@ export const UPGAL_TOOL_METADATA = [
     false,
   ],
   [
+    "list_templates",
+    "Read built-in and organization Compose templates with search and pagination.",
+    false,
+  ],
+  [
+    "get_template",
+    "Read the complete Compose definition and metadata for one built-in or organization template.",
+    false,
+  ],
+  [
     "list_projects",
     "Read every project in the active organization, including its stable ID and name.",
     false,
@@ -138,13 +165,33 @@ export const UPGAL_TOOL_METADATA = [
     false,
   ],
   [
+    "get_resource_config",
+    "Read non-secret deployment and advanced configuration for a resource.",
+    false,
+  ],
+  [
     "list_servers",
     "Read all servers configured for the active organization.",
     false,
   ],
   [
+    "get_monitoring_status",
+    "Read monitoring-agent health and collection status for a server.",
+    false,
+  ],
+  [
+    "get_monitoring_metrics",
+    "Read historical host or container metrics from a server monitoring agent.",
+    false,
+  ],
+  [
     "list_deployments",
     "Read the recent deployment history with project, environment, resource, status, and logs.",
+    false,
+  ],
+  [
+    "get_audit_logs",
+    "Search and filter organization audit logs by actor, action, resource, date, and rich text query.",
     false,
   ],
   [
@@ -188,6 +235,11 @@ export const UPGAL_TOOL_METADATA = [
     true,
   ],
   [
+    "create_template",
+    "Create a validated organization Compose template after approval.",
+    true,
+  ],
+  [
     "create_environment",
     "Create an environment inside a project after approval.",
     true,
@@ -217,12 +269,25 @@ export const UPGAL_TOOL_METADATA = [
     "Prune unused Docker resources (images, volumes, containers, builder, system, or all) on a server after approval.",
     true,
   ],
+  [
+    "deploy_template",
+    "Create a resource from a built-in or organization template and queue its first deployment after approval.",
+    true,
+  ],
 ] as const;
 
 export type UpGalTools = {
   get_account_status: UpGalExecutableTool<
     z.infer<typeof emptySchema>,
     Awaited<ReturnType<GetAccountStatusUseCase["execute"]>>
+  >;
+  list_templates: UpGalExecutableTool<
+    z.infer<typeof listTemplatesSchema>,
+    z.infer<typeof listTemplatesOutputSchema>
+  >;
+  get_template: UpGalExecutableTool<
+    z.infer<typeof templateLookupSchema>,
+    z.infer<typeof templateOutputSchema> | null
   >;
   list_projects: UpGalExecutableTool<
     z.infer<typeof emptySchema>,
@@ -244,13 +309,29 @@ export type UpGalTools = {
     z.infer<typeof idSchema>,
     Awaited<ReturnType<GetResourceStatsUseCase["execute"]>>
   >;
+  get_resource_config: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    z.infer<typeof resourceConfigOutputSchema>
+  >;
   list_servers: UpGalExecutableTool<
     z.infer<typeof emptySchema>,
     Awaited<ReturnType<GetServersUseCase["execute"]>>
   >;
+  get_monitoring_status: UpGalExecutableTool<
+    z.infer<typeof serverIdSchema>,
+    Awaited<ReturnType<GetServerMonitoringStatusUseCase["execute"]>>
+  >;
+  get_monitoring_metrics: UpGalExecutableTool<
+    z.infer<typeof monitoringMetricsSchema>,
+    unknown
+  >;
   list_deployments: UpGalExecutableTool<
     Record<string, never>,
     Awaited<ReturnType<GetDeploymentsUseCase["execute"]>>
+  >;
+  get_audit_logs: UpGalExecutableTool<
+    z.infer<typeof auditLogsSchema>,
+    Awaited<ReturnType<ListAuditLogsUseCase["execute"]>>
   >;
   get_docker_info: UpGalExecutableTool<
     z.infer<typeof dockerTargetSchema>,
@@ -284,6 +365,10 @@ export type UpGalTools = {
     z.infer<typeof createProjectSchema>,
     Awaited<ReturnType<CreateProjectUseCase["execute"]>>
   >;
+  create_template: UpGalExecutableTool<
+    z.infer<typeof CreateTemplateInputSchema>,
+    z.infer<typeof templateOutputSchema>
+  >;
   create_environment: UpGalExecutableTool<
     z.infer<typeof createEnvironmentSchema>,
     Awaited<ReturnType<CreateEnvironmentUseCase["execute"]>>
@@ -291,6 +376,10 @@ export type UpGalTools = {
   deploy_resource: UpGalExecutableTool<
     z.infer<typeof idSchema>,
     Awaited<ReturnType<DeployResourceUseCase["execute"]>>
+  >;
+  deploy_template: UpGalExecutableTool<
+    z.infer<typeof DeployTemplateInputSchema>,
+    Awaited<ReturnType<DeployTemplateUseCase["execute"]>>
   >;
   control_resource: UpGalExecutableTool<
     z.infer<typeof controlResourceSchema>,
@@ -349,6 +438,65 @@ const projectIdSchema = z.object({
 });
 const environmentIdSchema = z.object({
   environmentId: z.string().min(1).describe("Stable ID of the environment."),
+});
+const serverIdSchema = z.object({
+  serverId: z
+    .string()
+    .min(1)
+    .describe("Server ID, or 'local' for the local monitoring agent."),
+});
+const listTemplatesSchema = z.object({
+  search: z.string().trim().max(120).optional(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(48).default(12),
+});
+const templateLookupSchema = z.object({
+  id: z.string().min(1).describe("Template ID."),
+  source: z.enum(["builtin", "custom"]).default("custom"),
+});
+const monitoringMetricsSchema = serverIdSchema.extend({
+  limit: z
+    .string()
+    .regex(/^(all|[1-9]\d{0,3})$/)
+    .default("50"),
+  appName: z.string().trim().max(200).optional(),
+  containerMetrics: z.boolean().default(false),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+const auditLogsSchema = z.object({
+  actorId: z.string().min(1).optional(),
+  action: z
+    .enum([
+      "read",
+      "create",
+      "update",
+      "delete",
+      "deploy",
+      "cancel",
+      "run",
+      "start",
+      "stop",
+      "reload",
+      "login",
+      "logout",
+      "failure",
+      "invite",
+      "revoke",
+      "rotate",
+      "test",
+      "import",
+      "restore",
+      "duplicate",
+      "configure",
+    ])
+    .optional(),
+  resourceType: z.string().min(1).max(64).optional(),
+  search: z.string().trim().max(200).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(50),
 });
 const resourceLogsSchema = z.object({
   id: z.string().min(1).describe("Stable ID of the resource."),
@@ -478,6 +626,34 @@ const pruneDockerOutputSchema = z.object({
   output: z
     .array(z.string())
     .describe("Detailed output from each pruned resource class."),
+});
+const templateOutputSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    tags: z.array(z.string()),
+    composeFile: z.string().optional(),
+    source: z.enum(["builtin", "custom"]),
+    version: z.string().optional(),
+    logoUrl: z.string().optional(),
+    links: z.record(z.string(), z.string().optional()).optional(),
+    createdAt: z.any().optional(),
+    updatedAt: z.any().optional(),
+  })
+  .describe("Template metadata and Compose definition.");
+const listTemplatesOutputSchema = z.object({
+  items: z.array(templateOutputSchema),
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  pageCount: z.number(),
+});
+const resourceConfigOutputSchema = z.object({
+  resourceId: z.string(),
+  buildConfig: z.unknown(),
+  advancedConfig: z.unknown(),
+  domains: z.unknown(),
 });
 const toolContextSchema = z.object({
   organizationId: z
@@ -755,6 +931,15 @@ function resolve<T>(scope: ServiceScope, token: TokenLike<T>): T {
   return scope.resolve(token);
 }
 
+function parseJsonValue(value: string | null | undefined): unknown {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 function repository(context: UpGalContext): IAIRepository {
   return resolve(context.scope, AIRepositoryToken);
 }
@@ -839,7 +1024,7 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
       tail: 150,
       ...input,
     });
-  return {
+  const tools: UpGalTools = {
     get_account_status: readTool(
       "Read a compact health and inventory summary for the active organization.",
       emptySchema,
@@ -848,6 +1033,56 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
           organizationId: context.organizationId,
         }),
       accountStatusOutputSchema,
+    ),
+    list_templates: readTool(
+      "List built-in and organization templates. Search matches names, descriptions, tags, and supports pagination.",
+      listTemplatesSchema,
+      async (input) => {
+        const [custom, builtin] = await Promise.all([
+          run(UnitOfWorkToken).templateRepository.findByOrganizationId(
+            context.organizationId,
+            input.search,
+          ),
+          Promise.resolve(listNativeTemplates(input.search)),
+        ]);
+        const combined = [
+          ...custom.map((template) => ({
+            ...template,
+            source: "custom" as const,
+            description: template.description ?? null,
+          })),
+          ...builtin.map((template) => ({
+            ...template,
+            source: "builtin" as const,
+          })),
+        ].sort((left, right) => left.name.localeCompare(right.name));
+        const offset = (input.page - 1) * input.pageSize;
+        return {
+          items: combined.slice(offset, offset + input.pageSize),
+          total: combined.length,
+          page: input.page,
+          pageSize: input.pageSize,
+          pageCount: Math.max(1, Math.ceil(combined.length / input.pageSize)),
+        };
+      },
+      listTemplatesOutputSchema,
+    ),
+    get_template: readTool(
+      "Read one complete built-in or organization template. Use source=builtin for the built-in catalog.",
+      templateLookupSchema,
+      async ({ id, source }) => {
+        if (source === "builtin") {
+          const template = getNativeTemplate(id);
+          return { ...template, source: "builtin" as const };
+        }
+        const template =
+          await run(UnitOfWorkToken).templateRepository.findById(id);
+        if (!template || template.organizationId !== context.organizationId) {
+          throw new Error("Template not found.");
+        }
+        return { ...template, source: "custom" as const };
+      },
+      templateOutputSchema.nullable(),
     ),
     list_projects: readTool(
       "Read all projects in the active Upstand organization. If none exist, report that clearly.",
@@ -902,6 +1137,20 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
       },
       resourceStatsOutputSchema,
     ),
+    get_resource_config: readTool(
+      "Read non-secret build, advanced, and domain configuration for a resource.",
+      idSchema,
+      async ({ id }) => {
+        const resource = await assertResource(context, id);
+        return {
+          resourceId: resource.id,
+          buildConfig: parseJsonValue(resource.buildConfig),
+          advancedConfig: parseResourceAdvancedConfig(resource.advancedConfig),
+          domains: parseJsonValue(resource.domains),
+        };
+      },
+      resourceConfigOutputSchema,
+    ),
     list_servers: readTool(
       "Read remote servers available to the active organization.",
       emptySchema,
@@ -911,11 +1160,54 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
         }),
       serversOutputSchema,
     ),
+    get_monitoring_status: readTool(
+      "Read monitoring-agent health and collection status for a server.",
+      serverIdSchema,
+      async ({ serverId }) =>
+        run(GetServerMonitoringStatusUseCaseToken).execute({
+          organizationId: context.organizationId,
+          serverId,
+        }),
+      z.object({
+        serverId: z.string(),
+        reachable: z.boolean(),
+        status: z.enum(["healthy", "unhealthy", "not_configured"]),
+        lastCollectedAt: z.string().optional(),
+        collectionError: z.string().optional(),
+      }),
+    ),
+    get_monitoring_metrics: readTool(
+      "Read historical monitoring metrics for a host or its containers.",
+      monitoringMetricsSchema,
+      async (input) =>
+        run(GetServerHistoricalMetricsUseCaseToken).execute({
+          organizationId: context.organizationId,
+          ...input,
+        }),
+      z.any(),
+    ),
     list_deployments: readTool(
       "Read recent deployment history enriched with project and environment names.",
       emptySchema,
       async () => run(GetDeploymentsUseCaseToken).execute(),
       deploymentsOutputSchema,
+    ),
+    get_audit_logs: readTool(
+      "Search organization audit logs using actor, action, resource type, date range, and text filters.",
+      auditLogsSchema,
+      async (input) =>
+        run(ListAuditLogsUseCaseToken).execute({
+          organizationId: context.organizationId,
+          actorId: input.actorId,
+          action: input.action,
+          resourceType: input.resourceType as never,
+          search: input.search,
+          from: input.from ? new Date(input.from) : undefined,
+          to: input.to ? new Date(input.to) : undefined,
+          limit: input.pageSize,
+          offset: (input.page - 1) * input.pageSize,
+        }),
+      z.any(),
     ),
     get_docker_info: readTool(
       "Read Docker engine status. Omit serverId or use 'local' to inspect the local engine.",
@@ -975,6 +1267,18 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
         }),
       projectOutputSchema,
     ),
+    create_template: mutationTool(
+      "Create a validated organization Compose template. This requires approval.",
+      CreateTemplateInputSchema,
+      async (input) =>
+        run(CreateTemplateUseCaseToken)
+          .execute({
+            ...input,
+            organizationId: context.organizationId,
+          })
+          .then((template) => ({ ...template, source: "custom" as const })),
+      templateOutputSchema,
+    ),
     create_environment: mutationTool(
       "Create an environment within a project. This requires approval.",
       createEnvironmentSchema,
@@ -993,6 +1297,15 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
           .execute({ id })
           .then((resource) => redactResource(resource));
       },
+      resourceOutputSchema,
+    ),
+    deploy_template: mutationTool(
+      "Create a resource from a built-in or organization template and queue its first deployment. This requires approval.",
+      DeployTemplateInputSchema,
+      async (input) =>
+        run(DeployTemplateUseCaseToken)
+          .execute({ ...input, organizationId: context.organizationId })
+          .then((resource) => redactResource(resource)),
       resourceOutputSchema,
     ),
     control_resource: mutationTool(
@@ -1038,10 +1351,37 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
       pruneDockerOutputSchema,
     ),
   };
+  if (!context.allowedToolNames) return tools;
+  const allowed = new Set(context.allowedToolNames);
+  return Object.fromEntries(
+    Object.entries(tools).filter(([name]) =>
+      allowed.has(name as UpGalToolName),
+    ),
+  ) as UpGalTools;
 }
 
 export function isUpGalToolName(value: string): value is UpGalToolName {
   return UPGAL_TOOL_METADATA.some(([name]) => name === value);
+}
+
+export async function getUpGalToolNamesForUser(
+  userId: string,
+  organizationId: string,
+): Promise<UpGalToolName[]> {
+  const allowed: UpGalToolName[] = [];
+  for (const [name] of UPGAL_TOOL_METADATA) {
+    try {
+      await checkPermission(
+        userId,
+        organizationId,
+        UPGAL_TOOL_CAPABILITIES[name],
+      );
+      allowed.push(name);
+    } catch {
+      // A missing capability removes only this tool from the agent surface.
+    }
+  }
+  return allowed;
 }
 
 export function upGalToolNeedsApproval(value: string): boolean {
@@ -1064,6 +1404,20 @@ export async function executeUpGalReadTool(
   switch (name) {
     case "get_account_status":
       return toJsonValue(await tools.get_account_status.execute({}, options));
+    case "list_templates":
+      return toJsonValue(
+        await tools.list_templates.execute(
+          listTemplatesSchema.parse(input),
+          options,
+        ),
+      );
+    case "get_template":
+      return toJsonValue(
+        await tools.get_template.execute(
+          templateLookupSchema.parse(input),
+          options,
+        ),
+      );
     case "list_projects":
       return toJsonValue(await tools.list_projects.execute({}, options));
     case "list_environments":
@@ -1091,10 +1445,35 @@ export async function executeUpGalReadTool(
       return toJsonValue(
         await tools.get_resource_stats.execute(idSchema.parse(input), options),
       );
+    case "get_resource_config":
+      return toJsonValue(
+        await tools.get_resource_config.execute(idSchema.parse(input), options),
+      );
     case "list_servers":
       return toJsonValue(await tools.list_servers.execute({}, options));
+    case "get_monitoring_status":
+      return toJsonValue(
+        await tools.get_monitoring_status.execute(
+          serverIdSchema.parse(input),
+          options,
+        ),
+      );
+    case "get_monitoring_metrics":
+      return toJsonValue(
+        await tools.get_monitoring_metrics.execute(
+          monitoringMetricsSchema.parse(input),
+          options,
+        ),
+      );
     case "list_deployments":
       return toJsonValue(await tools.list_deployments.execute({}, options));
+    case "get_audit_logs":
+      return toJsonValue(
+        await tools.get_audit_logs.execute(
+          auditLogsSchema.parse(input),
+          options,
+        ),
+      );
     case "get_docker_info":
       return toJsonValue(
         await tools.get_docker_info.execute(
@@ -1488,13 +1867,19 @@ export async function createUpGalResponse(
       upGalToolNeedsApproval(toolCall.toolName) ? "user-approval" : undefined,
     toolsContext: {
       get_account_status: { organizationId: context.organizationId },
+      list_templates: { organizationId: context.organizationId },
+      get_template: { organizationId: context.organizationId },
       list_projects: { organizationId: context.organizationId },
       list_environments: { organizationId: context.organizationId },
       list_resources: { organizationId: context.organizationId },
       get_resource_logs: { organizationId: context.organizationId },
       get_resource_stats: { organizationId: context.organizationId },
+      get_resource_config: { organizationId: context.organizationId },
       list_servers: { organizationId: context.organizationId },
+      get_monitoring_status: { organizationId: context.organizationId },
+      get_monitoring_metrics: { organizationId: context.organizationId },
       list_deployments: { organizationId: context.organizationId },
+      get_audit_logs: { organizationId: context.organizationId },
       get_docker_info: { organizationId: context.organizationId },
       list_docker_containers: { organizationId: context.organizationId },
       list_docker_images: { organizationId: context.organizationId },
@@ -1503,8 +1888,10 @@ export async function createUpGalResponse(
       list_docker_services: { organizationId: context.organizationId },
       get_docker_logs: { organizationId: context.organizationId },
       create_project: { organizationId: context.organizationId },
+      create_template: { organizationId: context.organizationId },
       create_environment: { organizationId: context.organizationId },
       deploy_resource: { organizationId: context.organizationId },
+      deploy_template: { organizationId: context.organizationId },
       control_resource: { organizationId: context.organizationId },
       delete_resource: { organizationId: context.organizationId },
       delete_project: { organizationId: context.organizationId },

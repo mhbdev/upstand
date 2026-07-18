@@ -36,4 +36,12 @@ describe("native template catalog", () => {
     expect(template.source).toBe("builtin");
     expect(template.composeFile).not.toContain("../files");
   });
+
+  test("exposes repository logo and GitHub metadata for catalog cards", () => {
+    const template = getNativeTemplate("ackee");
+    expect(template.logoUrl).toBe(
+      "https://raw.githubusercontent.com/Dokploy/templates/canary/blueprints/ackee/logo.png",
+    );
+    expect(template.links.github).toContain("github.com");
+  });
 });

@@ -37,12 +37,12 @@ Configure your LLM provider by navigating to **Settings → UpGal Settings** (re
 
 ## 2. Execution Loop & Safeguards
 
-UpGal executes on the server using Vercel AI SDK's `ToolLoopAgent` and streams real-time tool states, messages, and approval prompts to the dashboard:
+UpGal executes on the server using Vercel AI SDK's `ToolLoopAgent` and streams real-time tool states, messages, and approval prompts to the dashboard. The tool list is calculated for the current user and organization on every chat request, so the agent cannot see or invoke a capability that the user cannot use in the dashboard:
 
 - **12-Step Loop Limit**: Runs are capped at 12 sequential tool execution loops to prevent runaway API spend or infinite loops.
 - **Request-Scoped DI**: Uses the same request container lifecycle as standard HTTP endpoints, ensuring strict tenant isolation.
 - **Auto-run (Read-only)**: Inspection tools (e.g. listing resources, viewing container statistics, tailing logs) run automatically after verifying tenant permission.
-- **Approval Gates (Mutations)**: Destructive or mutative actions (creating projects, deploying apps, stopping services, deleting resources) require explicit user approval.
+- **Approval Gates (Mutations)**: Destructive or mutative actions (creating projects/templates, deploying apps/templates, stopping services, deleting resources, or pruning Docker state) require explicit user approval.
 
 ```mermaid
 sequenceDiagram
@@ -62,7 +62,25 @@ sequenceDiagram
 
 ---
 
-## 3. Templates AI Draft Generator
+## 3. Capability coverage
+
+UpGal has access to the same organization-scoped information and actions exposed by the dashboard, subject to the active user's permissions:
+
+| Area | Read tools | Approval-gated actions |
+| --- | --- | --- |
+| Organization | `get_account_status` | — |
+| Templates | `list_templates`, `get_template` | `create_template`, `deploy_template` |
+| Projects | `list_projects`, `list_environments` | `create_project`, `create_environment`, `delete_project` |
+| Resources | `list_resources`, `get_resource_logs`, `get_resource_stats`, `get_resource_config` | `deploy_resource`, `control_resource`, `delete_resource` |
+| Servers | `list_servers`, `get_docker_info` | — |
+| Monitoring | `get_monitoring_status`, `get_monitoring_metrics` | — |
+| Deployments | `list_deployments` | — |
+| Audit | `get_audit_logs` with actor/action/resource/date/text filters and pagination | — |
+| Docker | `list_docker_containers`, `list_docker_images`, `list_docker_volumes`, `list_docker_networks`, `list_docker_services`, `get_docker_logs` | `prune_docker_resources` |
+
+Resource configuration output is intentionally redacted: credentials, environment secrets, and build secrets are not returned to the model. All organization lookups are server-side and IDs are preferred over display names to avoid ambiguous actions.
+
+## 4. Templates AI Draft Generator
 
 The **Templates** page integrates an AI template drafter. 
 
@@ -80,7 +98,7 @@ UpGal follows a strict Compose generation contract so drafts are deployable inst
 
 ---
 
-## 4. Model Context Protocol (MCP) Integration
+## 5. Model Context Protocol (MCP) Integration
 
 UpGal exposes a JSON-RPC Model Context Protocol endpoint at `/api/mcp` for external LLM integrations:
 

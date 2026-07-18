@@ -4,7 +4,6 @@ import {
   DeployTemplateInputSchema,
   ListTemplatesInputSchema,
   listNativeTemplates,
-  STARTER_TEMPLATES,
   UpdateTemplateInputSchema,
 } from "@upstand/usecases";
 import {
@@ -20,19 +19,30 @@ import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
 export const templateRouter = router({
-  starters: twoFactorVerifiedProcedure.query(() => STARTER_TEMPLATES),
-
   catalog: twoFactorVerifiedProcedure
     .input(
       z.object({
         search: z.string().trim().max(120).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(48).default(12),
       }),
     )
     .query(async ({ input }) => {
-      return listNativeTemplates(input.search).map((template) => ({
-        ...template,
-        source: "builtin" as const,
-      }));
+      const all = listNativeTemplates(input.search);
+      const offset = (input.page - 1) * input.pageSize;
+      const items = all
+        .slice(offset, offset + input.pageSize)
+        .map((template) => ({
+          ...template,
+          source: "builtin" as const,
+        }));
+      return {
+        items,
+        total: all.length,
+        page: input.page,
+        pageSize: input.pageSize,
+        pageCount: Math.max(1, Math.ceil(all.length / input.pageSize)),
+      };
     }),
 
   list: twoFactorVerifiedProcedure

@@ -13,6 +13,14 @@ export const TemplateSchema = z.object({
 
 export type Template = z.infer<typeof TemplateSchema>;
 
+export type TemplatePage = {
+  items: Template[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+};
+
 export interface CreateTemplateDTO {
   id?: string;
   organizationId: string;
@@ -28,6 +36,12 @@ export interface ITemplateRepository {
     organizationId: string,
     search?: string,
   ): Promise<Template[]>;
+  findPageByOrganizationId(input: {
+    organizationId: string;
+    search?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<TemplatePage>;
   create(data: CreateTemplateDTO): Promise<Template>;
   updateById(
     id: string,
