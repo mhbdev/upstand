@@ -62,6 +62,7 @@ import {
 import {
   BackupSchedulerToken,
   CreateGitProviderUseCaseToken,
+  DeliverNotificationUseCaseToken,
   GeneralSchedulerToken,
   GetDockerInventoryUseCaseToken,
   GetWebServerSettingsUseCaseToken,
@@ -135,8 +136,15 @@ type AppEnv = EvlogVariables & {
 const app = new Hono<AppEnv>();
 const deploymentRuntime = new DeploymentRuntime();
 const outboxRuntime = new OutboxRuntime();
-const notificationWorker = new NotificationDeliveryWorker(() =>
-  getServiceProvider(),
+const notificationWorker = new NotificationDeliveryWorker(
+  async (deliveryId) => {
+    const scope = getServiceProvider().createScope();
+    try {
+      await scope.resolve(DeliverNotificationUseCaseToken).execute(deliveryId);
+    } finally {
+      await scope.dispose();
+    }
+  },
 );
 const backupWorker = new BackupRunWorker(() => getServiceProvider());
 const backupScheduler = getServiceProvider().resolve(BackupSchedulerToken);

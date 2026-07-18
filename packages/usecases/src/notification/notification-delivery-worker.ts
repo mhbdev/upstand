@@ -1,14 +1,17 @@
 import { closeRedis, createRedis, type Redis } from "@upstand/redis";
 import { Worker } from "bullmq";
 import { log } from "evlog";
-import { DeliverNotificationUseCaseToken } from "../tokens";
 import { NOTIFICATION_DELIVERY_QUEUE } from "./publish-notification.usecase";
+
+export type NotificationDeliveryHandler = (deliveryId: string) => Promise<void>;
 
 export class NotificationDeliveryWorker {
   private worker: Worker | null = null;
   private workerRedis: Redis | null = null;
 
-  constructor(private readonly getServiceProvider: () => any) {}
+  constructor(
+    private readonly deliverNotification: NotificationDeliveryHandler,
+  ) {}
 
   async start(): Promise<void> {
     if (this.worker) return;
@@ -28,13 +31,7 @@ export class NotificationDeliveryWorker {
             throw new Error("Notification job is missing deliveryId");
           }
 
-          const scope = this.getServiceProvider().createScope();
-          try {
-            const deliver = scope.resolve(DeliverNotificationUseCaseToken);
-            await deliver.execute(deliveryId);
-          } finally {
-            await scope.dispose();
-          }
+          await this.deliverNotification(deliveryId);
         },
         {
           connection: connection as never,
