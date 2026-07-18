@@ -191,6 +191,26 @@ export class DockerReadOnlyService {
     return dockerInfo(JSON.parse(raw));
   }
 
+  async listSwarmNodes(target: DockerInspectionTarget): Promise<
+    Array<{
+      id: string;
+      hostname: string;
+      ip: string;
+      isLeader: boolean;
+    }>
+  > {
+    if (target.kind !== "local") return [];
+    const info = await this.docker.info();
+    if (info.Swarm?.LocalNodeState !== "active") return [];
+    const nodes = await this.docker.listNodes();
+    return nodes.map((node) => ({
+      id: node.ID || "",
+      hostname: node.Description?.Hostname || node.ID || "",
+      ip: node.Status?.Addr || "127.0.0.1",
+      isLeader: Boolean(node.ManagerStatus?.Leader),
+    }));
+  }
+
   async getHostTime(
     target: DockerInspectionTarget,
   ): Promise<{ epochSeconds: number; iso: string }> {

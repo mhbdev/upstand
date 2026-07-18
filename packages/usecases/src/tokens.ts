@@ -276,6 +276,10 @@ export const RotateSwarmJoinTokenUseCaseToken =
   );
 export const GetDeploymentsUseCaseToken =
   createToken<UseCases.GetDeploymentsUseCase>("GetDeploymentsUseCase");
+export const GetDeploymentServerSettingsUseCaseToken =
+  createToken<UseCases.GetDeploymentServerSettingsUseCase>(
+    "GetDeploymentServerSettingsUseCase",
+  );
 export const GetQueueUseCaseToken =
   createToken<UseCases.GetQueueUseCase>("GetQueueUseCase");
 export const GetRequestsUseCaseToken =
