@@ -79,23 +79,18 @@ docker-compose.prod.yml  Production Swarm stack configuration
    git clone https://github.com/mhbdev/upstand.git
    cd upstand
    ```
-2. Install dependencies:
+2. Run the idempotent local setup:
    ```bash
-   bun install --frozen-lockfile
+   bun setup
    ```
-3. Boot the local database & queue stack:
+   This creates ignored local environment files for the API and web app, installs dependencies, starts PostgreSQL and Redis, waits for readiness, and applies the checked-in migrations.
+3. Launch the development workspace:
    ```bash
-   bun run docker:local:up
+   bun dev
    ```
-4. Push the schema to the database:
-   ```bash
-   bun run db:push
-   ```
-5. Launch the development workspace:
-   ```bash
-   bun run dev
-   ```
-   Open `http://localhost:3001` for the web console and `http://localhost:3000` for the API Swagger UI (`/api/docs/`).
+   Open `http://localhost:3001` for the web console, `http://localhost:3000/api/docs/` for the API Swagger UI, and `http://localhost:4000` for Fumadocs. Run `bun setup` again after pulling dependency or schema changes.
+
+For database schema changes, update the TypeScript schema and run `bun run db:generate`; Drizzle Kit generates the migration files. Never create migration files manually.
 
 ---
 

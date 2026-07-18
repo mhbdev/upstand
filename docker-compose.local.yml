@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: upstand
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-upstand-local-password}
     ports:
       - "5432:5432"
     volumes:
@@ -42,8 +42,8 @@ services:
       - ./.docker/caddy:/etc/caddy
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}@postgres:5432/upstand
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in the environment}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-upstand-local-password}@postgres:5432/upstand
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-upstand-local-development-secret-that-is-at-least-32-characters}
       BETTER_AUTH_URL: http://localhost:3000
       CORS_ORIGIN: http://localhost:3001
       REDIS_URL: redis://redis:6379

@@ -11,18 +11,22 @@ Thank you for helping improve Upstand. Small, reviewable pull requests are easie
 
 ## Development setup
 
-Install Bun 1.3.14 and Docker, then:
+Install Bun 1.3.14 and Docker Desktop (or Docker Engine with Compose v2), then run:
 
 ```bash
 git clone https://github.com/mhbdev/upstand.git
 cd upstand
-bun install --frozen-lockfile
-bun run db:start
-bun run db:push
-bun run dev
+bun setup
+bun dev
 ```
 
-Use throwaway local credentials. Do not commit `.env` files, private keys, production URLs, database dumps, or generated secrets. If your change touches migrations, run it against a fresh database and an upgraded database.
+`bun setup` is safe to re-run. It creates ignored local environment files for the API and web app from the checked-in examples, installs the frozen lockfile, starts local PostgreSQL and Redis, waits for PostgreSQL, synchronizes only the local database password without deleting data, and applies the checked-in migrations. `bun dev` starts the API, web console, and Fumadocs together.
+
+- Web console: `http://localhost:3001`
+- API Swagger UI: `http://localhost:3000/api/docs/`
+- Fumadocs: `http://localhost:4000`
+
+Use throwaway local credentials. Do not commit `.env` files, private keys, production URLs, database dumps, or generated secrets. For schema changes, update the TypeScript schema, run `bun run db:generate`, and test the generated migration against both a fresh database and an upgraded database. Never create migration files manually.
 
 ## Making a change
 
