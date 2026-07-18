@@ -7,7 +7,7 @@ import {
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 import type { DockerRegistryAuth } from "../ports/docker";
-import type { DockerService } from "./docker-client";
+import type { DockerResourceControlService as DockerService } from "./docker-client";
 import { resolveDockerServiceForServer } from "./docker-client";
 
 export const RollbackResourceInputSchema = z.object({

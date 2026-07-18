@@ -4,7 +4,7 @@ import {
   ValidationError,
 } from "@upstand/domain";
 import { z } from "zod";
-import type { DockerService } from "./docker-client";
+import type { DockerContainerControlService as DockerService } from "./docker-client";
 import { resolveDockerServiceForServer } from "./docker-client";
 
 export const ControlContainerInputSchema = z.object({

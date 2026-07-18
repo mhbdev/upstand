@@ -2,7 +2,14 @@ import type { IUnitOfWork, Resource } from "@upstand/domain";
 import type Docker from "dockerode";
 import type { CaddyServicePort } from "../ports/caddy";
 import type {
+  DockerCommandPort,
+  DockerContainerControlPort,
+  DockerDatabaseDeploymentPort,
+  DockerDeploymentPort,
   DockerInfrastructureResolverPort,
+  DockerResourceControlPort,
+  DockerResourceReadPort,
+  DockerServerStatsPort,
   DockerServicePort,
   RemoteDockerConnectionPort,
 } from "../ports/docker";
@@ -41,7 +48,13 @@ export function configureDockerInfrastructure(
   dockerClientFactory = clientFactory;
 }
 
-export type DockerService = DockerServicePort;
+export type DockerDeploymentService = DockerDeploymentPort;
+export type DockerResourceControlService = DockerResourceControlPort;
+export type DockerResourceReadService = DockerResourceReadPort;
+export type DockerContainerControlService = DockerContainerControlPort;
+export type DockerCommandService = DockerCommandPort;
+export type DockerDatabaseDeploymentService = DockerDatabaseDeploymentPort;
+export type DockerServerStatsService = DockerServerStatsPort;
 
 export function getDockerInstance(): Docker {
   if (!dockerClientFactory) {
@@ -50,16 +63,16 @@ export function getDockerInstance(): Docker {
   return dockerClientFactory();
 }
 
-export function resolveDockerServiceForServer(
+export function resolveDockerServiceForServer<T>(
   serverId: string | null | undefined,
   uow: IUnitOfWork,
-  defaultDockerService: DockerServicePort,
+  defaultDockerService: T,
 ) {
   return resolver.resolveDockerServiceForServer(
     serverId,
     uow,
-    defaultDockerService,
-  );
+    defaultDockerService as DockerServicePort,
+  ) as Promise<{ dockerService: T; cleanup: () => void }>;
 }
 
 export function resolveDockerCliEnvironmentForServer(
@@ -69,18 +82,22 @@ export function resolveDockerCliEnvironmentForServer(
   return resolver.resolveDockerCliEnvironmentForServer(serverId, uow);
 }
 
-export function resolveServicesForResource(
+export function resolveServicesForResource<T>(
   resource: Resource,
   uow: IUnitOfWork,
-  defaultDockerService: DockerServicePort,
+  defaultDockerService: T,
   defaultCaddyService: CaddyServicePort,
 ) {
   return resolver.resolveServicesForResource(
     resource,
     uow,
-    defaultDockerService,
+    defaultDockerService as DockerServicePort,
     defaultCaddyService,
-  );
+  ) as Promise<{
+    dockerService: T;
+    caddyService: CaddyServicePort;
+    cleanup: () => void;
+  }>;
 }
 
 export function createRemoteServices(connection: RemoteDockerConnectionPort) {
