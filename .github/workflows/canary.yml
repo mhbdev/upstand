@@ -15,7 +15,8 @@ jobs:
   verify-and-publish:
     if: >-
       ${{
-        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/canary') ||
         (github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_repository.full_name == github.repository)
       }}
@@ -68,3 +69,5 @@ jobs:
           build-args: ${{ matrix.build_args }}
           cache-from: type=gha,scope=${{ matrix.scope }}
           cache-to: type=gha,scope=${{ matrix.scope }},mode=max
+          provenance: mode=max
+          sbom: true

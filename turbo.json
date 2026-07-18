@@ -83,7 +83,13 @@
       "env": ["DATABASE_URL"]
     },
     "db:generate": {
-      "cache": false
+      "cache": false,
+      "env": [
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "BETTER_AUTH_SECRET",
+        "DATABASE_URL"
+      ]
     },
     "db:migrate": {
       "cache": false,
