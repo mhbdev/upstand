@@ -101,6 +101,13 @@ type TemplateRecord = Omit<Template, "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
 };
+type DeployableTemplate = Pick<
+  TemplateRecord,
+  "id" | "name" | "description" | "tags"
+> & {
+  source: "custom" | "builtin";
+  version?: string;
+};
 
 function slug(value: string): string {
   return value
@@ -132,6 +139,9 @@ export default function TemplatesPage() {
   const [generatedModel, setGeneratedModel] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deployingId, setDeployingId] = useState<string | null>(null);
+  const [deployingSource, setDeployingSource] = useState<"custom" | "builtin">(
+    "custom",
+  );
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
@@ -151,6 +161,13 @@ export default function TemplatesPage() {
       search: search.trim() || undefined,
     }),
     enabled: Boolean(organizationId),
+  });
+  const catalog = useQuery({
+    ...trpc.template.catalog.queryOptions({
+      search: search.trim() || undefined,
+    }),
+    enabled: Boolean(organizationId),
+    staleTime: 15 * 60 * 1000,
   });
   const starters = useQuery({ ...trpc.template.starters.queryOptions() });
   const projects = useQuery({
@@ -241,6 +258,7 @@ export default function TemplatesPage() {
     onSuccess: () => {
       toast.success("Deployment queued. Track its progress in Deployments.");
       setDeployingId(null);
+      setDeployingSource("custom");
       setProjectId("");
       setEnvironmentId("");
       setServerId("");
@@ -249,17 +267,24 @@ export default function TemplatesPage() {
     onError: (error) => toast.error(error.message),
   });
 
-  const selectedTemplate = templates.data?.find(
-    (template) => template.id === deployingId,
-  );
+  const selectedTemplate: DeployableTemplate | undefined =
+    deployingSource === "builtin"
+      ? catalog.data?.find((template) => template.id === deployingId)
+      : (() => {
+          const template = templates.data?.find(
+            (candidate) => candidate.id === deployingId,
+          );
+          return template
+            ? { ...template, source: "custom" as const }
+            : undefined;
+        })();
   const readyServers = (servers.data ?? []).filter(
     (server) => server.status === "ready",
   );
   const aiReady = Boolean(
-    aiSettings.data &&
-      aiSettings.data.some(
-        (provider) => provider.configured && provider.enabled,
-      ),
+    aiSettings.data?.some(
+      (provider) => provider.configured && provider.enabled,
+    ),
   );
   const isSaving = create.isPending || update.isPending;
   const canGenerate = Boolean(
@@ -362,8 +387,8 @@ export default function TemplatesPage() {
           icon={<Boxes />}
         />
         <MetricCard
-          label="Starter blueprints"
-          value={starters.data?.length ?? 0}
+          label="Built-in catalog"
+          value={catalog.data?.length ?? 0}
           icon={<FilePlus2 />}
         />
         <MetricCard
@@ -660,6 +685,99 @@ export default function TemplatesPage() {
           </Card>
 
           <Card>
+            <CardHeader className="gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <CardTitle>Built-in catalog</CardTitle>
+                <CardDescription className="mt-1">
+                  {catalog.data?.length ?? 0} maintained open-source blueprints,
+                  imported locally and ready to deploy without an external
+                  catalog.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                <span className="size-2 rounded-full bg-emerald-500" />
+                Live catalog
+              </div>
+            </CardHeader>
+            <CardContent>
+              {catalog.isPending ? (
+                <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground text-sm">
+                  <Loader2 className="size-4 animate-spin" /> Loading built-in
+                  catalog…
+                </div>
+              ) : catalog.isError ? (
+                <Alert variant="destructive">
+                  <AlertCircle />
+                  <AlertTitle>Catalog unavailable</AlertTitle>
+                  <AlertDescription>
+                    The built-in catalog could not be loaded. Saved and starter
+                    templates remain available; reload the page to retry.
+                  </AlertDescription>
+                </Alert>
+              ) : catalog.data?.length ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {catalog.data.map((template) => (
+                    <article
+                      key={template.id}
+                      className="flex min-w-0 flex-col gap-3 rounded-xl border bg-muted/10 p-4 transition-colors hover:border-primary/35 hover:bg-primary/[0.025]"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background text-primary">
+                          <Code2 className="size-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="truncate font-medium">
+                            {template.name}
+                          </h3>
+                          <p className="mt-1 line-clamp-2 text-muted-foreground text-xs">
+                            {template.description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex min-h-6 flex-wrap gap-1">
+                        {template.tags.slice(0, 4).map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="text-[10px]"
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="mt-auto flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-muted-foreground">
+                          {template.version}
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setDeployingSource("builtin");
+                            setDeployingId(template.id);
+                            setResourceName(template.name);
+                            setAppName(slug(template.name));
+                          }}
+                        >
+                          <Rocket data-icon="inline-start" /> Deploy
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <Empty className="min-h-40 border">
+                  <EmptyHeader>
+                    <EmptyTitle>No catalog matches</EmptyTitle>
+                    <EmptyDescription>
+                      Try a different search term.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader>
               <CardTitle>Starter blueprints</CardTitle>
               <CardDescription>
@@ -795,6 +913,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             onClick={() => {
+                              setDeployingSource("custom");
                               setDeployingId(template.id);
                               setResourceName(template.name);
                               setAppName(slug(template.name));
@@ -914,6 +1033,7 @@ export default function TemplatesPage() {
             deploy.mutate({
               organizationId,
               templateId: selectedTemplate.id,
+              source: selectedTemplate.source,
               environmentId,
               resourceName: resourceName.trim(),
               appName: appName.trim(),
@@ -979,7 +1099,7 @@ function ChecklistItem({ done, label }: { done: boolean; label: string }) {
 }
 
 type DeployDialogProps = {
-  template: TemplateRecord;
+  template: DeployableTemplate;
   open: boolean;
   projects: { id: string; name: string }[];
   environments: { id: string; name: string }[];

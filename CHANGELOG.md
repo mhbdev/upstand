@@ -4,6 +4,15 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+### Added
+
+- Add a native, versioned template catalog with 476 ready-to-use Compose blueprints, searchable directly from the Templates dashboard and deployable without a runtime catalog dependency.
+- Add built-in template variable rendering, relative mount isolation, source-aware one-click deployment, and a complete Fumadocs inventory for the shipped catalog.
+
+### Changed
+
+- Make UpGal Compose generation instructions explicit about YAML shape, service references, version pinning, named volumes, health checks, and host-access safety rules.
+
 ## 0.1.70 - 2026-07-17
 
 ### Changed

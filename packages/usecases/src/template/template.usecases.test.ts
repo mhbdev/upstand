@@ -117,4 +117,54 @@ describe("template catalog use cases", () => {
     );
     expect(deployedId).toBe("resource-1");
   });
+
+  test("deploys a built-in blueprint without requiring an organization template row", async () => {
+    let createInput: Record<string, unknown> | undefined;
+    const uow = {
+      environmentRepository: {
+        findById: async () => ({ projectId: "project-1" }),
+      },
+      projectRepository: {
+        findById: async () => ({ organizationId: "org-1" }),
+      },
+      resourceRepository: { updateById: async () => null },
+    } as unknown as IUnitOfWork;
+    const useCase = new DeployTemplateUseCase(
+      uow,
+      {
+        execute: async (input: Record<string, unknown>) => {
+          createInput = input;
+          return { id: "resource-remote" };
+        },
+      } as any,
+      { execute: async () => ({ id: "resource-remote" }) } as any,
+      () => ({
+        id: "ackee",
+        name: "Ackee",
+        version: "latest",
+        description: "",
+        logo: "",
+        links: {},
+        tags: [],
+        variables: {},
+        composeFile: "services:\n  ackee:\n    image: electerious/ackee:3.4.2",
+        source: "builtin" as const,
+      }),
+    );
+
+    await useCase.execute({
+      organizationId: "org-1",
+      templateId: "ackee",
+      source: "builtin",
+      environmentId: "environment-1",
+      resourceName: "Ackee",
+      appName: "ackee",
+      composeType: "stack",
+      randomize: false,
+    });
+
+    expect(JSON.parse(String(createInput?.credentials))).toMatchObject({
+      composeFile: expect.stringContaining("electerious/ackee:3.4.2"),
+    });
+  });
 });

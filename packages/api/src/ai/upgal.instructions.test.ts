@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { buildUpGalInstructions } from "./upgal-instructions";
+import {
+  buildUpGalInstructions,
+  UPGAL_TEMPLATE_GENERATION_RULES,
+} from "./upgal-instructions";
 import { describeUpGalPage } from "./upgal-page-context";
 
 describe("UpGal instructions", () => {
@@ -20,6 +23,16 @@ describe("UpGal instructions", () => {
     expect(instructions).toContain('"projectId":"project-1"');
     expect(instructions).toContain("server-verified");
     expect(instructions).toContain("client-reported application metadata");
+    expect(instructions).toContain("Prefer named volumes");
+  });
+
+  test("publishes deterministic Compose generation rules", () => {
+    expect(UPGAL_TEMPLATE_GENERATION_RULES.join("\n")).toContain(
+      "return only one YAML document",
+    );
+    expect(UPGAL_TEMPLATE_GENERATION_RULES.join("\n")).toContain(
+      "Docker socket mounts",
+    );
   });
 
   test("describes nested resource pages with route identifiers", () => {

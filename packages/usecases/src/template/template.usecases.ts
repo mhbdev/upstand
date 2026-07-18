@@ -14,6 +14,7 @@ import {
   DeployResourceInputSchema,
   type DeployResourceUseCase,
 } from "../resource/deploy-resource.usecase";
+import { getNativeTemplate, type NativeTemplate } from "./native-catalog";
 
 const TemplateTagsSchema = z
   .array(z.string().trim().min(1).max(64))
@@ -45,6 +46,7 @@ export const DeleteTemplateInputSchema = z.object({
 export const DeployTemplateInputSchema = z.object({
   organizationId: z.string().min(1),
   templateId: z.string().min(1),
+  source: z.enum(["custom", "builtin"]).default("custom"),
   environmentId: z.string().min(1),
   resourceName: z.string().trim().min(1).max(120),
   appName: z.string().trim().min(1).max(120),
@@ -214,16 +216,26 @@ export class DeployTemplateUseCase {
     private readonly uow: IUnitOfWork,
     private readonly createResource: CreateResourceUseCase,
     private readonly deployResource: DeployResourceUseCase,
+    private readonly loadNativeTemplate: (
+      templateId: string,
+    ) => NativeTemplate = getNativeTemplate,
   ) {}
 
   async execute(
     input: z.infer<typeof DeployTemplateInputSchema>,
   ): Promise<Resource> {
-    const template = await this.uow.templateRepository.findById(
-      input.templateId,
-    );
-    if (!template || template.organizationId !== input.organizationId) {
-      throw new Error("Template not found");
+    let composeFile: string;
+    if (input.source === "builtin") {
+      const blueprint = this.loadNativeTemplate(input.templateId);
+      composeFile = validateTemplateComposeFile(blueprint.composeFile);
+    } else {
+      const template = await this.uow.templateRepository.findById(
+        input.templateId,
+      );
+      if (!template || template.organizationId !== input.organizationId) {
+        throw new Error("Template not found");
+      }
+      composeFile = template.composeFile;
     }
     const environment = await this.uow.environmentRepository.findById(
       input.environmentId,
@@ -248,7 +260,7 @@ export class DeployTemplateUseCase {
         credentials: JSON.stringify({
           provider: "raw",
           autoDeploy: false,
-          composeFile: template.composeFile,
+          composeFile,
         }),
       }),
     );
