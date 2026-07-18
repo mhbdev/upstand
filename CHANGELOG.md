@@ -4,6 +4,19 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.73 - 2026-07-18
+
+### Added
+
+- Expand UpGal with scoped diagnostics for projects, environments, resources, containers, previews, routing, backups, Git providers, Docker registries, organization search, Swarm, web-server logs, and update status.
+- Add a unified TokenLens-backed model catalog with remote discovery, static fallback, caching, search, and capability metadata.
+- Add optional, approval-gated MCP Apps connections for trusted HTTPS or localhost MCP servers.
+
+### Changed
+
+- Add provider model controls for temperature, reasoning, and maximum output tokens, with persisted settings and database migration support.
+- Harden UpGal streaming, chat, persistence, and MCP error handling with safe user messages, retry classification, and structured tool failures.
+
 ## 0.1.72 - 2026-07-18
 
 ### Added
