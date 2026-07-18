@@ -109,12 +109,9 @@ jobs:
         id: meta
         run: |
           TAG_NAME="${GITHUB_REF##*/}"
-          if [[ "${GITHUB_REF}" != refs/tags/* ]]; then
-            TAG_NAME="latest"
-          fi
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "repo=$REPO_LOWER" >> $GITHUB_OUTPUT
+          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          REPO_LOWER="${GITHUB_REPOSITORY,,}"
+          echo "repo=${REPO_LOWER}" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push ${{ matrix.name }}
         uses: docker/build-push-action@v7

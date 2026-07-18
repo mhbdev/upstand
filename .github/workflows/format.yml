@@ -1,4 +1,4 @@
-name: Autofix formatting
+name: autofix.ci
 
 on:
   push:
