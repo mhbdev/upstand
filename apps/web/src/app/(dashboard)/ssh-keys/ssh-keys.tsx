@@ -40,6 +40,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 type AddKeyMode = "generate" | "import";
@@ -204,7 +205,7 @@ export default function SSHKeys(_props: {
   const handleCopyPrivateKey = async () => {
     if (!revealedKey) return;
     try {
-      await navigator.clipboard.writeText(revealedKey.privateKey);
+      await copyText(revealedKey.privateKey);
       setPrivateKeyCopied(true);
       toast.success("Private key copied to clipboard");
     } catch {

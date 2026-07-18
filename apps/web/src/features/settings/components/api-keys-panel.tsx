@@ -29,6 +29,7 @@ import { Copy, ShieldCheck, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 const PRESETS: Array<{
@@ -266,8 +267,9 @@ export function ApiKeysPanel() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  void navigator.clipboard.writeText(secret);
-                  toast.success("Secret copied");
+                  void copyText(secret)
+                    .then(() => toast.success("Secret copied"))
+                    .catch(() => toast.error("Failed to copy secret"));
                 }}
                 className="w-fit"
               >

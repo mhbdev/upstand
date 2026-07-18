@@ -81,6 +81,7 @@ import {
 } from "@/components/dashboard/dashboard-page";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { authClient } from "@/lib/auth-client";
+import { downloadText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 const DEFAULT_COMPOSE = `services:
@@ -316,17 +317,11 @@ export default function TemplatesPage() {
   };
 
   const exportTemplate = (template: { name: string; composeFile: string }) => {
-    const blob = new Blob([template.composeFile], {
-      type: "application/x-yaml;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${slug(template.name) || "compose-template"}.yaml`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    downloadText(
+      template.composeFile,
+      `${slug(template.name) || "compose-template"}.yaml`,
+      "application/x-yaml;charset=utf-8",
+    );
   };
 
   const applyStarter = (starter: NonNullable<typeof starters.data>[number]) => {

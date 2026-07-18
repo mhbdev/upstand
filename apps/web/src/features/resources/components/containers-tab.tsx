@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@upstand/ui/components/dropdown-menu";
+import { Input } from "@upstand/ui/components/input";
 import {
   Select,
   SelectContent,
@@ -49,9 +50,15 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { TerminalDialogShell } from "@/components/shared/terminal-dialog-shell";
+import {
+  uploadArchive,
+  validateArchiveDestination,
+  validateArchiveFile,
+} from "@/lib/archive-upload";
 import { authClient } from "@/lib/auth-client";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
+import { parseJsonObject } from "./general-tab.helpers";
 
 type ContainerItem = {
   id: string;
@@ -77,12 +84,8 @@ function resourceIngressNetwork(resource: any): {
   scope: string;
 } {
   let isolated = false;
-  try {
-    const config = JSON.parse(resource.advancedConfig || "{}");
-    isolated = config.isolatedDeployment === true;
-  } catch {
-    // Legacy resources use the shared network by default.
-  }
+  const config = parseJsonObject(resource.advancedConfig);
+  isolated = config.isolatedDeployment === true;
 
   if (!isolated) {
     return {
@@ -120,6 +123,11 @@ export function ContainersTab({
   >(null);
   const [terminalContainer, setTerminalContainer] =
     useState<ContainerItem | null>(null);
+  const [uploadContainerTarget, setUploadContainerTarget] =
+    useState<ContainerItem | null>(null);
+  const [uploadDestination, setUploadDestination] = useState("/tmp");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const dispatchContainerCommand = (
     containerId: string,
@@ -133,43 +141,38 @@ export function ContainersTab({
     });
   };
 
-  const uploadToContainer = (container: ContainerItem) => {
-    const destination = window.prompt(
-      "Absolute destination directory inside the container",
-      "/tmp",
-    );
-    if (!destination || !organization?.id) return;
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".tar,application/x-tar";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append("file", file);
-      try {
-        const params = new URLSearchParams({
-          organizationId: organization.id,
-          destination,
-          resourceId: resource.id,
-        });
-        const response = await fetch(
-          getServerApiUrl(
-            `/api/docker/containers/${encodeURIComponent(container.id)}/upload?${params.toString()}`,
-          ),
-          { method: "POST", body: formData, credentials: "include" },
-        );
-        const result = (await response.json()) as { error?: string };
-        if (!response.ok)
-          throw new Error(result.error || "Container upload failed");
-        toast.success(`Archive uploaded to ${container.name}`);
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Container upload failed",
-        );
-      }
-    };
-    input.click();
+  const uploadToContainer = async () => {
+    if (!organization?.id || !uploadContainerTarget || !uploadFile) return;
+    const fileError = validateArchiveFile(uploadFile);
+    const destinationError = validateArchiveDestination(uploadDestination);
+    if (fileError || destinationError) {
+      toast.error(fileError || destinationError);
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const params = new URLSearchParams({
+        organizationId: organization.id,
+        destination: uploadDestination.trim(),
+        resourceId: resource.id,
+      });
+      await uploadArchive({
+        url: getServerApiUrl(
+          `/api/docker/containers/${encodeURIComponent(uploadContainerTarget.id)}/upload?${params.toString()}`,
+        ),
+        file: uploadFile,
+      });
+      toast.success(`Archive uploaded to ${uploadContainerTarget.name}`);
+      setUploadContainerTarget(null);
+      setUploadFile(null);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Container upload failed",
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const containerLogs = containerLogsData
@@ -331,7 +334,11 @@ export function ContainersTab({
                               <Terminal className="mr-2 size-4" /> Open Terminal
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => uploadToContainer(con)}
+                              onClick={() => {
+                                setUploadContainerTarget(con);
+                                setUploadDestination("/tmp");
+                                setUploadFile(null);
+                              }}
                             >
                               <Upload className="mr-2 size-4" /> Upload .tar
                               archive
@@ -351,6 +358,73 @@ export function ContainersTab({
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={uploadContainerTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !isUploading) {
+            setUploadContainerTarget(null);
+            setUploadFile(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload archive to container</DialogTitle>
+            <DialogDescription>
+              Select an uncompressed .tar archive and an absolute destination
+              directory inside the container.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <label
+                className="font-medium text-sm"
+                htmlFor="container-archive"
+              >
+                Archive
+              </label>
+              <Input
+                id="container-archive"
+                type="file"
+                accept=".tar,application/x-tar"
+                onChange={(event) =>
+                  setUploadFile(event.currentTarget.files?.[0] ?? null)
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <label
+                className="font-medium text-sm"
+                htmlFor="container-destination"
+              >
+                Destination directory
+              </label>
+              <Input
+                id="container-destination"
+                value={uploadDestination}
+                onChange={(event) => setUploadDestination(event.target.value)}
+                placeholder="/tmp"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setUploadContainerTarget(null)}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void uploadToContainer()}
+              disabled={!uploadFile || isUploading}
+            >
+              {isUploading ? "Uploading…" : "Upload archive"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Container detail dialogs */}
       <Dialog

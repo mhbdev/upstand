@@ -54,6 +54,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 export default function DeploymentsPage() {
@@ -584,8 +585,9 @@ export default function DeploymentsPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  navigator.clipboard.writeText(selectedDeployment?.logs || "");
-                  toast.success("Logs copied to clipboard");
+                  void copyText(selectedDeployment?.logs || "")
+                    .then(() => toast.success("Logs copied to clipboard"))
+                    .catch(() => toast.error("Failed to copy logs"));
                 }}
                 className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
               >

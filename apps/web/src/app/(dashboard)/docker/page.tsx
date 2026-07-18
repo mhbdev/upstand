@@ -57,7 +57,13 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { DockerContainerTerminalDialog } from "@/components/docker-container-terminal-dialog";
+import {
+  uploadArchive,
+  validateArchiveDestination,
+  validateArchiveFile,
+} from "@/lib/archive-upload";
 import { authClient } from "@/lib/auth-client";
+import { copyText } from "@/lib/browser";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
@@ -82,7 +88,10 @@ function formatBytes(bytes: number, decimals = 2) {
 }
 
 function stripAnsi(str: string) {
-  return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+  const ansiEscapeSequence =
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape parser intentionally matches control characters.
+    /[\x1b\x9b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+  return str.replace(ansiEscapeSequence, "");
 }
 
 export default function DockerInventoryPage() {
@@ -205,22 +214,25 @@ export default function DockerInventoryPage() {
 
   const uploadVolume = async (volumeName: string, file: File) => {
     if (!organizationId) return;
-    const formData = new FormData();
-    formData.append("file", file);
+    const destination = volumeDestination || "/";
+    const destinationError = validateArchiveDestination(destination);
+    const fileError = validateArchiveFile(file);
+    if (destinationError || fileError) {
+      toast.error(destinationError || fileError);
+      return;
+    }
     try {
       const params = new URLSearchParams({
         organizationId,
-        destination: volumeDestination || "/",
+        destination,
       });
       if (serverId !== "local") params.set("serverId", serverId);
-      const response = await fetch(
-        getServerApiUrl(
+      await uploadArchive({
+        url: getServerApiUrl(
           `/api/docker/volumes/${encodeURIComponent(volumeName)}/upload?${params.toString()}`,
         ),
-        { method: "POST", body: formData, credentials: "include" },
-      );
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "Volume upload failed");
+        file,
+      });
       toast.success(`Archive uploaded to ${volumeName}`);
       void inventoryQuery.refetch();
     } catch (error) {
@@ -232,31 +244,25 @@ export default function DockerInventoryPage() {
 
   const uploadContainer = async (cId: string, file: File) => {
     if (!organizationId) return;
-    if (!file.name.toLowerCase().endsWith(".tar")) {
-      toast.error("Only uncompressed .tar archives are supported");
+    const destination = containerDestination || "/tmp";
+    const destinationError = validateArchiveDestination(destination);
+    const fileError = validateArchiveFile(file);
+    if (destinationError || fileError) {
+      toast.error(destinationError || fileError);
       return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("Container archives must not exceed 50 MB");
-      return;
-    }
-    const formData = new FormData();
-    formData.append("file", file);
     try {
       const params = new URLSearchParams({
         organizationId,
-        destination: containerDestination || "/tmp",
+        destination,
       });
       if (serverId !== "local") params.set("serverId", serverId);
-      const response = await fetch(
-        getServerApiUrl(
+      await uploadArchive({
+        url: getServerApiUrl(
           `/api/docker/containers/${encodeURIComponent(cId)}/upload?${params.toString()}`,
         ),
-        { method: "POST", body: formData, credentials: "include" },
-      );
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok)
-        throw new Error(result.error || "Container upload failed");
+        file,
+      });
       toast.success("Archive uploaded to container");
       void inventoryQuery.refetch();
     } catch (error) {
@@ -1183,8 +1189,11 @@ export default function DockerInventoryPage() {
                               ? inventoryQuery.data
                               : "";
                           if (logsText) {
-                            navigator.clipboard.writeText(logsText);
-                            toast.success("Logs copied to clipboard");
+                            void copyText(logsText)
+                              .then(() =>
+                                toast.success("Logs copied to clipboard"),
+                              )
+                              .catch(() => toast.error("Failed to copy logs"));
                           } else {
                             toast.error("No logs to copy");
                           }
