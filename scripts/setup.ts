@@ -29,7 +29,7 @@ function run(command: string, args: string[], env = process.env): void {
   }
 
   if (!result.success) {
-    fail(`'${command} ${args.join(" ")}' exited with code ${result.exitCode}.`);
+    fail(`'${command}' exited with code ${result.exitCode}.`);
   }
 }
 
