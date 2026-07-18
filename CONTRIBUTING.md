@@ -38,6 +38,111 @@ Use throwaway local credentials. Do not commit `.env` files, private keys, produ
 - Preserve rollback behavior and existing database data. Add a migration for schema changes; never edit an applied migration.
 - Add or update tests for changed behavior, especially deployment, update, Caddy, notification, and authorization flows.
 
+## Git Flow for contributors and maintainers
+
+Upstand uses Git Flow with `canary` as the integration branch and `master` as the release-ready branch. Do not commit directly to either branch. Contributors should start work from the latest `canary`, publish a feature or bug-fix branch, and open a pull request back to `canary`.
+
+### Install and initialize Git Flow
+
+Install the `git-flow` CLI using your operating system's package manager, then initialize it once in the repository:
+
+```bash
+git flow init
+```
+
+Use these values when prompted:
+
+```text
+Production releases: master
+Development branch: canary
+Feature branches: feature/
+Release branches: release/
+Hotfix branches: hotfix/
+Version tag prefix: v
+```
+
+If Git Flow has already been initialized with the wrong development branch, rerun `git flow init` and select `canary`. Verify the configuration with `git config --get-regexp '^gitflow\.'`.
+
+Before starting work, synchronize both the remote references and your local integration branch:
+
+```bash
+git fetch origin --prune
+git switch canary
+git pull --ff-only origin canary
+```
+
+### Contributors: features and fixes
+
+Use a feature branch for a feature, refactor, documentation change, or ordinary bug fix. Start it from `canary`:
+
+```bash
+git flow feature start short-description
+# edit files, then run the relevant checks
+git add <files>
+git commit -m "feat: describe the change"
+git flow feature publish short-description
+```
+
+`git flow feature publish` pushes `feature/short-description` to the remote so it can be reviewed. Open the pull request against `canary`, keep committing to the same branch while review is in progress, and do not run `git flow feature finish` before the pull request is merged. After the pull request is merged, remove the local branch if it is no longer needed:
+
+```bash
+git fetch origin --prune
+git switch canary
+git pull --ff-only origin canary
+git branch -d feature/short-description
+```
+
+Use `git flow feature pull origin short-description` when you need to check out or update another contributor's published feature branch locally. Use `git flow feature track short-description` when the branch already exists remotely but is not present locally.
+
+### Maintainers: releases
+
+When `canary` contains the changes planned for a release and CI is green, create a release branch from it. Use the release branch only for versioning, changelog updates, release notes, and final release fixes:
+
+```bash
+git switch canary
+git pull --ff-only origin canary
+git flow release start 0.1.74
+git flow release publish 0.1.74
+```
+
+Open a pull request from `release/0.1.74` to `master` if the repository's normal review process requires one, but do not merge that pull request in the hosting service. After approval and final verification, finish the release from the release branch. This performs the merges into `master` and `canary`, creates the `v0.1.74` tag, and removes the local release branch:
+
+```bash
+git switch release/0.1.74
+git flow release finish 0.1.74
+git push origin master canary --follow-tags
+```
+
+Replace `0.1.74` with the next version from the release plan. Check `CHANGELOG.md`, the updates documentation, migrations, image publication, and the rollback path before pushing the release.
+
+### Maintainers: urgent production fixes
+
+Use a hotfix branch when a fix must be released from `master` before the next planned release. Start it from the current production branch:
+
+```bash
+git switch master
+git pull --ff-only origin master
+git flow hotfix start 0.1.75
+# make and test the minimal production fix
+git flow hotfix finish 0.1.75
+git push origin master canary --follow-tags
+```
+
+Finishing a hotfix merges it into both `master` and `canary`, creates the `v0.1.75` tag, and removes the local hotfix branch. Resolve any conflicts carefully so the fix is not lost from either branch. Use a normal feature branch for non-urgent work; do not use a hotfix branch simply because a change is small.
+
+### Command reference
+
+| Situation | Command | Branch/result |
+| --- | --- | --- |
+| Start normal work | `git flow feature start <name>` | Creates `feature/<name>` from `canary` |
+| Publish work for review | `git flow feature publish <name>` | Pushes the feature branch |
+| Start a planned release | `git flow release start <version>` | Creates `release/<version>` from `canary` |
+| Start an urgent fix | `git flow hotfix start <version>` | Creates `hotfix/<version>` from `master` |
+| Complete a release | `git flow release finish <version>` | Merges to `master` and `canary`, tags `v<version>` |
+| Complete a hotfix | `git flow hotfix finish <version>` | Merges to `master` and `canary`, tags `v<version>` |
+
+Use `git flow <type> list` to inspect local branches and `git flow <type> delete <name>` only after the corresponding pull request or release has been completed and the remote branch is no longer needed.
+
 ## Required checks
 
 Run the relevant focused checks while iterating, then all checks before requesting review:
