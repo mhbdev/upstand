@@ -5,7 +5,7 @@ import {
 } from "@upstand/domain";
 import { z } from "zod";
 import { QueueDeploymentUseCase } from "../deployment/queue-deployment.usecase";
-import type { DockerService } from "./docker-client";
+import type { DockerResourceControlService as DockerService } from "./docker-client";
 import { resolveDockerServiceForServer } from "./docker-client";
 
 export const ControlResourceInputSchema = z.object({

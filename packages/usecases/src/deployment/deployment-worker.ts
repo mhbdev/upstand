@@ -8,7 +8,7 @@ import { log } from "evlog";
 import { getInstallationToken } from "../git-provider/github-client";
 import type { NotificationPublisher } from "../notification/publish-notification.usecase";
 import { getDatabaseEnvironment } from "../resource/database-environment";
-import type { DockerService } from "../resource/docker-client";
+import type { DockerDeploymentService as DockerService } from "../resource/docker-client";
 import { createRemoteServices } from "../resource/docker-client";
 import { parseResourceCredentials } from "../resource/resource-credentials";
 import { parseResourceEnvironmentVariables } from "../resource/resource-environment";

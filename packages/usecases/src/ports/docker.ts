@@ -112,6 +112,42 @@ export interface DockerServicePort {
   ): Promise<string>;
 }
 
+/** Capabilities consumed by individual application workflows. */
+export type DockerDeploymentPort = Pick<
+  DockerServicePort,
+  | "sanitizeName"
+  | "setCancellationKey"
+  | "deployDatabase"
+  | "deployAppImage"
+  | "deployAppGit"
+  | "readComposeFileFromGit"
+  | "deployComposeStack"
+>;
+export type DockerResourceReadPort = Pick<
+  DockerServicePort,
+  "getContainers" | "getRoutingServices" | "getLogs" | "getContainerStats"
+>;
+export type DockerResourceControlPort = Pick<
+  DockerServicePort,
+  "controlService" | "rollbackService" | "removeResource" | "removeDatabase"
+>;
+export type DockerDatabaseDeploymentPort = Pick<
+  DockerServicePort,
+  "removeDatabase" | "deployDatabase"
+>;
+export type DockerContainerControlPort = Pick<
+  DockerServicePort,
+  "controlContainer"
+>;
+export type DockerCommandPort = Pick<
+  DockerServicePort,
+  "runCommandInResourceContainer"
+>;
+export type DockerServerStatsPort = Pick<
+  DockerServicePort,
+  "getServerRuntimeStats"
+>;
+
 export type DockerInspectionTarget =
   | { kind: "local"; name: string }
   | {
