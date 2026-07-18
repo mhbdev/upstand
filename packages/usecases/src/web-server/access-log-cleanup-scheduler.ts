@@ -1,18 +1,14 @@
-import type { IUnitOfWork } from "@upstand/domain";
 import { Cron } from "croner";
 import { log } from "evlog";
-import { CaddyServiceToken, UnitOfWorkToken } from "../tokens";
 
 interface ScheduledCleanup {
   cron: Cron;
   signature: string;
 }
 
-interface ScopedServiceProvider {
-  createScope(): {
-    resolve<T>(token: unknown): T;
-    dispose(): Promise<void>;
-  };
+export interface AccessLogCleanupSchedule {
+  enabled: boolean;
+  cronExpression: string;
 }
 
 export class AccessLogCleanupScheduler {
@@ -21,7 +17,8 @@ export class AccessLogCleanupScheduler {
   private refreshInFlight: Promise<void> | null = null;
 
   constructor(
-    private readonly getServiceProvider: () => ScopedServiceProvider,
+    private readonly getSchedule: () => Promise<AccessLogCleanupSchedule>,
+    private readonly cleanupAccessLogs: () => Promise<void>,
   ) {}
 
   async start(): Promise<void> {
@@ -59,17 +56,7 @@ export class AccessLogCleanupScheduler {
   }
 
   private async performRefresh(): Promise<void> {
-    const scope = this.getServiceProvider().createScope();
-    let enabled = false;
-    let cronExpression = "0 3 * * *";
-    try {
-      const uow = scope.resolve<IUnitOfWork>(UnitOfWorkToken);
-      const settings = await uow.webServerSettingsRepository.findGlobal();
-      enabled = settings?.accessLogsEnabled ?? false;
-      cronExpression = settings?.accessLogCleanupCron ?? cronExpression;
-    } finally {
-      await scope.dispose();
-    }
+    const { enabled, cronExpression } = await this.getSchedule();
 
     const signature = enabled ? cronExpression : "disabled";
     if (this.job?.signature === signature) return;
@@ -94,22 +81,16 @@ export class AccessLogCleanupScheduler {
   }
 
   private async runCleanup(): Promise<void> {
-    const scope = this.getServiceProvider().createScope();
     try {
-      const uow = scope.resolve<IUnitOfWork>(UnitOfWorkToken);
-      const settings = await uow.webServerSettingsRepository.findGlobal();
-      if (!settings?.accessLogsEnabled) return;
-      await scope
-        .resolve<{ cleanupAccessLogs(): Promise<void> }>(CaddyServiceToken)
-        .cleanupAccessLogs();
+      const { enabled } = await this.getSchedule();
+      if (!enabled) return;
+      await this.cleanupAccessLogs();
       log.info({ message: "Caddy access-log cleanup completed" });
     } catch (error) {
       log.error({
         message: "Caddy access-log cleanup failed",
         err: error instanceof Error ? error.message : String(error),
       });
-    } finally {
-      await scope.dispose();
     }
   }
 }

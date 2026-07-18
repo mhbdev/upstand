@@ -61,6 +61,7 @@ import {
 } from "@upstand/usecases";
 import {
   BackupSchedulerToken,
+  CaddyServiceToken,
   CreateGitProviderUseCaseToken,
   DeliverNotificationUseCaseToken,
   GeneralSchedulerToken,
@@ -152,8 +153,29 @@ const backupWorker = new BackupRunWorker(
 );
 const backupScheduler = getServiceProvider().resolve(BackupSchedulerToken);
 const generalScheduler = getServiceProvider().resolve(GeneralSchedulerToken);
-const accessLogCleanupScheduler = new AccessLogCleanupScheduler(() =>
-  getServiceProvider(),
+const accessLogCleanupScheduler = new AccessLogCleanupScheduler(
+  async () => {
+    const scope = getServiceProvider().createScope();
+    try {
+      const settings = await scope
+        .resolve(UnitOfWorkToken)
+        .webServerSettingsRepository.findGlobal();
+      return {
+        enabled: settings?.accessLogsEnabled ?? false,
+        cronExpression: settings?.accessLogCleanupCron ?? "0 3 * * *",
+      };
+    } finally {
+      await scope.dispose();
+    }
+  },
+  async () => {
+    const scope = getServiceProvider().createScope();
+    try {
+      await scope.resolve(CaddyServiceToken).cleanupAccessLogs();
+    } finally {
+      await scope.dispose();
+    }
+  },
 );
 const scheduledDockerCleanup = new ScheduledDockerCleanup();
 const autoUpdateRuntime = new AutoUpdateRuntime();
