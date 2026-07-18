@@ -181,9 +181,16 @@ jobs:
           RELEASE_VERSION: ${{ github.ref_name }}
           MANIFEST_FILE: ${{ runner.temp }}/upstand-release-manifest.json
         run: |
-          gh release create "$RELEASE_VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --title "Upstand $RELEASE_VERSION" \
-            --generate-notes \
-            "$MANIFEST_FILE#upstand-release-manifest.json"
+          if gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber \
+              "$MANIFEST_FILE#upstand-release-manifest.json"
+          else
+            gh release create "$RELEASE_VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "Upstand $RELEASE_VERSION" \
+              --generate-notes \
+              "$MANIFEST_FILE#upstand-release-manifest.json"
+          fi
