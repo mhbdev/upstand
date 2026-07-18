@@ -1,4 +1,4 @@
-import { serviceProvider } from "@upstand/api/di";
+import { getServiceProvider } from "@upstand/api/di";
 import {
   GetUpdateStatusUseCaseToken,
   TriggerUpdateUseCaseToken,
@@ -30,7 +30,7 @@ export class AutoUpdateRuntime {
     if (this.inFlight || process.env.UPSTAND_SERVER_IMAGE?.includes(":source-"))
       return;
     this.inFlight = true;
-    const scope = serviceProvider.createScope();
+    const scope = getServiceProvider().createScope();
     try {
       const status = await scope.resolve(GetUpdateStatusUseCaseToken).execute();
       if (

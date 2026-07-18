@@ -1,4 +1,4 @@
-import { serviceProvider } from "@upstand/api/di";
+import { getServiceProvider } from "@upstand/api/di";
 import { BullMqOutboxJobPublisher } from "@upstand/infrastructure";
 import { OutboxPublisher } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
@@ -45,7 +45,7 @@ export class OutboxRuntime {
     if (this.publishInFlight) return this.publishInFlight;
 
     this.publishInFlight = (async () => {
-      const scope = serviceProvider.createScope();
+      const scope = getServiceProvider().createScope();
       try {
         const publisher = new OutboxPublisher(
           scope.resolve(UnitOfWorkToken),
@@ -79,7 +79,7 @@ export class OutboxRuntime {
   }
 
   private async prunePublished(): Promise<void> {
-    const scope = serviceProvider.createScope();
+    const scope = getServiceProvider().createScope();
     try {
       const uow = scope.resolve(UnitOfWorkToken);
       const deleted = await uow.outboxRepository.prunePublished(

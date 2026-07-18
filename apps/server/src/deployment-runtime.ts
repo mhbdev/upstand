@@ -1,4 +1,4 @@
-import { serviceProvider } from "@upstand/api/di";
+import { getServiceProvider } from "@upstand/api/di";
 import { getDockerInstance } from "@upstand/infrastructure";
 import { DeploymentWorker } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
@@ -41,7 +41,9 @@ export class DeploymentRuntime {
       const serverIds = await this.discoverServerIds();
       for (const serverId of serverIds) {
         if (this.workers.has(serverId)) continue;
-        const worker = new DeploymentWorker(serverId, () => serviceProvider);
+        const worker = new DeploymentWorker(serverId, () =>
+          getServiceProvider(),
+        );
         await worker.start();
         this.workers.set(serverId, worker);
         log.info({
@@ -72,7 +74,7 @@ export class DeploymentRuntime {
     if (process.env.SERVER_ID) return [process.env.SERVER_ID];
 
     const serverIds = new Set<string>();
-    const scope = serviceProvider.createScope();
+    const scope = getServiceProvider().createScope();
     try {
       const uow = scope.resolve(UnitOfWorkToken);
       const servers = await uow.serverRepository.findMany();

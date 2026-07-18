@@ -1,0 +1,482 @@
+import * as dependencies from "./dependencies";
+
+type ServiceCollection = InstanceType<typeof dependencies.ServiceCollection>;
+
+export function registerApplicationFeatures(services: ServiceCollection) {
+  // 4. Use Cases (transient)
+  services.addTransient(
+    dependencies.CreateProjectUseCaseToken,
+    (c) =>
+      new dependencies.CreateProjectUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetProjectsUseCaseToken,
+    (c) =>
+      new dependencies.GetProjectsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetProjectUseCaseToken,
+    (c) =>
+      new dependencies.GetProjectUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteProjectUseCaseToken,
+    (c) =>
+      new dependencies.DeleteProjectUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DuplicateProjectUseCaseToken,
+    (c) =>
+      new dependencies.DuplicateProjectUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListTagsUseCaseToken,
+    (c) =>
+      new dependencies.ListTagsUseCase(c.resolve(dependencies.UnitOfWorkToken)),
+  );
+  services.addTransient(
+    dependencies.CreateTagUseCaseToken,
+    (c) =>
+      new dependencies.CreateTagUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateTagUseCaseToken,
+    (c) =>
+      new dependencies.UpdateTagUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteTagUseCaseToken,
+    (c) =>
+      new dependencies.DeleteTagUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListResourceTagsUseCaseToken,
+    (c) =>
+      new dependencies.ListResourceTagsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.AssignResourceTagUseCaseToken,
+    (c) =>
+      new dependencies.AssignResourceTagUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RemoveResourceTagUseCaseToken,
+    (c) =>
+      new dependencies.RemoveResourceTagUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListTemplatesUseCaseToken,
+    (c) =>
+      new dependencies.ListTemplatesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.CreateTemplateUseCaseToken,
+    (c) =>
+      new dependencies.CreateTemplateUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateTemplateUseCaseToken,
+    (c) =>
+      new dependencies.UpdateTemplateUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteTemplateUseCaseToken,
+    (c) =>
+      new dependencies.DeleteTemplateUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeployTemplateUseCaseToken,
+    (c) =>
+      new dependencies.DeployTemplateUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.CreateResourceUseCaseToken),
+        c.resolve(dependencies.DeployResourceUseCaseToken),
+      ),
+  );
+
+  services.addTransient(
+    dependencies.CreateEnvironmentUseCaseToken,
+    (c) =>
+      new dependencies.CreateEnvironmentUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetEnvironmentsUseCaseToken,
+    (c) =>
+      new dependencies.GetEnvironmentsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetEnvironmentUseCaseToken,
+    (c) =>
+      new dependencies.GetEnvironmentUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteEnvironmentUseCaseToken,
+    (c) =>
+      new dependencies.DeleteEnvironmentUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+
+  services.addTransient(
+    dependencies.CreateResourceUseCaseToken,
+    (c) =>
+      new dependencies.CreateResourceUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetResourcesUseCaseToken,
+    (c) =>
+      new dependencies.GetResourcesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetResourceUseCaseToken,
+    (c) =>
+      new dependencies.GetResourceUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateResourceUseCaseToken,
+    (c) =>
+      new dependencies.UpdateResourceUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.CaddyServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RotateResourceWebhookTokenUseCaseToken,
+    (c) =>
+      new dependencies.RotateResourceWebhookTokenUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteResourceUseCaseToken,
+    (c) =>
+      new dependencies.DeleteResourceUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.CaddyServiceToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RollbackResourceUseCaseToken,
+    (c) =>
+      new dependencies.RollbackResourceUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RebuildDatabaseUseCaseToken,
+    (c) =>
+      new dependencies.RebuildDatabaseUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DatabaseCommandUseCaseToken,
+    (c) =>
+      new dependencies.DatabaseCommandUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RandomizeComposeUseCaseToken,
+    (c) =>
+      new dependencies.RandomizeComposeUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.InspectComposeUseCaseToken,
+    () => new dependencies.InspectComposeUseCase(),
+  );
+  services.addTransient(
+    dependencies.ValidateDomainUseCaseToken,
+    () => new dependencies.ValidateDomainUseCase(),
+  );
+  services.addTransient(
+    dependencies.DeployResourceUseCaseToken,
+    (c) =>
+      new dependencies.DeployResourceUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ControlResourceUseCaseToken,
+    (c) =>
+      new dependencies.ControlResourceUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ControlContainerUseCaseToken,
+    (c) =>
+      new dependencies.ControlContainerUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetResourceContainersUseCaseToken,
+    (c) =>
+      new dependencies.GetResourceContainersUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetResourceLogsUseCaseToken,
+    (c) =>
+      new dependencies.GetResourceLogsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetResourcePreviewsUseCaseToken,
+    (c) =>
+      new dependencies.GetResourcePreviewsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetResourceRoutingTargetsUseCaseToken,
+    (c) =>
+      new dependencies.GetResourceRoutingTargetsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetResourceStatsUseCaseToken,
+    (c) =>
+      new dependencies.GetResourceStatsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetServerRuntimeStatsUseCaseToken,
+    (c) =>
+      new dependencies.GetServerRuntimeStatsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetAccountStatusUseCaseToken,
+    (c) =>
+      new dependencies.GetAccountStatusUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetDockerInventoryUseCaseToken,
+    (c) =>
+      new dependencies.GetDockerInventoryUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerReadOnlyServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.PruneDockerResourcesUseCaseToken,
+    (c) =>
+      new dependencies.PruneDockerResourcesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerReadOnlyServiceToken),
+      ),
+  );
+
+  services.addTransient(
+    dependencies.CreateSshKeyUseCaseToken,
+    (c) =>
+      new dependencies.CreateSshKeyUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetSshKeysUseCaseToken,
+    (c) =>
+      new dependencies.GetSshKeysUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GenerateSshKeyUseCaseToken,
+    (c) =>
+      new dependencies.GenerateSshKeyUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteSshKeyUseCaseToken,
+    (c) =>
+      new dependencies.DeleteSshKeyUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateSshKeyUseCaseToken,
+    (c) =>
+      new dependencies.UpdateSshKeyUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+
+  services.addTransient(
+    dependencies.CreateGitProviderUseCaseToken,
+    (c) =>
+      new dependencies.CreateGitProviderUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetGitProvidersUseCaseToken,
+    (c) =>
+      new dependencies.GetGitProvidersUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteGitProviderUseCaseToken,
+    (c) =>
+      new dependencies.DeleteGitProviderUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateGitProviderUseCaseToken,
+    (c) =>
+      new dependencies.UpdateGitProviderUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListGitRepositoriesUseCaseToken,
+    (c) =>
+      new dependencies.ListGitRepositoriesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListGitBranchesUseCaseToken,
+    (c) =>
+      new dependencies.ListGitBranchesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+
+  services.addTransient(
+    dependencies.CreateCertificateUseCaseToken,
+    (c) =>
+      new dependencies.CreateCertificateUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListCertificatesUseCaseToken,
+    (c) =>
+      new dependencies.ListCertificatesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateCertificateUseCaseToken,
+    (c) =>
+      new dependencies.UpdateCertificateUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteCertificateUseCaseToken,
+    (c) =>
+      new dependencies.DeleteCertificateUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+
+  services.addTransient(
+    dependencies.CreateS3DestinationUseCaseToken,
+    (c) =>
+      new dependencies.CreateS3DestinationUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetS3DestinationsUseCaseToken,
+    (c) =>
+      new dependencies.GetS3DestinationsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateS3DestinationUseCaseToken,
+    (c) =>
+      new dependencies.UpdateS3DestinationUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteS3DestinationUseCaseToken,
+    (c) =>
+      new dependencies.DeleteS3DestinationUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.TestS3DestinationConnectionUseCaseToken,
+    () => new dependencies.TestS3DestinationConnectionUseCase(),
+  );
+  services.addTransient(
+    dependencies.ListComposeServicesUseCaseToken,
+    (c) =>
+      new dependencies.ListComposeServicesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.InspectComposeUseCaseToken),
+      ),
+  );
+}
