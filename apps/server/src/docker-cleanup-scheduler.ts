@@ -1,4 +1,4 @@
-import { serviceProvider } from "@upstand/api/di";
+import { getServiceProvider } from "@upstand/api/di";
 import { DockerCleanupService } from "@upstand/infrastructure";
 import { resolveDockerCliEnvironmentForServer } from "@upstand/usecases";
 import {
@@ -32,7 +32,7 @@ export class ScheduledDockerCleanup {
     if (now.getHours() !== 3 || this.lastRunDate === date) return;
     this.lastRunDate = date;
 
-    const scope = serviceProvider.createScope();
+    const scope = getServiceProvider().createScope();
     try {
       const uow = scope.resolve(UnitOfWorkToken);
       const settings = await uow.webServerSettingsRepository.findGlobal();

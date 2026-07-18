@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { serviceProvider } from "@upstand/api/di";
+import { getServiceProvider } from "@upstand/api/di";
 import { getDockerInstance } from "@upstand/infrastructure";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
@@ -13,7 +13,7 @@ const MONITORING_IMAGE_ENV = "UPSTAND_MONITORING_IMAGE";
 export async function initializeMonitoring(): Promise<void> {
   try {
     const docker = getDockerInstance();
-    const scope = serviceProvider.createScope();
+    const scope = getServiceProvider().createScope();
     let token = "";
     let cpuThreshold = 90;
     let memoryThreshold = 90;
