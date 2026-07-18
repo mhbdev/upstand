@@ -47,7 +47,8 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
+import type { authClient } from "@/lib/auth-client";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
@@ -60,7 +61,7 @@ export default function GitProviders({
 }: {
   session: typeof authClient.$Infer.Session;
 }) {
-  const { data: activeOrg } = authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
   const [addProviderOpen, setAddProviderOpen] = useState(false);
   const [providerType, setProviderType] = useState<ProviderType>("github");
 
@@ -96,7 +97,7 @@ export default function GitProviders({
     name: string;
   } | null>(null);
 
-  const orgId = activeOrg?.id;
+  const orgId = organizationState.organizationId as string;
 
   const oauthStateMutation = useMutation({
     ...trpc.gitProvider.createOAuthState.mutationOptions(),
@@ -113,8 +114,8 @@ export default function GitProviders({
     isLoading: loadingProviders,
     refetch,
   } = useQuery({
-    ...trpc.gitProvider.list.queryOptions({ organizationId: orgId || "" }),
-    enabled: !!orgId,
+    ...trpc.gitProvider.list.queryOptions({ organizationId: orgId }),
+    enabled: organizationState.status === "ready",
   });
 
   const createMutation = useMutation({
@@ -131,7 +132,7 @@ export default function GitProviders({
         newProvider.provider === "gitea"
       ) {
         oauthStateMutation.mutate(
-          { organizationId: orgId || "", providerId: newProvider.id },
+          { organizationId: orgId, providerId: newProvider.id },
           {
             onSuccess: ({ state }) => {
               const authorizeUrl = getOAuthAuthorizeUrl(

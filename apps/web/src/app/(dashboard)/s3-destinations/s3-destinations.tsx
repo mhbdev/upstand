@@ -42,7 +42,8 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
+import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
 export const S3_PROVIDERS: Array<{
@@ -89,7 +90,7 @@ export const S3_PROVIDERS: Array<{
 export default function S3Destinations(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
-  const { data: activeOrg } = authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
@@ -108,15 +109,15 @@ export default function S3Destinations(_props: {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteName, setDeleteName] = useState("");
 
-  const orgId = activeOrg?.id;
+  const orgId = organizationState.organizationId as string;
 
   const {
     data: destinations,
     isLoading: loadingDestinations,
     refetch,
   } = useQuery({
-    ...trpc.s3Destination.list.queryOptions({ organizationId: orgId || "" }),
-    enabled: !!orgId,
+    ...trpc.s3Destination.list.queryOptions({ organizationId: orgId }),
+    enabled: organizationState.status === "ready",
   });
 
   const createMutation = useMutation({

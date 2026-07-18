@@ -30,7 +30,8 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
+import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
 const createProjectTarget = getUpGalTargetDefinition("create-project");
@@ -450,7 +451,7 @@ function DeleteProjectDialog({
 export default function Projects(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
-  const { data: activeOrg } = authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
@@ -461,7 +462,7 @@ export default function Projects(_props: {
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const organizationId = activeOrg?.id ?? "";
+  const organizationId = organizationState.organizationId as string;
 
   const {
     data: projects,
@@ -469,7 +470,7 @@ export default function Projects(_props: {
     refetch,
   } = useQuery({
     ...trpc.project.list.queryOptions({ organizationId }),
-    enabled: !!organizationId,
+    enabled: organizationState.status === "ready",
   });
 
   const filteredProjects =
@@ -489,7 +490,7 @@ export default function Projects(_props: {
           <>
             Manage your apps, databases, and environments under{" "}
             <span className="font-semibold text-foreground">
-              {activeOrg?.name || "your organization"}
+              {organizationState.organization?.name || "your organization"}
             </span>
             .
           </>

@@ -27,20 +27,20 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { Copy, KeyRound, RotateCw, Trash2 } from "@/components/huge-icons";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 export default function ScimSettingsPage() {
-  const { data: organization } = authClient.useActiveOrganization();
-  const organizationId = organization?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [providerId, setProviderId] = useState("identity-provider");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<string | null>(null);
   const providersQuery = useQuery({
     ...trpc.scim.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const create = useMutation({
     ...trpc.scim.create.mutationOptions(),

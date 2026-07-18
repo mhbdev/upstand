@@ -35,28 +35,28 @@ export function useResourceDetail({
 
   const sshKeysQuery = useQuery({
     ...trpc.sshKey.list.queryOptions({
-      organizationId: projectQuery.data?.organizationId || "",
+      organizationId: projectQuery.data?.organizationId as string,
     }),
     enabled: !!projectQuery.data?.organizationId,
   });
 
   const serversQuery = useQuery({
     ...trpc.server.list.queryOptions({
-      organizationId: projectQuery.data?.organizationId || "",
+      organizationId: projectQuery.data?.organizationId as string,
     }),
     enabled: !!projectQuery.data?.organizationId,
   });
 
   const gitProvidersQuery = useQuery({
     ...trpc.gitProvider.list.queryOptions({
-      organizationId: projectQuery.data?.organizationId || "",
+      organizationId: projectQuery.data?.organizationId as string,
     }),
     enabled: !!projectQuery.data?.organizationId,
   });
 
   const certificatesQuery = useQuery({
     ...trpc.certificate.list.queryOptions({
-      organizationId: projectQuery.data?.organizationId || "",
+      organizationId: projectQuery.data?.organizationId as string,
     }),
     enabled: !!projectQuery.data?.organizationId,
   });

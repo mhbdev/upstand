@@ -25,7 +25,7 @@ import {
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 const QUICK_NAVIGATION = [
@@ -75,7 +75,7 @@ const RESULT_LABELS = {
 
 export function GlobalSearch() {
   const router = useRouter();
-  const { data: organization } = authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
@@ -105,11 +105,11 @@ export function GlobalSearch() {
 
   const results = useQuery({
     ...trpc.search.global.queryOptions({
-      organizationId: organization?.id ?? "",
+      organizationId: organizationState.organizationId as string,
       query: query || "_",
       limit: 30,
     }),
-    enabled: open && Boolean(organization?.id) && query.length > 1,
+    enabled: open && organizationState.status === "ready" && query.length > 1,
   });
 
   const groupedResults = (results.data ?? []).reduce<

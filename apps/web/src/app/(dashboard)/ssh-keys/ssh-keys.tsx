@@ -42,7 +42,8 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
+import type { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
@@ -77,7 +78,7 @@ interface RevealedKey {
 export default function SSHKeys(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
-  const { data: activeOrg } = authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
   const [addKeyOpen, setAddKeyOpen] = useState(false);
   const [addKeyMode, setAddKeyMode] = useState<AddKeyMode>("generate");
   const [deleteKeyOpen, setDeleteKeyOpen] = useState(false);
@@ -103,7 +104,7 @@ export default function SSHKeys(_props: {
   const [rotationPrivateKey, setRotationPrivateKey] = useState("");
   const [rotationPublicKey, setRotationPublicKey] = useState("");
 
-  const orgId = activeOrg?.id;
+  const orgId = organizationState.organizationId as string;
 
   const resetForm = () => {
     setName("");
@@ -126,8 +127,8 @@ export default function SSHKeys(_props: {
     isLoading: loadingKeys,
     refetch,
   } = useQuery({
-    ...trpc.sshKey.list.queryOptions({ organizationId: orgId || "" }),
-    enabled: !!orgId,
+    ...trpc.sshKey.list.queryOptions({ organizationId: orgId }),
+    enabled: organizationState.status === "ready",
   });
 
   // Generate SSH Key mutation (server generates a real ED25519 key pair)

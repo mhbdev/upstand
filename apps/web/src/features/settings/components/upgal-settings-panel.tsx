@@ -17,7 +17,7 @@ import {
 } from "@/components/dashboard/dashboard-page";
 import { Bot, Loader2, Plus, ShieldCheck } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 import { AddProviderDialog } from "./add-provider-dialog";
 import { EditProviderDialog } from "./edit-provider-dialog";
@@ -33,12 +33,12 @@ const addProviderTarget = getUpGalTargetDefinition("upgal-add-provider");
 export function UpGalSettingsPanel({
   embedded = false,
 }: UpGalSettingsPanelProps) {
-  const { data: activeOrg } = authClient.useActiveOrganization();
-  const organizationId = activeOrg?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
 
   const providersQuery = useQuery({
     ...trpc.ai.listProviders.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
 
   const [addOpen, setAddOpen] = useState(false);

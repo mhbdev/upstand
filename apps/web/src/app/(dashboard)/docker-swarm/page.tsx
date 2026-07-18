@@ -81,7 +81,7 @@ import {
   TriangleAlert,
   UserRound,
 } from "@/components/huge-icons";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
@@ -161,8 +161,8 @@ function actionCopy(action: PendingAction): {
 }
 
 export default function DockerSwarmPage() {
-  const { data: activeOrganization } = authClient.useActiveOrganization();
-  const organizationId = activeOrganization?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [advertiseAddr, setAdvertiseAddr] = useState("");
   const [dataPathAddr, setDataPathAddr] = useState("");
   const [defaultAddrPools, setDefaultAddrPools] = useState(
@@ -181,7 +181,7 @@ export default function DockerSwarmPage() {
 
   const swarmInfoQuery = useQuery({
     ...trpc.swarm.getInfo.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
     refetchInterval: REFRESH_INTERVAL_MS,
   });
   const swarmInfo = swarmInfoQuery.data;
@@ -190,7 +190,7 @@ export default function DockerSwarmPage() {
 
   const nodesQuery = useQuery({
     ...trpc.swarm.getNodes.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId) && canManageCluster,
+    enabled: organizationState.status === "ready" && canManageCluster,
     refetchInterval: REFRESH_INTERVAL_MS,
   });
   const nodes = (nodesQuery.data || []) as SwarmNode[];
@@ -198,7 +198,9 @@ export default function DockerSwarmPage() {
   const tasksQuery = useQuery({
     ...trpc.swarm.getTasks.queryOptions({ organizationId }),
     enabled:
-      Boolean(organizationId) && canManageCluster && activeTab === "tasks",
+      organizationState.status === "ready" &&
+      canManageCluster &&
+      activeTab === "tasks",
     refetchInterval: REFRESH_INTERVAL_MS,
   });
 

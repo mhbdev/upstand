@@ -58,8 +58,8 @@ import {
   Upload,
 } from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { uploadArchive, validateArchiveFile } from "@/lib/archive-upload";
-import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -116,12 +116,17 @@ export function GeneralTab({
   deleteResource,
   isDeletingResource,
 }: GeneralTabProps) {
-  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
+  const activeOrganization =
+    organizationState.status === "ready"
+      ? organizationState.organization
+      : null;
   const dockerRegistriesQuery = useQuery({
     ...trpc.dockerRegistry.list.queryOptions({
-      organizationId: activeOrganization?.id || "",
+      organizationId: organizationState.organizationId as string,
     }),
-    enabled: resource.type === "application" && Boolean(activeOrganization?.id),
+    enabled:
+      resource.type === "application" && organizationState.status === "ready",
   });
   const previewsQuery = useQuery({
     ...trpc.resource.getPreviews.queryOptions({ id: resource.id }),

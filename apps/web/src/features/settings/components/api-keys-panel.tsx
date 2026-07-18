@@ -28,7 +28,7 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, ShieldCheck, Trash2 } from "@/components/huge-icons";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
@@ -65,8 +65,8 @@ const PRESETS: Array<{
 ];
 
 export function ApiKeysPanel() {
-  const { data: activeOrganization } = authClient.useActiveOrganization();
-  const organizationId = activeOrganization?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [name, setName] = useState("");
   const [preset, setPreset] = useState<ApiKeyPreset>("read-only");
   const [expiresInDays, setExpiresInDays] = useState("90");
@@ -78,7 +78,7 @@ export function ApiKeysPanel() {
 
   const keys = useQuery({
     ...trpc.apiKey.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const create = useMutation({
     ...trpc.apiKey.create.mutationOptions(),

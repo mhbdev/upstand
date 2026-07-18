@@ -192,7 +192,7 @@ export function MonitoringTab({
   }, [rangeKey]);
   const historyQuery = useQuery({
     ...trpc.server.historicalMetrics.queryOptions({
-      organizationId: organizationId ?? "",
+      organizationId: organizationId as string,
       serverId: serverId ?? "",
       appName: appName ?? undefined,
       containerMetrics: true,

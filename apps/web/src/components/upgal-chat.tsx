@@ -371,7 +371,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
       void conversations.refetch();
       queryClient.removeQueries({
         queryKey: trpc.ai.getConversation.queryKey({
-          organizationId: organizationId || "",
+          organizationId: organizationId as string,
           conversationId: variables.conversationId,
         }),
       });
@@ -380,7 +380,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
   });
   const conversations = useQuery({
     ...trpc.ai.conversations.queryOptions({
-      organizationId: organizationId || "",
+      organizationId: organizationId as string,
     }),
     enabled: Boolean(organizationId),
   });

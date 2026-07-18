@@ -29,7 +29,7 @@ import {
   FileClock,
   Search,
 } from "@/components/huge-icons";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 const ACTIONS = [
@@ -77,8 +77,8 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 export default function AuditLogsPage() {
-  const { data: organization } = authClient.useActiveOrganization();
-  const organizationId = organization?.id ?? "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [search, setSearch] = useState("");
   const [action, setAction] = useState("all");
   const [resourceType, setResourceType] = useState("all");
@@ -94,7 +94,7 @@ export default function AuditLogsPage() {
       page,
       pageSize,
     }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const totalPages = Math.max(1, Math.ceil((logs.data?.total ?? 0) / pageSize));
 

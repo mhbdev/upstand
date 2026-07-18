@@ -40,7 +40,7 @@ export function WebServerTerminalDialog({
   const { data: organization } = authClient.useActiveOrganization();
   const { data: keys = [] } = useQuery({
     ...trpc.sshKey.list.queryOptions({
-      organizationId: organization?.id || "",
+      organizationId: organization?.id as string,
     }),
     enabled: Boolean(organization?.id && open),
   });
