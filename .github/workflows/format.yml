@@ -48,7 +48,7 @@ jobs:
       - name: Check formatting and lint
         env:
           BASE_BRANCH: ${{ github.base_ref || 'master' }}
-        run: bunx biome check --changed --since "origin/${BASE_BRANCH}"
+        run: bunx biome check --changed --since "origin/${BASE_BRANCH}" --no-errors-on-unmatched
 
   autofix:
     name: Format and autofix
@@ -80,6 +80,6 @@ jobs:
       - name: Apply Biome fixes
         env:
           BASE_BRANCH: ${{ github.base_ref || 'master' }}
-        run: bunx biome check --write --changed --since "origin/${BASE_BRANCH}"
+        run: bunx biome check --write --changed --since "origin/${BASE_BRANCH}" --no-errors-on-unmatched
       - name: Commit formatting fixes
         uses: autofix-ci/action@635ffb0c9798bd160680f18fd73371e355b85f27 # v1.3.2

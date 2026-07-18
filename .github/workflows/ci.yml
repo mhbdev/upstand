@@ -52,7 +52,7 @@ jobs:
       - name: Check changed formatting and lint
         env:
           BASE_BRANCH: ${{ github.base_ref || github.ref_name }}
-        run: bunx biome check --changed --since "origin/${BASE_BRANCH}"
+        run: bunx biome check --changed --since "origin/${BASE_BRANCH}" --no-errors-on-unmatched
       - name: Verify generated database migrations
         env:
           BETTER_AUTH_URL: http://localhost:3000
