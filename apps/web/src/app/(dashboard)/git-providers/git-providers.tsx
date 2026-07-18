@@ -46,6 +46,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import type { authClient } from "@/lib/auth-client";
@@ -521,30 +522,25 @@ export default function GitProviders({
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-border/60 border-dashed bg-card/10 p-12 text-center">
-          <HugeiconsIcon
-            icon={SourceCodeIcon}
-            className="mx-auto size-12 text-muted-foreground/50"
-          />
-          <h2 className="mt-4 font-semibold text-foreground text-lg">
-            No Git Providers
-          </h2>
-          <p className="mt-2 max-w-sm text-muted-foreground text-sm">
-            Configure Git providers (GitHub App, GitLab, Bitbucket, Gitea) to
-            access repositories, branches, and deploy resources.
-          </p>
-          <Button
-            onClick={() => {
-              resetForms();
-              setProviderType("github");
-              setAddProviderOpen(true);
-            }}
-            className="mt-6 gap-2"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Add Git Provider
-          </Button>
-        </div>
+        <PageEmpty
+          icon={SourceCodeIcon}
+          title="No Git providers yet"
+          description="Connect GitHub, GitLab, Bitbucket, or Gitea to access repositories and deploy resources."
+          action={
+            <UpGalTarget definition={addGitProviderTarget}>
+              <Button
+                onClick={() => {
+                  resetForms();
+                  setProviderType("github");
+                  setAddProviderOpen(true);
+                }}
+              >
+                <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+                Add Git provider
+              </Button>
+            </UpGalTarget>
+          }
+        />
       )}
 
       {/* Add Provider Dialog */}

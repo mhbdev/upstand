@@ -44,6 +44,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
@@ -189,7 +190,30 @@ export default function TagsPage() {
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground text-sm">No tags yet.</p>
+            <PageEmpty
+              className="col-span-full"
+              icon={PlusSignIcon}
+              title="No tags yet"
+              description="Create a shared label to organize resources, environments, and operations."
+              action={
+                <UpGalTarget definition={createTagTarget}>
+                  <Button
+                    onClick={() => {
+                      setEditingTag(null);
+                      setName("");
+                      setColor(DEFAULT_TAG_COLOR);
+                      setOpen(true);
+                    }}
+                  >
+                    <HugeiconsIcon
+                      icon={PlusSignIcon}
+                      data-icon="inline-start"
+                    />
+                    New tag
+                  </Button>
+                </UpGalTarget>
+              }
+            />
           )}
         </CardContent>
       </Card>
