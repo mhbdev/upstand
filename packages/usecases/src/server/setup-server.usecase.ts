@@ -154,9 +154,7 @@ export class SetupServerUseCase {
         log.info({
           message: `[Server Setup] Docker not found on ${server.ipAddress}. Installing Docker...`,
         });
-        await executeCommand(
-          `curl -fsSL https://get.docker.com | ${sudo ? `${sudo} ` : ""}sh`,
-        );
+        await executeCommand(buildDockerInstallCommand(sudo));
       }
 
       await privileged("systemctl enable --now docker");
@@ -334,7 +332,9 @@ export class SetupServerUseCase {
       await new Promise<void>((resolve, reject) => {
         conn.sftp((err, sftp) => {
           if (err) return reject(err);
-          sftp.fastPut(localTarPath, remoteTarPath!, {}, (err) => {
+          if (!remoteTarPath)
+            return reject(new Error("Remote archive path is missing"));
+          sftp.fastPut(localTarPath, remoteTarPath, {}, (err) => {
             if (err) reject(err);
             else resolve();
           });
@@ -409,6 +409,49 @@ export class SetupServerUseCase {
       message: `[Monitoring Setup] Monitoring Agent configured successfully on ${server.ipAddress}! ✅`,
     });
   }
+}
+
+const DOCKER_GPG_KEY_FINGERPRINT = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88";
+
+/**
+ * Build a non-interactive Docker Engine installation command for supported
+ * Debian-family hosts. The installer is deliberately repository-based: the
+ * key and repository metadata are verified before apt is allowed to install
+ * packages, and the mutable convenience script is never executed.
+ */
+export function buildDockerInstallCommand(
+  sudo: string,
+  requestedVersion = process.env.UPSTAND_DOCKER_VERSION?.trim(),
+): string {
+  const privileged = (command: string) => `${sudo ? `${sudo} ` : ""}${command}`;
+  const packages = requestedVersion
+    ? `docker-ce=${shellQuote(requestedVersion)} docker-ce-cli=${shellQuote(requestedVersion)} containerd.io docker-buildx-plugin docker-compose-plugin`
+    : "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin";
+  const packageInstall = `${privileged("env DEBIAN_FRONTEND=noninteractive apt-get install -y")} ${packages}`;
+
+  return [
+    "set -eu",
+    'test -r /etc/os-release || { echo "Unsupported host: /etc/os-release is missing" >&2; exit 1; }',
+    ". /etc/os-release",
+    `case "\${ID:-}" in ubuntu) docker_repo=ubuntu ;; debian) docker_repo=debian ;; *) echo "Unsupported host OS: \${ID:-unknown}. Install Docker manually and retry." >&2; exit 1 ;; esac`,
+    `test -n "\${VERSION_CODENAME:-}" || { echo "Unsupported host: distribution codename is unavailable" >&2; exit 1; }`,
+    privileged("apt-get update"),
+    privileged(
+      "env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg",
+    ),
+    'key_tmp=$(mktemp); keyring_tmp=$(mktemp); source_tmp=$(mktemp); trap \'rm -f "$key_tmp" "$keyring_tmp" "$source_tmp"\' EXIT',
+    'curl --fail --silent --show-error --location --proto "=https" --tlsv1.2 https://download.docker.com/linux/$docker_repo/gpg -o "$key_tmp"',
+    `key_fingerprint=$(gpg --batch --show-keys --with-colons "$key_tmp" | awk -F: '$1 == "fpr" { print toupper($10); exit }'); test "$key_fingerprint" = "${DOCKER_GPG_KEY_FINGERPRINT}" || { echo "Docker repository key fingerprint mismatch" >&2; exit 1; }`,
+    `gpg --batch --dearmor -o "$keyring_tmp" "$key_tmp"`,
+    privileged("install -m 0755 -d /etc/apt/keyrings"),
+    privileged('install -m 0644 "$keyring_tmp" /etc/apt/keyrings/docker.gpg'),
+    'printf "Types: deb\\nURIs: https://download.docker.com/linux/%s\\nSuites: %s\\nComponents: stable\\nArchitectures: %s\\nSigned-By: /etc/apt/keyrings/docker.gpg\\n" "$docker_repo" "$VERSION_CODENAME" "$(dpkg --print-architecture)" > "$source_tmp"',
+    privileged(
+      'install -m 0644 "$source_tmp" /etc/apt/sources.list.d/docker.sources',
+    ),
+    privileged("apt-get update"),
+    packageInstall,
+  ].join(" && ");
 }
 
 function shellQuote(value: string): string {

@@ -1493,8 +1493,8 @@ function toScimUser(row: ScimMembership, baseUrl: string) {
     externalId: row.member.scimExternalId ?? undefined,
     userName: row.user.email,
     active: row.member.scimActive,
-    displayName: row.user.name,
-    name: { formatted: row.user.name },
+    displayName: row.member.scimDisplayName ?? row.user.name,
+    name: { formatted: row.member.scimDisplayName ?? row.user.name },
     emails: [{ value: row.user.email, type: "work", primary: true }],
     meta: {
       resourceType: "User",
@@ -1573,15 +1573,12 @@ async function handleScimCreateUser(c: Context<AppEnv>) {
 
   let user: ScimUser | undefined = existingUser;
   if (!user) {
-    const displayName =
-      (typeof body.displayName === "string" && body.displayName.trim()) ||
-      (typeof scimRecord(body.name).formatted === "string" &&
-        String(scimRecord(body.name).formatted).trim()) ||
-      email;
     const created = await auth.api.createUser({
       body: {
         email,
-        name: displayName,
+        // Keep the global account profile neutral. SCIM display names belong
+        // to the organization membership, not the shared user record.
+        name: email,
         password: randomBytes(32).toString("base64url"),
         role: "user",
         data: { managed: true },
@@ -1619,7 +1616,7 @@ async function handleScimCreateUser(c: Context<AppEnv>) {
     }
   }
 
-  const name =
+  const displayName =
     (typeof body.displayName === "string" && body.displayName.trim()) ||
     user.name;
   const active = body.active !== false;
@@ -1636,16 +1633,11 @@ async function handleScimCreateUser(c: Context<AppEnv>) {
         typeof body.externalId === "string"
           ? body.externalId.slice(0, 255)
           : null,
+      scimDisplayName: displayName.slice(0, 120),
       createdAt: new Date(),
     })
     .returning();
   if (!membership) return scimError(c, 500, "Unable to provision SCIM user");
-  if (name !== user.name) {
-    await db
-      .update(authSchema.user)
-      .set({ name, updatedAt: new Date() })
-      .where(eq(authSchema.user.id, user.id));
-  }
   const row = await findScimMembership(organizationId, user.id);
   if (!row)
     return scimError(c, 500, "Provisioned SCIM user could not be loaded");
@@ -1673,7 +1665,7 @@ async function handleScimPatchUser(c: Context<AppEnv>) {
   }
   const operations = Array.isArray(body.Operations) ? body.Operations : [];
   let active: boolean | undefined;
-  let displayName: string | undefined;
+  let displayName: string | null | undefined;
   let externalId: string | null | undefined;
   for (const operation of operations) {
     const item = scimRecord(operation);
@@ -1691,6 +1683,8 @@ async function handleScimPatchUser(c: Context<AppEnv>) {
       if (typeof record.active === "boolean") active = record.active;
     } else if (path === "externalid" && operationName === "remove") {
       externalId = null;
+    } else if (path === "displayname" && operationName === "remove") {
+      displayName = null;
     } else if (path === "displayname" && typeof value === "string") {
       displayName = value.trim().slice(0, 120);
     } else if (path === "externalid" && typeof value === "string") {
@@ -1709,6 +1703,7 @@ async function handleScimPatchUser(c: Context<AppEnv>) {
     .set({
       ...(active === undefined ? {} : { scimActive: active }),
       ...(externalId === undefined ? {} : { scimExternalId: externalId }),
+      ...(displayName === undefined ? {} : { scimDisplayName: displayName }),
     })
     .where(
       and(
@@ -1716,17 +1711,6 @@ async function handleScimPatchUser(c: Context<AppEnv>) {
         eq(authSchema.member.userId, userId),
       ),
     );
-  if (displayName !== undefined && displayName.length > 0) {
-    await db
-      .update(authSchema.user)
-      .set({ name: displayName, updatedAt: new Date() })
-      .where(eq(authSchema.user.id, userId));
-  }
-  if (active === false) {
-    await db
-      .delete(authSchema.session)
-      .where(eq(authSchema.session.userId, userId));
-  }
   const row = await findScimMembership(organizationId, userId);
   if (!row) return scimError(c, 404, "SCIM user not found");
   const baseUrl = `${new URL(c.req.url).origin}/api/scim/v2.0/${organizationId}`;
