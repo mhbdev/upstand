@@ -133,20 +133,25 @@ function DashboardSidebarGroup({
         {group.items.map((item) => (
           <SidebarMenuItem key={item.title}>
             <SidebarMenuButton
-              render={
-                <UpGalTarget
-                  definition={defineUpGalTarget({
-                    id: `navigation-${item.href.slice(1).replaceAll("/", "-")}`,
-                    label: `${item.title} navigation`,
-                    description: `Open the ${item.title} page.`,
-                    kind: "navigation",
-                    action: "spotlight",
-                    path: item.href as `/${string}`,
-                  })}
-                >
-                  <Link href={item.href as Route} />
-                </UpGalTarget>
-              }
+              render={(props) => {
+                const { children, ...linkProps } = props;
+                return (
+                  <UpGalTarget
+                    definition={defineUpGalTarget({
+                      id: `navigation-${item.href.slice(1).replaceAll("/", "-")}`,
+                      label: `${item.title} navigation`,
+                      description: `Open the ${item.title} page.`,
+                      kind: "navigation",
+                      action: "spotlight",
+                      path: item.href as `/${string}`,
+                    })}
+                  >
+                    <Link {...linkProps} href={item.href as Route}>
+                      {children}
+                    </Link>
+                  </UpGalTarget>
+                );
+              }}
               isActive={
                 pathname === item.href || pathname.startsWith(`${item.href}/`)
               }

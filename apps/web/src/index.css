@@ -16,3 +16,28 @@
   z-index: 1;
   animation: upgal-spotlight 2.6s ease-in-out;
 }
+
+.upgal-spotlight-frame {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+  border: 2px solid color-mix(in srgb, var(--primary) 80%, transparent);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 100vmax color-mix(in srgb, var(--foreground) 24%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent),
+    0 0 24px color-mix(in srgb, var(--primary) 32%, transparent);
+  transition:
+    top 180ms ease,
+    left 180ms ease,
+    width 180ms ease,
+    height 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upgal-spotlight,
+  .upgal-spotlight-frame {
+    animation: none;
+    transition: none;
+  }
+}

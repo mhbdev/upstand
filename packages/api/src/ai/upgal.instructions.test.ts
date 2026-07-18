@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildUpGalInstructions,
+  UPGAL_INTENT_RULES,
   UPGAL_TEMPLATE_GENERATION_RULES,
 } from "./upgal-instructions";
 import { describeUpGalPage } from "./upgal-page-context";
@@ -33,6 +34,19 @@ describe("UpGal instructions", () => {
     expect(UPGAL_TEMPLATE_GENERATION_RULES.join("\n")).toContain(
       "Docker socket mounts",
     );
+  });
+
+  test("separates guidance intent from mutation intent", () => {
+    const intentRules = UPGAL_INTENT_RULES.join("\n");
+    const instructions = buildUpGalInstructions({
+      organizationId: "org-1",
+      userId: "user-1",
+    });
+
+    expect(intentRules).toContain("how to");
+    expect(intentRules).toContain("never call a mutation tool");
+    expect(intentRules).toContain("whether the user wants instructions");
+    expect(instructions).toContain(intentRules);
   });
 
   test("describes nested resource pages with route identifiers", () => {

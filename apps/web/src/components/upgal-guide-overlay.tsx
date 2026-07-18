@@ -11,7 +11,10 @@ import {
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import type { UpGalTargetRect } from "@/lib/upgal-ui-actions";
 import {
+  findUpGalTarget,
+  getUpGalTargetRect,
   readUpGalPlan,
   removeUpGalPlan,
   spotlightUpGalTarget,
@@ -19,12 +22,6 @@ import {
 } from "@/lib/upgal-ui-actions";
 
 type Plan = UpGalUIAction;
-
-function findTarget(target: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(
-    `[data-upgal-target="${CSS.escape(target)}"]`,
-  );
-}
 
 function cleanPlanQuery(pathname: string, planId: string) {
   const params = new URLSearchParams(window.location.search);
@@ -51,6 +48,8 @@ export function UpGalGuideOverlay() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [targetAvailable, setTargetAvailable] = useState(false);
+  const [targetLabel, setTargetLabel] = useState<string | null>(null);
+  const [targetRect, setTargetRect] = useState<UpGalTargetRect | null>(null);
 
   useEffect(() => {
     if (!planId) {
@@ -69,23 +68,36 @@ export function UpGalGuideOverlay() {
   const step = plan?.steps[stepIndex];
 
   useEffect(() => {
-    if (!step) return;
+    if (!step) {
+      setTargetAvailable(false);
+      setTargetLabel(null);
+      setTargetRect(null);
+      return;
+    }
     if (step.type === "navigate") {
       setTargetAvailable(true);
+      setTargetLabel(null);
+      setTargetRect(null);
       return;
     }
     setTargetAvailable(false);
+    setTargetLabel(null);
+    setTargetRect(null);
     let attempts = 0;
     let timer: number | undefined;
+    let highlighted = false;
     const locate = () => {
-      const found = findTarget(step.target);
-      setTargetAvailable(Boolean(found));
-      if (found && step.type !== "open_dialog") {
+      const found = findUpGalTarget(step.target);
+      const rect = found ? getUpGalTargetRect(step.target) : null;
+      setTargetAvailable(Boolean(rect));
+      setTargetLabel(found?.dataset.upgalLabel ?? null);
+      setTargetRect(rect);
+      if (found && rect && !highlighted) {
+        highlighted = true;
         if (step.type === "focus") found.focus({ preventScroll: true });
         spotlightUpGalTarget(step.target);
-        return;
       }
-      if (!found && attempts < 50) {
+      if (attempts < (found ? 15 : 50)) {
         attempts += 1;
         timer = window.setTimeout(locate, 100);
       }
@@ -119,7 +131,7 @@ export function UpGalGuideOverlay() {
       return;
     }
     if (step.type === "open_dialog") {
-      const element = findTarget(step.target);
+      const element = findUpGalTarget(step.target);
       if (element?.dataset.upgalAction !== "open_dialog") return;
       element.click();
     }
@@ -128,30 +140,88 @@ export function UpGalGuideOverlay() {
   };
 
   return (
-    <Card className="fixed bottom-5 left-5 z-50 w-[min(360px,calc(100vw-40px))] border-primary/30 shadow-xl">
-      <CardHeader className="gap-1 pb-2">
-        <CardTitle className="text-sm">UpGal walkthrough</CardTitle>
-        <p className="text-muted-foreground text-xs">
-          Step {stepIndex + 1} of {plan.steps.length}
-        </p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 pt-0">
-        <p className="text-sm">{step.description}</p>
-        {!targetAvailable ? (
-          <p className="text-muted-foreground text-xs">
-            This control is not available on the current page state. Open the
-            relevant section and try the walkthrough again.
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <Button onClick={finish} size="sm" variant="ghost">
-            Close
-          </Button>
-          <Button disabled={!targetAvailable} onClick={advance} size="sm">
-            {step.type === "open_dialog" ? "Open" : isLast ? "Finish" : "Next"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      {targetRect ? (
+        <div
+          aria-hidden="true"
+          className="upgal-spotlight-frame"
+          style={{
+            top: targetRect.top,
+            left: targetRect.left,
+            width: targetRect.width,
+            height: targetRect.height,
+          }}
+        />
+      ) : null}
+      <Card
+        aria-label="UpGal walkthrough"
+        className="fixed bottom-5 left-5 z-[60] w-[min(380px,calc(100vw-40px))] border-primary/30 shadow-2xl"
+        role="region"
+      >
+        <CardHeader className="gap-3 pb-3">
+          <div className="flex items-start gap-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <span className="font-semibold text-sm">{stepIndex + 1}</span>
+            </div>
+            <div className="min-w-0">
+              <CardTitle className="text-sm">UpGal guide</CardTitle>
+              <p className="text-muted-foreground text-xs">
+                Step {stepIndex + 1} of {plan.steps.length}
+              </p>
+            </div>
+          </div>
+          <div
+            aria-label={`Walkthrough progress: step ${stepIndex + 1} of ${plan.steps.length}`}
+            aria-valuemax={plan.steps.length}
+            aria-valuemin={1}
+            aria-valuenow={stepIndex + 1}
+            className="h-1 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-300"
+              style={{
+                width: `${((stepIndex + 1) / plan.steps.length) * 100}%`,
+              }}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 pt-0">
+          {targetLabel ? (
+            <p className="font-medium text-sm" translate="no">
+              {targetLabel}
+            </p>
+          ) : null}
+          <p className="text-sm leading-relaxed">{step.description}</p>
+          {!targetAvailable ? (
+            <p aria-live="polite" className="text-muted-foreground text-xs">
+              Waiting for the relevant control to become available…
+            </p>
+          ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <Button onClick={finish} size="sm" variant="ghost">
+              Exit guide
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                disabled={stepIndex === 0}
+                onClick={() => setStepIndex((current) => current - 1)}
+                size="sm"
+                variant="outline"
+              >
+                Back
+              </Button>
+              <Button disabled={!targetAvailable} onClick={advance} size="sm">
+                {step.type === "open_dialog"
+                  ? "Open dialog"
+                  : isLast
+                    ? "Done"
+                    : "Next"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }

@@ -4,6 +4,16 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.76 - 2026-07-18
+
+### Fixed
+
+- Preserve wrapped navigation content when adding typed UpGal targets, including sidebar labels and icons.
+- Keep the UpGal chat above the guide overlay and history menu, and preserve the active chat while replaying a walkthrough.
+- Improve guide target availability, spotlight positioning, step progress, navigation feedback, and replay controls.
+- Make guidance requests explain the workflow without asking for mutation-only input such as a project name.
+- Align UpGal provider cards and settings hierarchy with the existing Settings card, badge, typography, and action patterns.
+
 ## 0.1.75 - 2026-07-18
 
 ### Added

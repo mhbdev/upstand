@@ -15,6 +15,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { Bot, Loader2, Plus, ShieldCheck } from "@/components/huge-icons";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 import { AddProviderDialog } from "./add-provider-dialog";
@@ -25,6 +26,14 @@ import { ProviderCard, type ProviderView } from "./provider-card";
 type UpGalSettingsPanelProps = {
   embedded?: boolean;
 };
+
+const addProviderTarget = defineUpGalTarget({
+  id: "upgal-add-provider",
+  label: "Add provider button",
+  description: "Opens the form for configuring an AI provider.",
+  kind: "button",
+  action: "open_dialog",
+});
 
 export function UpGalSettingsPanel({
   embedded = false,
@@ -44,30 +53,53 @@ export function UpGalSettingsPanel({
 
   const providers = (providersQuery.data as ProviderView[]) || [];
 
+  const addProviderButton = (
+    <UpGalTarget definition={addProviderTarget}>
+      <Button
+        onClick={() => setAddOpen(true)}
+        disabled={!organizationId || providersQuery.isPending}
+        size="sm"
+      >
+        <Plus data-icon="inline-start" />
+        Add provider
+      </Button>
+    </UpGalTarget>
+  );
+
   const content = (
-    <div className="flex flex-col gap-6">
-      {/* Providers Section */}
-      <Card className="border-border bg-card/50">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-          <div className="flex flex-col gap-1">
-            <CardTitle className="font-semibold text-sm">
+    <div
+      className={
+        embedded
+          ? "mx-auto flex w-full max-w-5xl flex-col gap-8 p-5 sm:p-8"
+          : "flex flex-col gap-8"
+      }
+    >
+      {embedded ? (
+        <section className="flex flex-col gap-4 border-border/60 border-b pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="font-semibold text-xl tracking-tight">
               AI Providers
-            </CardTitle>
-            <CardDescription>
+            </h1>
+            <p className="mt-2 max-w-2xl text-muted-foreground text-sm leading-relaxed">
               Configure the AI models and API integrations that power your
               organization&apos;s assistant.
-            </CardDescription>
+            </p>
           </div>
-          <Button
-            size="sm"
-            onClick={() => setAddOpen(true)}
-            disabled={!organizationId || providersQuery.isPending}
-          >
-            <Plus className="mr-1.5 size-4" />
-            Add provider
-          </Button>
+          <div className="shrink-0">{addProviderButton}</div>
+        </section>
+      ) : null}
+
+      <Card className="border border-border/40 bg-card/25 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="font-semibold text-sm">
+            Configured providers
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Provider credentials are stored securely and used by the selected
+            UpGal features.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-4 border-border/10 border-t pt-5">
           {providersQuery.isPending ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground text-xs">
               <Loader2 className="mr-2 size-4 animate-spin" />
@@ -118,7 +150,10 @@ export function UpGalSettingsPanel({
 
       <div className="flex items-start gap-2 px-1 text-muted-foreground text-xs">
         <ShieldCheck className="size-4 text-muted-foreground/80" />
-        All UpGal mutations require an explicit approval in chat.
+        <span>
+          All UpGal mutations require explicit approval in chat. Provider keys
+          are encrypted server-side and never shown again.
+        </span>
       </div>
 
       {/* Dialogs */}
@@ -147,11 +182,12 @@ export function UpGalSettingsPanel({
   return embedded ? (
     content
   ) : (
-    <DashboardPage className="max-w-4xl gap-6">
+    <DashboardPage className="max-w-5xl gap-8">
       <DashboardPageHeader
         title="UpGal AI Settings"
         icon={<Bot className="size-6 text-primary" />}
         description="Configure AI providers and assign them to specific UpGal operations."
+        actions={addProviderButton}
       />
       {content}
     </DashboardPage>

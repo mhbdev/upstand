@@ -4,6 +4,12 @@ import type { UpGalUIAction } from "@upstand/api/ai/upgal";
 import type { UpGalPageContext } from "@upstand/api/ai/upgal-page-context";
 
 export type UpGalUiTarget = NonNullable<UpGalPageContext["uiTargets"]>[number];
+export type UpGalTargetRect = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
 const inMemoryPlans = new Map<string, UpGalUIAction>();
 const consumedActionIds = new Set<string>();
 
@@ -119,6 +125,15 @@ export function storeUpGalPlan(planId: string, plan: UpGalUIAction): void {
   }
 }
 
+export function replayUpGalPlan(plan: UpGalUIAction): string {
+  const randomId =
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const planId = `upgal-replay-${randomId}`;
+  storeUpGalPlan(planId, plan);
+  return planId;
+}
+
 export function removeUpGalPlan(planId: string): void {
   inMemoryPlans.delete(planId);
   try {
@@ -141,10 +156,31 @@ export function readUpGalPlan(planId: string): UpGalUIAction | null {
   }
 }
 
-export function spotlightUpGalTarget(target: string): boolean {
-  const element = document.querySelector<HTMLElement>(
+export function findUpGalTarget(target: string): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  return document.querySelector<HTMLElement>(
     `[data-upgal-target="${CSS.escape(target)}"]`,
   );
+}
+
+export function getUpGalTargetRect(
+  target: string,
+  padding = 6,
+): UpGalTargetRect | null {
+  const element = findUpGalTarget(target);
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  return {
+    top: Math.max(4, rect.top - padding),
+    left: Math.max(4, rect.left - padding),
+    width: rect.width + padding * 2,
+    height: rect.height + padding * 2,
+  };
+}
+
+export function spotlightUpGalTarget(target: string): boolean {
+  const element = findUpGalTarget(target);
   if (!element) return false;
   element.scrollIntoView({ behavior: "smooth", block: "center" });
   element.classList.add("upgal-spotlight");

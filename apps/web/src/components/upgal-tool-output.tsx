@@ -2,6 +2,7 @@
 
 import type { UpGalUIAction } from "@upstand/api/ai/upgal";
 import { Badge } from "@upstand/ui/components/badge";
+import { Button } from "@upstand/ui/components/button";
 import { cn } from "@upstand/ui/lib/utils";
 import type { Route } from "next";
 import Link from "next/link";
@@ -12,12 +13,14 @@ import {
   BoxIcon,
   DatabaseIcon,
   FileTextIcon,
+  RotateCw,
   ServerIcon,
 } from "@/components/huge-icons";
 
 type ToolResultProps = {
   name: string;
   input?: unknown;
+  onReplay?: (action: UpGalUIAction) => void;
   output: unknown;
 };
 
@@ -270,12 +273,31 @@ function LogsResult({ output }: { output: string }) {
   );
 }
 
-function UiActionResult({ output }: { output: UpGalUIAction }) {
+function UiActionResult({
+  onReplay,
+  output,
+}: {
+  onReplay?: (action: UpGalUIAction) => void;
+  output: UpGalUIAction;
+}) {
   return (
-    <p className="rounded-md border border-primary/20 bg-primary/5 p-3 text-muted-foreground text-xs">
-      UpGal started a {output.steps.length}-step walkthrough. Follow the guide
-      on the page; it will not submit forms for you.
-    </p>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-primary/5 p-3">
+      <p className="min-w-0 text-muted-foreground text-xs">
+        UpGal started a {output.steps.length}-step walkthrough. Follow the guide
+        on the page; it will not submit forms for you.
+      </p>
+      {onReplay ? (
+        <Button
+          className="shrink-0"
+          onClick={() => onReplay(output)}
+          size="sm"
+          variant="outline"
+        >
+          <RotateCw aria-hidden="true" data-icon="inline-start" />
+          Replay
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -331,6 +353,7 @@ function WebSearchResult({ output }: { output: RecordValue }) {
 export function UpGalToolOutput({
   name,
   input,
+  onReplay,
   output,
 }: ToolResultProps): ReactNode {
   if (
@@ -338,7 +361,12 @@ export function UpGalToolOutput({
     output.kind === "ui_action_plan" &&
     Array.isArray(output.steps)
   ) {
-    return <UiActionResult output={output as unknown as UpGalUIAction} />;
+    return (
+      <UiActionResult
+        onReplay={onReplay}
+        output={output as unknown as UpGalUIAction}
+      />
+    );
   }
   if (isRecord(output) && Array.isArray(output.results)) {
     return <WebSearchResult output={output} />;

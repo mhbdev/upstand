@@ -2,6 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import type { AIProvider } from "@upstand/domain";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import { Card, CardContent } from "@upstand/ui/components/card";
 import { toast } from "sonner";
@@ -59,48 +60,63 @@ export function ProviderCard({
   });
 
   return (
-    <Card className="overflow-hidden border-border bg-card/50 transition-all hover:bg-card">
-      <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-foreground text-sm">
+    <Card className="border border-border/40 bg-card/25 shadow-sm">
+      <CardContent className="grid gap-5 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <p className="font-semibold text-foreground text-sm">
               {provider.name}
-            </span>
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary text-xs">
+            </p>
+            <Badge variant="secondary">
               {PROVIDER_NAMES[provider.provider]}
-            </span>
+            </Badge>
             {provider.baseUrl ? (
-              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-medium text-[10px] text-muted-foreground">
-                Custom URL
-              </span>
+              <Badge variant="outline">Custom URL</Badge>
             ) : null}
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-              <span>Temperature: {provider.temperature ?? "default"}</span>
-              <span>Reasoning: {provider.reasoningEnabled ? "on" : "off"}</span>
-              {provider.maxOutputTokens ? (
-                <span>Max output: {provider.maxOutputTokens}</span>
-              ) : null}
-            </div>
           </div>
-          <div className="flex flex-col gap-1 text-muted-foreground text-xs">
-            <div>
-              <span className="font-medium text-foreground/75">Model: </span>
-              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-                {provider.model}
-              </code>
+
+          <dl className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Model</dt>
+              <dd className="mt-0.5 truncate font-medium text-foreground/90">
+                <code>{provider.model}</code>
+              </dd>
             </div>
-            {provider.baseUrl ? (
-              <div className="max-w-[300px] truncate">
-                <span className="font-medium text-foreground/75">
-                  Endpoint:{" "}
-                </span>
-                {provider.baseUrl}
+            <div>
+              <dt className="text-muted-foreground">Temperature</dt>
+              <dd className="mt-0.5 font-medium text-foreground/90">
+                {provider.temperature ?? "default"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Reasoning</dt>
+              <dd className="mt-0.5 font-medium text-foreground/90">
+                {provider.reasoningEnabled ? "On" : "Off"}
+              </dd>
+            </div>
+            {provider.maxOutputTokens ? (
+              <div>
+                <dt className="text-muted-foreground">Max output</dt>
+                <dd className="mt-0.5 font-medium text-foreground/90">
+                  {provider.maxOutputTokens}
+                </dd>
               </div>
             ) : null}
-          </div>
+            {provider.baseUrl ? (
+              <div className="min-w-0 sm:col-span-2">
+                <dt className="text-muted-foreground">Endpoint</dt>
+                <dd
+                  className="mt-0.5 truncate font-medium text-foreground/90"
+                  title={provider.baseUrl}
+                >
+                  {provider.baseUrl}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-center">
+        <div className="flex flex-wrap items-center gap-2 md:justify-end">
           <Button
             size="sm"
             variant="outline"
@@ -127,6 +143,7 @@ export function ProviderCard({
             size="sm"
             variant="ghost"
             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            aria-label={`Delete ${provider.name}`}
             onClick={() => {
               if (
                 confirm(
@@ -143,7 +160,6 @@ export function ProviderCard({
             ) : (
               <Trash2 className="size-3.5" />
             )}
-            <span className="sr-only">Delete</span>
           </Button>
         </div>
       </CardContent>

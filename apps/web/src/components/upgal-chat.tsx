@@ -80,6 +80,8 @@ import {
   collectUpGalUiTargets,
   consumeUpGalAction,
   isUpGalUIAction,
+  removeUpGalPlan,
+  replayUpGalPlan,
   storeUpGalPlan,
   upGalPlanUrl,
 } from "@/lib/upgal-ui-actions";
@@ -182,11 +184,13 @@ function Part({
   part,
   approve,
   approvalPendingId,
+  onReplay,
   onUiAction,
 }: {
   part: UpGalUIMessage["parts"][number];
   approve: (id: string, approved: boolean) => void;
   approvalPendingId?: string;
+  onReplay?: (action: UpGalUIAction) => void;
   onUiAction?: (actionId: string, action: UpGalUIAction) => void;
 }) {
   useEffect(() => {
@@ -281,6 +285,7 @@ function Part({
             <UpGalToolOutput
               input={part.input}
               name={toolName}
+              onReplay={onReplay}
               output={part.output}
             />
           ) : part.state === "output-error" ? (
@@ -318,6 +323,24 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
   const loadRequestId = useRef(0);
   const previousOrganizationId = useRef(organizationId);
   const manualNewConversation = useRef(false);
+  const replayUiAction = useCallback(
+    (action: UpGalUIAction) => {
+      const activePlanId = new URLSearchParams(window.location.search).get(
+        "upgal_plan",
+      );
+      if (activePlanId) removeUpGalPlan(activePlanId);
+      const planId = replayUpGalPlan(action);
+      const firstNavigation = action.steps.find(
+        (step) => step.type === "navigate",
+      );
+      const destination = upGalPlanUrl(
+        firstNavigation?.path ?? pathname,
+        planId,
+      );
+      router.push(destination as Route, { scroll: false });
+    },
+    [pathname, router],
+  );
   const executeUiAction = useCallback(
     (actionId: string, action: UpGalUIAction) => {
       const activePlanId = new URLSearchParams(window.location.search).get(
@@ -568,6 +591,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
               <PopoverContent
                 align="end"
                 className="w-[min(88vw,340px)] gap-2 p-2"
+                positionerClassName="z-[80]"
               >
                 <div className="flex items-center justify-between px-2 py-1">
                   <p className="font-semibold text-sm">
@@ -665,6 +689,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
                         part={part}
                         approve={respondToApproval}
                         approvalPendingId={approvalPendingId}
+                        onReplay={replayUiAction}
                         onUiAction={executeUiAction}
                       />
                     ))}
