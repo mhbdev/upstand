@@ -24,6 +24,15 @@ const providerFormSchema = z.object({
   model: z.string().min(1).max(160),
   apiKey: z.string().min(1).optional(),
   baseUrl: z.url().optional().or(z.literal("")),
+  temperature: z.number().min(0).max(2).nullable().optional(),
+  reasoningEnabled: z.boolean().default(false),
+  maxOutputTokens: z
+    .number()
+    .int()
+    .min(256)
+    .max(1_000_000)
+    .nullable()
+    .optional(),
 });
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -69,6 +78,9 @@ export const aiRouter = router({
         provider: row.provider,
         model: row.model,
         baseUrl: row.baseUrl,
+        temperature: row.temperature,
+        reasoningEnabled: row.reasoningEnabled,
+        maxOutputTokens: row.maxOutputTokens,
         enabled: row.enabled,
         configured: Boolean(row.apiKeyCiphertext),
       }));
@@ -92,6 +104,9 @@ export const aiRouter = router({
           provider: input.provider,
           model: input.model,
           baseUrl: input.baseUrl || null,
+          temperature: input.temperature ?? null,
+          reasoningEnabled: input.reasoningEnabled,
+          maxOutputTokens: input.maxOutputTokens ?? null,
           secret: encrypted,
         });
       return {
@@ -100,6 +115,9 @@ export const aiRouter = router({
         provider: created.provider,
         model: created.model,
         baseUrl: created.baseUrl,
+        temperature: created.temperature,
+        reasoningEnabled: created.reasoningEnabled,
+        maxOutputTokens: created.maxOutputTokens,
         enabled: created.enabled,
         configured: Boolean(created.apiKeyCiphertext),
       };
@@ -129,6 +147,9 @@ export const aiRouter = router({
         provider: input.provider,
         model: input.model,
         baseUrl: input.baseUrl || null,
+        temperature: input.temperature,
+        reasoningEnabled: input.reasoningEnabled,
+        maxOutputTokens: input.maxOutputTokens,
         secret: encrypted,
       });
       return { updated: true };
@@ -177,8 +198,8 @@ export const aiRouter = router({
     .input(
       organizationInput.extend({
         provider: z.enum(AI_PROVIDERS),
-        apiKey: z.string().min(1).optional(),
-        baseUrl: z.url().optional().or(z.literal("")),
+        search: z.string().trim().max(120).optional(),
+        forceRefresh: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -189,8 +210,8 @@ export const aiRouter = router({
       );
       return listProviderModels(input.organizationId, ctx.scope, {
         provider: input.provider,
-        apiKey: input.apiKey,
-        baseUrl: input.baseUrl,
+        search: input.search,
+        forceRefresh: input.forceRefresh,
       });
     }),
 

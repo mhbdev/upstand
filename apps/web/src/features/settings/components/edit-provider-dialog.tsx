@@ -42,9 +42,17 @@ export function EditProviderDialog({
     model: "",
     apiKey: "",
     baseUrl: "",
+    temperature: 0.5,
+    reasoningEnabled: false,
+    maxOutputTokens: null,
   });
   const [modelSuggestions, setModelSuggestions] = useState<
-    Array<{ id: string; name: string }>
+    Array<{
+      id: string;
+      name: string;
+      reasoning?: boolean;
+      contextLength?: number;
+    }>
   >([]);
 
   // Sync form when the provider being edited changes
@@ -56,6 +64,9 @@ export function EditProviderDialog({
       model: provider.model,
       apiKey: "",
       baseUrl: provider.baseUrl ?? "",
+      temperature: provider.temperature,
+      reasoningEnabled: provider.reasoningEnabled,
+      maxOutputTokens: provider.maxOutputTokens,
     });
     setModelSuggestions([]);
   }, [provider]);
@@ -93,8 +104,6 @@ export function EditProviderDialog({
         listModels.mutate({
           organizationId,
           provider: next.provider as AIProvider,
-          apiKey: updated.apiKey || undefined,
-          baseUrl: updated.baseUrl || undefined,
         });
       }
       return updated;
@@ -115,6 +124,9 @@ export function EditProviderDialog({
       model: values.model,
       apiKey: values.apiKey || undefined,
       baseUrl: values.baseUrl || undefined,
+      temperature: values.temperature,
+      reasoningEnabled: values.reasoningEnabled,
+      maxOutputTokens: values.maxOutputTokens,
     });
   }
 
