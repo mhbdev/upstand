@@ -99,6 +99,7 @@ const toolTitles: Record<string, string> = {
 function displayChatError(error: Error): {
   message: string;
   detail?: string;
+  retryable: boolean;
 } {
   if (
     error.message === "An error occurred." ||
@@ -108,9 +109,36 @@ function displayChatError(error: Error): {
       message: "The response ended before UpGal finished.",
       detail:
         "Completed tool results are still available above. Retry to continue from the latest conversation state.",
+      retryable: true,
     };
   }
-  return { message: error.message || "UpGal could not complete this request." };
+  return {
+    message: error.message || "UpGal could not complete this request.",
+    retryable: (error as Error & { retryable?: boolean }).retryable !== false,
+  };
+}
+
+async function upGalFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init);
+  if (response.ok) return response;
+
+  let message = "UpGal could not complete this request.";
+  let retryable = true;
+  try {
+    const payload = (await response.clone().json()) as {
+      error?: unknown;
+      retryable?: unknown;
+    };
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      message = payload.error;
+    }
+    if (typeof payload.retryable === "boolean") retryable = payload.retryable;
+  } catch {
+    // Streaming responses and proxies do not always return JSON errors.
+  }
+  const error = new Error(message) as Error & { retryable?: boolean };
+  error.retryable = retryable;
+  throw error;
 }
 
 function toolTitle(name: string) {
@@ -298,6 +326,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
         // a relative URL sends the request to the dashboard instead.
         api: getServerApiUrl("/api/ai/chat"),
         credentials: "include",
+        fetch: upGalFetch,
       }),
     [],
   );
@@ -305,6 +334,11 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
     transport,
     sendAutomaticallyWhen: ({ messages }) =>
       lastAssistantMessageIsCompleteWithApprovalResponses({ messages }),
+    onError: (error) => {
+      // Keep the SDK's typed error state for rendering while making failures
+      // visible to the application logger during development.
+      if (process.env.NODE_ENV !== "production") console.error(error);
+    },
   });
 
   async function ensureConversation() {
@@ -597,21 +631,23 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
                       ) : null}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        onClick={() =>
-                          void chat.regenerate({
-                            body: {
-                              organizationId,
-                              conversationId,
-                              page: pageContext,
-                            },
-                          })
-                        }
-                        size="sm"
-                        variant="outline"
-                      >
-                        Retry response
-                      </Button>
+                      {displayChatError(chat.error).retryable ? (
+                        <Button
+                          onClick={() =>
+                            void chat.regenerate({
+                              body: {
+                                organizationId,
+                                conversationId,
+                                page: pageContext,
+                              },
+                            })
+                          }
+                          size="sm"
+                          variant="outline"
+                        >
+                          Retry response
+                        </Button>
+                      ) : null}
                       <Button
                         onClick={() => chat.clearError()}
                         size="sm"

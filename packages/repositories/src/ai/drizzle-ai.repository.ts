@@ -35,7 +35,11 @@ export class DrizzleAIRepository implements IAIRepository {
       .from(aiProviderConfig)
       .where(eq(aiProviderConfig.organizationId, organizationId))
       .orderBy(asc(aiProviderConfig.createdAt));
-    return rows.map((r) => ({ ...r, enabled: r.enabled === 1 }));
+    return rows.map((r) => ({
+      ...r,
+      enabled: r.enabled === 1,
+      reasoningEnabled: r.reasoningEnabled === 1,
+    }));
   }
 
   async findProviderConfigById(
@@ -53,7 +57,13 @@ export class DrizzleAIRepository implements IAIRepository {
       )
       .limit(1)
       .then((rows) => rows[0]);
-    return row ? { ...row, enabled: row.enabled === 1 } : null;
+    return row
+      ? {
+          ...row,
+          enabled: row.enabled === 1,
+          reasoningEnabled: row.reasoningEnabled === 1,
+        }
+      : null;
   }
 
   async findFirstEnabledProviderConfig(
@@ -71,7 +81,9 @@ export class DrizzleAIRepository implements IAIRepository {
       .orderBy(asc(aiProviderConfig.createdAt))
       .limit(1)
       .then((rows) => rows[0]);
-    return row ? { ...row, enabled: true } : null;
+    return row
+      ? { ...row, enabled: true, reasoningEnabled: row.reasoningEnabled === 1 }
+      : null;
   }
 
   async createProviderConfig(
@@ -86,6 +98,9 @@ export class DrizzleAIRepository implements IAIRepository {
         provider: input.provider,
         model: input.model,
         baseUrl: input.baseUrl,
+        temperature: input.temperature,
+        reasoningEnabled: input.reasoningEnabled ? 1 : 0,
+        maxOutputTokens: input.maxOutputTokens,
         enabled: 1,
         apiKeyCiphertext: input.secret?.ciphertext ?? null,
         apiKeyIv: input.secret?.iv ?? null,
@@ -94,7 +109,11 @@ export class DrizzleAIRepository implements IAIRepository {
       })
       .returning();
     if (!row) throw new Error("AI provider config insert returned no row.");
-    return { ...row, enabled: row.enabled === 1 };
+    return {
+      ...row,
+      enabled: row.enabled === 1,
+      reasoningEnabled: row.reasoningEnabled === 1,
+    };
   }
 
   async updateProviderConfig(
@@ -106,6 +125,11 @@ export class DrizzleAIRepository implements IAIRepository {
     if (patch.provider !== undefined) set.provider = patch.provider;
     if (patch.model !== undefined) set.model = patch.model;
     if (patch.baseUrl !== undefined) set.baseUrl = patch.baseUrl;
+    if (patch.temperature !== undefined) set.temperature = patch.temperature;
+    if (patch.reasoningEnabled !== undefined)
+      set.reasoningEnabled = patch.reasoningEnabled ? 1 : 0;
+    if (patch.maxOutputTokens !== undefined)
+      set.maxOutputTokens = patch.maxOutputTokens;
     if (patch.secret !== undefined && patch.secret !== null) {
       set.apiKeyCiphertext = patch.secret.ciphertext;
       set.apiKeyIv = patch.secret.iv;

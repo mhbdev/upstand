@@ -58,17 +58,31 @@ import {
   DeployResourceUseCaseToken,
   DeployTemplateUseCaseToken,
   GetAccountStatusUseCaseToken,
+  GetBackupRunsUseCaseToken,
+  GetBackupSchedulesUseCaseToken,
   GetDeploymentsUseCaseToken,
   GetDockerInventoryUseCaseToken,
+  GetDockerRegistriesUseCaseToken,
   GetEnvironmentsUseCaseToken,
+  GetGitProvidersUseCaseToken,
   GetProjectsUseCaseToken,
+  GetResourceContainersUseCaseToken,
   GetResourceLogsUseCaseToken,
+  GetResourcePreviewsUseCaseToken,
+  GetResourceRoutingTargetsUseCaseToken,
   GetResourceStatsUseCaseToken,
   GetResourcesUseCaseToken,
   GetServerHistoricalMetricsUseCaseToken,
   GetServerMonitoringStatusUseCaseToken,
   GetServersUseCaseToken,
+  GetSwarmContainersUseCaseToken,
+  GetSwarmInfoUseCaseToken,
+  GetSwarmNodesUseCaseToken,
+  GetUpdateStatusUseCaseToken,
+  GetWebServerLogsUseCaseToken,
+  GlobalSearchUseCaseToken,
   ListAuditLogsUseCaseToken,
+  ListBackupVolumesUseCaseToken,
   PruneDockerResourcesUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
@@ -89,6 +103,9 @@ import {
 import { log } from "evlog";
 import { z } from "zod";
 import { checkPermission } from "../permissions";
+import { connectUpGalMCPApps } from "./mcp-apps";
+import { listUpGalModelCatalog } from "./model-catalog";
+import { upGalErrorMessage } from "./upgal-errors";
 import type { UpGalInstructionContext } from "./upgal-instructions";
 import {
   buildUpGalInstructions,
@@ -229,6 +246,59 @@ export const UPGAL_TOOL_METADATA = [
     "Read recent Docker container or Swarm service logs from the selected target.",
     false,
   ],
+  ["get_project", "Read one project with its current metadata.", false],
+  ["get_environment", "Read one environment with its current metadata.", false],
+  [
+    "get_resource",
+    "Read one resource with safe, non-secret deployment metadata.",
+    false,
+  ],
+  [
+    "get_resource_containers",
+    "Read live containers belonging to a resource.",
+    false,
+  ],
+  ["get_resource_previews", "Read preview deployments for a resource.", false],
+  [
+    "get_resource_routing_targets",
+    "Read runtime routing targets for a resource.",
+    false,
+  ],
+  [
+    "list_resource_backup_schedules",
+    "Read backup schedules configured for a resource.",
+    false,
+  ],
+  [
+    "list_resource_backup_runs",
+    "Read backup run history for a resource.",
+    false,
+  ],
+  ["list_backup_volumes", "Read backup-capable volumes for a resource.", false],
+  [
+    "list_git_providers",
+    "Read configured Git providers with secrets redacted.",
+    false,
+  ],
+  [
+    "list_docker_registries",
+    "Read configured Docker registries with credentials redacted.",
+    false,
+  ],
+  [
+    "search_upstand",
+    "Search projects, environments, and resources by name.",
+    false,
+  ],
+  [
+    "get_swarm_info",
+    "Read local Docker Swarm health and manager state.",
+    false,
+  ],
+  ["get_swarm_nodes", "Read Docker Swarm node health and availability.", false],
+  ["get_swarm_containers", "Read Docker Swarm task and service health.", false],
+  ["get_web_server_logs", "Read recent Upstand web-server logs.", false],
+  ["get_update_status", "Read the current Upstand update status.", false],
   [
     "create_project",
     "Create a project and its default production environment after approval.",
@@ -361,6 +431,44 @@ export type UpGalTools = {
     z.infer<typeof dockerLogsSchema>,
     Awaited<ReturnType<GetDockerInventoryUseCase["execute"]>>
   >;
+  get_project: UpGalExecutableTool<z.infer<typeof idSchema>, unknown>;
+  get_environment: UpGalExecutableTool<z.infer<typeof idSchema>, unknown>;
+  get_resource: UpGalExecutableTool<z.infer<typeof idSchema>, unknown>;
+  get_resource_containers: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    unknown
+  >;
+  get_resource_previews: UpGalExecutableTool<z.infer<typeof idSchema>, unknown>;
+  get_resource_routing_targets: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    unknown
+  >;
+  list_resource_backup_schedules: UpGalExecutableTool<
+    z.infer<typeof idSchema>,
+    unknown
+  >;
+  list_resource_backup_runs: UpGalExecutableTool<
+    z.infer<typeof backupRunsSchema>,
+    unknown
+  >;
+  list_backup_volumes: UpGalExecutableTool<z.infer<typeof idSchema>, unknown>;
+  list_git_providers: UpGalExecutableTool<z.infer<typeof emptySchema>, unknown>;
+  list_docker_registries: UpGalExecutableTool<
+    z.infer<typeof emptySchema>,
+    unknown
+  >;
+  search_upstand: UpGalExecutableTool<z.infer<typeof searchSchema>, unknown>;
+  get_swarm_info: UpGalExecutableTool<z.infer<typeof emptySchema>, unknown>;
+  get_swarm_nodes: UpGalExecutableTool<z.infer<typeof emptySchema>, unknown>;
+  get_swarm_containers: UpGalExecutableTool<
+    z.infer<typeof emptySchema>,
+    unknown
+  >;
+  get_web_server_logs: UpGalExecutableTool<
+    z.infer<typeof webServerLogsSchema>,
+    string
+  >;
+  get_update_status: UpGalExecutableTool<z.infer<typeof emptySchema>, unknown>;
   create_project: UpGalExecutableTool<
     z.infer<typeof createProjectSchema>,
     Awaited<ReturnType<CreateProjectUseCase["execute"]>>
@@ -432,6 +540,16 @@ const idSchema = z.object({
     .describe(
       "Stable ID of the resource, project, or other entity to inspect.",
     ),
+});
+const backupRunsSchema = idSchema.extend({
+  limit: z.number().int().min(1).max(200).default(50),
+});
+const searchSchema = z.object({
+  query: z.string().trim().min(1).max(100),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+const webServerLogsSchema = z.object({
+  tail: z.number().int().min(1).max(1000).default(200),
 });
 const projectIdSchema = z.object({
   projectId: z.string().min(1).describe("Stable ID of the project."),
@@ -1257,6 +1375,148 @@ export function createUpGalTools(context: UpGalContext): UpGalTools {
         }),
       dockerOutputSchema,
     ),
+    get_project: readTool(
+      "Read one project with its current metadata.",
+      idSchema,
+      async ({ id }) => {
+        const project = await assertProject(context, id);
+        return project;
+      },
+      z.any(),
+    ),
+    get_environment: readTool(
+      "Read one environment with its current metadata.",
+      idSchema,
+      async ({ id }) => assertEnvironment(context, id),
+      z.any(),
+    ),
+    get_resource: readTool(
+      "Read one resource with safe, non-secret deployment metadata.",
+      idSchema,
+      async ({ id }) => redactResource(await assertResource(context, id)),
+      z.any(),
+    ),
+    get_resource_containers: readTool(
+      "Read live containers belonging to a resource.",
+      idSchema,
+      async ({ id }) => {
+        await assertResource(context, id);
+        return run(GetResourceContainersUseCaseToken).execute({ id });
+      },
+      z.any(),
+    ),
+    get_resource_previews: readTool(
+      "Read preview deployments for a resource.",
+      idSchema,
+      async ({ id }) => {
+        await assertResource(context, id);
+        return run(GetResourcePreviewsUseCaseToken).execute({ id });
+      },
+      z.any(),
+    ),
+    get_resource_routing_targets: readTool(
+      "Read runtime routing targets for a resource.",
+      idSchema,
+      async ({ id }) => {
+        await assertResource(context, id);
+        return run(GetResourceRoutingTargetsUseCaseToken).execute({ id });
+      },
+      z.any(),
+    ),
+    list_resource_backup_schedules: readTool(
+      "Read backup schedules configured for a resource.",
+      idSchema,
+      async ({ id }) => {
+        await assertResource(context, id);
+        return run(GetBackupSchedulesUseCaseToken).execute({ resourceId: id });
+      },
+      z.any(),
+    ),
+    list_resource_backup_runs: readTool(
+      "Read backup run history for a resource.",
+      backupRunsSchema,
+      async ({ id, limit }) => {
+        await assertResource(context, id);
+        return run(GetBackupRunsUseCaseToken).execute({
+          resourceId: id,
+          limit,
+        });
+      },
+      z.any(),
+    ),
+    list_backup_volumes: readTool(
+      "Read backup-capable volumes for a resource.",
+      idSchema,
+      async ({ id }) => {
+        await assertResource(context, id);
+        return run(ListBackupVolumesUseCaseToken).execute({ resourceId: id });
+      },
+      z.any(),
+    ),
+    list_git_providers: readTool(
+      "Read configured Git providers with secrets redacted.",
+      emptySchema,
+      async () =>
+        run(GetGitProvidersUseCaseToken).execute({
+          organizationId: context.organizationId,
+        }),
+      z.any(),
+    ),
+    list_docker_registries: readTool(
+      "Read configured Docker registries with credentials redacted.",
+      emptySchema,
+      async () => {
+        const registries = await run(GetDockerRegistriesUseCaseToken).execute({
+          organizationId: context.organizationId,
+        });
+        return registries.map(({ password: _password, ...registry }) => ({
+          ...registry,
+          hasPassword: Boolean(_password),
+        }));
+      },
+      z.any(),
+    ),
+    search_upstand: readTool(
+      "Search projects, environments, and resources by name.",
+      searchSchema,
+      async ({ query, limit }) =>
+        run(GlobalSearchUseCaseToken).execute({
+          organizationId: context.organizationId,
+          query,
+          limit,
+        }),
+      z.any(),
+    ),
+    get_swarm_info: readTool(
+      "Read local Docker Swarm health and manager state.",
+      emptySchema,
+      async () => run(GetSwarmInfoUseCaseToken).execute(),
+      z.any(),
+    ),
+    get_swarm_nodes: readTool(
+      "Read Docker Swarm node health and availability.",
+      emptySchema,
+      async () => run(GetSwarmNodesUseCaseToken).execute(),
+      z.any(),
+    ),
+    get_swarm_containers: readTool(
+      "Read Docker Swarm task and service health.",
+      emptySchema,
+      async () => run(GetSwarmContainersUseCaseToken).execute(),
+      z.any(),
+    ),
+    get_web_server_logs: readTool(
+      "Read recent Upstand web-server logs.",
+      webServerLogsSchema,
+      async ({ tail }) => run(GetWebServerLogsUseCaseToken).execute(tail),
+      z.string(),
+    ),
+    get_update_status: readTool(
+      "Read the current Upstand update status.",
+      emptySchema,
+      async () => run(GetUpdateStatusUseCaseToken).execute(),
+      z.any(),
+    ),
     create_project: mutationTool(
       "Create a project and its default production environment. This requires approval.",
       createProjectSchema,
@@ -1523,6 +1783,82 @@ export async function executeUpGalReadTool(
           options,
         ),
       );
+    case "get_project":
+      return toJsonValue(
+        await tools.get_project.execute(idSchema.parse(input), options),
+      );
+    case "get_environment":
+      return toJsonValue(
+        await tools.get_environment.execute(idSchema.parse(input), options),
+      );
+    case "get_resource":
+      return toJsonValue(
+        await tools.get_resource.execute(idSchema.parse(input), options),
+      );
+    case "get_resource_containers":
+      return toJsonValue(
+        await tools.get_resource_containers.execute(
+          idSchema.parse(input),
+          options,
+        ),
+      );
+    case "get_resource_previews":
+      return toJsonValue(
+        await tools.get_resource_previews.execute(
+          idSchema.parse(input),
+          options,
+        ),
+      );
+    case "get_resource_routing_targets":
+      return toJsonValue(
+        await tools.get_resource_routing_targets.execute(
+          idSchema.parse(input),
+          options,
+        ),
+      );
+    case "list_resource_backup_schedules":
+      return toJsonValue(
+        await tools.list_resource_backup_schedules.execute(
+          idSchema.parse(input),
+          options,
+        ),
+      );
+    case "list_resource_backup_runs":
+      return toJsonValue(
+        await tools.list_resource_backup_runs.execute(
+          backupRunsSchema.parse(input),
+          options,
+        ),
+      );
+    case "list_backup_volumes":
+      return toJsonValue(
+        await tools.list_backup_volumes.execute(idSchema.parse(input), options),
+      );
+    case "list_git_providers":
+      return toJsonValue(await tools.list_git_providers.execute({}, options));
+    case "list_docker_registries":
+      return toJsonValue(
+        await tools.list_docker_registries.execute({}, options),
+      );
+    case "search_upstand":
+      return toJsonValue(
+        await tools.search_upstand.execute(searchSchema.parse(input), options),
+      );
+    case "get_swarm_info":
+      return toJsonValue(await tools.get_swarm_info.execute({}, options));
+    case "get_swarm_nodes":
+      return toJsonValue(await tools.get_swarm_nodes.execute({}, options));
+    case "get_swarm_containers":
+      return toJsonValue(await tools.get_swarm_containers.execute({}, options));
+    case "get_web_server_logs":
+      return toJsonValue(
+        await tools.get_web_server_logs.execute(
+          webServerLogsSchema.parse(input),
+          options,
+        ),
+      );
+    case "get_update_status":
+      return toJsonValue(await tools.get_update_status.execute({}, options));
     default:
       throw new Error(`Tool ${name} requires approval before execution.`);
   }
@@ -1593,6 +1929,9 @@ async function getProvider(
           provider: overrides.provider,
           model: overrides.model,
           baseUrl: overrides.baseUrl || null,
+          temperature: null,
+          reasoningEnabled: false,
+          maxOutputTokens: null,
           enabled: true,
         }
       : null;
@@ -1604,6 +1943,11 @@ async function getProvider(
 
   const apiKey = overrides.apiKey?.trim() || decryptProviderApiKey(stored);
   if (!apiKey) throw new Error("The configured AI provider has no API key.");
+  const controls = {
+    temperature: config.temperature ?? 0.5,
+    reasoningEnabled: config.reasoningEnabled ?? false,
+    maxOutputTokens: config.maxOutputTokens ?? undefined,
+  };
 
   // OpenRouter keys are easy to paste while OpenAI is selected. Route them to
   // the matching provider instead of sending them to api.openai.com, which
@@ -1618,7 +1962,7 @@ async function getProvider(
     const modelId = config.model.includes("/")
       ? config.model
       : `openai/${config.model}`;
-    return { model: gateway(modelId), modelId };
+    return { model: gateway(modelId), modelId, ...controls };
   }
   if (effectiveProvider === "anthropic")
     return {
@@ -1626,6 +1970,7 @@ async function getProvider(
         config.model,
       ),
       modelId: config.model,
+      ...controls,
     };
   if (effectiveProvider === "google")
     return {
@@ -1634,6 +1979,7 @@ async function getProvider(
         baseURL: config.baseUrl || undefined,
       })(config.model),
       modelId: config.model,
+      ...controls,
     };
   if (effectiveProvider === "openrouter")
     return {
@@ -1648,12 +1994,14 @@ async function getProvider(
         appName: "Upstand",
       }).chat(config.model),
       modelId: config.model,
+      ...controls,
     };
   return {
     model: createOpenAI({ apiKey, baseURL: config.baseUrl || undefined })(
       config.model,
     ),
     modelId: config.model,
+    ...controls,
   };
 }
 
@@ -1675,110 +2023,21 @@ function decryptProviderApiKey(config: AIProviderConfigRecord | null) {
 }
 
 function upGalStreamErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("configure an ai provider")) {
-    return "UpGal needs an AI provider. Open Settings → UpGal Settings, configure a provider, and try again.";
-  }
-  if (message.includes("no api key")) {
-    return "UpGal could not authenticate with the configured AI provider. Check the API key in Settings → UpGal Settings.";
-  }
-  if (message.includes("429") || message.includes("rate limit")) {
-    return "The AI provider is busy or rate-limiting this request. Wait a moment and try again.";
-  }
-  return "UpGal could not complete this response. Completed tool results remain available above; retry to continue.";
+  return upGalErrorMessage(error);
 }
-
-const MODEL_CATALOG_BASE_URLS: Record<AIProvider, string> = {
-  openai: "https://api.openai.com/v1",
-  anthropic: "https://api.anthropic.com/v1",
-  google: "https://generativelanguage.googleapis.com/v1beta",
-  openrouter: "https://openrouter.ai/api/v1",
-  gateway: "https://ai-gateway.vercel.sh/v1",
-};
 
 export async function listProviderModels(
   organizationId: string,
   scope: ServiceScope,
   input: {
     provider: AIProvider;
-    apiKey?: string;
-    baseUrl?: string;
-    providerConfigId?: string;
+    search?: string;
+    forceRefresh?: boolean;
   },
 ) {
-  const repository = resolve(scope, AIRepositoryToken);
-  let config: AIProviderConfigRecord | null = null;
-  if (input.providerConfigId) {
-    config = await repository.findProviderConfigById(
-      input.providerConfigId,
-      organizationId,
-    );
-  } else {
-    const allConfigs = await repository.listProviderConfigs(organizationId);
-    config = allConfigs.find((c) => c.provider === input.provider) ?? null;
-  }
-  const apiKey = input.apiKey?.trim() || decryptProviderApiKey(config);
-  if (!apiKey) throw new Error(`Enter a ${input.provider} API key first.`);
-  const effectiveProvider =
-    input.provider === "openai" && apiKey.startsWith("sk-or-v1-")
-      ? "openrouter"
-      : input.provider;
-
-  const endpoint = new URL(
-    "models",
-    `${(input.baseUrl?.trim() || MODEL_CATALOG_BASE_URLS[effectiveProvider]).replace(/\/$/, "")}/`,
-  );
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (effectiveProvider === "google") {
-    endpoint.searchParams.set("key", apiKey);
-  } else if (effectiveProvider === "anthropic") {
-    headers["x-api-key"] = apiKey;
-    headers["anthropic-version"] = "2023-06-01";
-  } else {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-  if (effectiveProvider === "openrouter" || effectiveProvider === "gateway") {
-    headers["HTTP-Referer"] = "https://upstand.dev";
-    headers["X-Title"] = "Upstand";
-  }
-  const response = await fetch(endpoint, {
-    cache: "no-store",
-    headers,
-  });
-  if (!response.ok) {
-    const message = (await response.text()).slice(0, 500);
-    throw new Error(
-      `${input.provider} model request failed (${response.status}): ${message}`,
-    );
-  }
-  const payload = (await response.json()) as {
-    data?: Array<{
-      id?: string;
-      name?: string;
-      display_name?: string;
-      context_length?: number;
-    }>;
-    models?: Array<{
-      name?: string;
-      displayName?: string;
-      inputTokenLimit?: number;
-    }>;
-  };
-  const models =
-    input.provider === "google"
-      ? (payload.models ?? []).map((model) => ({
-          id: model.name?.replace(/^models\//, "") || "",
-          name: model.displayName || model.name || "",
-          contextLength: model.inputTokenLimit,
-        }))
-      : (payload.data ?? []).map((model) => ({
-          id: model.id || "",
-          name: model.name || model.id || "",
-          contextLength: model.context_length,
-        }));
-  return models
-    .filter((model) => Boolean(model.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  void organizationId;
+  void scope;
+  return listUpGalModelCatalog(input);
 }
 
 export async function testUpGalProvider(
@@ -1841,6 +2100,7 @@ export async function createUpGalResponse(
     userId: context.userId,
     model: provider.modelId,
   });
+  const mcpApps = await connectUpGalMCPApps();
   const updateRunSafely = async (patch: {
     stepCount?: number;
     status?: string;
@@ -1857,14 +2117,23 @@ export async function createUpGalResponse(
     }
   };
 
+  const agentTools = {
+    ...createUpGalTools(context),
+    ...mcpApps.tools,
+  };
   const agent = new ToolLoopAgent({
     id: "upgal",
     model: provider.model,
-    temperature: 0.5,
+    temperature: provider.temperature,
+    maxOutputTokens: provider.maxOutputTokens,
+    reasoning: provider.reasoningEnabled ? "provider-default" : "none",
     instructions: buildUpGalInstructions(context),
-    tools: createUpGalTools(context),
+    tools: agentTools,
     toolApproval: ({ toolCall }) =>
-      upGalToolNeedsApproval(toolCall.toolName) ? "user-approval" : undefined,
+      upGalToolNeedsApproval(toolCall.toolName) ||
+      toolCall.toolName.startsWith("mcp_")
+        ? "user-approval"
+        : undefined,
     toolsContext: {
       get_account_status: { organizationId: context.organizationId },
       list_templates: { organizationId: context.organizationId },
@@ -1887,6 +2156,25 @@ export async function createUpGalResponse(
       list_docker_networks: { organizationId: context.organizationId },
       list_docker_services: { organizationId: context.organizationId },
       get_docker_logs: { organizationId: context.organizationId },
+      get_project: { organizationId: context.organizationId },
+      get_environment: { organizationId: context.organizationId },
+      get_resource: { organizationId: context.organizationId },
+      get_resource_containers: { organizationId: context.organizationId },
+      get_resource_previews: { organizationId: context.organizationId },
+      get_resource_routing_targets: { organizationId: context.organizationId },
+      list_resource_backup_schedules: {
+        organizationId: context.organizationId,
+      },
+      list_resource_backup_runs: { organizationId: context.organizationId },
+      list_backup_volumes: { organizationId: context.organizationId },
+      list_git_providers: { organizationId: context.organizationId },
+      list_docker_registries: { organizationId: context.organizationId },
+      search_upstand: { organizationId: context.organizationId },
+      get_swarm_info: { organizationId: context.organizationId },
+      get_swarm_nodes: { organizationId: context.organizationId },
+      get_swarm_containers: { organizationId: context.organizationId },
+      get_web_server_logs: { organizationId: context.organizationId },
+      get_update_status: { organizationId: context.organizationId },
       create_project: { organizationId: context.organizationId },
       create_template: { organizationId: context.organizationId },
       create_environment: { organizationId: context.organizationId },
@@ -1898,6 +2186,8 @@ export async function createUpGalResponse(
       prune_docker_resources: { organizationId: context.organizationId },
     },
     stopWhen: stepCountIs(12),
+    maxRetries: 2,
+    timeout: { stepMs: 120_000, toolMs: 45_000 },
     runtimeContext: context,
     onStepEnd: async ({ stepNumber }) => {
       await updateRunSafely({ stepCount: stepNumber + 1 });
@@ -1907,12 +2197,14 @@ export async function createUpGalResponse(
         status: "completed",
         finishedAt: new Date(),
       });
+      await mcpApps.close();
     },
   });
 
   const agentStream = await createAgentUIStream({
     agent,
     uiMessages,
+    sendReasoning: provider.reasoningEnabled,
     // Passing the original messages lets the UI stream treat an approval
     // response as a continuation of the pending assistant message. Without
     // it, every approved tool call is persisted as a second assistant turn.
@@ -1968,6 +2260,7 @@ export async function createUpGalResponse(
     },
     onError: (error) => {
       void updateRunSafely({ status: "failed", finishedAt: new Date() });
+      void mcpApps.close();
       log.error({
         message: "UpGal response stream failed",
         runId,

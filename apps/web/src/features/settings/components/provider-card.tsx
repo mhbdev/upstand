@@ -16,6 +16,9 @@ export type ProviderView = {
   baseUrl: string | null;
   enabled: boolean;
   configured: boolean;
+  temperature: number | null;
+  reasoningEnabled: boolean;
+  maxOutputTokens: number | null;
 };
 
 type Props = {
@@ -71,6 +74,13 @@ export function ProviderCard({
                 Custom URL
               </span>
             ) : null}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+              <span>Temperature: {provider.temperature ?? "default"}</span>
+              <span>Reasoning: {provider.reasoningEnabled ? "on" : "off"}</span>
+              {provider.maxOutputTokens ? (
+                <span>Max output: {provider.maxOutputTokens}</span>
+              ) : null}
+            </div>
           </div>
           <div className="flex flex-col gap-1 text-muted-foreground text-xs">
             <div>

@@ -33,6 +33,9 @@ const DEFAULT_VALUES: ProviderFormValues = {
   model: "gpt-4o-mini",
   apiKey: "",
   baseUrl: "",
+  temperature: 0.5,
+  reasoningEnabled: false,
+  maxOutputTokens: null,
 };
 
 export function AddProviderDialog({
@@ -43,7 +46,12 @@ export function AddProviderDialog({
 }: Props) {
   const [values, setValues] = useState<ProviderFormValues>(DEFAULT_VALUES);
   const [modelSuggestions, setModelSuggestions] = useState<
-    Array<{ id: string; name: string }>
+    Array<{
+      id: string;
+      name: string;
+      reasoning?: boolean;
+      contextLength?: number;
+    }>
   >([]);
 
   const add = useMutation({
@@ -82,8 +90,6 @@ export function AddProviderDialog({
         listModels.mutate({
           organizationId,
           provider: next.provider as AIProvider,
-          apiKey: updated.apiKey || undefined,
-          baseUrl: updated.baseUrl || undefined,
         });
       }
       return updated;
@@ -102,6 +108,9 @@ export function AddProviderDialog({
       model: values.model,
       apiKey: values.apiKey || undefined,
       baseUrl: values.baseUrl || undefined,
+      temperature: values.temperature,
+      reasoningEnabled: values.reasoningEnabled,
+      maxOutputTokens: values.maxOutputTokens,
     });
   }
 

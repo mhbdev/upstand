@@ -24,6 +24,7 @@ import {
   type UpGalUIMessage,
   validateAndRecoverUpGalMessages,
 } from "@upstand/api/ai/upgal";
+import { classifyUpGalError } from "@upstand/api/ai/upgal-errors";
 import { UpGalPageContextSchema } from "@upstand/api/ai/upgal-page-context";
 import {
   authenticateApiKey,
@@ -2043,12 +2044,32 @@ app.post("/api/ai/chat", async (c) => {
       400,
     );
   }
-  await saveIncomingMessages(
-    conversationId,
-    messages,
-    c.get("scope").resolve(AIRepositoryToken),
-  );
-  return createUpGalResponse(context, messages, c.req.raw);
+  try {
+    await saveIncomingMessages(
+      conversationId,
+      messages,
+      c.get("scope").resolve(AIRepositoryToken),
+    );
+    return await createUpGalResponse(context, messages, c.req.raw);
+  } catch (error) {
+    const info = classifyUpGalError(error);
+    log.error({
+      message: "UpGal request failed before streaming started",
+      organizationId: body.organizationId,
+      conversationId,
+      code: info.code,
+      retryable: info.retryable,
+      err: error instanceof Error ? error.message : String(error),
+    });
+    return c.json(
+      {
+        error: info.userMessage,
+        code: info.code,
+        retryable: info.retryable,
+      },
+      info.status,
+    );
+  }
 });
 
 app.all("/api/mcp", async (c) => {
@@ -2155,18 +2176,37 @@ app.all("/api/mcp", async (c) => {
           ],
         },
       });
-    const result = await executeUpGalReadTool(name, args, {
-      organizationId: key.organizationId,
-      userId: key.userId,
-      conversationId: randomUUID(),
-      runId: randomUUID(),
-      scope: c.get("scope"),
-    });
-    return c.json({
-      jsonrpc: "2.0",
-      id,
-      result: { content: [{ type: "text", text: JSON.stringify(result) }] },
-    });
+    try {
+      const result = await executeUpGalReadTool(name, args, {
+        organizationId: key.organizationId,
+        userId: key.userId,
+        conversationId: randomUUID(),
+        runId: randomUUID(),
+        scope: c.get("scope"),
+      });
+      return c.json({
+        jsonrpc: "2.0",
+        id,
+        result: { content: [{ type: "text", text: JSON.stringify(result) }] },
+      });
+    } catch (error) {
+      const info = classifyUpGalError(error);
+      log.warn({
+        message: "UpGal MCP tool execution failed",
+        toolName: name,
+        organizationId: key.organizationId,
+        code: info.code,
+        err: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          isError: true,
+          content: [{ type: "text", text: info.userMessage }],
+        },
+      });
+    }
   }
   return c.json(
     {

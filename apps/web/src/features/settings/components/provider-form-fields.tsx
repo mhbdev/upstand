@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Switch } from "@upstand/ui/components/switch";
 
 export type ProviderFormValues = {
   name: string;
@@ -17,6 +18,9 @@ export type ProviderFormValues = {
   model: string;
   apiKey: string;
   baseUrl: string;
+  temperature: number | null;
+  reasoningEnabled: boolean;
+  maxOutputTokens: number | null;
 };
 
 type Props = {
@@ -25,7 +29,12 @@ type Props = {
   /** When true the API key label shows a "leave blank to keep" hint */
   hasExistingKey?: boolean;
   /** Model suggestions for the autocomplete datalist */
-  modelSuggestions?: Array<{ id: string; name: string }>;
+  modelSuggestions?: Array<{
+    id: string;
+    name: string;
+    reasoning?: boolean;
+    contextLength?: number;
+  }>;
   /** Prefix added to id attributes to avoid collisions when rendered multiple times */
   idPrefix?: string;
 };
@@ -110,10 +119,70 @@ export function ProviderFormFields({
           ))}
         </datalist>
         <p className="text-muted-foreground text-xs">
-          Models load automatically when you select a provider with a valid API
-          key. You can also enter any custom model ID.
+          Models come from the shared TokenLens catalog. You can also enter any
+          custom model ID.
         </p>
       </Field>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor={`${idPrefix}-temperature`}>
+            Temperature
+          </FieldLabel>
+          <Input
+            id={`${idPrefix}-temperature`}
+            type="number"
+            min={0}
+            max={2}
+            step={0.1}
+            value={values.temperature ?? ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              onChange({ temperature: value === "" ? null : Number(value) });
+            }}
+            placeholder="0.5"
+          />
+          <p className="text-muted-foreground text-xs">
+            Lower values make agent responses more deterministic.
+          </p>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${idPrefix}-max-output-tokens`}>
+            Output token limit
+          </FieldLabel>
+          <Input
+            id={`${idPrefix}-max-output-tokens`}
+            type="number"
+            min={256}
+            max={1_000_000}
+            step={256}
+            value={values.maxOutputTokens ?? ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              onChange({
+                maxOutputTokens: value === "" ? null : Number(value),
+              });
+            }}
+            placeholder="Provider default"
+          />
+        </Field>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border p-3">
+        <div className="space-y-0.5">
+          <FieldLabel htmlFor={`${idPrefix}-reasoning`}>
+            Enable model reasoning
+          </FieldLabel>
+          <p className="text-muted-foreground text-xs">
+            Sends the provider-default reasoning setting when supported.
+          </p>
+        </div>
+        <Switch
+          id={`${idPrefix}-reasoning`}
+          checked={values.reasoningEnabled}
+          onCheckedChange={(checked) => onChange({ reasoningEnabled: checked })}
+        />
+      </div>
 
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-api-key`}>

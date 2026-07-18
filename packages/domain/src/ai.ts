@@ -27,6 +27,9 @@ export type AIProviderConfigRecord = {
   provider: AIProvider;
   model: string;
   baseUrl: string | null;
+  temperature: number | null;
+  reasoningEnabled: boolean;
+  maxOutputTokens: number | null;
   apiKeyCiphertext: string | null;
   apiKeyIv: string | null;
   apiKeyAuthTag: string | null;
@@ -46,6 +49,9 @@ export type AIProviderConfigView = {
   provider: AIProvider;
   model: string;
   baseUrl: string | null;
+  temperature: number | null;
+  reasoningEnabled: boolean;
+  maxOutputTokens: number | null;
   enabled: boolean;
   configured: boolean;
 };
@@ -57,6 +63,9 @@ export type CreateAIProviderConfig = {
   provider: AIProvider;
   model: string;
   baseUrl: string | null;
+  temperature: number | null;
+  reasoningEnabled: boolean;
+  maxOutputTokens: number | null;
   secret: {
     ciphertext: string;
     iv: string;
@@ -70,6 +79,9 @@ export type UpdateAIProviderConfig = {
   provider?: AIProvider;
   model?: string;
   baseUrl?: string | null;
+  temperature?: number | null;
+  reasoningEnabled?: boolean;
+  maxOutputTokens?: number | null;
   secret?: {
     ciphertext: string;
     iv: string;
