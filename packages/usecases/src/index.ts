@@ -64,6 +64,7 @@ export * from "./outbox/outbox-publisher";
 export * from "./ports/caddy";
 export * from "./ports/docker";
 export * from "./ports/monitoring";
+export * from "./ports/server-provisioning";
 export * from "./project/create-project.usecase";
 export * from "./project/delete-project.usecase";
 export * from "./project/duplicate-project.usecase";
