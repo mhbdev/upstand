@@ -9,9 +9,9 @@ import {
 import { Badge } from "@upstand/ui/components/badge";
 import { cn } from "@upstand/ui/lib/utils";
 import type { Tool } from "ai";
-import { BotIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { memo } from "react";
+import { BotIcon } from "@/components/huge-icons";
 
 import { CodeBlock } from "./code-block";
 

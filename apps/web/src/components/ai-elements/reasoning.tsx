@@ -11,7 +11,6 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -24,6 +23,7 @@ import {
   useState,
 } from "react";
 import { Streamdown } from "streamdown";
+import { BrainIcon, ChevronDownIcon } from "@/components/huge-icons";
 
 import { Shimmer } from "./shimmer";
 

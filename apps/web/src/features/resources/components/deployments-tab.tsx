@@ -27,9 +27,9 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { cn } from "@upstand/ui/lib/utils";
-import { Eye, History, Play, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Eye, History, Play, RefreshCw, Trash2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 type DeploymentItem = {

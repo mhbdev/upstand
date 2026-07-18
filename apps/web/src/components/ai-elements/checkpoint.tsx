@@ -8,9 +8,9 @@ import {
   TooltipTrigger,
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
-import type { LucideProps } from "lucide-react";
-import { BookmarkIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
+import type { HugeIconProps } from "@/components/huge-icons";
+import { BookmarkIcon } from "@/components/huge-icons";
 
 export type CheckpointProps = HTMLAttributes<HTMLDivElement>;
 
@@ -31,7 +31,7 @@ export const Checkpoint = ({
   </div>
 );
 
-export type CheckpointIconProps = LucideProps;
+export type CheckpointIconProps = HugeIconProps;
 
 export const CheckpointIcon = ({
   className,

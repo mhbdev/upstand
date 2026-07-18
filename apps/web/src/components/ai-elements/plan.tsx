@@ -15,9 +15,9 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
-import { ChevronsUpDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
+import { ChevronsUpDownIcon } from "@/components/huge-icons";
 
 import { Shimmer } from "./shimmer";
 

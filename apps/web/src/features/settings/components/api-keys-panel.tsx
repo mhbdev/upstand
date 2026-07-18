@@ -25,9 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
-import { Copy, ShieldCheck, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Copy, ShieldCheck, Trash2 } from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";

@@ -8,7 +8,6 @@ import {
   InputGroupText,
 } from "@upstand/ui/components/input-group";
 import { cn } from "@upstand/ui/lib/utils";
-import { CheckIcon, CopyIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import {
   createContext,
@@ -19,6 +18,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { CheckIcon, CopyIcon } from "@/components/huge-icons";
 
 interface SnippetContextType {
   code: string;

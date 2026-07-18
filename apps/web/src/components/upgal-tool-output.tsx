@@ -2,17 +2,17 @@
 
 import { Badge } from "@upstand/ui/components/badge";
 import { cn } from "@upstand/ui/lib/utils";
+import type { Route } from "next";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { ToolOutput } from "@/components/ai-elements/tool";
 import {
   ArrowUpRightIcon,
   BoxIcon,
   DatabaseIcon,
   FileTextIcon,
   ServerIcon,
-} from "lucide-react";
-import type { Route } from "next";
-import Link from "next/link";
-import type { ReactNode } from "react";
-import { ToolOutput } from "@/components/ai-elements/tool";
+} from "@/components/huge-icons";
 
 type ToolResultProps = {
   name: string;

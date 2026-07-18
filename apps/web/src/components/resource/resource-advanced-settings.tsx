@@ -32,9 +32,9 @@ import {
 } from "@upstand/ui/components/select";
 import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
-import { Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Plus, Save, Trash2 } from "@/components/huge-icons";
 import { ResourceKeyValueEditor } from "@/components/resource/key-value-editor";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { trpc } from "@/utils/trpc";

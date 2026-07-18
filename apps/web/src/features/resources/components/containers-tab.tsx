@@ -33,6 +33,8 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { cn } from "@upstand/ui/lib/utils";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   CircleX,
   Code,
@@ -45,9 +47,7 @@ import {
   Square,
   Terminal,
   Upload,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+} from "@/components/huge-icons";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { TerminalDialogShell } from "@/components/shared/terminal-dialog-shell";
 import {

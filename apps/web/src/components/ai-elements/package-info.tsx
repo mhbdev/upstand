@@ -2,9 +2,14 @@
 
 import { Badge } from "@upstand/ui/components/badge";
 import { cn } from "@upstand/ui/lib/utils";
-import { ArrowRightIcon, MinusIcon, PackageIcon, PlusIcon } from "lucide-react";
 import type { HTMLAttributes } from "react";
 import { createContext, useContext, useMemo } from "react";
+import {
+  ArrowRightIcon,
+  MinusIcon,
+  PackageIcon,
+  PlusIcon,
+} from "@/components/huge-icons";
 
 type ChangeType = "major" | "minor" | "patch" | "added" | "removed";
 

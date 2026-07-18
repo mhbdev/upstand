@@ -4,8 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import type { AIProvider } from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import { Card, CardContent } from "@upstand/ui/components/card";
-import { Edit2, Loader2, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Edit2, Loader2, Play, Trash2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 export type ProviderView = {

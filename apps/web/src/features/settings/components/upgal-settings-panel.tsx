@@ -9,12 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import { Bot, Loader2, Plus, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { Bot, Loader2, Plus, ShieldCheck } from "@/components/huge-icons";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 import { AddProviderDialog } from "./add-provider-dialog";

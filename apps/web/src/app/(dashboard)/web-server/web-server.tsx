@@ -1068,6 +1068,7 @@ export default function WebServerDashboard(_props: {
                           .catch(() => toast.error("Failed to copy IP"));
                       }}
                       disabled={!info?.settings?.serverIp}
+                      aria-label="Copy server IP"
                     >
                       <HugeiconsIcon icon={Copy01Icon} className="size-3" />
                     </Button>

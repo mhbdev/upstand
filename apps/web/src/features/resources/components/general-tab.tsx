@@ -43,6 +43,10 @@ import {
 } from "@upstand/ui/components/select";
 import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
+import type { Route } from "next";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   Code,
   Copy,
@@ -52,11 +56,7 @@ import {
   Square,
   Trash2,
   Upload,
-} from "lucide-react";
-import type { Route } from "next";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+} from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { uploadArchive, validateArchiveFile } from "@/lib/archive-upload";
 import { authClient } from "@/lib/auth-client";

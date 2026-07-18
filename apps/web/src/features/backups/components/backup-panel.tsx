@@ -41,6 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from "@upstand/ui/components/table";
+import { useState } from "react";
+import z from "zod";
 import {
   ArchiveRestore,
   CalendarClock,
@@ -50,9 +52,7 @@ import {
   Play,
   Plus,
   Trash2,
-} from "lucide-react";
-import { useState } from "react";
-import z from "zod";
+} from "@/components/huge-icons";
 import { SearchableSelect } from "@/components/shared/searchable-select";
 import { trpc } from "@/utils/trpc";
 import { useBackupSettings } from "../hooks/use-backup-settings";

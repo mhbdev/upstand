@@ -33,19 +33,6 @@ import {
   isToolUIPart,
   lastAssistantMessageIsCompleteWithApprovalResponses,
 } from "ai";
-import {
-  Bot,
-  Check,
-  CircleAlert,
-  History,
-  Loader2,
-  MessageCircle,
-  Plus,
-  ShieldAlert,
-  ShieldCheck,
-  Trash2,
-  X,
-} from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -73,6 +60,19 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import {
+  Bot,
+  Check,
+  CircleAlert,
+  History,
+  Loader2,
+  MessageCircle,
+  Plus,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+  X,
+} from "@/components/huge-icons";
 import { UpGalToolOutput } from "@/components/upgal-tool-output";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";

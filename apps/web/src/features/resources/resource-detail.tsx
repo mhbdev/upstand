@@ -30,6 +30,10 @@ import {
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
+import type { Route } from "next";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   Code,
@@ -38,11 +42,7 @@ import {
   RefreshCw,
   Settings,
   Terminal,
-} from "lucide-react";
-import type { Route } from "next";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+} from "@/components/huge-icons";
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { BackupPanel } from "@/features/backups";

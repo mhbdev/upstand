@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@upstand/ui/lib/utils";
-import { AlertCircle } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -15,6 +14,7 @@ import {
 } from "react";
 import type { TProps as JsxParserProps } from "react-jsx-parser";
 import JsxParser from "react-jsx-parser";
+import { AlertCircle } from "@/components/huge-icons";
 
 interface JSXPreviewContextValue {
   jsx: string;

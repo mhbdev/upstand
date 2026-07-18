@@ -7,15 +7,15 @@ import {
   CollapsibleTrigger,
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
+import type { ComponentProps, HTMLAttributes } from "react";
+import { createContext, useContext, useMemo } from "react";
 import {
   CheckCircle2Icon,
   ChevronRightIcon,
   CircleDotIcon,
   CircleIcon,
   XCircleIcon,
-} from "lucide-react";
-import type { ComponentProps, HTMLAttributes } from "react";
-import { createContext, useContext, useMemo } from "react";
+} from "@/components/huge-icons";
 
 type TestStatus = "passed" | "failed" | "skipped" | "running";
 

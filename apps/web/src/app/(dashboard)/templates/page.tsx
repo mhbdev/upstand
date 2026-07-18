@@ -54,6 +54,12 @@ import {
 } from "@upstand/ui/components/select";
 import { Separator } from "@upstand/ui/components/separator";
 import { Textarea } from "@upstand/ui/components/textarea";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+} from "@/components/dashboard/dashboard-page";
 import {
   AlertCircle,
   ArrowLeft,
@@ -71,13 +77,7 @@ import {
   Trash2,
   Upload,
   WandSparkles,
-} from "lucide-react";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
-import {
-  DashboardPage,
-  DashboardPageHeader,
-} from "@/components/dashboard/dashboard-page";
+} from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { authClient } from "@/lib/auth-client";
 import { downloadText } from "@/lib/browser";

@@ -14,7 +14,6 @@ import {
   TooltipTrigger,
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
-import { ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -23,6 +22,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { ChevronDownIcon } from "@/components/huge-icons";
 
 export interface WebPreviewContextValue {
   url: string;

@@ -17,7 +17,6 @@ import {
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
 import type { UIMessage } from "ai";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import {
   createContext,
@@ -29,6 +28,7 @@ import {
   useState,
 } from "react";
 import { Streamdown } from "streamdown";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/huge-icons";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];

@@ -16,14 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
-import {
-  Activity,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Cpu,
-  MemoryStick,
-  Network,
-} from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -33,6 +25,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  Activity,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Cpu,
+  MemoryStick,
+  Network,
+} from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 type RangeKey = "1h" | "24h" | "7d";

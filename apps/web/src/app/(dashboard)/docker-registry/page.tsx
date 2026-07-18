@@ -207,6 +207,7 @@ export default function DockerRegistryPage() {
                     size="icon"
                     onClick={() => openEdit(reg)}
                     className="size-8"
+                    aria-label={`Edit registry ${reg.name}`}
                   >
                     <HugeiconsIcon icon={Edit02Icon} className="size-4" />
                   </Button>
@@ -215,6 +216,7 @@ export default function DockerRegistryPage() {
                     size="icon"
                     onClick={() => handleDelete(reg.id)}
                     className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Delete registry ${reg.name}`}
                   >
                     <HugeiconsIcon icon={Delete02Icon} className="size-4" />
                   </Button>

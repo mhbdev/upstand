@@ -8,9 +8,9 @@ import {
   TooltipTrigger,
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
-import type { LucideIcon } from "lucide-react";
-import { XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
+import type { HugeIcon } from "@/components/huge-icons";
+import { XIcon } from "@/components/huge-icons";
 
 export type ArtifactProps = HTMLAttributes<HTMLDivElement>;
 
@@ -93,7 +93,7 @@ export const ArtifactActions = ({
 export type ArtifactActionProps = ComponentProps<typeof Button> & {
   tooltip?: string;
   label?: string;
-  icon?: LucideIcon;
+  icon?: HugeIcon;
 };
 
 export const ArtifactAction = ({

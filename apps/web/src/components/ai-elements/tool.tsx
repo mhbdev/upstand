@@ -8,6 +8,8 @@ import {
 } from "@upstand/ui/components/collapsible";
 import { cn } from "@upstand/ui/lib/utils";
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
+import type { ComponentProps, ReactNode } from "react";
+import { isValidElement } from "react";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
@@ -15,9 +17,7 @@ import {
   ClockIcon,
   WrenchIcon,
   XCircleIcon,
-} from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
-import { isValidElement } from "react";
+} from "@/components/huge-icons";
 
 import { CodeBlock } from "./code-block";
 
