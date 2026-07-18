@@ -1,8 +1,24 @@
 import { z } from "zod";
+import { internalPathSchema, uiTargetIdSchema } from "./tools/ui-schemas";
 
 export const UpGalPageContextSchema = z.object({
   path: z.string().trim().min(1).max(512),
   title: z.string().trim().min(1).max(200).optional(),
+  uiTargets: z
+    .array(
+      z.object({
+        id: uiTargetIdSchema,
+        label: z.string().trim().min(1).max(160),
+        description: z.string().trim().max(400).optional(),
+        kind: z.enum(["button", "field", "dialog", "navigation", "other"]),
+        path: internalPathSchema.optional(),
+        action: z
+          .enum(["spotlight", "focus", "open_dialog", "submit"])
+          .optional(),
+      }),
+    )
+    .max(100)
+    .optional(),
 });
 
 export type UpGalPageContext = z.infer<typeof UpGalPageContextSchema>;
@@ -40,12 +56,24 @@ const PAGE_ROUTES: readonly PageRoute[] = [
     description: "Projects in the active organization.",
   },
   {
-    pattern: /^\/dashboard\/?$/,
-    description: "Organization overview and operational account status.",
+    pattern: /^\/ssh-keys\/?$/,
+    description: "Organization SSH keys and the SSH key creation dialog.",
+  },
+  {
+    pattern: /^\/tags\/?$/,
+    description: "Reusable organization tags and tag management.",
   },
   {
     pattern: /^\/deployments\/?$/,
-    description: "Deployment history, status, and logs.",
+    description: "Deployment history, queue, and concurrency controls.",
+  },
+  {
+    pattern: /^\/requests\/?$/,
+    description: "Recent HTTP request activity and diagnostics.",
+  },
+  {
+    pattern: /^\/remote-servers\/?$/,
+    description: "Remote deploy, build, and database servers.",
   },
   {
     pattern: /^\/docker\/?$/,
@@ -53,44 +81,56 @@ const PAGE_ROUTES: readonly PageRoute[] = [
   },
   {
     pattern: /^\/docker-swarm\/?$/,
-    description: "Docker Swarm cluster status, nodes, and controls.",
+    description: "Docker Swarm cluster status, nodes, and tasks.",
   },
   {
-    pattern: /^\/remote-servers\/?$/,
-    description: "Remote deploy, build, and database servers.",
-  },
-  {
-    pattern: /^\/monitoring\/?$/,
-    description: "Server monitoring metrics, history, and alert thresholds.",
+    pattern: /^\/docker-registry\/?$/,
+    description: "Configured Docker registries and credentials metadata.",
   },
   {
     pattern: /^\/web-server\/?$/,
-    description: "Caddy web server configuration, routes, and access logs.",
+    description: "Caddy web server configuration, routes, and logs.",
   },
   {
-    pattern: /^\/templates\/?$/,
-    description: "Reusable application and Docker Compose templates.",
+    pattern: /^\/certificates\/?$/,
+    description: "TLS certificates and certificate management.",
+  },
+  {
+    pattern: /^\/git-providers\/?$/,
+    description: "Configured Git providers and repository integrations.",
+  },
+  {
+    pattern: /^\/s3-destinations\/?$/,
+    description: "S3-compatible backup and storage destinations.",
+  },
+  {
+    pattern: /^\/monitoring\/?$/,
+    description: "Server monitoring metrics and alert thresholds.",
   },
   {
     pattern: /^\/notifications\/?$/,
-    description: "Notification channels, event subscriptions, and deliveries.",
-  },
-  {
-    pattern: /^\/requests\/?$/,
-    description: "Recent HTTP request activity and diagnostics.",
+    description: "Notification channels, subscriptions, and deliveries.",
   },
   {
     pattern: /^\/audit-logs\/?$/,
     description: "Organization audit events and actor activity.",
   },
   {
-    pattern: /^\/settings\/ai\/?$/,
-    description: "UpGal provider, model, and API credential settings.",
+    pattern: /^\/templates\/?$/,
+    description: "Reusable application and Docker Compose templates.",
   },
   {
     pattern: /^\/settings\/(sso|scim)\/?$/,
     description: "Organization identity-provider integration settings.",
     parameterNames: ["identityProtocol"],
+  },
+  {
+    pattern: /^\/dashboard\/?$/,
+    description: "Organization overview and operational account status.",
+  },
+  {
+    pattern: /^\/settings\/ai\/?$/,
+    description: "UpGal provider, model, and API credential settings.",
   },
 ];
 

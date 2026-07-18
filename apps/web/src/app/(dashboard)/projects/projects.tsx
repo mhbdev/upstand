@@ -28,8 +28,30 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+
+const createProjectTarget = defineUpGalTarget({
+  id: "create-project",
+  label: "New Project button",
+  description: "Opens the form for creating a new project.",
+  kind: "button",
+  action: "open_dialog",
+});
+const projectNameTarget = defineUpGalTarget({
+  id: "project-name",
+  label: "Project name field",
+  description: "Enter the human-readable name for the new project.",
+  kind: "field",
+});
+const createProjectSubmitTarget = defineUpGalTarget({
+  id: "create-project-submit",
+  label: "Create Project button",
+  description: "Submits the project form after you review the name.",
+  kind: "button",
+  action: "submit",
+});
 
 function ProjectCard({
   project,
@@ -212,10 +234,12 @@ function EmptyProjects({ onNew }: { onNew: () => void }) {
           Create your first project to start deploying apps and services.
         </p>
       </div>
-      <Button onClick={onNew} size="sm" className="mt-1 gap-2">
-        <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-        New Project
-      </Button>
+      <UpGalTarget definition={createProjectTarget}>
+        <Button onClick={onNew} size="sm" className="mt-1 gap-2">
+          <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+          New Project
+        </Button>
+      </UpGalTarget>
     </div>
   );
 }
@@ -262,15 +286,17 @@ function CreateProjectDialog({
         >
           <div className="space-y-2">
             <Label htmlFor="proj-name">Project Name</Label>
-            <Input
-              id="proj-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Production Web App"
-              autoComplete="off"
-              autoFocus
-              className="border-border/40 focus:border-primary"
-            />
+            <UpGalTarget definition={projectNameTarget}>
+              <Input
+                id="proj-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Production Web App"
+                autoComplete="off"
+                autoFocus
+                className="border-border/40 focus:border-primary"
+              />
+            </UpGalTarget>
           </div>
           <DialogFooter className="gap-2 pt-2">
             <Button
@@ -280,14 +306,16 @@ function CreateProjectDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={mutation.isPending || !name.trim()}
-              className="gap-2"
-            >
-              {mutation.isPending && <Spinner className="size-4" />}
-              Create Project
-            </Button>
+            <UpGalTarget definition={createProjectSubmitTarget}>
+              <Button
+                type="submit"
+                disabled={mutation.isPending || !name.trim()}
+                className="gap-2"
+              >
+                {mutation.isPending && <Spinner className="size-4" />}
+                Create Project
+              </Button>
+            </UpGalTarget>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -491,14 +519,16 @@ export default function Projects(_props: {
               placeholder="Search projects…"
               className="w-full min-w-0 border-border/40 bg-card/30 sm:w-64"
             />
-            <Button
-              onClick={() => setCreateProjectOpen(true)}
-              className="gap-2 font-medium"
-              disabled={!organizationId}
-            >
-              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-              New Project
-            </Button>
+            <UpGalTarget definition={createProjectTarget}>
+              <Button
+                onClick={() => setCreateProjectOpen(true)}
+                className="gap-2 font-medium"
+                disabled={!organizationId}
+              >
+                <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+                New Project
+              </Button>
+            </UpGalTarget>
           </div>
         }
       />

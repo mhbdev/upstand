@@ -73,8 +73,17 @@ import {
   Send,
   Users,
 } from "@/components/huge-icons";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+
+const addNotificationTarget = defineUpGalTarget({
+  id: "add-notification-channel",
+  label: "Add notification button",
+  description: "Opens the form for adding a notification channel.",
+  kind: "button",
+  action: "open_dialog",
+});
 
 type NotificationChannelDto = Omit<
   NotificationChannelView,
@@ -724,9 +733,11 @@ export default function NotificationsPage() {
         icon={<Bell className="size-6 text-primary" />}
         description="Route operational alerts to multiple channels. Credentials stay encrypted and delivery failures never block deployments."
         actions={
-          <Button onClick={openCreate} disabled={!organizationId}>
-            Add notification
-          </Button>
+          <UpGalTarget definition={addNotificationTarget}>
+            <Button onClick={openCreate} disabled={!organizationId}>
+              Add notification
+            </Button>
+          </UpGalTarget>
         }
       />
 

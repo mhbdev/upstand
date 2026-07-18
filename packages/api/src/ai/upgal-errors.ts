@@ -26,14 +26,16 @@ export function classifyUpGalError(error: unknown): UpGalErrorInfo {
   const message = errorText(error).toLowerCase();
   if (
     message.includes("configure an ai provider") ||
-    message.includes("provider config not found")
+    message.includes("provider config not found") ||
+    message.includes("web search is not configured")
   ) {
     return {
       code: "configuration",
       status: 503,
       retryable: false,
-      userMessage:
-        "UpGal needs a configured AI provider. Open Settings → UpGal Settings and configure one before retrying.",
+      userMessage: message.includes("web search")
+        ? "Web search is not configured on this Upstand server. Set UPGAL_WEB_SEARCH_API_KEY and retry."
+        : "UpGal needs a configured AI provider. Open Settings → UpGal Settings and configure one before retrying.",
     };
   }
   if (

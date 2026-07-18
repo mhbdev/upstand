@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { UpGalUIMessage } from "@upstand/api/ai/upgal";
+import type { UpGalUIAction, UpGalUIMessage } from "@upstand/api/ai/upgal";
 import type { UpGalPageContext } from "@upstand/api/ai/upgal-page-context";
 import {
   Alert,
@@ -33,7 +33,8 @@ import {
   isToolUIPart,
   lastAssistantMessageIsCompleteWithApprovalResponses,
 } from "ai";
-import { usePathname } from "next/navigation";
+import type { Route } from "next";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Conversation,
@@ -75,6 +76,13 @@ import {
 } from "@/components/huge-icons";
 import { UpGalToolOutput } from "@/components/upgal-tool-output";
 import { getServerApiUrl } from "@/lib/server-url";
+import {
+  collectUpGalUiTargets,
+  consumeUpGalAction,
+  isUpGalUIAction,
+  storeUpGalPlan,
+  upGalPlanUrl,
+} from "@/lib/upgal-ui-actions";
 import { trpc } from "@/utils/trpc";
 
 type UpGalChatProps = {
@@ -94,6 +102,15 @@ const toolTitles: Record<string, string> = {
   delete_project: "Delete project",
   delete_resource: "Delete resource",
   deploy_resource: "Deploy resource",
+  create_tag: "Create tag",
+  update_tag: "Update tag",
+  delete_tag: "Delete tag",
+  assign_resource_tag: "Assign resource tag",
+  detach_resource_tag: "Detach resource tag",
+  list_tags: "List tags",
+  get_resource_tags: "Resource tags",
+  search_web: "Web search",
+  guide_upstand: "Open Upstand guidance",
 };
 
 function displayChatError(error: Error): {
@@ -165,11 +182,23 @@ function Part({
   part,
   approve,
   approvalPendingId,
+  onUiAction,
 }: {
   part: UpGalUIMessage["parts"][number];
   approve: (id: string, approved: boolean) => void;
   approvalPendingId?: string;
+  onUiAction?: (actionId: string, action: UpGalUIAction) => void;
 }) {
+  useEffect(() => {
+    if (!isToolUIPart(part) || part.state !== "output-available") return;
+    const candidate = part as typeof part & {
+      output?: unknown;
+      toolCallId?: string;
+    };
+    if (!candidate.toolCallId || !isUpGalUIAction(candidate.output)) return;
+    onUiAction?.(candidate.toolCallId, candidate.output);
+  }, [onUiAction, part]);
+
   if (isTextUIPart(part)) return <MessageResponse>{part.text}</MessageResponse>;
   if (isToolUIPart(part)) {
     const toolName = getToolName(part);
@@ -274,6 +303,7 @@ function Part({
 
 export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string>();
@@ -288,6 +318,27 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
   const loadRequestId = useRef(0);
   const previousOrganizationId = useRef(organizationId);
   const manualNewConversation = useRef(false);
+  const executeUiAction = useCallback(
+    (actionId: string, action: UpGalUIAction) => {
+      const activePlanId = new URLSearchParams(window.location.search).get(
+        "upgal_plan",
+      );
+      if (activePlanId && activePlanId !== actionId) return;
+      if (!consumeUpGalAction(actionId)) return;
+      if (action.kind === "ui_action_plan") {
+        const planId = actionId;
+        storeUpGalPlan(planId, action);
+        const firstNavigation = action.steps.find(
+          (step) => step.type === "navigate",
+        );
+        const destinationPath = firstNavigation?.path ?? pathname;
+        const destination = upGalPlanUrl(destinationPath, planId);
+        router.push(destination as Route, { scroll: false });
+        return;
+      }
+    },
+    [pathname, router],
+  );
   const createConversation = useMutation(
     trpc.ai.createConversation.mutationOptions(),
   );
@@ -318,6 +369,10 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
     }),
     [pageTitle, pathname],
   );
+  const currentPageContext = useCallback(
+    () => ({ ...pageContext, uiTargets: collectUpGalUiTargets() }),
+    [pageContext],
+  );
 
   const transport = useMemo(
     () =>
@@ -345,7 +400,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
     if (conversationId || !organizationId) return conversationId;
     const result = await createConversation.mutateAsync({
       organizationId,
-      context: { page: pageContext },
+      context: { page: currentPageContext() },
     });
     setConversationId(result.id);
     void conversations.refetch();
@@ -432,7 +487,13 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
     const id = await ensureConversation();
     await chat.sendMessage(
       { text: trimmedText },
-      { body: { organizationId, conversationId: id, page: pageContext } },
+      {
+        body: {
+          organizationId,
+          conversationId: id,
+          page: currentPageContext(),
+        },
+      },
     );
   }
 
@@ -457,7 +518,11 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
           id,
           approved,
           options: {
-            body: { organizationId, conversationId, page: pageContext },
+            body: {
+              organizationId,
+              conversationId,
+              page: currentPageContext(),
+            },
           },
         });
       } finally {
@@ -471,13 +536,13 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
       {!open ? (
         <Button
           aria-label="Open UpGal assistant"
-          className="fixed right-5 bottom-5 z-50 size-14 rounded-full shadow-lg"
+          className="fixed right-5 bottom-5 z-[70] size-14 rounded-full shadow-lg"
           onClick={() => setOpen(true)}
         >
           <MessageCircle className="size-6" />
         </Button>
       ) : (
-        <section className="fixed inset-x-3 bottom-3 z-50 flex h-[min(720px,calc(100svh-24px))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:inset-x-auto sm:right-5 sm:w-[440px]">
+        <section className="fixed inset-x-3 bottom-3 z-[70] flex h-[min(720px,calc(100svh-24px))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:inset-x-auto sm:right-5 sm:w-[440px]">
           <header className="flex items-center gap-3 border-b px-4 py-3">
             <div className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Bot className="size-5" />
@@ -600,6 +665,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
                         part={part}
                         approve={respondToApproval}
                         approvalPendingId={approvalPendingId}
+                        onUiAction={executeUiAction}
                       />
                     ))}
                   </MessageContent>
@@ -638,7 +704,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
                               body: {
                                 organizationId,
                                 conversationId,
-                                page: pageContext,
+                                page: currentPageContext(),
                               },
                             })
                           }

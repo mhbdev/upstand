@@ -58,6 +58,8 @@ import { UserButton } from "@/components/auth/user/user-button";
 import { GlobalSearch } from "@/components/global-search";
 import { ModeToggle } from "@/components/mode-toggle";
 import { UpGalChat } from "@/components/upgal-chat";
+import { UpGalGuideOverlay } from "@/components/upgal-guide-overlay";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { SettingsDialog } from "@/features/settings";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -131,7 +133,20 @@ function DashboardSidebarGroup({
         {group.items.map((item) => (
           <SidebarMenuItem key={item.title}>
             <SidebarMenuButton
-              render={<Link href={item.href as Route} />}
+              render={
+                <UpGalTarget
+                  definition={defineUpGalTarget({
+                    id: `navigation-${item.href.slice(1).replaceAll("/", "-")}`,
+                    label: `${item.title} navigation`,
+                    description: `Open the ${item.title} page.`,
+                    kind: "navigation",
+                    action: "spotlight",
+                    path: item.href as `/${string}`,
+                  })}
+                >
+                  <Link href={item.href as Route} />
+                </UpGalTarget>
+              }
               isActive={
                 pathname === item.href || pathname.startsWith(`${item.href}/`)
               }
@@ -317,6 +332,7 @@ export default function DashboardLayout({
       />
       <SettingsDialog />
       <UpGalChat organizationId={activeOrg?.id} pageTitle={currentNav?.title} />
+      <UpGalGuideOverlay />
     </SidebarProvider>
   );
 }

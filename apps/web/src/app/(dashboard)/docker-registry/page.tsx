@@ -32,8 +32,17 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+
+const createDockerRegistryTarget = defineUpGalTarget({
+  id: "create-docker-registry",
+  label: "Add External Registry button",
+  description: "Opens the form for configuring an external Docker registry.",
+  kind: "button",
+  action: "open_dialog",
+});
 
 export default function DockerRegistryPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
@@ -178,10 +187,12 @@ export default function DockerRegistryPage() {
           <HugeiconsIcon icon={ContainerIcon} className="size-6 text-primary" />
         }
         actions={
-          <Button onClick={openCreate} className="gap-2 font-medium">
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Add External Registry
-          </Button>
+          <UpGalTarget definition={createDockerRegistryTarget}>
+            <Button onClick={openCreate} className="gap-2 font-medium">
+              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              Add External Registry
+            </Button>
+          </UpGalTarget>
         }
       />
 

@@ -79,6 +79,7 @@ import {
   WandSparkles,
 } from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { downloadText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
@@ -97,6 +98,13 @@ const PROMPT_PRESETS = [
 ];
 
 type EditorMode = "library" | "studio";
+const createTemplateTarget = defineUpGalTarget({
+  id: "create-template",
+  label: "New template button",
+  description: "Opens the template editor for creating a reusable blueprint.",
+  kind: "button",
+  action: "open_dialog",
+});
 type TemplateRecord = Omit<Template, "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
@@ -365,10 +373,12 @@ export default function TemplatesPage() {
                 Back to catalog
               </Button>
             )}
-            <Button onClick={openNewEditor}>
-              <Plus data-icon="inline-start" />
-              New template
-            </Button>
+            <UpGalTarget definition={createTemplateTarget}>
+              <Button onClick={openNewEditor}>
+                <Plus data-icon="inline-start" />
+                New template
+              </Button>
+            </UpGalTarget>
           </>
         }
       />

@@ -44,9 +44,18 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
+
+const addGitProviderTarget = defineUpGalTarget({
+  id: "add-git-provider",
+  label: "Add Git Provider button",
+  description: "Opens the form for configuring a Git provider.",
+  kind: "button",
+  action: "open_dialog",
+});
 
 type ProviderType = "github" | "gitlab" | "bitbucket" | "gitea";
 
@@ -323,17 +332,19 @@ export default function GitProviders({
         }
         description="Add and manage Git providers to pull source code and enable automatic deployments."
         actions={
-          <Button
-            onClick={() => {
-              resetForms();
-              setProviderType("github");
-              setAddProviderOpen(true);
-            }}
-            className="gap-2 font-medium"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Add Git Provider
-          </Button>
+          <UpGalTarget definition={addGitProviderTarget}>
+            <Button
+              onClick={() => {
+                resetForms();
+                setProviderType("github");
+                setAddProviderOpen(true);
+              }}
+              className="gap-2 font-medium"
+            >
+              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              Add Git Provider
+            </Button>
+          </UpGalTarget>
         }
       />
 

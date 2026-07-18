@@ -1,1 +1,18 @@
 @import "@upstand/ui/globals.css";
+
+@keyframes upgal-spotlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+  35%,
+  70% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+}
+
+.upgal-spotlight {
+  position: relative;
+  z-index: 1;
+  animation: upgal-spotlight 2.6s ease-in-out;
+}

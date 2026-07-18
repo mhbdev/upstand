@@ -42,8 +42,30 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+
+const createTagTarget = defineUpGalTarget({
+  id: "create-tag",
+  label: "New tag button",
+  description: "Opens the form for creating an organization tag.",
+  kind: "button",
+  action: "open_dialog",
+});
+const tagNameTarget = defineUpGalTarget({
+  id: "tag-name",
+  label: "Tag name field",
+  description: "Enter the shared label name.",
+  kind: "field",
+});
+const createTagSubmitTarget = defineUpGalTarget({
+  id: "create-tag-submit",
+  label: "Create tag button",
+  description: "Saves the tag after reviewing its name and color.",
+  kind: "button",
+  action: "submit",
+});
 
 export default function TagsPage() {
   const { data: organization } = authClient.useActiveOrganization();
@@ -97,17 +119,19 @@ export default function TagsPage() {
         title="Tags"
         description="Organize resources with reusable organization-scoped labels."
         actions={
-          <Button
-            onClick={() => {
-              setEditingTag(null);
-              setName("");
-              setColor(DEFAULT_TAG_COLOR);
-              setOpen(true);
-            }}
-          >
-            <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
-            New tag
-          </Button>
+          <UpGalTarget definition={createTagTarget}>
+            <Button
+              onClick={() => {
+                setEditingTag(null);
+                setName("");
+                setColor(DEFAULT_TAG_COLOR);
+                setOpen(true);
+              }}
+            >
+              <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
+              New tag
+            </Button>
+          </UpGalTarget>
         }
       />
       <Card>
@@ -206,12 +230,14 @@ export default function TagsPage() {
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="tag-name">Name</FieldLabel>
-                <Input
-                  id="tag-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  autoFocus
-                />
+                <UpGalTarget definition={tagNameTarget}>
+                  <Input
+                    id="tag-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    autoFocus
+                  />
+                </UpGalTarget>
               </Field>
               <Field data-invalid={!colorIsValid}>
                 <FieldLabel htmlFor="tag-color">Color</FieldLabel>
@@ -253,20 +279,22 @@ export default function TagsPage() {
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={
-                  create.isPending ||
-                  update.isPending ||
-                  !name.trim() ||
-                  !colorIsValid
-                }
-              >
-                {(create.isPending || update.isPending) && (
-                  <Spinner data-icon="inline-start" />
-                )}
-                {editingTag ? "Save changes" : "Create tag"}
-              </Button>
+              <UpGalTarget definition={createTagSubmitTarget}>
+                <Button
+                  type="submit"
+                  disabled={
+                    create.isPending ||
+                    update.isPending ||
+                    !name.trim() ||
+                    !colorIsValid
+                  }
+                >
+                  {(create.isPending || update.isPending) && (
+                    <Spinner data-icon="inline-start" />
+                  )}
+                  {editingTag ? "Save changes" : "Create tag"}
+                </Button>
+              </UpGalTarget>
             </DialogFooter>
           </form>
         </DialogContent>

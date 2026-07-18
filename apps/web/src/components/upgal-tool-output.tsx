@@ -1,5 +1,6 @@
 "use client";
 
+import type { UpGalUIAction } from "@upstand/api/ai/upgal";
 import { Badge } from "@upstand/ui/components/badge";
 import { cn } from "@upstand/ui/lib/utils";
 import type { Route } from "next";
@@ -44,6 +45,7 @@ const toolTitles: Record<string, string> = {
   list_docker_images: "Docker images",
   list_docker_volumes: "Docker volumes",
   list_docker_services: "Docker services",
+  search_web: "Web search results",
 };
 
 const displayValue = (value: unknown): string => {
@@ -268,11 +270,79 @@ function LogsResult({ output }: { output: string }) {
   );
 }
 
+function UiActionResult({ output }: { output: UpGalUIAction }) {
+  return (
+    <p className="rounded-md border border-primary/20 bg-primary/5 p-3 text-muted-foreground text-xs">
+      UpGal started a {output.steps.length}-step walkthrough. Follow the guide
+      on the page; it will not submit forms for you.
+    </p>
+  );
+}
+
+function WebSearchResult({ output }: { output: RecordValue }) {
+  const results = Array.isArray(output.results)
+    ? output.results.filter(isRecord)
+    : [];
+  return (
+    <section aria-label="Web search results" className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <DatabaseIcon aria-hidden="true" />
+        <span className="font-medium text-xs">Web search results</span>
+        <Badge className="ml-auto rounded-full" variant="secondary">
+          {results.length}
+        </Badge>
+      </div>
+      {results.length === 0 ? (
+        <p className="rounded-md border border-dashed p-3 text-muted-foreground text-xs">
+          No web results found.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {results.map((result, index) => {
+            const url = stringValue(result.url);
+            return (
+              <a
+                className="rounded-md border bg-muted/20 px-3 py-2 hover:bg-muted/50"
+                href={url}
+                key={`${url ?? "result"}-${index}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <p className="font-medium text-sm">
+                  {displayValue(result.title)}
+                </p>
+                <p className="mt-1 text-muted-foreground text-xs">
+                  {displayValue(result.description)}
+                </p>
+                {url ? (
+                  <p className="mt-1 truncate text-[11px] text-primary">
+                    {url}
+                  </p>
+                ) : null}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function UpGalToolOutput({
   name,
   input,
   output,
 }: ToolResultProps): ReactNode {
+  if (
+    isRecord(output) &&
+    output.kind === "ui_action_plan" &&
+    Array.isArray(output.steps)
+  ) {
+    return <UiActionResult output={output as unknown as UpGalUIAction} />;
+  }
+  if (isRecord(output) && Array.isArray(output.results)) {
+    return <WebSearchResult output={output} />;
+  }
   if (typeof output === "string" && name.includes("log")) {
     return <LogsResult output={output} />;
   }

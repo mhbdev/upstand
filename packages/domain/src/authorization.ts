@@ -685,6 +685,15 @@ export const MCP_TOOL_CAPABILITIES = {
   get_swarm_containers: "swarm:view",
   get_web_server_logs: "server:view",
   get_update_status: "server:view",
+  list_tags: "tag:view",
+  get_resource_tags: "tag:view",
+  create_tag: "tag:create",
+  update_tag: "tag:update",
+  delete_tag: "tag:delete",
+  assign_resource_tag: "tag:update",
+  detach_resource_tag: "tag:update",
+  search_web: "ai:view",
+  guide_upstand: "ai:view",
 } as const satisfies Record<string, Capability>;
 
 export const MCP_READ_ONLY_TOOL_NAMES = [
@@ -726,4 +735,8 @@ export const MCP_READ_ONLY_TOOL_NAMES = [
   "get_swarm_containers",
   "get_web_server_logs",
   "get_update_status",
+  "list_tags",
+  "get_resource_tags",
+  "search_web",
+  "guide_upstand",
 ] as const satisfies readonly (keyof typeof MCP_TOOL_CAPABILITIES)[];

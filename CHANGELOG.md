@@ -4,6 +4,20 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.75 - 2026-07-18
+
+### Added
+
+- Add organization-scoped UpGal tag listing, creation, updates, deletion, assignment, and detachment with permission checks and approval gates for mutations.
+- Add optional server-side Brave web search with bounded, sanitized result metadata and cited links in the chat UI.
+- Add generic, type-safe UpGal UI action plans for internal navigation, target spotlighting, field focus, and guarded dialog opening.
+
+### Changed
+
+- Keep the UpGal chat above the walkthrough overlay and preserve the chat during guided navigation.
+- Replace repeated raw UI action attributes with the reusable `UpGalTarget` definition component.
+- Split new UpGal capability factories and schemas into focused tool modules instead of a shared feature schema file.
+
 ## 0.1.74 - 2026-07-18
 
 - Bump

@@ -51,8 +51,17 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+
+const createServerTarget = defineUpGalTarget({
+  id: "create-server",
+  label: "Create Server button",
+  description: "Opens the form for adding a remote server.",
+  kind: "button",
+  action: "open_dialog",
+});
 
 export default function RemoteServersPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
@@ -271,16 +280,18 @@ export default function RemoteServersPage() {
           />
         }
         actions={
-          <Button
-            onClick={() => {
-              resetForm();
-              setDialogOpen(true);
-            }}
-            className="gap-2 self-start sm:self-auto"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Create Server
-          </Button>
+          <UpGalTarget definition={createServerTarget}>
+            <Button
+              onClick={() => {
+                resetForm();
+                setDialogOpen(true);
+              }}
+              className="gap-2 self-start sm:self-auto"
+            >
+              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              Create Server
+            </Button>
+          </UpGalTarget>
         }
       />
 

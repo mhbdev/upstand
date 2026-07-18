@@ -42,7 +42,7 @@ UpGal executes on the server using Vercel AI SDK's `ToolLoopAgent` and streams r
 - **12-Step Loop Limit**: Runs are capped at 12 sequential tool execution loops to prevent runaway API spend or infinite loops.
 - **Request-Scoped DI**: Uses the same request container lifecycle as standard HTTP endpoints, ensuring strict tenant isolation.
 - **Auto-run (Read-only)**: Inspection tools (e.g. listing resources, viewing container statistics, tailing logs) run automatically after verifying tenant permission.
-- **Approval Gates (Mutations)**: Destructive or mutative actions (creating projects/templates, deploying apps/templates, stopping services, deleting resources, or pruning Docker state) require explicit user approval.
+- **Approval Gates (Mutations)**: Destructive or mutative actions (creating projects/templates/tags, assigning tags, deploying apps/templates, stopping services, deleting resources, or pruning Docker state) require explicit user approval.
 
 ```mermaid
 sequenceDiagram
@@ -76,11 +76,40 @@ UpGal has access to the same organization-scoped information and actions exposed
 | Monitoring | `get_monitoring_status`, `get_monitoring_metrics` | — |
 | Deployments | `list_deployments` | — |
 | Audit | `get_audit_logs` with actor/action/resource/date/text filters and pagination | — |
+| Tags | `list_tags`, `get_resource_tags` | `create_tag`, `update_tag`, `delete_tag`, `assign_resource_tag`, `detach_resource_tag` |
+| Web | `search_web` (optional current public-web search) | — |
+| UI guidance | `guide_upstand` | — |
 | Docker | `list_docker_containers`, `list_docker_images`, `list_docker_volumes`, `list_docker_networks`, `list_docker_services`, `get_docker_logs` | `prune_docker_resources` |
 
 Resource configuration output is intentionally redacted: credentials, environment secrets, and build secrets are not returned to the model. All organization lookups are server-side and IDs are preferred over display names to avoid ambiguous actions.
 
-## 4. Templates AI Draft Generator
+## 4. Tags, web search, and UI guidance
+
+UpGal can manage reusable organization tags and inspect resource assignments. Read operations run automatically when the user has the corresponding permission. Tag creation, edits, deletion, assignment, and detachment always produce an approval request before changing data.
+
+Public-web search is disabled unless the server has `UPGAL_WEB_SEARCH_API_KEY` configured. The optional Brave-compatible endpoint can be changed with `UPGAL_WEB_SEARCH_BASE_URL`. Keys stay server-side; result titles, snippets, and pages are treated as untrusted data, and the chat shows bounded result metadata with links for citations.
+
+For how-to questions, UpGal can return one bounded UI walkthrough. Walkthroughs use typed page targets registered by the dashboard to navigate internally, spotlight visible controls, focus fields, and open explicitly safe dialogs. They never submit forms or perform destructive actions. The chat remains mounted while the guide navigates, and the guide consumes each plan once to avoid redirect loops or repeated execution.
+
+Dashboard developers can register a target with the reusable `UpGalTarget` component:
+
+```tsx
+<UpGalTarget
+  definition={{
+    id: "create-project",
+    label: "New Project button",
+    description: "Opens the form for creating a new project.",
+    kind: "button",
+    action: "open_dialog",
+  }}
+>
+  <Button onClick={openDialog}>New Project</Button>
+</UpGalTarget>
+```
+
+The definition is type-checked, while the component emits the runtime metadata consumed by UpGal. New pages and controls can add targets without changing a central action enum.
+
+## 5. Templates AI Draft Generator
 
 The **Templates** page integrates an AI template drafter. 
 
@@ -98,7 +127,7 @@ UpGal follows a strict Compose generation contract so drafts are deployable inst
 
 ---
 
-## 5. Model Context Protocol (MCP) Integration
+## 6. Model Context Protocol (MCP) Integration
 
 UpGal exposes a JSON-RPC Model Context Protocol endpoint at `/api/mcp` for external LLM integrations:
 

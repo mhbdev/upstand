@@ -39,9 +39,32 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
+
+const createSshKeyTarget = defineUpGalTarget({
+  id: "create-ssh-key",
+  label: "Add SSH Key button",
+  description: "Opens the SSH key creation dialog.",
+  kind: "button",
+  action: "open_dialog",
+});
+const sshKeyNameTarget = defineUpGalTarget({
+  id: "ssh-key-name",
+  label: "SSH key name field",
+  description: "Enter a recognizable name for this key.",
+  kind: "field",
+});
+const generateSshKeySubmitTarget = defineUpGalTarget({
+  id: "generate-ssh-key-submit",
+  label: "Generate Key button",
+  description:
+    "Generates and stores the SSH key pair. Review the name before submitting.",
+  kind: "button",
+  action: "submit",
+});
 
 type AddKeyMode = "generate" | "import";
 
@@ -250,17 +273,19 @@ export default function SSHKeys(_props: {
           <HugeiconsIcon icon={Key01Icon} className="size-6 text-primary" />
         }
         actions={
-          <Button
-            onClick={() => {
-              resetForm();
-              setAddKeyMode("generate");
-              setAddKeyOpen(true);
-            }}
-            className="gap-2 font-medium"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-            Add SSH Key
-          </Button>
+          <UpGalTarget definition={createSshKeyTarget}>
+            <Button
+              onClick={() => {
+                resetForm();
+                setAddKeyMode("generate");
+                setAddKeyOpen(true);
+              }}
+              className="gap-2 font-medium"
+            >
+              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              Add SSH Key
+            </Button>
+          </UpGalTarget>
         }
       />
 
@@ -352,16 +377,18 @@ export default function SSHKeys(_props: {
             Add an SSH Key to reuse it across different git providers,
             deployments, and servers.
           </p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              resetForm();
-              setAddKeyMode("generate");
-              setAddKeyOpen(true);
-            }}
-          >
-            Create first key
-          </Button>
+          <UpGalTarget definition={createSshKeyTarget}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetForm();
+                setAddKeyMode("generate");
+                setAddKeyOpen(true);
+              }}
+            >
+              Create first key
+            </Button>
+          </UpGalTarget>
         </div>
       )}
 
@@ -498,14 +525,16 @@ export default function SSHKeys(_props: {
             <form onSubmit={handleGenerate} className="space-y-4 pt-1">
               <div className="space-y-2">
                 <Label htmlFor="gen-key-name">Name</Label>
-                <Input
-                  id="gen-key-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Hetzner Production VPS"
-                  autoComplete="off"
-                  required
-                />
+                <UpGalTarget definition={sshKeyNameTarget}>
+                  <Input
+                    id="gen-key-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Hetzner Production VPS"
+                    autoComplete="off"
+                    required
+                  />
+                </UpGalTarget>
               </div>
 
               <div className="space-y-2">
@@ -539,16 +568,20 @@ export default function SSHKeys(_props: {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  className="gap-2 font-medium"
-                  disabled={isSubmitting}
-                >
-                  {generateMutation.isPending && <Spinner className="size-4" />}
-                  {generateMutation.isPending
-                    ? "Generating..."
-                    : "Generate Key"}
-                </Button>
+                <UpGalTarget definition={generateSshKeySubmitTarget}>
+                  <Button
+                    type="submit"
+                    className="gap-2 font-medium"
+                    disabled={isSubmitting}
+                  >
+                    {generateMutation.isPending && (
+                      <Spinner className="size-4" />
+                    )}
+                    {generateMutation.isPending
+                      ? "Generating..."
+                      : "Generate Key"}
+                  </Button>
+                </UpGalTarget>
               </DialogFooter>
             </form>
           ) : (
