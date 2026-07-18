@@ -4,6 +4,8 @@
     "deployments",
     "routing",
     "servers",
-    "terminal-logs"
+    "terminal-logs",
+    "templates",
+    "template-catalog"
   ]
 }

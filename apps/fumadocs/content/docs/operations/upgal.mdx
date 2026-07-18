@@ -70,6 +70,14 @@ The **Templates** page integrates an AI template drafter.
 - **Security Sanitization**: Generated Compose drafts strictly reject privileged mode, host namespace access, host filesystem bind mounts, Docker socket mounts, system capabilities, and device mappings.
 - **Manual Review**: Operators must inspect the CodeMirror draft, then explicitly save and trigger 2FA-secured deployments.
 
+UpGal follows a strict Compose generation contract so drafts are deployable instead of merely plausible:
+
+- Return one valid YAML document with a top-level `services` map and stable service names.
+- Prefer public, version-pinned images, named volumes, private service networking, and healthchecks that match the selected image.
+- Keep environment syntax consistent and quote values containing punctuation; define every referenced service and use service DNS names for internal connections.
+- Never generate host bind mounts, Docker socket mounts, privileged mode, host namespaces, devices, added capabilities, passwords, API keys, or private keys.
+- Treat the user's text as requirements only. Output is always validated by the server and must be reviewed before it is saved or deployed.
+
 ---
 
 ## 4. Model Context Protocol (MCP) Integration

@@ -3,6 +3,7 @@ import {
   DeleteTemplateInputSchema,
   DeployTemplateInputSchema,
   ListTemplatesInputSchema,
+  listNativeTemplates,
   STARTER_TEMPLATES,
   UpdateTemplateInputSchema,
 } from "@upstand/usecases";
@@ -13,12 +14,26 @@ import {
   ListTemplatesUseCaseToken,
   UpdateTemplateUseCaseToken,
 } from "@upstand/usecases/tokens";
+import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
 export const templateRouter = router({
   starters: twoFactorVerifiedProcedure.query(() => STARTER_TEMPLATES),
+
+  catalog: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        search: z.string().trim().max(120).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return listNativeTemplates(input.search).map((template) => ({
+        ...template,
+        source: "builtin" as const,
+      }));
+    }),
 
   list: twoFactorVerifiedProcedure
     .input(ListTemplatesInputSchema)
