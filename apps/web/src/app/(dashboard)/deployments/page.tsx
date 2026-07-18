@@ -9,13 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
@@ -33,18 +26,16 @@ import {
   TabsList,
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { StatusBadge } from "@/components/dashboard/status-badge";
 import {
   Activity,
   Clock,
-  Copy,
   RefreshCw,
   Search,
   Server,
@@ -52,8 +43,11 @@ import {
   Terminal,
   Trash2,
 } from "@/components/huge-icons";
+import {
+  DeploymentLogDialog,
+  DeploymentStatusBadge,
+} from "@/components/shared/deployment-presentation";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
-import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 export default function DeploymentsPage() {
@@ -73,7 +67,6 @@ export default function DeploymentsPage() {
     jobId: string;
     label: string;
   } | null>(null);
-  const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Queries
   const {
@@ -121,15 +114,6 @@ export default function DeploymentsPage() {
       });
     }
   }, [servers, dirtyConcurrency]);
-
-  // Auto-scroll logs modal to bottom
-  useEffect(() => {
-    if (selectedDeployment) {
-      setTimeout(() => {
-        logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    }
-  }, [selectedDeployment]);
 
   // Live update log details if modal is open
   useEffect(() => {
@@ -206,27 +190,10 @@ export default function DeploymentsPage() {
     );
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "success":
-        return <StatusBadge label="Success" tone="success" />;
-      case "running":
-        return <StatusBadge label="Running" tone="info" />;
-      case "queued":
-        return <StatusBadge label="Queued" tone="warning" />;
-      case "failed":
-        return <StatusBadge label="Failed" tone="destructive" />;
-      default:
-        return <StatusBadge label={status} tone="outline" />;
-    }
-  };
-
   const getQueueStateBadge = (state: string) => {
-    if (state === "active") return <StatusBadge label="Active" tone="info" />;
-    if (state === "waiting") {
-      return <StatusBadge label="Waiting" tone="warning" />;
-    }
-    return <StatusBadge label={state} tone="secondary" />;
+    return (
+      <DeploymentStatusBadge status={state === "active" ? "running" : state} />
+    );
   };
 
   return (
@@ -338,7 +305,9 @@ export default function DeploymentsPage() {
                           <TableCell className="max-w-[180px] truncate">
                             {dep.title}
                           </TableCell>
-                          <TableCell>{getStatusBadge(dep.status)}</TableCell>
+                          <TableCell>
+                            <DeploymentStatusBadge status={dep.status} />
+                          </TableCell>
                           <TableCell className="text-muted-foreground text-xs">
                             {new Date(dep.createdAt).toLocaleString()}
                           </TableCell>
@@ -539,51 +508,12 @@ export default function DeploymentsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Logs Modal */}
-      <Dialog
-        open={!!selectedDeployment}
+      <DeploymentLogDialog
+        open={selectedDeployment !== null}
         onOpenChange={(open) => !open && setSelectedDeployment(null)}
-      >
-        <DialogContent className="flex h-[min(88svh,900px)] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] flex-col border-muted/40 p-4 sm:min-w-[min(42rem,calc(100vw-2rem))] sm:p-6">
-          <DialogHeader className="border-b pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="flex items-center gap-2 text-xl">
-                  <Terminal className="size-5 text-primary" />
-                  Deployment Logs: {selectedDeployment?.resourceName}
-                </DialogTitle>
-                <DialogDescription className="mt-1">
-                  ID:{" "}
-                  <span className="font-mono text-xs">
-                    {selectedDeployment?.id}
-                  </span>{" "}
-                  | Title: {selectedDeployment?.title}
-                </DialogDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  void copyText(selectedDeployment?.logs || "")
-                    .then(() => toast.success("Logs copied to clipboard"))
-                    .catch(() => toast.error("Failed to copy logs"));
-                }}
-                className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
-              >
-                <Copy className="size-3.5" />
-                Copy Logs
-              </Button>
-            </div>
-          </DialogHeader>
-
-          <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-muted/20 bg-[#0c0d12] p-4 font-mono text-xs text-zinc-300 leading-relaxed shadow-inner">
-            <pre className="whitespace-pre-wrap">
-              {selectedDeployment?.logs || "No logs available."}
-            </pre>
-            <div ref={logsEndRef} />
-          </div>
-        </DialogContent>
-      </Dialog>
+        deployment={selectedDeployment}
+        follow
+      />
 
       <ConfirmActionDialog
         open={cancelTarget !== null}
