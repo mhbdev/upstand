@@ -1,19 +1,20 @@
-import type { IUnitOfWork } from "@upstand/domain";
 import { Cron } from "croner";
 import { log } from "evlog";
-import { UnitOfWorkToken } from "../tokens";
-import { TriggerBackupRunUseCase } from "./trigger-backup-run.usecase";
 
 interface ScheduledBackup {
   cron: Cron;
   signature: string;
 }
 
-interface ScopedServiceProvider {
-  createScope(): {
-    resolve<T>(token: unknown): T;
-    dispose(): Promise<void>;
-  };
+export interface BackupSchedulerDependencies {
+  loadSchedules: () => Promise<
+    Array<{
+      id: string;
+      cronExpression: string;
+      timezone: string;
+    }>
+  >;
+  trigger: (scheduleId: string) => Promise<{ id: string } | null>;
 }
 
 export class BackupScheduler {
@@ -22,9 +23,7 @@ export class BackupScheduler {
   private ready = false;
   private refreshInFlight: Promise<void> | null = null;
 
-  constructor(
-    private readonly getServiceProvider: () => ScopedServiceProvider,
-  ) {}
+  constructor(private readonly dependencies: BackupSchedulerDependencies) {}
 
   async start(): Promise<void> {
     if (this.refreshTimer) return;
@@ -69,17 +68,7 @@ export class BackupScheduler {
   }
 
   private async performRefresh(): Promise<void> {
-    const scope = this.getServiceProvider().createScope();
-    let schedules: Awaited<
-      ReturnType<IUnitOfWork["backupScheduleRepository"]["findEnabled"]>
-    >;
-    try {
-      const uow = scope.resolve<IUnitOfWork>(UnitOfWorkToken);
-      schedules = await uow.backupScheduleRepository.findEnabled();
-    } finally {
-      await scope.dispose();
-    }
-
+    const schedules = await this.dependencies.loadSchedules();
     const activeIds = new Set(schedules.map((schedule) => schedule.id));
     for (const [id, job] of this.jobs) {
       if (!activeIds.has(id)) {
@@ -116,12 +105,8 @@ export class BackupScheduler {
   }
 
   private async trigger(scheduleId: string): Promise<void> {
-    const scope = this.getServiceProvider().createScope();
     try {
-      const uow = scope.resolve<IUnitOfWork>(UnitOfWorkToken);
-      const run = await new TriggerBackupRunUseCase(uow).execute({
-        scheduleId,
-      });
+      const run = await this.dependencies.trigger(scheduleId);
       if (run) {
         log.info({
           message: "Scheduled backup queued",
@@ -135,8 +120,6 @@ export class BackupScheduler {
         scheduleId,
         err: error instanceof Error ? error.message : String(error),
       });
-    } finally {
-      await scope.dispose();
     }
   }
 }

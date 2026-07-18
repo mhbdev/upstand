@@ -1,4 +1,8 @@
 import * as dependencies from "./dependencies";
+import { resolveDockerServiceForServer } from "@upstand/usecases/resource/docker-client";
+import { QueueDeploymentUseCase } from "@upstand/usecases/deployment/queue-deployment.usecase";
+import { TriggerBackupRunUseCase } from "@upstand/usecases/backup/trigger-backup-run.usecase";
+import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 
 type ServiceCollection = InstanceType<typeof dependencies.ServiceCollection>;
 type ServiceProviderFactory = () => ReturnType<ServiceCollection["build"]>;
@@ -7,18 +11,77 @@ export function registerBackups(
   services: ServiceCollection,
   getServiceProvider: ServiceProviderFactory,
 ) {
+  const withScope = async <T>(operation: (uow: any) => Promise<T>) => {
+    const scope = getServiceProvider().createScope();
+    try {
+      return await operation(scope.resolve(UnitOfWorkToken));
+    } finally {
+      await scope.dispose();
+    }
+  };
+
   // Backups
   services.addSingleton(
     dependencies.BackupSchedulerToken,
-    () => new dependencies.BackupScheduler(() => getServiceProvider()),
+    () =>
+      new dependencies.BackupScheduler({
+        loadSchedules: () =>
+          withScope((uow) => uow.backupScheduleRepository.findEnabled()),
+        trigger: (scheduleId) =>
+          withScope((uow) =>
+            new TriggerBackupRunUseCase(uow).execute({ scheduleId }),
+          ),
+      }),
   );
   services.addSingleton(
     dependencies.GeneralSchedulerToken,
     (c) =>
-      new dependencies.GeneralScheduler(
-        () => getServiceProvider(),
-        c.resolve(dependencies.DockerServiceToken),
-      ),
+      new dependencies.GeneralScheduler({
+        loadSchedules: () =>
+          withScope((uow) => uow.scheduleRepository.findEnabled()),
+        execute: (scheduleId, manual) =>
+          withScope(async (uow) => {
+            const schedule = await uow.scheduleRepository.findById(scheduleId);
+            if ((!schedule?.enabled && !manual) || !schedule?.resourceId)
+              return;
+
+            const resource = await uow.resourceRepository.findById(
+              schedule.resourceId,
+            );
+            if (!resource) return;
+
+            const jobType = schedule.jobType ?? "command";
+            if (jobType === "deployment") {
+              await new QueueDeploymentUseCase(uow).execute({
+                resourceId: resource.id,
+                title: `Scheduled deployment: ${schedule.name}`,
+              });
+              return;
+            }
+            if (jobType === "backup") {
+              if (!schedule.backupScheduleId) return;
+              await new TriggerBackupRunUseCase(uow).execute({
+                scheduleId: schedule.backupScheduleId,
+              });
+              return;
+            }
+
+            const { dockerService, cleanup } =
+              await resolveDockerServiceForServer(
+                resource.serverId,
+                uow,
+                c.resolve(dependencies.DockerServiceToken),
+              );
+            try {
+              await dockerService.runCommandInResourceContainer(
+                resource,
+                schedule.command,
+              );
+            } finally {
+              cleanup();
+            }
+          }),
+      }),
   );
   services.addTransient(
     dependencies.GetSchedulesUseCaseToken,

@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { ServiceProvider } from "@circulo-ai/di";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
@@ -16,16 +15,24 @@ import {
   assertBuildServerSupportsResource,
   assertDeploymentServerSupportsResource,
 } from "../server/server-role";
-import {
-  CaddyServiceToken,
-  DockerServiceToken,
-  PublishNotificationUseCaseToken,
-  UnitOfWorkToken,
-} from "../tokens";
 import type { CaddyService } from "../web-server/caddy.service";
+import type { NotificationPublisher } from "../notification/publish-notification.usecase";
 import { buildRegistryImageTag } from "./build-registry";
 import { getDeploymentQueueName } from "./deployment-queue-name";
 import { ResourceLock } from "./resource-lock";
+
+export interface DeploymentWorkerScope {
+  uow: IUnitOfWork;
+  dockerService: DockerService;
+  caddyService: CaddyService;
+  publisher: NotificationPublisher;
+  dispose: () => Promise<void>;
+}
+
+export interface DeploymentWorkerDependencies {
+  getBuildSettings: () => Promise<{ concurrency: number } | null>;
+  createScope: () => Promise<DeploymentWorkerScope>;
+}
 
 export class DeploymentWorker {
   private worker: Worker | null = null;
@@ -34,10 +41,7 @@ export class DeploymentWorker {
 
   constructor(
     private readonly serverId: string,
-    private readonly getServiceProvider: () => Pick<
-      ServiceProvider,
-      "createScope"
-    >,
+    private readonly dependencies: DeploymentWorkerDependencies,
   ) {}
 
   public async start(): Promise<void> {
@@ -52,25 +56,11 @@ export class DeploymentWorker {
 
     // Get initial concurrency from DB or default
     let concurrency = 2; // Default to 2 for manager/leader, 1 for workers
-    const scope = this.getServiceProvider().createScope();
     try {
-      const uow = scope.resolve(UnitOfWorkToken);
-      const settings = await uow.serverBuildSettingsRepository.findById(
-        this.serverId,
-      );
+      const settings = await this.dependencies.getBuildSettings();
       if (settings) {
         concurrency = Math.max(1, Math.min(100, settings.concurrency));
       } else {
-        // Create default settings if not exists
-        await uow.serverBuildSettingsRepository.create({
-          id: this.serverId,
-          hostname:
-            this.serverId === "local"
-              ? "Dokploy Server"
-              : `Swarm Node ${this.serverId}`,
-          ip: "127.0.0.1",
-          concurrency: this.serverId === "local" ? 2 : 1,
-        });
         concurrency = this.serverId === "local" ? 2 : 1;
       }
     } catch (err: any) {
@@ -80,7 +70,6 @@ export class DeploymentWorker {
         err: err.message,
       });
     } finally {
-      await scope.dispose();
     }
 
     log.info({
@@ -231,19 +220,10 @@ export class DeploymentWorker {
     let remoteCliCleanup: (() => void) | null = null;
     let buildCliCleanup: (() => void) | null = null;
 
-    const scope = this.getServiceProvider().createScope();
-    let uow: IUnitOfWork;
-    let dockerService: DockerService;
-    let caddyService: CaddyService;
-    try {
-      uow = scope.resolve(UnitOfWorkToken);
-      dockerService = scope.resolve(DockerServiceToken);
-      caddyService = scope.resolve(CaddyServiceToken);
-    } catch (error) {
-      await scope.dispose();
-      await resourceLock.release();
-      throw error;
-    }
+    const scope = await this.dependencies.createScope();
+    const { uow, publisher } = scope;
+    let dockerService = scope.dockerService;
+    let caddyService = scope.caddyService;
 
     const publishDeploymentOutcome = async (status: "success" | "failed") => {
       if (!resource) return;
@@ -257,7 +237,6 @@ export class DeploymentWorker {
       );
       if (!project) return;
 
-      const publisher = scope.resolve(PublishNotificationUseCaseToken);
       const succeeded = status === "success";
       await publisher.execute({
         organizationId: project.organizationId,
