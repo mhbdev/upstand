@@ -37,6 +37,7 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -148,8 +149,8 @@ export default function S3Destinations(_props: {
     ...trpc.s3Destination.delete.mutationOptions(),
     onSuccess: () => {
       toast.success("S3 Destination deleted successfully");
-      setDeleteOpen(false);
       setDeleteId(null);
+      setDeleteOpen(false);
       refetch();
     },
     onError: (err) => {
@@ -606,40 +607,23 @@ export default function S3Destinations(_props: {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Destination</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-foreground">
-                {deleteName}
-              </span>
-              ? This action cannot be undone and will prevent backups from using
-              this destination.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setDeleteOpen(false);
-                setDeleteId(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteSubmit}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete Destination"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmActionDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          setDeleteOpen(open);
+          if (!open) setDeleteId(null);
+        }}
+        title="Delete S3 destination?"
+        description={
+          <>
+            This will delete <strong>{deleteName}</strong> and prevent backups
+            from using it. This action cannot be undone.
+          </>
+        }
+        actionLabel="Delete destination"
+        pending={deleteMutation.isPending}
+        onConfirm={handleDeleteSubmit}
+      />
     </DashboardPage>
   );
 }

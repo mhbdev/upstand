@@ -29,6 +29,7 @@ import {
 } from "@upstand/ui/components/table";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -94,6 +95,15 @@ function stripAnsi(str: string) {
   return str.replace(ansiEscapeSequence, "");
 }
 
+type PendingRemoval =
+  | { kind: "container"; id: string; label: string }
+  | {
+      kind: "resource";
+      id: string;
+      label: string;
+      command: "remove-image" | "remove-network" | "remove-volume";
+    };
+
 export default function DockerInventoryPage() {
   const { data: organization } = authClient.useActiveOrganization();
   const organizationId = organization?.id || "";
@@ -115,6 +125,9 @@ export default function DockerInventoryPage() {
     id: string;
     name: string;
   } | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(
+    null,
+  );
 
   // Auto-scroll logic for logs
   const [autoScroll, setAutoScroll] = useState(true);
@@ -197,6 +210,7 @@ export default function DockerInventoryPage() {
     ...trpc.server.controlContainer.mutationOptions(),
     onSuccess: () => {
       toast.success("Container command completed");
+      setPendingRemoval(null);
       void inventoryQuery.refetch();
       void containersQuery.refetch();
     },
@@ -207,6 +221,7 @@ export default function DockerInventoryPage() {
     ...trpc.server.controlResource.mutationOptions(),
     onSuccess: () => {
       toast.success("Docker resource removed");
+      setPendingRemoval(null);
       void inventoryQuery.refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -712,22 +727,15 @@ export default function DockerInventoryPage() {
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      className="size-7 text-zinc-400 hover:bg-destructive/10 hover:text-destructive"
+                                      className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                       disabled={controlContainer.isPending}
-                                      onClick={() => {
-                                        if (
-                                          window.confirm(
-                                            `Force remove container '${c.name}'?`,
-                                          )
-                                        ) {
-                                          controlContainer.mutate({
-                                            organizationId,
-                                            serverId,
-                                            containerId: c.id,
-                                            command: "remove",
-                                          });
-                                        }
-                                      }}
+                                      onClick={() =>
+                                        setPendingRemoval({
+                                          kind: "container",
+                                          id: c.id,
+                                          label: c.name,
+                                        })
+                                      }
                                       title="Force Remove"
                                       aria-label={`Force remove container ${c.name}`}
                                     >
@@ -786,22 +794,16 @@ export default function DockerInventoryPage() {
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  className="size-7 text-zinc-400 hover:bg-destructive/10 hover:text-destructive"
+                                  className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                   disabled={controlResource.isPending}
-                                  onClick={() => {
-                                    if (
-                                      window.confirm(
-                                        `Force remove image '${img.id}'?`,
-                                      )
-                                    ) {
-                                      controlResource.mutate({
-                                        organizationId,
-                                        serverId,
-                                        resourceId: img.id,
-                                        command: "remove-image",
-                                      });
-                                    }
-                                  }}
+                                  onClick={() =>
+                                    setPendingRemoval({
+                                      kind: "resource",
+                                      id: img.id,
+                                      label: img.id,
+                                      command: "remove-image",
+                                    })
+                                  }
                                   title="Remove Image"
                                   aria-label={`Remove image ${img.id}`}
                                 >
@@ -884,22 +886,16 @@ export default function DockerInventoryPage() {
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="size-7 text-zinc-400 hover:bg-destructive/10 hover:text-destructive"
+                                    className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                     disabled={controlResource.isPending}
-                                    onClick={() => {
-                                      if (
-                                        window.confirm(
-                                          `Remove volume '${v.name}'?`,
-                                        )
-                                      ) {
-                                        controlResource.mutate({
-                                          organizationId,
-                                          serverId,
-                                          resourceId: v.name,
-                                          command: "remove-volume",
-                                        });
-                                      }
-                                    }}
+                                    onClick={() =>
+                                      setPendingRemoval({
+                                        kind: "resource",
+                                        id: v.name,
+                                        label: v.name,
+                                        command: "remove-volume",
+                                      })
+                                    }
                                     title="Remove Volume"
                                     aria-label={`Remove volume ${v.name}`}
                                   >
@@ -973,22 +969,16 @@ export default function DockerInventoryPage() {
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  className="size-7 text-zinc-400 hover:bg-destructive/10 hover:text-destructive"
+                                  className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                   disabled={controlResource.isPending}
-                                  onClick={() => {
-                                    if (
-                                      window.confirm(
-                                        `Remove network '${net.name}'?`,
-                                      )
-                                    ) {
-                                      controlResource.mutate({
-                                        organizationId,
-                                        serverId,
-                                        resourceId: net.id,
-                                        command: "remove-network",
-                                      });
-                                    }
-                                  }}
+                                  onClick={() =>
+                                    setPendingRemoval({
+                                      kind: "resource",
+                                      id: net.id,
+                                      label: net.name,
+                                      command: "remove-network",
+                                    })
+                                  }
                                   title="Remove Network"
                                   aria-label={`Remove network ${net.name}`}
                                 >
@@ -1442,6 +1432,39 @@ export default function DockerInventoryPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmActionDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => !open && setPendingRemoval(null)}
+        title={`Remove ${pendingRemoval?.kind === "container" ? "container" : pendingRemoval?.command === "remove-image" ? "image" : pendingRemoval?.command === "remove-volume" ? "volume" : "network"}?`}
+        description={
+          <>
+            This will permanently remove{" "}
+            <strong>{pendingRemoval?.label}</strong>
+            from the selected Docker server. This action cannot be undone.
+          </>
+        }
+        actionLabel="Remove resource"
+        pending={controlContainer.isPending || controlResource.isPending}
+        onConfirm={() => {
+          if (!pendingRemoval) return;
+          if (pendingRemoval.kind === "container") {
+            controlContainer.mutate({
+              organizationId,
+              serverId,
+              containerId: pendingRemoval.id,
+              command: "remove",
+            });
+            return;
+          }
+          controlResource.mutate({
+            organizationId,
+            serverId,
+            resourceId: pendingRemoval.id,
+            command: pendingRemoval.command,
+          });
+        }}
+      />
 
       {/* Terminal emulator modal dialog */}
       <DockerContainerTerminalDialog

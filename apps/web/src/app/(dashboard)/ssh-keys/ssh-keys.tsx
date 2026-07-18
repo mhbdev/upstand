@@ -36,6 +36,7 @@ import { Textarea } from "@upstand/ui/components/textarea";
 import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -163,8 +164,8 @@ export default function SSHKeys(_props: {
     ...trpc.sshKey.delete.mutationOptions(),
     onSuccess: () => {
       toast.success("SSH Key deleted successfully");
-      setDeleteKeyOpen(false);
       setSelectedKey(null);
+      setDeleteKeyOpen(false);
       refetch();
     },
     onError: (err) => {
@@ -771,47 +772,26 @@ export default function SSHKeys(_props: {
         </DialogContent>
       </Dialog>
 
-      {/* Delete SSH Key Dialog */}
-      <Dialog open={deleteKeyOpen} onOpenChange={setDeleteKeyOpen}>
-        <DialogContent className="rounded-2xl border border-destructive/30 bg-card shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-bold text-destructive text-xl">
-              <HugeiconsIcon icon={Alert02Icon} className="size-5" />
-              Delete SSH Key
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-sm">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-foreground">
-                {selectedKey?.name}
-              </span>
-              ? This action is permanent and cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setDeleteKeyOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              className="gap-2"
-              onClick={() => {
-                if (selectedKey) {
-                  deleteMutation.mutate({ id: selectedKey.id });
-                }
-              }}
-            >
-              {deleteMutation.isPending && <Spinner className="size-4" />}
-              Delete Key
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmActionDialog
+        open={deleteKeyOpen}
+        onOpenChange={(open) => {
+          setDeleteKeyOpen(open);
+          if (!open) setSelectedKey(null);
+        }}
+        title="Delete SSH key?"
+        description={
+          <>
+            This will permanently delete <strong>{selectedKey?.name}</strong>.
+            Any deployments that reference this key may fail. This action cannot
+            be undone.
+          </>
+        }
+        actionLabel="Delete key"
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (selectedKey) deleteMutation.mutate({ id: selectedKey.id });
+        }}
+      />
     </DashboardPage>
   );
 }

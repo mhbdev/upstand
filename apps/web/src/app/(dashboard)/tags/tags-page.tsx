@@ -39,6 +39,7 @@ import { Input } from "@upstand/ui/components/input";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -61,6 +62,10 @@ export default function TagsPage() {
     id: string;
     name: string;
     color: TagColor;
+  } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
   } | null>(null);
   const tags = useQuery({
     ...trpc.tag.list.queryOptions({ organizationId }),
@@ -91,7 +96,11 @@ export default function TagsPage() {
   });
   const remove = useMutation({
     ...trpc.tag.remove.mutationOptions(),
-    onSuccess: () => tags.refetch(),
+    onSuccess: () => {
+      toast.success("Tag deleted");
+      setDeleteTarget(null);
+      void tags.refetch();
+    },
     onError: (error) => toast.error(error.message),
   });
   const parsedColor = TagColorSchema.safeParse(color);
@@ -170,10 +179,9 @@ export default function TagsPage() {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`Delete ${tag.name}`}
-                    onClick={() => {
-                      if (confirm(`Delete tag ${tag.name}?`))
-                        remove.mutate({ id: tag.id, organizationId });
-                    }}
+                    onClick={() =>
+                      setDeleteTarget({ id: tag.id, name: tag.name })
+                    }
                   >
                     <HugeiconsIcon icon={Delete02Icon} />
                   </Button>
@@ -283,6 +291,19 @@ export default function TagsPage() {
           </form>
         </DialogContent>
       </Dialog>
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        onOpenChange={(nextOpen) => !nextOpen && setDeleteTarget(null)}
+        title={`Delete ${deleteTarget?.name ?? "tag"}?`}
+        description={`${deleteTarget?.name ?? "This tag"} will be removed from the organization and detached from resources. This action cannot be undone.`}
+        actionLabel="Delete Tag"
+        pending={remove.isPending}
+        onConfirm={() => {
+          if (deleteTarget) {
+            remove.mutate({ id: deleteTarget.id, organizationId });
+          }
+        }}
+      />
     </DashboardPage>
   );
 }

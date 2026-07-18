@@ -41,6 +41,7 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -154,8 +155,8 @@ export default function GitProviders({
     ...trpc.gitProvider.delete.mutationOptions(),
     onSuccess: () => {
       toast.success("Git Provider deleted successfully");
-      setDeleteProviderOpen(false);
       setSelectedProvider(null);
+      setDeleteProviderOpen(false);
       refetch();
     },
     onError: (err) => {
@@ -841,40 +842,24 @@ export default function GitProviders({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <Dialog open={deleteProviderOpen} onOpenChange={setDeleteProviderOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Git Provider</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-foreground">
-                {selectedProvider?.name}
-              </span>
-              ? This action cannot be undone and will prevent Upstand from
-              fetching repositories from this provider.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setDeleteProviderOpen(false);
-                setSelectedProvider(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete Provider"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmActionDialog
+        open={deleteProviderOpen}
+        onOpenChange={(open) => {
+          setDeleteProviderOpen(open);
+          if (!open) setSelectedProvider(null);
+        }}
+        title="Delete Git provider?"
+        description={
+          <>
+            This will delete <strong>{selectedProvider?.name}</strong> and stop
+            Upstand from fetching repositories from it. This action cannot be
+            undone.
+          </>
+        }
+        actionLabel="Delete provider"
+        pending={deleteMutation.isPending}
+        onConfirm={handleDelete}
+      />
     </DashboardPage>
   );
 }

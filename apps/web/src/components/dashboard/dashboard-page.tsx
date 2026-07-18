@@ -41,7 +41,7 @@ export function DashboardPageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="flex min-w-0 items-center gap-2 font-bold text-2xl text-foreground [text-wrap:balance]">
+        <h1 className="flex min-w-0 items-center gap-2 font-bold text-2xl text-foreground tracking-tight [text-wrap:balance]">
           {icon}
           <span className="truncate">{title}</span>
         </h1>

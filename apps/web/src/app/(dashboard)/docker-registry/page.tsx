@@ -29,6 +29,7 @@ import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -53,6 +54,10 @@ export default function DockerRegistryPage() {
   const [imagePrefix, setImagePrefix] = useState("");
   const [registryUrl, setRegistryUrl] = useState("");
   const [serverId, setServerId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const { data: registries = [], refetch } = useQuery({
     ...trpc.dockerRegistry.list.queryOptions({ organizationId }),
@@ -75,7 +80,8 @@ export default function DockerRegistryPage() {
   const deleteMutation = useMutation({
     ...trpc.dockerRegistry.delete.mutationOptions(),
     onSuccess: () => {
-      toast.success("Docker Registry deleted successfully!");
+      toast.success("Docker Registry deleted");
+      setDeleteTarget(null);
       refetch();
     },
     onError: (err: any) => {
@@ -170,9 +176,8 @@ export default function DockerRegistryPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this Docker Registry?")) {
-      deleteMutation.mutate({ id });
-    }
+    const registry = registries.find((item: any) => item.id === id);
+    setDeleteTarget(registry ? { id: registry.id, name: registry.name } : null);
   };
 
   return (
@@ -369,6 +374,18 @@ export default function DockerRegistryPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={`Delete ${deleteTarget?.name ?? "Docker Registry"}?`}
+        description={`${deleteTarget?.name ?? "This registry"} will be permanently deleted and unavailable to deployments. This action cannot be undone.`}
+        actionLabel="Delete Registry"
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id });
+        }}
+      />
     </DashboardPage>
   );
 }
