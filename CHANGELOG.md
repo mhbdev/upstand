@@ -4,6 +4,22 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.79 - 2026-07-19
+
+### Changed
+
+- Align all 19 dashboard pages (Audit Logs, Certificates, Deployments, Docker Registry, Docker Swarm, Docker Inventory, Git Providers, Monitoring, Notifications, Projects, Remote Servers, S3 Destinations, SSO, SCIM, SSH Keys, Tags, Templates, Web Server) with the standardized UI layouts, PageToolbar, PageEmpty, StatusBadge, and ConfirmActionDialog components.
+
+### Fixed
+
+- Exclude stale Next development types from the apps' TypeScript configurations to prevent workspace build conflicts.
+
+### Refactored
+
+- Inject authentication, backup worker, notification delivery, access-log scheduler, and worker/scheduler dependencies at the API and infrastructure boundaries.
+- Move deployment server orchestration, Docker inventory queries, Docker prune actions, and organization-scoped checks into use cases.
+- Split Docker inspection capabilities into specialized interfaces.
+
 ## 0.1.78 - 2026-07-18
 
 ### Fixed
