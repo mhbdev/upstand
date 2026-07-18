@@ -8,6 +8,22 @@ import { cn } from "@upstand/ui/lib/utils";
 
 export type KeyValuePair = { key: string; value: string };
 
+export function recordToKeyValuePairs(
+  record: Record<string, string>,
+): KeyValuePair[] {
+  return Object.entries(record).map(([key, value]) => ({ key, value }));
+}
+
+export function keyValuePairsToRecord(
+  pairs: KeyValuePair[],
+): Record<string, string> {
+  return Object.fromEntries(
+    pairs
+      .map(({ key, value }) => [key.trim(), value] as const)
+      .filter(([key]) => key.length > 0),
+  );
+}
+
 export type KeyValueIssue = {
   index: number;
   message: string;

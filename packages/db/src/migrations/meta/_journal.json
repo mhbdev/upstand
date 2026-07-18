@@ -253,6 +253,13 @@
       "when": 1784240112130,
       "tag": "0035_third_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1784354251113,
+      "tag": "0036_parched_brood",
+      "breakpoints": true
     }
   ]
 }

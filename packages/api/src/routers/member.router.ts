@@ -12,7 +12,11 @@ import {
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
-import { protectedProcedure, router } from "../index";
+import {
+  protectedProcedure,
+  router,
+  twoFactorVerifiedProcedure,
+} from "../index";
 import { type PermissionAction, ROLE_PERMISSIONS } from "../permissions";
 
 const permissionActions = CUSTOM_ROLE_CAPABILITY_ACTIONS as [
@@ -123,7 +127,7 @@ export const memberRouter = router({
     };
   }),
 
-  create: protectedProcedure
+  create: twoFactorVerifiedProcedure
     .input(
       baseInput.extend({
         name: z.string().trim().min(1).max(120),
@@ -207,7 +211,7 @@ export const memberRouter = router({
       return { user: created.user };
     }),
 
-  invite: protectedProcedure
+  invite: twoFactorVerifiedProcedure
     .input(
       baseInput.extend({
         email: z.string().email(),
@@ -269,7 +273,7 @@ export const memberRouter = router({
       });
     }),
 
-  update: protectedProcedure
+  update: twoFactorVerifiedProcedure
     .input(
       baseInput.extend({
         memberId: z.string().min(1),
@@ -321,7 +325,7 @@ export const memberRouter = router({
       return { success: true };
     }),
 
-  remove: protectedProcedure
+  remove: twoFactorVerifiedProcedure
     .input(baseInput.extend({ memberId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const actor = await ensureOrganizationAccess(

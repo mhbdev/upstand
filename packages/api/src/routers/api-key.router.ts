@@ -9,7 +9,11 @@ import {
 } from "@upstand/domain";
 import { z } from "zod";
 import { ensureOrganizationAccess } from "../access-control";
-import { protectedProcedure, router } from "../index";
+import {
+  protectedProcedure,
+  router,
+  twoFactorVerifiedProcedure,
+} from "../index";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
 const headersFrom = (ctx: { honoContext: { req: { raw: Request } } }) =>
@@ -97,7 +101,7 @@ export const apiKeyRouter = router({
       return { ...result, apiKeys: result.apiKeys.map(mapKey) };
     }),
 
-  create: protectedProcedure
+  create: twoFactorVerifiedProcedure
     .input(
       organizationInput
         .extend({
@@ -153,7 +157,7 @@ export const apiKeyRouter = router({
       }
     }),
 
-  update: protectedProcedure
+  update: twoFactorVerifiedProcedure
     .input(
       organizationInput
         .extend({
@@ -204,7 +208,7 @@ export const apiKeyRouter = router({
       return mapKey(result);
     }),
 
-  revoke: protectedProcedure
+  revoke: twoFactorVerifiedProcedure
     .input(organizationInput.extend({ keyId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await requireKeyAdmin(ctx.session.user.id, input.organizationId);

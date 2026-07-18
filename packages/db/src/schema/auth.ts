@@ -117,6 +117,7 @@ export const member = pgTable(
     permissions: text("permissions"),
     scimActive: boolean("scim_active").default(true),
     scimExternalId: text("scim_external_id"),
+    scimDisplayName: text("scim_display_name"),
   },
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),

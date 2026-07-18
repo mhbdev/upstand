@@ -9,6 +9,7 @@ import {
   assertDeploymentServerSupportsResource,
   getServerProvisioningPlan,
 } from "./server-role";
+import { buildDockerInstallCommand } from "./setup-server.usecase";
 import { UpdateServerUseCase } from "./update-server.usecase";
 
 function createUow() {
@@ -55,6 +56,20 @@ function createUow() {
 }
 
 describe("server use cases", () => {
+  test("builds a verified Docker repository installer", () => {
+    const command = buildDockerInstallCommand(
+      "sudo",
+      "5:29.6.1-1~ubuntu.24.04~noble",
+    );
+
+    expect(command).toContain(
+      "https://download.docker.com/linux/$docker_repo/gpg",
+    );
+    expect(command).toContain("Docker repository key fingerprint mismatch");
+    expect(command).toContain("docker-ce='5:29.6.1-1~ubuntu.24.04~noble'");
+    expect(command).not.toContain("get.docker.com | sudo sh");
+  });
+
   test("accepts only the supported server roles", () => {
     expect(
       CreateServerInputSchema.safeParse({

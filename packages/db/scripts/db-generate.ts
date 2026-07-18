@@ -40,13 +40,8 @@ function run(args: string[]) {
   }
 }
 
-run([
-  "better-auth",
-  "generate",
-  "--config",
-  "../auth/src/index.ts",
-  "--output",
-  "src/schema/auth.ts",
-  "--yes",
-]);
+// Better Auth's CLI must match the Better Auth runtime exactly. The
+// workspace intentionally keeps migration generation in Drizzle so schema
+// changes are generated from the checked-in TypeScript schema without
+// rewriting the auth tables through a separately versioned CLI.
 run(["drizzle-kit", "generate"]);

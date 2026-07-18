@@ -35,7 +35,7 @@ import { cn } from "@upstand/ui/lib/utils";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { KeyValueEditor } from "@/components/resource/key-value-editor";
+import { ResourceKeyValueEditor } from "@/components/resource/key-value-editor";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { trpc } from "@/utils/trpc";
 
@@ -241,7 +241,7 @@ export function ResourceAdvancedSettings({
           </FieldGroup>
 
           <FieldGroup className="grid gap-5 lg:grid-cols-2">
-            <KeyValueEditor
+            <ResourceKeyValueEditor
               id="advanced-environment"
               label="Environment overrides"
               description="Values override the environment generated for the resource."
@@ -250,7 +250,7 @@ export function ResourceAdvancedSettings({
                 updateConfig("environment", environment)
               }
             />
-            <KeyValueEditor
+            <ResourceKeyValueEditor
               id="advanced-labels"
               label="Service labels"
               description="Labels are applied to the deployed Swarm service."
@@ -979,7 +979,7 @@ export function ResourceAdvancedSettings({
           </FieldGroup>
 
           <FieldGroup className="grid gap-5 lg:grid-cols-3">
-            <KeyValueEditor
+            <ResourceKeyValueEditor
               id="advanced-sysctls"
               label="Sysctls"
               description="Kernel parameters passed to the container."
