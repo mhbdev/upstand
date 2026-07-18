@@ -25,36 +25,31 @@ describe("application archive validation", () => {
     ).toEqual({ entryCount: 1, totalSize: 7029 });
   });
 
-  test.each([
-    "../outside.txt",
-    "/outside.txt",
-    "C:/outside.txt",
-  ])("rejects an absolute or traversing path: %s", (entry) => {
-    expect(() =>
-      validateApplicationArchiveListings(
-        100,
-        `${entry}\n`,
-        `-rw-r--r-- user/group 1 2026-07-15 12:00 ${entry}\n`,
-      ),
-    ).toThrow(ApplicationArchiveValidationError);
-  });
+  test.each(["../outside.txt", "/outside.txt", "C:/outside.txt"])(
+    "rejects an absolute or traversing path: %s",
+    (entry) => {
+      expect(() =>
+        validateApplicationArchiveListings(
+          100,
+          `${entry}\n`,
+          `-rw-r--r-- user/group 1 2026-07-15 12:00 ${entry}\n`,
+        ),
+      ).toThrow(ApplicationArchiveValidationError);
+    },
+  );
 
-  test.each([
-    "l",
-    "h",
-    "b",
-    "c",
-    "p",
-    "s",
-  ])("rejects a special or link entry type: %s", (entryType) => {
-    expect(() =>
-      validateApplicationArchiveListings(
-        100,
-        "project/entry\n",
-        `${entryType}rwxr-xr-x user/group 1 2026-07-15 12:00 project/entry\n`,
-      ),
-    ).toThrow(ApplicationArchiveValidationError);
-  });
+  test.each(["l", "h", "b", "c", "p", "s"])(
+    "rejects a special or link entry type: %s",
+    (entryType) => {
+      expect(() =>
+        validateApplicationArchiveListings(
+          100,
+          "project/entry\n",
+          `${entryType}rwxr-xr-x user/group 1 2026-07-15 12:00 project/entry\n`,
+        ),
+      ).toThrow(ApplicationArchiveValidationError);
+    },
+  );
 
   test("rejects duplicate paths and excessive compression", () => {
     expect(() =>
