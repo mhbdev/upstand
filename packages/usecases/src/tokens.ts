@@ -3,7 +3,14 @@ import type { IUnitOfWork } from "@upstand/domain";
 import type * as UseCases from "./index";
 import type { NotificationTransport } from "./notification/notification-transport.port";
 import type { CaddyServicePort } from "./ports/caddy";
-import type { DockerReadOnlyPort, DockerServicePort } from "./ports/docker";
+import type {
+  DockerArchiveTransferPort,
+  DockerContainerControllerPort,
+  DockerInventoryReaderPort,
+  DockerPrunePort,
+  DockerResourceControllerPort,
+  DockerServicePort,
+} from "./ports/docker";
 
 // Application composition token. The domain exposes the IUnitOfWork contract,
 // while the DI token belongs to the outer composition layer.
@@ -17,9 +24,15 @@ export const DockerServiceToken =
   createToken<DockerServicePort>("DockerService");
 export const DatabaseCommandUseCaseToken =
   createToken<UseCases.DatabaseCommandUseCase>("DatabaseCommandUseCase");
-export const DockerReadOnlyServiceToken = createToken<DockerReadOnlyPort>(
-  "DockerReadOnlyService",
-);
+export const DockerInventoryReaderToken =
+  createToken<DockerInventoryReaderPort>("DockerInventoryReader");
+export const DockerContainerControllerToken =
+  createToken<DockerContainerControllerPort>("DockerContainerController");
+export const DockerResourceControllerToken =
+  createToken<DockerResourceControllerPort>("DockerResourceController");
+export const DockerPruneToken = createToken<DockerPrunePort>("DockerPrune");
+export const DockerArchiveTransferToken =
+  createToken<DockerArchiveTransferPort>("DockerArchiveTransfer");
 export const PublishNotificationUseCaseToken =
   createToken<UseCases.NotificationPublisher>("PublishNotificationUseCase");
 export const CreateAuditLogUseCaseToken =

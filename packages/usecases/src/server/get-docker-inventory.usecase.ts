@@ -2,9 +2,12 @@ import type { IUnitOfWork } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 import type {
+  DockerArchiveTransferPort,
   DockerContainerCommand,
+  DockerContainerControllerPort,
   DockerInspectionTarget,
-  DockerReadOnlyPort as DockerReadOnlyService,
+  DockerInventoryReaderPort,
+  DockerResourceControllerPort,
 } from "../ports/docker";
 import { dockerLogLevels } from "../resource/docker-log-filter";
 
@@ -78,29 +81,32 @@ export type GetDockerInventoryInput = z.infer<
 export class GetDockerInventoryUseCase {
   constructor(
     private readonly uow: IUnitOfWork,
-    private readonly docker: DockerReadOnlyService,
+    private readonly inventory: DockerInventoryReaderPort,
+    private readonly containerController: DockerContainerControllerPort,
+    private readonly resourceController: DockerResourceControllerPort,
+    private readonly archiveTransfer: DockerArchiveTransferPort,
   ) {}
 
   async execute(input: GetDockerInventoryInput) {
     const target = await this.getTarget(input);
     switch (input.kind) {
       case "info":
-        return this.docker.getInfo(target);
+        return this.inventory.getInfo(target);
       case "containers":
-        return this.docker.listContainers(target, {
+        return this.inventory.listContainers(target, {
           search: input.search,
           state: input.state,
         });
       case "images":
-        return this.docker.listImages(target);
+        return this.inventory.listImages(target);
       case "volumes":
-        return this.docker.listVolumes(target);
+        return this.inventory.listVolumes(target);
       case "networks":
-        return this.docker.listNetworks(target);
+        return this.inventory.listNetworks(target);
       case "services":
-        return this.docker.listServices(target);
+        return this.inventory.listServices(target);
       case "logs":
-        return this.docker.getLogs(target, {
+        return this.inventory.getLogs(target, {
           containerId: input.containerId,
           serviceName: input.serviceName,
           tail: input.tail,
@@ -112,7 +118,7 @@ export class GetDockerInventoryUseCase {
         if (!input.containerId) {
           throw new Error("A container ID is required for stats.");
         }
-        return this.docker.getContainerStats(target, input.containerId);
+        return this.inventory.getContainerStats(target, input.containerId);
     }
   }
 
@@ -120,7 +126,7 @@ export class GetDockerInventoryUseCase {
     input: z.infer<typeof ControlDockerContainerInputSchema>,
   ) {
     const target = await this.getTarget(input);
-    return this.docker.controlContainer(
+    return this.containerController.controlContainer(
       target,
       input.containerId,
       input.command as DockerContainerCommand,
@@ -131,12 +137,16 @@ export class GetDockerInventoryUseCase {
     input: z.infer<typeof ControlDockerResourceInputSchema>,
   ) {
     const target = await this.getTarget(input);
-    return this.docker.controlResource(target, input.resourceId, input.command);
+    return this.resourceController.controlResource(
+      target,
+      input.resourceId,
+      input.command,
+    );
   }
 
   async getHostTime(input: { organizationId: string; serverId?: string }) {
     const target = await this.getTarget(input);
-    return this.docker.getHostTime(target);
+    return this.inventory.getHostTime(target);
   }
 
   async uploadVolume(
@@ -144,7 +154,7 @@ export class GetDockerInventoryUseCase {
     archive: Buffer,
   ) {
     const target = await this.getTarget(input);
-    return this.docker.uploadArchiveToVolume(
+    return this.archiveTransfer.uploadArchiveToVolume(
       target,
       input.volumeName,
       archive,
@@ -157,7 +167,7 @@ export class GetDockerInventoryUseCase {
     archive: Buffer,
   ) {
     const target = await this.getTarget(input);
-    return this.docker.uploadArchiveToContainer(
+    return this.archiveTransfer.uploadArchiveToContainer(
       target,
       input.containerId,
       archive,

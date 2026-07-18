@@ -1,10 +1,7 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
-import type {
-  DockerInspectionTarget,
-  DockerReadOnlyPort as DockerReadOnlyService,
-} from "../ports/docker";
+import type { DockerInspectionTarget, DockerPrunePort } from "../ports/docker";
 
 export const PruneDockerResourcesInputSchema = z.object({
   organizationId: z.string().min(1),
@@ -15,7 +12,7 @@ export const PruneDockerResourcesInputSchema = z.object({
 export class PruneDockerResourcesUseCase {
   constructor(
     private readonly uow: IUnitOfWork,
-    private readonly docker: DockerReadOnlyService,
+    private readonly docker: DockerPrunePort,
   ) {}
 
   async execute(input: z.infer<typeof PruneDockerResourcesInputSchema>) {
