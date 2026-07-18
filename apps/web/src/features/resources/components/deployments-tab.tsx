@@ -9,14 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import {
@@ -31,6 +23,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import { Eye, History, Play, RefreshCw, Trash2 } from "@/components/huge-icons";
+import {
+  DeploymentLogDialog,
+  DeploymentStatusBadge,
+} from "@/components/shared/deployment-presentation";
 import { trpc } from "@/utils/trpc";
 
 type DeploymentItem = {
@@ -508,16 +504,7 @@ export function DeploymentsTab({
                         {dep.sourceRevision?.slice(0, 12) || "—"}
                       </td>
                       <td className="p-3">
-                        <span
-                          className={cn(
-                            "rounded-full px-2.5 py-0.5 font-semibold text-xs",
-                            dep.status === "success"
-                              ? "bg-emerald-500/10 text-emerald-500"
-                              : "bg-destructive/10 text-destructive",
-                          )}
-                        >
-                          {dep.status}
-                        </span>
+                        <DeploymentStatusBadge status={dep.status} />
                       </td>
                       <td className="p-3 text-muted-foreground text-xs">
                         {new Date(dep.createdAt).toLocaleString()}
@@ -589,35 +576,11 @@ export function DeploymentsTab({
         </CardContent>
       </Card>
 
-      {/* Deployment build logs modal */}
-      <Dialog
+      <DeploymentLogDialog
         open={viewDeploymentLogsOpen}
         onOpenChange={setViewDeploymentLogsOpen}
-      >
-        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,56rem)] rounded-2xl border border-border bg-card font-mono shadow-2xl sm:min-w-[min(42rem,calc(100vw-2rem))]">
-          <DialogHeader className="border-border border-b pb-3">
-            <DialogTitle className="font-semibold text-foreground">
-              Build & Deploy Logs: {selectedDeployment?.id}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-xs">
-              Generated on{" "}
-              {selectedDeployment &&
-                new Date(selectedDeployment.createdAt).toLocaleString()}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-96 select-text overflow-y-auto whitespace-pre-wrap rounded-md border border-border/40 bg-muted/20 p-4 font-mono text-foreground text-xs leading-relaxed">
-            {selectedDeployment?.logs || "No logs available."}
-          </div>
-          <DialogFooter className="border-border border-t pt-3">
-            <Button
-              onClick={() => setViewDeploymentLogsOpen(false)}
-              variant="outline"
-            >
-              Close Logs
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        deployment={selectedDeployment}
+      />
 
       <ConfirmActionDialog
         open={pendingAction !== null}
