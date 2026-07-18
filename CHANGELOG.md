@@ -4,6 +4,8 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.71 - 2026-07-18
+
 ### Added
 
 - Add a native, versioned template catalog with 476 ready-to-use Compose blueprints, searchable directly from the Templates dashboard and deployable without a runtime catalog dependency.
