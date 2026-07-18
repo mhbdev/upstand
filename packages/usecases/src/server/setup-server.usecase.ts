@@ -151,6 +151,8 @@ export class SetupServerUseCase {
           );
         }
 
+        await privileged("docker swarm update --task-history-limit 1");
+
         await privileged(
           "docker network inspect upstand-network >/dev/null 2>&1 || docker network create --driver overlay --attachable upstand-network",
         );

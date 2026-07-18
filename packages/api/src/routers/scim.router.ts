@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { createDb } from "@upstand/db";
+import { db } from "@upstand/db";
 import { scimProvider } from "@upstand/db/schema/scim";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -34,7 +34,6 @@ export const scimRouter = router({
     .input(baseInput)
     .query(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      const db = createDb();
       const rows = await db
         .select({
           id: scimProvider.id,
@@ -53,7 +52,6 @@ export const scimRouter = router({
     .input(baseInput.extend({ providerId: z.string().trim().min(1).max(120) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      const db = createDb();
       const token = createScimToken();
       try {
         const [row] = await db
@@ -89,7 +87,6 @@ export const scimRouter = router({
     .input(baseInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      const db = createDb();
       const token = createScimToken();
       const [row] = await db
         .update(scimProvider)
@@ -117,7 +114,6 @@ export const scimRouter = router({
     .input(baseInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      const db = createDb();
       const deleted = await db
         .delete(scimProvider)
         .where(

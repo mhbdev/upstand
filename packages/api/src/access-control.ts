@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { createDb } from "@upstand/db";
+import { db } from "@upstand/db";
 import { member } from "@upstand/db/schema/auth";
 import { and, eq } from "drizzle-orm";
 
@@ -8,7 +8,6 @@ export async function ensureOrganizationAccess(
   organizationId: string,
   allowedRoles?: string[],
 ) {
-  const db = createDb();
   const membership = await db
     .select()
     .from(member)

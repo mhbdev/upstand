@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.80 - 2026-07-19
+
+### Fixed
+
+- Fix critical database connection pool leak caused by instantiating new client pools via `createDb()` in middlewares and route handlers. Reuse the shared global `db` client instead.
+- Enforce a Docker Swarm task history retention limit of 1 (instead of the default 5) so that older exited task containers are automatically cleaned up, allowing old and unused Docker images to be pruned cleanly on system updates.
+
 ## 0.1.79 - 2026-07-19
 
 ### Changed

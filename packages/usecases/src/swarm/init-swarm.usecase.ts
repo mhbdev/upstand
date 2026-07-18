@@ -75,6 +75,17 @@ export class InitSwarmUseCase {
         ensureUpstandOverlayNetwork(this.docker),
       ]);
 
+      if (swarm.Version?.Index) {
+        await this.docker.swarmUpdate({
+          version: swarm.Version.Index,
+          Spec: {
+            Orchestration: {
+              TaskHistoryRetentionLimit: 1,
+            },
+          },
+        } as any);
+      }
+
       return {
         swarmId: swarm.ID,
         networkName: process.env.DOCKER_NETWORK || "upstand-network",
