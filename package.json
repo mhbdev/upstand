@@ -81,10 +81,10 @@
     "security:scan": "bun audit"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.3",
+    "@biomejs/biome": "^2.5.4",
     "@types/bun": "^1.3.14",
     "@upstand/config": "workspace:*",
-    "knip": "^6.26.0",
+    "knip": "^6.27.0",
     "turbo": "^2.10.5",
     "typescript": "^6.0.3"
   },
