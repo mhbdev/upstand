@@ -1,7 +1,12 @@
 import { getServiceProvider } from "@upstand/api/di";
 import { getDockerInstance } from "@upstand/infrastructure";
 import { DeploymentWorker } from "@upstand/usecases";
-import { UnitOfWorkToken } from "@upstand/usecases/tokens";
+import {
+  CaddyServiceToken,
+  DockerServiceToken,
+  PublishNotificationUseCaseToken,
+  UnitOfWorkToken,
+} from "@upstand/usecases/tokens";
 import { log } from "evlog";
 
 export class DeploymentRuntime {
@@ -41,9 +46,41 @@ export class DeploymentRuntime {
       const serverIds = await this.discoverServerIds();
       for (const serverId of serverIds) {
         if (this.workers.has(serverId)) continue;
-        const worker = new DeploymentWorker(serverId, () =>
-          getServiceProvider(),
-        );
+        const worker = new DeploymentWorker(serverId, {
+          getBuildSettings: async () => {
+            const scope = getServiceProvider().createScope();
+            try {
+              const uow = scope.resolve(UnitOfWorkToken);
+              const settings =
+                await uow.serverBuildSettingsRepository.findById(serverId);
+              if (settings) return settings;
+
+              const concurrency = serverId === "local" ? 2 : 1;
+              await uow.serverBuildSettingsRepository.create({
+                id: serverId,
+                hostname:
+                  serverId === "local"
+                    ? "Upstand Server"
+                    : `Swarm Node ${serverId}`,
+                ip: "127.0.0.1",
+                concurrency,
+              });
+              return { concurrency };
+            } finally {
+              await scope.dispose();
+            }
+          },
+          createScope: async () => {
+            const scope = getServiceProvider().createScope();
+            return {
+              uow: scope.resolve(UnitOfWorkToken),
+              dockerService: scope.resolve(DockerServiceToken),
+              caddyService: scope.resolve(CaddyServiceToken),
+              publisher: scope.resolve(PublishNotificationUseCaseToken),
+              dispose: () => scope.dispose(),
+            };
+          },
+        });
         await worker.start();
         this.workers.set(serverId, worker);
         log.info({

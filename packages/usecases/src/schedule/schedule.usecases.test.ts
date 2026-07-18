@@ -117,7 +117,7 @@ describe("resource schedules", () => {
   });
 
   test("runs a disabled command schedule when explicitly requested", async () => {
-    const { uow, schedules } = createUow();
+    const { schedules } = createUow();
     const schedule = {
       id: "schedule-1",
       resourceId: "resource-1",
@@ -130,25 +130,14 @@ describe("resource schedules", () => {
     };
     schedules.set(schedule.id, schedule);
     const executed: string[] = [];
-    const dockerService = {
-      runCommandInResourceContainer: async (
-        _resource: unknown,
-        command: string,
-      ) => {
-        executed.push(command);
-        return "ok";
+    await new GeneralScheduler({
+      loadSchedules: async () => [],
+      execute: async (scheduleId, manual) => {
+        expect(scheduleId).toBe(schedule.id);
+        expect(manual).toBe(true);
+        executed.push(schedule.command);
       },
-    } as any;
-    const provider = {
-      createScope: () => ({
-        resolve: () => uow,
-        dispose: async () => {},
-      }),
-    } as any;
-
-    await new GeneralScheduler(() => provider, dockerService).executeNow(
-      schedule.id,
-    );
+    }).executeNow(schedule.id);
 
     expect(executed).toEqual([schedule.command]);
   });
