@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { createDb } from "@upstand/db";
+import { db } from "@upstand/db";
 import { organization, ssoProvider } from "@upstand/db/schema/auth";
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -36,7 +36,6 @@ export const ssoRouter = router({
     .input(inputSchema)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
-      const db = createDb();
       const [workspace, providerCount] = await Promise.all([
         db
           .select({ metadata: organization.metadata })
@@ -62,7 +61,6 @@ export const ssoRouter = router({
     .input(inputSchema.extend({ enforced: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      const db = createDb();
       const current = await db
         .select({ metadata: organization.metadata })
         .from(organization)

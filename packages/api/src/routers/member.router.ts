@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { createDb } from "@upstand/db";
+import { type DatabaseExecutor, db } from "@upstand/db";
 import { member, organization, user } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
 import { notificationChannel } from "@upstand/db/schema/notification";
@@ -50,7 +50,7 @@ function assertManager(actorRole: string, targetRole?: string) {
 }
 
 async function resolveRoleAssignment(
-  db: ReturnType<typeof createDb>,
+  db: DatabaseExecutor,
   organizationId: string,
   role: "member" | "admin",
   permissions: PermissionAction[],
@@ -110,7 +110,6 @@ function validatePermissions(role: string, permissions: PermissionAction[]) {
 export const memberRouter = router({
   list: protectedProcedure.input(baseInput).query(async ({ ctx, input }) => {
     await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
-    const db = createDb();
     const rows = await db
       .select({ member, user })
       .from(member)
@@ -150,7 +149,6 @@ export const memberRouter = router({
           message: "Admins can only create members",
         });
       }
-      const db = createDb();
       const assignment = await resolveRoleAssignment(
         db,
         input.organizationId,
@@ -232,7 +230,6 @@ export const memberRouter = router({
           code: "FORBIDDEN",
           message: "Admins can only invite members",
         });
-      const db = createDb();
       const assignment = await resolveRoleAssignment(
         db,
         input.organizationId,
@@ -287,7 +284,6 @@ export const memberRouter = router({
         ctx.session.user.id,
         input.organizationId,
       );
-      const db = createDb();
       const target = await db
         .select()
         .from(member)
@@ -332,7 +328,6 @@ export const memberRouter = router({
         ctx.session.user.id,
         input.organizationId,
       );
-      const db = createDb();
       const target = await db
         .select()
         .from(member)

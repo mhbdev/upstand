@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { createDb } from "@upstand/db";
+import { db } from "@upstand/db";
 import { invitation, member } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
 import {
@@ -67,7 +67,6 @@ export const customRoleRouter = router({
     .input(baseInput)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
-      const db = createDb();
       const rows = await db
         .select()
         .from(customRole)
@@ -89,7 +88,6 @@ export const customRoleRouter = router({
         input.organizationId,
       );
       assertDelegablePermissions(actor.role, input.permissions);
-      const db = createDb();
       const [row] = await db
         .insert(customRole)
         .values({
@@ -123,7 +121,6 @@ export const customRoleRouter = router({
       if (input.permissions) {
         assertDelegablePermissions(actor.role, input.permissions);
       }
-      const db = createDb();
       const [row] = await db
         .update(customRole)
         .set({
@@ -155,8 +152,6 @@ export const customRoleRouter = router({
     .input(baseInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      const db = createDb();
-
       // Degrade active members with this custom role to standard "member"
       await db
         .update(member)

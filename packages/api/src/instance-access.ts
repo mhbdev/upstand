@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { createDb } from "@upstand/db";
+import { db } from "@upstand/db";
 import { user } from "@upstand/db/schema/auth";
 import { asc } from "drizzle-orm";
 
@@ -30,7 +30,7 @@ export async function requireInstanceOwner(
     return;
   }
 
-  const firstUser = await createDb()
+  const firstUser = await db
     .select({ id: user.id })
     .from(user)
     .orderBy(asc(user.createdAt), asc(user.id))

@@ -133,6 +133,8 @@ ensure_swarm() {
     docker swarm init --advertise-addr "$advertise_address" --data-path-port 4789
   fi
 
+  docker swarm update --task-history-limit 1
+
   [[ "$(docker info --format '{{.Swarm.ControlAvailable}}')" == "true" ]] || fail "this host is a Swarm worker; run the installer on a reachable manager"
 
   local node_id
