@@ -29,7 +29,7 @@
     "evlog": "catalog:",
     "hono": "catalog:",
     "ssh2": "^1.17.0",
-    "swagger-ui-dist": "^5.32.8",
+    "swagger-ui-dist": "^5.32.9",
     "trpc-to-openapi": "^3.3.0",
     "zod": "catalog:"
   },
@@ -37,7 +37,7 @@
     "@types/bun": "catalog:",
     "@types/ssh2": "^1.15.5",
     "@upstand/config": "workspace:*",
-    "tsdown": "^0.22.3",
+    "tsdown": "^0.22.9",
     "typescript": "catalog:"
   }
 }
