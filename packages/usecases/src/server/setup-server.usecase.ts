@@ -3,18 +3,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { IUnitOfWork, Server } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
-import { hostVerifierForFingerprint } from "@upstand/platform/ssh/host-key";
 import { log } from "evlog";
-import { Client } from "ssh2";
 import { z } from "zod";
-import { createRemoteServices } from "../resource/docker-client";
+import type {
+  ServerProvisioningPort,
+  ServerProvisioningSession,
+} from "../ports/server-provisioning";
 import { getServerProvisioningPlan } from "./server-role";
-
-interface CommandResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
 
 export const SetupServerInputSchema = z.object({
   id: z.string().min(1, "Server ID is required"),
@@ -23,7 +18,10 @@ export const SetupServerInputSchema = z.object({
 export type SetupServerInput = z.infer<typeof SetupServerInputSchema>;
 
 export class SetupServerUseCase {
-  constructor(private readonly uow: IUnitOfWork) {}
+  constructor(
+    private readonly uow: IUnitOfWork,
+    private readonly provisioning: ServerProvisioningPort,
+  ) {}
 
   async execute(
     input: SetupServerInput,
@@ -67,44 +65,12 @@ export class SetupServerUseCase {
     privateKey: string,
     hostKeyFingerprint: string,
   ): Promise<{ success: boolean; message: string }> {
-    const conn = new Client();
+    let session: ServerProvisioningSession | null = null;
     const plan = getServerProvisioningPlan(server.serverType);
 
-    const executeCommandResult = (cmd: string): Promise<CommandResult> => {
-      return new Promise((resolve, reject) => {
-        conn.exec(cmd, (err, stream) => {
-          if (err) return reject(err);
-          let stdout = "";
-          let stderr = "";
-          let resolved = false;
-          let exitCode: number | null = null;
-          const done = (code: number | null) => {
-            if (resolved) return;
-            resolved = true;
-            resolve({ code, stdout, stderr });
-            try {
-              stream.destroy();
-            } catch {}
-          };
-          stream.on("exit", (code: number | null) => {
-            exitCode = code;
-            setTimeout(() => done(code), 20);
-          });
-          stream.on("close", () => {
-            done(exitCode);
-          });
-          stream.on("error", reject);
-          stream.on("data", (data: Buffer | string) => {
-            stdout += data.toString();
-          });
-          stream.stderr.on("data", (data: Buffer | string) => {
-            stderr += data.toString();
-          });
-        });
-      });
-    };
     const executeCommand = async (cmd: string): Promise<string> => {
-      const result = await executeCommandResult(cmd);
+      if (!session) throw new Error("Provisioning session is not connected");
+      const result = await session.execute(cmd);
       if (result.code !== 0) {
         throw new Error(
           `Command failed with code ${result.code}. Stderr: ${result.stderr.trim()}`,
@@ -114,20 +80,12 @@ export class SetupServerUseCase {
     };
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        conn
-          .on("ready", resolve)
-          .on("error", reject)
-          .connect({
-            host: server.ipAddress,
-            port: server.port,
-            username: server.username,
-            privateKey: privateKey,
-            hostHash: "sha256",
-            hostVerifier: hostVerifierForFingerprint(hostKeyFingerprint),
-            readyTimeout: 20000,
-          });
+      session = await this.provisioning.connect({
+        server,
+        privateKey,
+        hostKeyFingerprint,
       });
+      const connectedSession = session;
 
       let sudo: string;
       try {
@@ -162,18 +120,13 @@ export class SetupServerUseCase {
         await privileged('usermod -aG docker "$USER"');
       }
 
-      const remote = createRemoteServices({
-        host: server.ipAddress,
-        port: server.port,
-        username: server.username,
-        privateKey,
-        hostKeyFingerprint,
-      });
       // systemctl can return before dockerd has finished creating its socket.
       // Give the daemon a short, bounded window to become ready before
       // attempting Swarm operations. This also makes retries after a failed
       // setup deterministic instead of depending on daemon startup timing.
-      const remoteInfo = await waitForDocker(() => remote.info());
+      const remoteInfo = await waitForDocker(() =>
+        connectedSession.dockerInfo(),
+      );
       if (plan.requiresSwarm) {
         // Each deployment/database host owns an independent Swarm. It must
         // never join the control-plane cluster because its resource network,
@@ -202,7 +155,9 @@ export class SetupServerUseCase {
           "docker network inspect upstand-network >/dev/null 2>&1 || docker network create --driver overlay --attachable upstand-network",
         );
 
-        const initializedInfo = await waitForDocker(() => remote.info());
+        const initializedInfo = await waitForDocker(() =>
+          connectedSession.dockerInfo(),
+        );
         if (initializedInfo.Swarm?.LocalNodeState !== "active") {
           throw new Error(
             `Remote Docker Swarm is not active after initialization (state: ${initializedInfo.Swarm?.LocalNodeState ?? "unknown"}).`,
@@ -219,11 +174,11 @@ export class SetupServerUseCase {
         // have no edge proxy, so database credentials and ports stay private.
         const webServerSettings =
           await this.uow.webServerSettingsRepository.findGlobal();
-        await remote.caddyService.initializeCaddy(webServerSettings ?? {});
+        await connectedSession.initializeCaddy(webServerSettings ?? {});
       }
 
       if (plan.requiresMonitoring) {
-        await this.setupMonitoringAgent(conn, server, privileged);
+        await this.setupMonitoringAgent(connectedSession, server, privileged);
       }
 
       log.info({
@@ -249,12 +204,12 @@ export class SetupServerUseCase {
       });
       throw new Error(message);
     } finally {
-      conn.end();
+      await session?.close();
     }
   }
 
   private async setupMonitoringAgent(
-    conn: Client,
+    session: ServerProvisioningSession,
     server: Server,
     privileged: (cmd: string) => Promise<string>,
   ): Promise<void> {
@@ -329,17 +284,8 @@ export class SetupServerUseCase {
       log.info({
         message: `[Monitoring Setup] Uploading tarball to ${server.ipAddress}:${remoteTarPath}`,
       });
-      await new Promise<void>((resolve, reject) => {
-        conn.sftp((err, sftp) => {
-          if (err) return reject(err);
-          if (!remoteTarPath)
-            return reject(new Error("Remote archive path is missing"));
-          sftp.fastPut(localTarPath, remoteTarPath, {}, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-      });
+      if (!remoteTarPath) throw new Error("Remote archive path is missing");
+      await session.upload(localTarPath, remoteTarPath);
       fs.unlinkSync(localTarPath);
 
       log.info({

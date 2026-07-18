@@ -6,6 +6,7 @@ export {
   CaddyService,
   createDockerInfrastructureResolver,
   createMonitoringAgentPort,
+  createServerProvisioningPort,
   DockerReadOnlyService,
   DockerService,
   getDockerInstance,
