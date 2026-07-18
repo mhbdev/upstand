@@ -12,6 +12,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -39,32 +40,28 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
-const createSshKeyTarget = defineUpGalTarget({
-  id: "create-ssh-key",
-  label: "Add SSH Key button",
-  description: "Opens the SSH key creation dialog.",
-  kind: "button",
-  action: "open_dialog",
-});
-const sshKeyNameTarget = defineUpGalTarget({
-  id: "ssh-key-name",
-  label: "SSH key name field",
-  description: "Enter a recognizable name for this key.",
-  kind: "field",
-});
-const generateSshKeySubmitTarget = defineUpGalTarget({
-  id: "generate-ssh-key-submit",
-  label: "Generate Key button",
-  description:
-    "Generates and stores the SSH key pair. Review the name before submitting.",
-  kind: "button",
-  action: "submit",
-});
+const createSshKeyTarget = getUpGalTargetDefinition("create-ssh-key");
+const generateNewSshKeyTarget = getUpGalTargetDefinition(
+  "generate-new-ssh-key",
+);
+const useExistingSshKeyTarget = getUpGalTargetDefinition(
+  "use-existing-ssh-key",
+);
+const sshKeyNameTarget = getUpGalTargetDefinition("ssh-key-name");
+const sshKeyDescriptionTarget = getUpGalTargetDefinition("ssh-key-description");
+const sshKeyPrivateKeyTarget = getUpGalTargetDefinition("ssh-key-private-key");
+const sshKeyPublicKeyTarget = getUpGalTargetDefinition("ssh-key-public-key");
+const generateSshKeySubmitTarget = getUpGalTargetDefinition(
+  "generate-ssh-key-submit",
+);
+const importSshKeySubmitTarget = getUpGalTargetDefinition(
+  "import-ssh-key-submit",
+);
 
 type AddKeyMode = "generate" | "import";
 
@@ -495,30 +492,34 @@ export default function SSHKeys(_props: {
 
           {/* Mode toggle */}
           <div className="flex gap-1.5 rounded-lg border border-border/40 bg-muted/20 p-1">
-            <button
-              type="button"
-              onClick={() => setAddKeyMode("generate")}
-              className={cn(
-                "flex-1 rounded-md py-1.5 font-medium text-xs transition-colors",
-                addKeyMode === "generate"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Generate new key
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddKeyMode("import")}
-              className={cn(
-                "flex-1 rounded-md py-1.5 font-medium text-xs transition-colors",
-                addKeyMode === "import"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Use existing key
-            </button>
+            <UpGalTarget definition={generateNewSshKeyTarget}>
+              <button
+                type="button"
+                onClick={() => setAddKeyMode("generate")}
+                className={cn(
+                  "flex-1 rounded-md py-1.5 font-medium text-xs transition-colors",
+                  addKeyMode === "generate"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Generate new key
+              </button>
+            </UpGalTarget>
+            <UpGalTarget definition={useExistingSshKeyTarget}>
+              <button
+                type="button"
+                onClick={() => setAddKeyMode("import")}
+                className={cn(
+                  "flex-1 rounded-md py-1.5 font-medium text-xs transition-colors",
+                  addKeyMode === "import"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Use existing key
+              </button>
+            </UpGalTarget>
           </div>
 
           {addKeyMode === "generate" ? (
@@ -539,13 +540,15 @@ export default function SSHKeys(_props: {
 
               <div className="space-y-2">
                 <Label htmlFor="gen-key-desc">Description</Label>
-                <Input
-                  id="gen-key-desc"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Used for private git access"
-                  autoComplete="off"
-                />
+                <UpGalTarget definition={sshKeyDescriptionTarget}>
+                  <Input
+                    id="gen-key-desc"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Used for private git access"
+                    autoComplete="off"
+                  />
+                </UpGalTarget>
               </div>
 
               <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
@@ -588,51 +591,59 @@ export default function SSHKeys(_props: {
             <form onSubmit={handleImport} className="space-y-4 pt-1">
               <div className="space-y-2">
                 <Label htmlFor="key-name">Name</Label>
-                <Input
-                  id="key-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Hetzner Production VPS"
-                  autoComplete="off"
-                  required
-                />
+                <UpGalTarget definition={sshKeyNameTarget}>
+                  <Input
+                    id="key-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Hetzner Production VPS"
+                    autoComplete="off"
+                    required
+                  />
+                </UpGalTarget>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="key-desc">Description</Label>
-                <Input
-                  id="key-desc"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Used for private git access"
-                  autoComplete="off"
-                />
+                <UpGalTarget definition={sshKeyDescriptionTarget}>
+                  <Input
+                    id="key-desc"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Used for private git access"
+                    autoComplete="off"
+                  />
+                </UpGalTarget>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="private-key">Private Key</Label>
-                <Textarea
-                  id="private-key"
-                  value={privateKey}
-                  onChange={(e) => setPrivateKey(e.target.value)}
-                  rows={4}
-                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
-                  className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
-                  required
-                />
+                <UpGalTarget definition={sshKeyPrivateKeyTarget}>
+                  <Textarea
+                    id="private-key"
+                    value={privateKey}
+                    onChange={(e) => setPrivateKey(e.target.value)}
+                    rows={4}
+                    placeholder="-----BEGIN OPENSSH PRIVATE KEY-----…"
+                    className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
+                    required
+                  />
+                </UpGalTarget>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="public-key">Public Key</Label>
-                <Textarea
-                  id="public-key"
-                  value={publicKey}
-                  onChange={(e) => setPublicKey(e.target.value)}
-                  rows={2}
-                  placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5..."
-                  className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
-                  required
-                />
+                <UpGalTarget definition={sshKeyPublicKeyTarget}>
+                  <Textarea
+                    id="public-key"
+                    value={publicKey}
+                    onChange={(e) => setPublicKey(e.target.value)}
+                    rows={2}
+                    placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5…"
+                    className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
+                    required
+                  />
+                </UpGalTarget>
                 <p className="text-[11px] text-muted-foreground">
                   We verify the private and public key actually match before
                   storing them.
@@ -647,14 +658,16 @@ export default function SSHKeys(_props: {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  className="gap-2 font-medium"
-                  disabled={isSubmitting}
-                >
-                  {createMutation.isPending && <Spinner className="size-4" />}
-                  {createMutation.isPending ? "Adding..." : "Add Key"}
-                </Button>
+                <UpGalTarget definition={importSshKeySubmitTarget}>
+                  <Button
+                    type="submit"
+                    className="gap-2 font-medium"
+                    disabled={isSubmitting}
+                  >
+                    {createMutation.isPending && <Spinner className="size-4" />}
+                    {createMutation.isPending ? "Adding…" : "Add Key"}
+                  </Button>
+                </UpGalTarget>
               </DialogFooter>
             </form>
           )}

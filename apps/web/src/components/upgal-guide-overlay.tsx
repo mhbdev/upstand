@@ -15,6 +15,7 @@ import type { UpGalTargetRect } from "@/lib/upgal-ui-actions";
 import {
   findUpGalTarget,
   getUpGalTargetRect,
+  getUpGalUiTarget,
   readUpGalPlan,
   removeUpGalPlan,
   spotlightUpGalTarget,
@@ -22,6 +23,10 @@ import {
 } from "@/lib/upgal-ui-actions";
 
 type Plan = UpGalUIAction;
+
+function normalizedPath(path: string) {
+  return path.length > 1 ? path.replace(/\/+$/, "") : path;
+}
 
 function cleanPlanQuery(pathname: string, planId: string) {
   const params = new URLSearchParams(window.location.search);
@@ -66,6 +71,22 @@ export function UpGalGuideOverlay() {
   }, [planId]);
 
   const step = plan?.steps[stepIndex];
+  const targetDefinition =
+    step && step.type !== "navigate" ? getUpGalUiTarget(step.target) : null;
+  const targetRoute =
+    targetDefinition?.kind !== "navigation"
+      ? targetDefinition?.path
+      : undefined;
+  const targetRouteMismatch = Boolean(
+    targetRoute && normalizedPath(pathname) !== normalizedPath(targetRoute),
+  );
+
+  useEffect(() => {
+    if (!planId || !targetRoute || !targetRouteMismatch) return;
+    router.replace(upGalPlanUrl(targetRoute, planId) as Route, {
+      scroll: false,
+    });
+  }, [planId, router, targetRoute, targetRouteMismatch]);
 
   useEffect(() => {
     if (!step) {
@@ -81,7 +102,7 @@ export function UpGalGuideOverlay() {
       return;
     }
     setTargetAvailable(false);
-    setTargetLabel(null);
+    setTargetLabel(targetDefinition?.label ?? null);
     setTargetRect(null);
     let attempts = 0;
     let timer: number | undefined;
@@ -90,7 +111,9 @@ export function UpGalGuideOverlay() {
       const found = findUpGalTarget(step.target);
       const rect = found ? getUpGalTargetRect(step.target) : null;
       setTargetAvailable(Boolean(rect));
-      setTargetLabel(found?.dataset.upgalLabel ?? null);
+      setTargetLabel(
+        found?.dataset.upgalLabel ?? targetDefinition?.label ?? null,
+      );
       setTargetRect(rect);
       if (found && rect && !highlighted) {
         highlighted = true;
@@ -106,7 +129,7 @@ export function UpGalGuideOverlay() {
     return () => {
       if (timer) window.clearTimeout(timer);
     };
-  }, [step]);
+  }, [step, targetDefinition?.label]);
 
   const finish = useCallback(() => {
     if (planId) cleanPlanQuery(pathname, planId);
@@ -120,7 +143,7 @@ export function UpGalGuideOverlay() {
   const advance = () => {
     if (!targetAvailable) return;
     if (step.type === "navigate") {
-      if (pathname !== step.path && planId) {
+      if (normalizedPath(pathname) !== normalizedPath(step.path) && planId) {
         router.push(upGalPlanUrl(step.path, planId) as Route, {
           scroll: false,
         });
@@ -195,7 +218,9 @@ export function UpGalGuideOverlay() {
           <p className="text-sm leading-relaxed">{step.description}</p>
           {!targetAvailable ? (
             <p aria-live="polite" className="text-muted-foreground text-xs">
-              Waiting for the relevant control to become available…
+              {targetRouteMismatch
+                ? `Opening ${targetRoute}…`
+                : `Waiting for ${targetDefinition?.label ?? "the relevant control"} to become available…`}
             </p>
           ) : null}
           <div className="flex items-center justify-between gap-2">
@@ -212,11 +237,13 @@ export function UpGalGuideOverlay() {
                 Back
               </Button>
               <Button disabled={!targetAvailable} onClick={advance} size="sm">
-                {step.type === "open_dialog"
-                  ? "Open dialog"
-                  : isLast
-                    ? "Done"
-                    : "Next"}
+                {!targetAvailable
+                  ? "Waiting…"
+                  : step.type === "open_dialog"
+                    ? "Open dialog"
+                    : isLast
+                      ? "Done"
+                      : "Next"}
               </Button>
             </div>
           </div>

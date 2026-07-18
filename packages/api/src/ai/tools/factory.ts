@@ -2,11 +2,13 @@ import type { ServiceScope, TokenLike } from "@circulo-ai/di";
 import { toJsonValue } from "@upstand/domain";
 import type { FlexibleSchema, Tool, ToolExecutionOptions } from "ai";
 import { z } from "zod";
+import type { UpGalPageContext } from "../upgal-page-context";
 
 export type UpGalToolContext = { organizationId: string };
 export type UpGalToolFactoryContext = {
   organizationId: string;
   scope: ServiceScope;
+  page?: UpGalPageContext;
 };
 
 export const upGalToolContextSchema = z.object({

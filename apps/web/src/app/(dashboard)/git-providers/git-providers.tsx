@@ -10,6 +10,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -44,18 +45,12 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
-const addGitProviderTarget = defineUpGalTarget({
-  id: "add-git-provider",
-  label: "Add Git Provider button",
-  description: "Opens the form for configuring a Git provider.",
-  kind: "button",
-  action: "open_dialog",
-});
+const addGitProviderTarget = getUpGalTargetDefinition("add-git-provider");
 
 type ProviderType = "github" | "gitlab" | "bitbucket" | "gitea";
 

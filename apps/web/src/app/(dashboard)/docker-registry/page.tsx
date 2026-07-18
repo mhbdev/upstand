@@ -9,6 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -32,17 +33,13 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const createDockerRegistryTarget = defineUpGalTarget({
-  id: "create-docker-registry",
-  label: "Add External Registry button",
-  description: "Opens the form for configuring an external Docker registry.",
-  kind: "button",
-  action: "open_dialog",
-});
+const createDockerRegistryTarget = getUpGalTargetDefinition(
+  "create-docker-registry",
+);
 
 export default function DockerRegistryPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();

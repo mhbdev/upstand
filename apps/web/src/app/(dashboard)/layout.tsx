@@ -19,6 +19,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
+import { getUpGalNavigationTarget } from "@upstand/api/ai/upgal-ui-targets";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -59,7 +60,7 @@ import { GlobalSearch } from "@/components/global-search";
 import { ModeToggle } from "@/components/mode-toggle";
 import { UpGalChat } from "@/components/upgal-chat";
 import { UpGalGuideOverlay } from "@/components/upgal-guide-overlay";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { SettingsDialog } from "@/features/settings";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -137,14 +138,9 @@ function DashboardSidebarGroup({
                 const { children, ...linkProps } = props;
                 return (
                   <UpGalTarget
-                    definition={defineUpGalTarget({
-                      id: `navigation-${item.href.slice(1).replaceAll("/", "-")}`,
-                      label: `${item.title} navigation`,
-                      description: `Open the ${item.title} page.`,
-                      kind: "navigation",
-                      action: "spotlight",
-                      path: item.href as `/${string}`,
-                    })}
+                    definition={getUpGalNavigationTarget(
+                      item.href as `/${string}`,
+                    )}
                   >
                     <Link {...linkProps} href={item.href as Route}>
                       {children}

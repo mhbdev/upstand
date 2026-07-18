@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -15,7 +16,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { Bot, Loader2, Plus, ShieldCheck } from "@/components/huge-icons";
-import { defineUpGalTarget, UpGalTarget } from "@/components/upgal-target";
+import { UpGalTarget } from "@/components/upgal-target";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 import { AddProviderDialog } from "./add-provider-dialog";
@@ -27,13 +28,7 @@ type UpGalSettingsPanelProps = {
   embedded?: boolean;
 };
 
-const addProviderTarget = defineUpGalTarget({
-  id: "upgal-add-provider",
-  label: "Add provider button",
-  description: "Opens the form for configuring an AI provider.",
-  kind: "button",
-  action: "open_dialog",
-});
+const addProviderTarget = getUpGalTargetDefinition("upgal-add-provider");
 
 export function UpGalSettingsPanel({
   embedded = false,

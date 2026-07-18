@@ -2,6 +2,10 @@
 
 import type { UpGalUIAction } from "@upstand/api/ai/upgal";
 import type { UpGalPageContext } from "@upstand/api/ai/upgal-page-context";
+import {
+  resolveUpGalTargetId,
+  UPGAL_UI_TARGETS,
+} from "@upstand/api/ai/upgal-ui-targets";
 
 export type UpGalUiTarget = NonNullable<UpGalPageContext["uiTargets"]>[number];
 export type UpGalTargetRect = {
@@ -56,15 +60,15 @@ export function isUpGalUIAction(value: unknown): value is UpGalUIAction {
 
 export function collectUpGalUiTargets(): UpGalUiTarget[] {
   if (typeof document === "undefined") return [];
-  const seen = new Set<string>();
-  const targets: UpGalUiTarget[] = [];
+  const targets = new Map<string, UpGalUiTarget>(
+    UPGAL_UI_TARGETS.map((target) => [target.id, target]),
+  );
   for (const element of document.querySelectorAll<HTMLElement>(
     "[data-upgal-target]",
   )) {
     const id = element.dataset.upgalTarget?.trim();
     const label = element.dataset.upgalLabel?.trim();
-    if (!id || !label || seen.has(id)) continue;
-    seen.add(id);
+    if (!id || !label) continue;
     const kind =
       element.dataset.upgalKind &&
       ["button", "field", "dialog", "navigation", "other"].includes(
@@ -83,19 +87,31 @@ export function collectUpGalUiTargets(): UpGalUiTarget[] {
     const path =
       element.dataset.upgalPath ||
       (href?.startsWith("/") ? href.split("#", 1)[0] : undefined);
-    targets.push({
+    const registered = targets.get(id);
+    targets.set(id, {
+      ...registered,
       id,
       label,
       kind,
-      ...(path ? { path } : {}),
-      ...(element.dataset.upgalDescription
-        ? { description: element.dataset.upgalDescription.slice(0, 400) }
+      ...(path || registered?.path ? { path: path ?? registered?.path } : {}),
+      ...(element.dataset.upgalDescription || registered?.description
+        ? {
+            description:
+              element.dataset.upgalDescription?.slice(0, 400) ??
+              registered?.description,
+          }
         : {}),
-      ...(action ? { action } : {}),
+      ...(action || registered?.action
+        ? { action: action ?? registered?.action }
+        : {}),
     });
-    if (targets.length >= 100) break;
   }
-  return targets;
+  return Array.from(targets.values()).slice(0, 100);
+}
+
+export function getUpGalUiTarget(target: string) {
+  const canonicalId = resolveUpGalTargetId(target);
+  return UPGAL_UI_TARGETS.find((candidate) => candidate.id === canonicalId);
 }
 
 export function consumeUpGalAction(actionId: string): boolean {
@@ -158,8 +174,9 @@ export function readUpGalPlan(planId: string): UpGalUIAction | null {
 
 export function findUpGalTarget(target: string): HTMLElement | null {
   if (typeof document === "undefined") return null;
+  const canonicalId = resolveUpGalTargetId(target);
   return document.querySelector<HTMLElement>(
-    `[data-upgal-target="${CSS.escape(target)}"]`,
+    `[data-upgal-target="${CSS.escape(canonicalId)}"]`,
   );
 }
 
