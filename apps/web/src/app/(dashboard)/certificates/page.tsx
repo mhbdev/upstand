@@ -34,12 +34,12 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 export default function CertificatesPage() {
-  const { data: activeOrganization } = authClient.useActiveOrganization();
-  const organizationId = activeOrganization?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [name, setName] = useState("");
   const [certificatePem, setCertificatePem] = useState("");
   const [privateKeyPem, setPrivateKeyPem] = useState("");
@@ -51,7 +51,7 @@ export default function CertificatesPage() {
 
   const certificatesQuery = useQuery({
     ...trpc.certificate.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const createMutation = useMutation({
     ...trpc.certificate.create.mutationOptions(),

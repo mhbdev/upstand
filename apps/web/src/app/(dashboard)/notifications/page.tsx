@@ -76,7 +76,7 @@ import {
   Users,
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 const addNotificationTarget = getUpGalTargetDefinition(
@@ -547,8 +547,8 @@ function ProviderForm({
 }
 
 export default function NotificationsPage() {
-  const { data: activeOrganization } = authClient.useActiveOrganization();
-  const organizationId = activeOrganization?.id ?? "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<NotificationChannelDto | null>(null);
   const [provider, setProvider] = useState<NotificationProviderType>("slack");
@@ -564,14 +564,14 @@ export default function NotificationsPage() {
 
   const { data: channels = [], refetch } = useQuery({
     ...trpc.notification.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const { data: deliveries = [] } = useQuery({
     ...trpc.notification.deliveries.queryOptions({
       organizationId,
       limit: 25,
     }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
     refetchInterval: 10_000,
   });
 

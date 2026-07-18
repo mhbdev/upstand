@@ -81,7 +81,7 @@ import {
 } from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { downloadText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
@@ -130,8 +130,8 @@ function getServiceCount(composeFile: string): number {
 }
 
 export default function TemplatesPage() {
-  const { data: organization } = authClient.useActiveOrganization();
-  const organizationId = organization?.id ?? "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<EditorMode>("library");
@@ -169,7 +169,7 @@ export default function TemplatesPage() {
       page: templatePage,
       pageSize: 12,
     }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const catalog = useQuery({
     ...trpc.template.catalog.queryOptions({
@@ -177,12 +177,12 @@ export default function TemplatesPage() {
       page: catalogPage,
       pageSize: 12,
     }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
     staleTime: 15 * 60 * 1000,
   });
   const projects = useQuery({
     ...trpc.project.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const environments = useQuery({
     ...trpc.environment.list.queryOptions({ projectId }),
@@ -190,7 +190,7 @@ export default function TemplatesPage() {
   });
   const servers = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const aiSettings = useQuery({
     ...trpc.ai.listProviders.queryOptions({ organizationId }),

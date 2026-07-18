@@ -30,7 +30,7 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 import { useMembersSettings } from "../hooks/use-members-settings";
 
@@ -51,11 +51,11 @@ const DEFAULT_MEMBER_CAPABILITIES: Capability[] = [
 ];
 
 export function MembersPanel() {
-  const { data: activeOrg } = authClient.useActiveOrganization();
-  const organizationId = activeOrg?.id ?? "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const customRolesQuery = useQuery({
     ...trpc.customRole.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
 
   const createCustomRole = useMutation({
@@ -203,7 +203,7 @@ export function MembersPanel() {
     }
   };
 
-  if (!activeOrg) {
+  if (organizationState.status !== "ready") {
     return (
       <p className="text-muted-foreground text-sm">
         Select a workspace to manage members.

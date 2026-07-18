@@ -45,7 +45,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 const createTagTarget = getUpGalTargetDefinition("create-tag");
@@ -53,8 +53,8 @@ const tagNameTarget = getUpGalTargetDefinition("tag-name");
 const createTagSubmitTarget = getUpGalTargetDefinition("create-tag-submit");
 
 export default function TagsPage() {
-  const { data: organization } = authClient.useActiveOrganization();
-  const organizationId = organization?.id ?? "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(DEFAULT_TAG_COLOR);
@@ -69,7 +69,7 @@ export default function TagsPage() {
   } | null>(null);
   const tags = useQuery({
     ...trpc.tag.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const create = useMutation({
     ...trpc.tag.create.mutationOptions(),

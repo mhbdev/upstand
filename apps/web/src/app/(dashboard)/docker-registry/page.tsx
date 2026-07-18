@@ -35,7 +35,7 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 const createDockerRegistryTarget = getUpGalTargetDefinition(
@@ -43,8 +43,8 @@ const createDockerRegistryTarget = getUpGalTargetDefinition(
 );
 
 export default function DockerRegistryPage() {
-  const { data: activeOrg } = authClient.useActiveOrganization();
-  const organizationId = activeOrg?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,7 +61,7 @@ export default function DockerRegistryPage() {
 
   const { data: registries = [], refetch } = useQuery({
     ...trpc.dockerRegistry.list.queryOptions({ organizationId }),
-    enabled: !!organizationId,
+    enabled: organizationState.status === "ready",
   });
 
   const createMutation = useMutation({

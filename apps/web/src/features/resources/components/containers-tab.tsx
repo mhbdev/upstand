@@ -551,9 +551,9 @@ function ContainerTerminalDialog({
   const { data: organization } = authClient.useActiveOrganization();
   const { data: keys = [] } = useQuery({
     ...trpc.sshKey.list.queryOptions({
-      organizationId: organization?.id || "",
+      organizationId: organization?.id as string,
     }),
-    enabled: Boolean(organization?.id && container),
+    enabled: Boolean(organization?.id) && Boolean(container),
   });
   const [keyId, setKeyId] = useState("");
   const [token, setToken] = useState<string | null>(null);

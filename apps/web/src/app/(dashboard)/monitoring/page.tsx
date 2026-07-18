@@ -44,7 +44,7 @@ import {
   Network,
   Server,
 } from "@/components/huge-icons";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 type RangeKey = "1h" | "6h" | "24h" | "7d";
@@ -228,8 +228,13 @@ function StatCard({
 }
 
 export default function MonitoringPage() {
-  const { data: activeOrganization, isPending: organizationPending } =
-    authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
+  const activeOrganization =
+    organizationState.status === "ready"
+      ? organizationState.organization
+      : null;
+  const organizationPending = organizationState.status === "loading";
+  const organizationId = organizationState.organizationId as string;
   const [selectedServerId, setSelectedServerId] = useState("local");
   const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
   const [cpuThreshold, setCpuThreshold] = useState(90);
@@ -246,57 +251,57 @@ export default function MonitoringPage() {
 
   const serversQuery = useQuery({
     ...trpc.server.list.queryOptions({
-      organizationId: activeOrganization?.id ?? "",
+      organizationId,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled: organizationState.status === "ready",
   });
   const monitoringSettingsQuery = useQuery({
     ...trpc.server.monitoringSettings.queryOptions({
-      organizationId: activeOrganization?.id ?? "",
+      organizationId,
       serverId: selectedServerId,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled: organizationState.status === "ready",
   });
   const monitoringStatusQuery = useQuery({
     ...trpc.server.monitoringStatus.queryOptions({
-      organizationId: activeOrganization?.id ?? "",
+      organizationId,
       serverId: selectedServerId,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled: organizationState.status === "ready",
     refetchInterval: 30_000,
   });
   const historicalQuery = useQuery({
     ...trpc.server.historicalMetrics.queryOptions({
-      organizationId: activeOrganization?.id ?? "",
+      organizationId,
       serverId: selectedServerId,
       from: range.from,
       limit: range.limit,
     }),
     enabled:
-      Boolean(activeOrganization?.id) &&
+      organizationState.status === "ready" &&
       monitoringSettingsQuery.data?.isConfigured === true,
     refetchInterval: 30_000,
   });
   const containerQuery = useQuery({
     ...trpc.server.historicalMetrics.queryOptions({
-      organizationId: activeOrganization?.id ?? "",
+      organizationId,
       serverId: selectedServerId,
       containerMetrics: true,
       from: range.from,
       limit: "1000",
     }),
     enabled:
-      Boolean(activeOrganization?.id) &&
+      organizationState.status === "ready" &&
       monitoringSettingsQuery.data?.isConfigured === true &&
       historicalQuery.isSuccess,
     refetchInterval: 30_000,
   });
   const runtimeQuery = useQuery({
     ...trpc.server.runtimeStats.queryOptions({
-      organizationId: activeOrganization?.id ?? "",
+      organizationId,
       serverId: selectedServerId === "local" ? undefined : selectedServerId,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled: organizationState.status === "ready",
     refetchInterval: 10_000,
   });
   const updateMonitoringSettings = useMutation(

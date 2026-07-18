@@ -28,7 +28,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
@@ -58,8 +58,8 @@ async function ssoRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export default function SsoSettingsPage() {
-  const { data: organization } = authClient.useActiveOrganization();
-  const organizationId = organization?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState("");
   const [issuer, setIssuer] = useState("");
@@ -77,7 +77,7 @@ export default function SsoSettingsPage() {
 
   const settings = useQuery({
     ...trpc.sso.getSettings.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
   const updateSettings = useMutation({
     ...trpc.sso.updateSettings.mutationOptions(),

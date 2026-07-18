@@ -58,14 +58,14 @@ import {
   type StatusTone,
 } from "@/components/dashboard/status-badge";
 import { UpGalTarget } from "@/components/upgal-target";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
 const createServerTarget = getUpGalTargetDefinition("create-server");
 
 export default function RemoteServersPage() {
-  const { data: activeOrg } = authClient.useActiveOrganization();
-  const organizationId = activeOrg?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
@@ -86,17 +86,17 @@ export default function RemoteServersPage() {
 
   const { data: servers, refetch } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
-    enabled: !!organizationId,
+    enabled: organizationState.status === "ready",
   });
 
   const { data: serverCount } = useQuery({
     ...trpc.server.count.queryOptions({ organizationId }),
-    enabled: !!organizationId,
+    enabled: organizationState.status === "ready",
   });
 
   const { data: sshKeys } = useQuery({
     ...trpc.sshKey.list.queryOptions({ organizationId }),
-    enabled: !!organizationId,
+    enabled: organizationState.status === "ready",
   });
 
   const createMutation = useMutation({

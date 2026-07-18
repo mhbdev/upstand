@@ -58,12 +58,12 @@ import {
   Trash2,
   Upload,
 } from "@/components/huge-icons";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import {
   uploadArchive,
   validateArchiveDestination,
   validateArchiveFile,
 } from "@/lib/archive-upload";
-import { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -105,8 +105,8 @@ type PendingRemoval =
     };
 
 export default function DockerInventoryPage() {
-  const { data: organization } = authClient.useActiveOrganization();
-  const organizationId = organization?.id || "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [serverId, setServerId] = useState("local");
   const [kind, setKind] = useState<(typeof kinds)[number]["id"]>("info");
 
@@ -139,7 +139,7 @@ export default function DockerInventoryPage() {
   // Queries
   const serversQuery = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
 
   // Query all containers on the server to populate logs/stats selects
@@ -149,7 +149,7 @@ export default function DockerInventoryPage() {
       serverId,
       kind: "containers",
     }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
 
   const inventoryQuery = useQuery({

@@ -61,7 +61,8 @@ import {
   validateKeyValuePairs,
 } from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
+import type { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
@@ -85,7 +86,12 @@ export default function WebServerDashboard(_props: {
   session: typeof authClient.$Infer.Session;
 }) {
   const queryClient = useQueryClient();
-  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const organizationState = useRequiredActiveOrganization();
+  const activeOrganization =
+    organizationState.status === "ready"
+      ? organizationState.organization
+      : null;
+  const organizationId = organizationState.organizationId as string;
   // Database Web Server settings
   const [email, setEmail] = useState("");
   const [httpPort, setHttpPort] = useState(80);
@@ -134,31 +140,31 @@ export default function WebServerDashboard(_props: {
 
   const { data: securityAudit, refetch: refetchSecurityAudit } = useQuery({
     ...trpc.webServer.securityAudit.queryOptions({
-      organizationId: activeOrganization?.id || "",
+      organizationId,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled: organizationState.status === "ready",
     refetchInterval: 30000,
   });
 
   const { data: webBackupDestinations = [] } = useQuery({
     ...trpc.s3Destination.list.queryOptions({
-      organizationId: activeOrganization?.id || "",
+      organizationId,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled: organizationState.status === "ready",
   });
   const { data: webBackupSchedules = [], refetch: refetchWebBackupSchedules } =
     useQuery({
       ...trpc.backup.listWebServerSchedules.queryOptions({
-        organizationId: activeOrganization?.id || "",
+        organizationId,
       }),
-      enabled: Boolean(activeOrganization?.id),
+      enabled: organizationState.status === "ready",
     });
   const { data: webBackupRuns = [], refetch: refetchWebBackupRuns } = useQuery({
     ...trpc.backup.listWebServerRuns.queryOptions({
-      organizationId: activeOrganization?.id || "",
+      organizationId,
       limit: 10,
     }),
-    enabled: Boolean(activeOrganization?.id),
+    enabled: organizationState.status === "ready",
   });
 
   // 2. Fetch Caddy logs

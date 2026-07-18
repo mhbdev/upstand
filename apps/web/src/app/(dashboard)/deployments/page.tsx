@@ -52,13 +52,13 @@ import {
   Terminal,
   Trash2,
 } from "@/components/huge-icons";
-import { authClient } from "@/lib/auth-client";
+import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 export default function DeploymentsPage() {
-  const { data: organization } = authClient.useActiveOrganization();
-  const organizationId = organization?.id ?? "";
+  const organizationState = useRequiredActiveOrganization();
+  const organizationId = organizationState.organizationId as string;
   const [activeTab, setActiveTab] = useState("history");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
@@ -82,7 +82,7 @@ export default function DeploymentsPage() {
     refetch: refetchDeployments,
   } = useQuery({
     ...trpc.deployment.getDeployments.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
     refetchInterval: activeTab === "history" ? 5000 : false,
   });
 
@@ -92,7 +92,7 @@ export default function DeploymentsPage() {
     refetch: refetchQueue,
   } = useQuery({
     ...trpc.deployment.getQueue.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
     refetchInterval: activeTab === "queue" ? 3000 : false,
   });
 
@@ -102,7 +102,7 @@ export default function DeploymentsPage() {
     refetch: refetchServers,
   } = useQuery({
     ...trpc.deployment.getServerSettings.queryOptions({ organizationId }),
-    enabled: Boolean(organizationId),
+    enabled: organizationState.status === "ready",
   });
 
   // Sync concurrency inputs from DB settings
