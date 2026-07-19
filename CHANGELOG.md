@@ -4,6 +4,17 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.84 - 2026-07-19
+
+### Added
+
+- Add bookmarkIcon for tags tab item in the resource page.
+
+### Fixed
+
+- Resolve query suffix matching bug in container historical metrics retrieval to support dots, underscores, and hyphens separators.
+- Resolve "Resource not found" toast notification appearing during resource deletion by disabling active queries upon delete mutation success.
+
 ## 0.1.83 - 2026-07-19
 
 ### Added

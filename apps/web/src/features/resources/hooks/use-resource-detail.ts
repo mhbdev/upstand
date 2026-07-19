@@ -105,7 +105,7 @@ export function useResourceDetail({
 
   const statsQuery = useQuery({
     ...trpc.resource.getStats.queryOptions({ id: resourceId }),
-    refetchInterval: isDeleted ? false : (statsIntervalEnabled ? 5000 : false),
+    refetchInterval: isDeleted ? false : statsIntervalEnabled ? 5000 : false,
     enabled: !isDeleted && !!resourceId && statsIntervalEnabled,
   });
 
@@ -116,7 +116,7 @@ export function useResourceDetail({
       since: logsSince,
     }),
     enabled: !isDeleted && containerModalOpen && !!selectedContainerId,
-    refetchInterval: isDeleted ? false : (containerModalOpen ? 3000 : false),
+    refetchInterval: isDeleted ? false : containerModalOpen ? 3000 : false,
   });
 
   // Mutations
