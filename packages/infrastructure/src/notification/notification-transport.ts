@@ -10,7 +10,11 @@ const NOTIFICATION_REQUEST_TIMEOUT_MS = 15_000;
 const MAX_PROVIDER_ERROR_BODY_LENGTH = 500;
 
 function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, "");
+  let str = value.trim();
+  while (str.endsWith("/")) {
+    str = str.slice(0, -1);
+  }
+  return str;
 }
 
 async function ensureSuccess(

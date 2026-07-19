@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Checkbox } from "@upstand/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -669,12 +670,10 @@ export default function RemoteServersPage() {
             </div>
 
             <div className="flex items-center space-x-2 pt-2">
-              <input
+              <Checkbox
                 id="enableDockerCleanup"
-                type="checkbox"
                 checked={enableDockerCleanup}
-                onChange={(e) => setEnableDockerCleanup(e.target.checked)}
-                className="size-4 animate-none cursor-pointer rounded border-border/40 text-indigo-600 transition-none focus:ring-indigo-500"
+                onCheckedChange={(val) => setEnableDockerCleanup(Boolean(val))}
               />
               <Label
                 htmlFor="enableDockerCleanup"

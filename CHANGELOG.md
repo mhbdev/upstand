@@ -4,7 +4,21 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.89 - 2026-07-20
+## 0.1.90 - 2026-07-20
+
+### Fixed
+
+- Resolve Upstand Server Logs loading issue by adding fallback to running container logs when Swarm service is unavailable, and triggering immediate refetch on log dialog open.
+- Fix Caddy configuration save timeout ("fetch failed") by matching full Docker Hub `docker.io/library/` image tags during existence checks to avoid redundant Docker pulls.
+- Standardize all UI checkboxes and labels across Web, Remote Servers, and Resource General settings to use `@upstand/ui` Base UI components (`Checkbox`, `Label`).
+
+### Security & Bug Fixes
+
+- Resolve CodeQL `js/shell-command-constructed-from-input` security alerts (#5, #6, #7, #8, #9, #10) in `docker-readonly.service.ts` via strict `shellQuote` parameter escaping.
+- Resolve CodeQL `DOM text reinterpreted as HTML` / client-side redirection alerts (#2, #29) in `git-providers.tsx` by URL-encoding dynamic organization names with `encodeURIComponent`.
+- Resolve CodeQL `js/polynomial-redos` alerts (#24, #25, #26, #27) by replacing slash trimming regexes in `build-registry.ts`, `backup-storage.ts`, and `notification-transport.ts` with O(n) loop string slicing.
+- Resolve CodeQL CWE-916 heuristic alert (#3) in `oauth-state.ts` by explicitly converting token payloads to UTF-8 binary byte buffers.
+
 
 ### Security & Bug Fixes
 

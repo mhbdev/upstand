@@ -8,7 +8,9 @@ export interface BackupStorageDestination {
 }
 
 export function normalizeBackupPrefix(prefix: string): string {
-  const normalized = prefix.trim().replace(/^\/+|\/+$/g, "");
+  let normalized = prefix.trim();
+  while (normalized.startsWith("/")) normalized = normalized.slice(1);
+  while (normalized.endsWith("/")) normalized = normalized.slice(0, -1);
   return normalized ? `${normalized}/` : "";
 }
 

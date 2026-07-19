@@ -662,9 +662,15 @@ export class CaddyService {
 
   private async ensureImage(): Promise<void> {
     const images = await this.docker.listImages();
-    if (
-      images.some((image) => image.RepoTags?.some((tag) => tag === CADDY_IMAGE))
-    ) {
+    const hasImage = images.some((image) =>
+      image.RepoTags?.some(
+        (tag) =>
+          tag === CADDY_IMAGE ||
+          tag === `docker.io/library/${CADDY_IMAGE}` ||
+          tag.endsWith(`/${CADDY_IMAGE}`),
+      ),
+    );
+    if (hasImage) {
       return;
     }
 

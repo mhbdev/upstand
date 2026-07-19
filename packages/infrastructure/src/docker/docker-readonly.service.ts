@@ -114,9 +114,10 @@ export class DockerReadOnlyService implements DockerExecPort {
       if (command === "remove") await container.remove({ force: true });
     } else {
       const action = command === "remove" ? "rm --force" : command;
+      const safeContainer = shellQuote(containerId);
       await this.executeRemote(
         target,
-        `docker container ${action} ${containerId}`,
+        `docker container ${action} ${safeContainer}`,
       );
     }
     return { success: true };
@@ -152,7 +153,8 @@ export class DockerReadOnlyService implements DockerExecPort {
           : command === "remove-network"
             ? "network rm"
             : "image rm --force";
-      await this.executeRemote(target, `docker ${action} ${resourceId}`);
+      const safeResource = shellQuote(resourceId);
+      await this.executeRemote(target, `docker ${action} ${safeResource}`);
     }
     return { success: true };
   }

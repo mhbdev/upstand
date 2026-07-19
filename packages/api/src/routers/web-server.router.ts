@@ -491,17 +491,37 @@ export const webServerRouter = router({
     .query(async ({ ctx, input }) => {
       await requireActiveOrganizationPermission(ctx, "server:view");
       const docker = getDockerInstance();
+      const tail = input.tail || 100;
       try {
         const service = docker.getService(UPSTAND_SERVER_SERVICE);
         const logBuffer = await service.logs({
           stdout: true,
           stderr: true,
-          tail: input.tail || 100,
+          tail,
         });
-        return cleanDockerLogs(await dockerLogBuffer(logBuffer));
+        const text = cleanDockerLogs(await dockerLogBuffer(logBuffer));
+        if (text && !text.includes("no such service")) return text;
+      } catch {
+        // Fall through to container lookup
+      }
+
+      try {
+        const container = await getRunningServiceContainer(
+          UPSTAND_SERVER_SERVICE,
+        );
+        if (container) {
+          const logBuffer = await container.logs({
+            stdout: true,
+            stderr: true,
+            tail,
+          });
+          return cleanDockerLogs(await dockerLogBuffer(logBuffer));
+        }
       } catch (err: any) {
         return `Failed to fetch server logs: ${err.message}`;
       }
+
+      return "No active Upstand server process or container found.";
     }),
 
   reload: twoFactorVerifiedProcedure

@@ -33,9 +33,11 @@ function deriveStateSigningKey(): Buffer {
   );
 }
 
-function sign(payload: string): string {
-  return createHmac("sha256", deriveStateSigningKey())
-    .update(payload)
+function computeStateMac(tokenPayload: string): string {
+  const secretKey = deriveStateSigningKey();
+  const payloadBytes = Buffer.from(tokenPayload, "utf8");
+  return createHmac("sha256", secretKey)
+    .update(payloadBytes)
     .digest("base64url");
 }
 
@@ -51,7 +53,7 @@ export function createGitProviderOAuthState(
   const nonce = randomBytes(24).toString("base64url");
   const payload = `${STATE_VERSION}.${purpose}.${providerId}.${binding.organizationId}.${binding.userId}.${issuedAt}.${nonce}`;
   return {
-    state: `${payload}.${sign(payload)}`,
+    state: `${payload}.${computeStateMac(payload)}`,
     expiresAt: issuedAt + STATE_TTL_SECONDS,
   };
 }
@@ -104,7 +106,7 @@ export function parseGitProviderOAuthState(state: string): {
   }
 
   const payload = parts.slice(0, 7).join(".");
-  const expected = Buffer.from(sign(payload));
+  const expected = Buffer.from(computeStateMac(payload));
   const received = Buffer.from(receivedSignature || "");
   if (
     expected.length !== received.length ||

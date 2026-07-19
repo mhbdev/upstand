@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Checkbox } from "@upstand/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -793,15 +794,14 @@ export function GeneralTab({
                 <span className="font-medium text-muted-foreground text-xs">
                   {autoDeploy ? "Active" : "Disabled"}
                 </span>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={autoDeploy}
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setAutoDeploy(val);
+                  onCheckedChange={(val) => {
+                    const checked = Boolean(val);
+                    setAutoDeploy(checked);
                     const config = {
                       ...parseResourceCredentials(secrets.credentials),
-                      autoDeploy: val,
+                      autoDeploy: checked,
                     };
                     updateResource(
                       {
@@ -2471,11 +2471,11 @@ export function GeneralTab({
                         checkouts.
                       </span>
                     </div>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={githubSubmodules}
-                      onChange={(e) => setGithubSubmodules(e.target.checked)}
-                      className="size-4 cursor-pointer rounded accent-primary"
+                      onCheckedChange={(val) =>
+                        setGithubSubmodules(Boolean(val))
+                      }
                     />
                   </div>
                 </div>
@@ -2666,11 +2666,9 @@ export function GeneralTab({
                         checkouts.
                       </span>
                     </div>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={gitSubmodules}
-                      onChange={(e) => setGitSubmodules(e.target.checked)}
-                      className="size-4 cursor-pointer rounded accent-primary"
+                      onCheckedChange={(val) => setGitSubmodules(Boolean(val))}
                     />
                   </div>
                 </div>

@@ -242,10 +242,10 @@ export default function GitProviders({
   }, [addProviderOpen, providerType, fetchManifestOptions]);
 
   const getGithubAppCreationUrl = () => {
-    const base = isOrganization
-      ? `https://github.com/organizations/${orgName.trim()}/settings/apps/new`
+    const safeOrg = encodeURIComponent(orgName.trim());
+    return isOrganization && safeOrg
+      ? `https://github.com/organizations/${safeOrg}/settings/apps/new`
       : "https://github.com/settings/apps/new";
-    return base;
   };
 
   const handleCreateNonGithub = (e: React.FormEvent) => {
@@ -595,8 +595,8 @@ export default function GitProviders({
                 <DialogFooter className="flex items-center gap-2 pt-4 sm:justify-between">
                   <a
                     href={
-                      isOrganization && orgName
-                        ? `https://github.com/organizations/${orgName}/settings/installations`
+                      isOrganization && orgName.trim()
+                        ? `https://github.com/organizations/${encodeURIComponent(orgName.trim())}/settings/installations`
                         : "https://github.com/settings/installations"
                     }
                     target="_blank"

@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Checkbox } from "@upstand/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -189,6 +190,12 @@ export default function WebServerDashboard(_props: {
     refetchInterval: serverLogsOpen && autoRefreshServerLogs ? 5000 : false,
     enabled: serverLogsOpen,
   });
+
+  useEffect(() => {
+    if (serverLogsOpen) {
+      void refetchServerLogs();
+    }
+  }, [serverLogsOpen, refetchServerLogs]);
 
   // 4. Fetch GPU Status
   const { data: gpuStatus, isPending: loadingGpu } = useQuery({
@@ -1278,11 +1285,9 @@ export default function WebServerDashboard(_props: {
                           modern web performance.
                         </p>
                       </div>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={enableHttp3}
-                        onChange={(e) => setEnableHttp3(e.target.checked)}
-                        className="h-4 w-4 rounded border-border/40 accent-primary"
+                        onCheckedChange={(val) => setEnableHttp3(Boolean(val))}
                       />
                     </div>
 
@@ -1535,14 +1540,19 @@ export default function WebServerDashboard(_props: {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     id="auto-refresh-logs"
                     checked={autoRefreshCaddyLogs}
-                    onChange={(e) => setAutoRefreshCaddyLogs(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-border/40 accent-primary"
+                    onCheckedChange={(val) =>
+                      setAutoRefreshCaddyLogs(Boolean(val))
+                    }
                   />
-                  <label htmlFor="auto-refresh-logs">Auto-refresh (5s)</label>
+                  <Label
+                    htmlFor="auto-refresh-logs"
+                    className="cursor-pointer text-xs"
+                  >
+                    Auto-refresh (5s)
+                  </Label>
                 </div>
 
                 <Select
@@ -1614,15 +1624,20 @@ export default function WebServerDashboard(_props: {
               </DialogDescription>
             </div>
             <div className="mr-4 flex shrink-0 items-center gap-3">
-              <div className="flex items-center gap-1 text-xs">
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-1.5 text-xs">
+                <Checkbox
                   id="auto-refresh-server"
                   checked={autoRefreshServerLogs}
-                  onChange={(e) => setAutoRefreshServerLogs(e.target.checked)}
-                  className="h-3 w-3 rounded border-border/40 accent-primary"
+                  onCheckedChange={(val) =>
+                    setAutoRefreshServerLogs(Boolean(val))
+                  }
                 />
-                <label htmlFor="auto-refresh-server">Auto-refresh (5s)</label>
+                <Label
+                  htmlFor="auto-refresh-server"
+                  className="cursor-pointer text-xs"
+                >
+                  Auto-refresh (5s)
+                </Label>
               </div>
               <Select
                 items={[
