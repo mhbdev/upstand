@@ -4,8 +4,8 @@ const SERVICE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
 const MIDDLEWARE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 const HOSTNAME_PATTERN =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
-const SAFE_PATH_PATTERN = /^\/(?:[A-Za-z0-9._~!$&'()+,;=:@%-]+\/?)*$/;
-const SAFE_REDIRECT_TARGET_PATTERN = /^(?:https?:\/\/[^\r\n]+|\/[^\r\n]*)$/i;
+const SAFE_PATH_PATTERN = /^\/[A-Za-z0-9._~!$&'()+,;=:@%/-]*$/;
+const SAFE_REDIRECT_TARGET_PATTERN = /^(?:https?:\/\/[^\r\n\s]+|\/[^\r\n]*)$/i;
 
 export function normalizeDomainHost(value: string): string {
   const suppliedHost = value.trim().replace(/\.$/, "");

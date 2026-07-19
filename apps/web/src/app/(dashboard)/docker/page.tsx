@@ -10,7 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Checkbox } from "@upstand/ui/components/checkbox";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -1110,7 +1112,7 @@ export default function DockerInventoryPage() {
                               setServiceName("");
                             }}
                           >
-                            <SelectTrigger className="h-9 w-full bg-background">
+                            <SelectTrigger className="h-9 w-full">
                               <SelectValue placeholder="Choose container" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1212,15 +1214,14 @@ export default function DockerInventoryPage() {
                         <div className="flex-1" />
 
                         <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                          <label className="flex cursor-pointer items-center gap-1.5">
-                            <input
-                              type="checkbox"
+                          <Label className="flex cursor-pointer items-center gap-1.5">
+                            <Checkbox
                               checked={autoScroll}
-                              onChange={(e) => setAutoScroll(e.target.checked)}
+                              onCheckedChange={(value) => setAutoScroll(value)}
                               className="rounded border bg-background"
                             />
                             <span>Auto-scroll</span>
-                          </label>
+                          </Label>
                           <Button
                             size="sm"
                             variant="outline"
@@ -1276,7 +1277,7 @@ export default function DockerInventoryPage() {
                           value={containerId}
                           onValueChange={(val) => setContainerId(val ?? "")}
                         >
-                          <SelectTrigger className="h-9 w-full bg-background">
+                          <SelectTrigger className="h-9 w-full">
                             <SelectValue placeholder="Select container to monitor" />
                           </SelectTrigger>
                           <SelectContent>

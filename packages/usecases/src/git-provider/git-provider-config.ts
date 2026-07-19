@@ -2,11 +2,15 @@ import type { GitProvider, IUnitOfWork } from "@upstand/domain";
 import { refreshGiteaToken } from "./gitea-client";
 import { refreshGitlabToken } from "./gitlab-client";
 
-export function parseGitProviderConfig(provider: GitProvider): Record<string, any> {
+export function parseGitProviderConfig(
+  provider: GitProvider,
+): Record<string, any> {
   try {
     return JSON.parse(provider.config);
   } catch (_err) {
-    throw new Error(`Invalid or unparseable configuration for Git provider '${provider.name}'`);
+    throw new Error(
+      `Invalid or unparseable configuration for Git provider '${provider.name}'`,
+    );
   }
 }
 

@@ -4,7 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.88 - 2026-07-20
+## 0.1.89 - 2026-07-20
+
+### Security & Bug Fixes
+
+- Resolve CodeQL `js/shell-command-constructed-from-input` security finding by enforcing strict parameter tokenization, validation, and clean argument escaping across remote Docker execution and archive transfer methods.
+- Resolve ReDoS (Regular Expression Denial of Service) ambiguities by refactoring `SAFE_PATH_PATTERN` in `domain-mapping.ts` to eliminate nested quantifiers and guarantee linear time complexity matching.
+
 
 ### Added
 

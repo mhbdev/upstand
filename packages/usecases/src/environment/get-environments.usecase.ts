@@ -11,6 +11,8 @@ export class GetEnvironmentsUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: GetEnvironmentsInput): Promise<Environment[]> {
-    return await this.uow.environmentRepository.findByProjectId(input.projectId);
+    return await this.uow.environmentRepository.findByProjectId(
+      input.projectId,
+    );
   }
 }

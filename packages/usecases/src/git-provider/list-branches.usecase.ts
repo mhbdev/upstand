@@ -1,11 +1,11 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
 import { getBitbucketBranches } from "./bitbucket-client";
-import { getGiteaBranches } from "./gitea-client";
 import {
   getOrRefreshGitProviderToken,
   parseGitProviderConfig,
 } from "./git-provider-config";
+import { getGiteaBranches } from "./gitea-client";
 import { getBranches } from "./github-client";
 import { getGitlabBranches } from "./gitlab-client";
 

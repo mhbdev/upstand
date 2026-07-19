@@ -211,9 +211,11 @@ export class DockerReadOnlyService implements DockerExecPort {
       });
       return { output };
     }
+    const safeContainer = shellQuote(containerId);
+    const safeCommand = shellQuote(command);
     const output = await this.executeRemote(
       target,
-      `docker exec ${containerId} sh -c ${shellQuote(command)}`,
+      `docker exec ${safeContainer} sh -c ${safeCommand}`,
     );
     return { output };
   }
@@ -667,12 +669,15 @@ export class DockerReadOnlyService implements DockerExecPort {
       const remoteArchive = `/tmp/upstand-volume-${randomUUID()}.tar`;
       await writeFile(localArchive, archive);
       try {
-        await this.uploadRemoteFile(target, localArchive, remoteArchive);
         const destinationPath = `/upstand-volume${destination === "/" ? "" : destination}`;
-        await this.executeRemote(
-          target,
-          `docker run --rm -v ${shellQuote(volumeName)}:/upstand-volume ${VOLUME_HELPER_IMAGE} sh -c ${shellQuote(`mkdir -p ${shellQuote(destinationPath)} && tar -xf ${shellQuote(remoteArchive)} -C ${shellQuote(destinationPath)}`)}`,
+        const safeDestination = shellQuote(destinationPath);
+        const safeArchive = shellQuote(remoteArchive);
+        const volumeBind = shellQuote(`${volumeName}:/upstand-volume`);
+        const innerShCmd = shellQuote(
+          `mkdir -p ${safeDestination} && tar -xf ${safeArchive} -C ${safeDestination}`,
         );
+        const remoteCmd = `docker run --rm -v ${volumeBind} ${VOLUME_HELPER_IMAGE} sh -c ${innerShCmd}`;
+        await this.executeRemote(target, remoteCmd);
       } finally {
         await rm(localArchive, { force: true });
         await this.executeRemote(
@@ -717,10 +722,20 @@ export class DockerReadOnlyService implements DockerExecPort {
       try {
         await this.uploadRemoteFile(target, localArchive, remoteArchive);
         const destinationPath = destination || "/";
-        await this.executeRemote(
-          target,
-          `docker cp ${shellQuote(remoteArchive)} ${shellQuote(`${containerId}:/tmp/upstand-upload.tar`)} && docker exec ${containerId} sh -c ${shellQuote(`mkdir -p ${shellQuote(destinationPath)} && tar -xf /tmp/upstand-upload.tar -C ${shellQuote(destinationPath)} && rm -f /tmp/upstand-upload.tar`)}`,
+        const safeDestination = shellQuote(destinationPath);
+        const safeRemoteArchive = shellQuote(remoteArchive);
+        const safeTargetUpload = shellQuote(
+          `${containerId}:/tmp/upstand-upload.tar`,
         );
+        const safeContainer = shellQuote(containerId);
+
+        const cpCmd = `docker cp ${safeRemoteArchive} ${safeTargetUpload}`;
+        const innerShCmd = shellQuote(
+          `mkdir -p ${safeDestination} && tar -xf /tmp/upstand-upload.tar -C ${safeDestination} && rm -f /tmp/upstand-upload.tar`,
+        );
+        const execCmd = `docker exec ${safeContainer} sh -c ${innerShCmd}`;
+
+        await this.executeRemote(target, `${cpCmd} && ${execCmd}`);
       } finally {
         await rm(localArchive, { force: true });
         await this.executeRemote(
