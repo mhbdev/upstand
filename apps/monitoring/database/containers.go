@@ -62,13 +62,17 @@ func (db *DB) GetLastNContainerMetrics(containerName string, limit int) ([]Conta
 		WITH recent_metrics AS (
 			SELECT metrics_json
 			FROM container_metrics
-			WHERE container_name = ? OR container_name LIKE ? ESCAPE '\\'
+			WHERE container_name = ? 
+			   OR container_name LIKE ? ESCAPE '\\' 
+			   OR container_name LIKE ? ESCAPE '\\' 
+			   OR container_name LIKE ? ESCAPE '\\'
 			ORDER BY timestamp DESC
 			LIMIT ?
 		)
 		SELECT metrics_json FROM recent_metrics ORDER BY json_extract(metrics_json, '$.timestamp') ASC
 	`
-	rows, err := db.Query(query, containerName, escapeLike(containerName)+".%", limit)
+	escaped := escapeLike(containerName)
+	rows, err := db.Query(query, containerName, escaped+".%", escaped+"_%", escaped+"-%", limit)
 	if err != nil {
 		return nil, err
 	}
@@ -101,12 +105,16 @@ func (db *DB) GetAllMetricsContainer(containerName string) ([]ContainerMetric, e
 		WITH recent_metrics AS (
 			SELECT metrics_json
 			FROM container_metrics
-			WHERE container_name = ? OR container_name LIKE ? ESCAPE '\\'
+			WHERE container_name = ? 
+			   OR container_name LIKE ? ESCAPE '\\' 
+			   OR container_name LIKE ? ESCAPE '\\' 
+			   OR container_name LIKE ? ESCAPE '\\'
 			ORDER BY timestamp DESC
 		)
 		SELECT metrics_json FROM recent_metrics ORDER BY json_extract(metrics_json, '$.timestamp') ASC
 	`
-	rows, err := db.Query(query, containerName, escapeLike(containerName)+".%")
+	escaped := escapeLike(containerName)
+	rows, err := db.Query(query, containerName, escaped+".%", escaped+"_%", escaped+"-%")
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +152,9 @@ func (db *DB) GetContainerMetricsInRange(
 		end.UTC().Format(time.RFC3339Nano),
 	}
 	if containerName != "" {
-		whereClause = "(container_name = ? OR container_name LIKE ? ESCAPE '\\') AND " + whereClause
-		args = append([]interface{}{containerName, escapeLike(containerName) + ".%"}, args...)
+		whereClause = "(container_name = ? OR container_name LIKE ? ESCAPE '\\' OR container_name LIKE ? ESCAPE '\\' OR container_name LIKE ? ESCAPE '\\') AND " + whereClause
+		escaped := escapeLike(containerName)
+		args = append([]interface{}{containerName, escaped + ".%", escaped + "_%", escaped + "-%"}, args...)
 	}
 	if limit > 0 {
 		orderClause = "ORDER BY timestamp DESC"

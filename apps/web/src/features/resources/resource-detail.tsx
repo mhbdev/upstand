@@ -36,6 +36,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  BookmarkIcon,
   Code,
   Globe,
   HardDrive,
@@ -263,7 +264,7 @@ export default function ResourceDetail({
             <Activity className="size-4" /> Monitoring
           </TabsTrigger>
           <TabsTrigger value="tags" className="shrink-0 gap-2">
-            Tags
+            <BookmarkIcon className="size-4" /> Tags
           </TabsTrigger>
         </TabsList>
 
