@@ -1311,7 +1311,7 @@ export default function DockerInventoryPage() {
                             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                               {/* CPU card */}
                               <Card className="border-border/40">
-                                <CardHeader className="p-4 pb-2">
+                                <CardHeader>
                                   <CardDescription className="flex items-center justify-between">
                                     <span>CPU Usage</span>
                                     <Cpu className="size-4 text-primary" />
@@ -1320,7 +1320,7 @@ export default function DockerInventoryPage() {
                                     {cpuVal.toFixed(2)}%
                                   </CardTitle>
                                 </CardHeader>
-                                <CardContent className="p-4 pt-0">
+                                <CardContent>
                                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                                     <div
                                       className="h-full bg-emerald-500 transition-all duration-300"
@@ -1334,7 +1334,7 @@ export default function DockerInventoryPage() {
 
                               {/* Memory card */}
                               <Card className="border-border/40">
-                                <CardHeader className="p-4 pb-2">
+                                <CardHeader>
                                   <CardDescription className="flex items-center justify-between">
                                     <span>Memory Usage</span>
                                     <HardDrive className="size-4 text-primary" />
@@ -1343,7 +1343,7 @@ export default function DockerInventoryPage() {
                                     {memPercentVal.toFixed(2)}%
                                   </CardTitle>
                                 </CardHeader>
-                                <CardContent className="p-4 pt-0">
+                                <CardContent>
                                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                                     <div
                                       className="h-full bg-sky-500 transition-all duration-300"
@@ -1361,7 +1361,7 @@ export default function DockerInventoryPage() {
 
                               {/* Process IDs */}
                               <Card className="border-border/40">
-                                <CardHeader className="p-4 pb-2">
+                                <CardHeader>
                                   <CardDescription className="flex items-center justify-between">
                                     <span>Active Processes</span>
                                     <Activity className="size-4 text-primary" />
@@ -1370,7 +1370,7 @@ export default function DockerInventoryPage() {
                                     {String(stats.pids || 0)}
                                   </CardTitle>
                                 </CardHeader>
-                                <CardContent className="p-4 pt-0">
+                                <CardContent>
                                   <p className="mt-3 text-[11px] text-muted-foreground">
                                     Number of thread tasks running inside
                                     container namespaces.
@@ -1380,7 +1380,7 @@ export default function DockerInventoryPage() {
 
                               {/* Network I/O */}
                               <Card className="border-border/40 sm:col-span-2 md:col-span-1">
-                                <CardHeader className="p-4 pb-2">
+                                <CardHeader>
                                   <CardDescription>
                                     Network I/O Traffic
                                   </CardDescription>
@@ -1413,7 +1413,7 @@ export default function DockerInventoryPage() {
 
                               {/* Block I/O */}
                               <Card className="border-border/40 sm:col-span-2">
-                                <CardHeader className="p-4 pb-2">
+                                <CardHeader>
                                   <CardDescription>
                                     Disk Block I/O
                                   </CardDescription>
