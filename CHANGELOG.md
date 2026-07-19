@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.85 - 2026-07-19
+
+### Added
+
+- Add rich, dynamic, and searchable breadcrumb dropdown menus for project levels (Projects, Environments, and Resources) to allow fast context-switching and navigation.
+
 ## 0.1.84 - 2026-07-19
 
 ### Added
