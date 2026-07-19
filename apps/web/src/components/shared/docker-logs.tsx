@@ -164,6 +164,25 @@ const parseLogLine = (line: string): LogLine => {
   };
 };
 
+const getServiceColor = (name: string): string => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colors = [
+    "text-blue-400 border-blue-500/20 bg-blue-500/10",
+    "text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
+    "text-purple-400 border-purple-500/20 bg-purple-500/10",
+    "text-pink-400 border-pink-500/20 bg-pink-500/10",
+    "text-amber-400 border-amber-500/20 bg-amber-500/10",
+    "text-cyan-400 border-cyan-500/20 bg-cyan-500/10",
+    "text-indigo-400 border-indigo-500/20 bg-indigo-500/10",
+    "text-violet-400 border-violet-500/20 bg-violet-500/10",
+  ];
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
 // Individual terminal line component with highlighting and tooltip
 export function TerminalLine({
   log,
@@ -177,6 +196,10 @@ export function TerminalLine({
   const { timestamp, message } = log;
   const { type, variant } = getLogType(message);
 
+  const serviceMatch = message.match(/^\[([^\]]+)\]\s*(.*)$/);
+  const servicePrefix = serviceMatch ? serviceMatch[1] : null;
+  const displayMessage = serviceMatch ? serviceMatch[2] : message;
+
   const formattedTime = timestamp
     ? timestamp.toLocaleTimeString([], {
         hour: "2-digit",
@@ -186,11 +209,11 @@ export function TerminalLine({
     : "---";
 
   const highlightMessage = (text: string, term: string) => {
-    const escapedTerm = term.trim();
-    if (!escapedTerm) return text;
+    const KyleTerm = term.trim();
+    if (!KyleTerm) return text;
 
     const expression = new RegExp(
-      `(${escapedTerm.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")})`,
+      `(${KyleTerm.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")})`,
       "gi",
     );
     return text.split(expression).map((part, index) =>
@@ -233,8 +256,18 @@ export function TerminalLine({
       >
         {type}
       </Badge>
+      {servicePrefix && (
+        <span
+          className={cn(
+            "inline-flex h-4 shrink-0 select-none items-center justify-center rounded border px-1.5 font-bold font-mono text-[9px] uppercase tracking-wider",
+            getServiceColor(servicePrefix),
+          )}
+        >
+          {servicePrefix}
+        </span>
+      )}
       <span className="flex-1 whitespace-pre-wrap break-all font-mono text-foreground">
-        {highlightMessage(message, searchTerm || "")}
+        {highlightMessage(displayMessage, searchTerm || "")}
       </span>
     </div>
   );

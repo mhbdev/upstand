@@ -47,6 +47,7 @@ import {
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { BackupPanel } from "@/features/backups";
+import { ConsoleTab } from "./components/console-tab";
 import { ContainersTab } from "./components/containers-tab";
 import { DeploymentsTab } from "./components/deployments-tab";
 import { DomainsTab } from "./components/domains-tab";
@@ -77,6 +78,7 @@ const RESOURCE_TABS = new Set([
   "containers",
   "backups",
   "logs",
+  "console",
   "monitoring",
   "tags",
 ]);
@@ -260,6 +262,9 @@ export default function ResourceDetail({
           <TabsTrigger value="logs" className="shrink-0 gap-2">
             <Terminal className="size-4" /> Logs
           </TabsTrigger>
+          <TabsTrigger value="console" className="shrink-0 gap-2">
+            <Terminal className="size-4" /> Console
+          </TabsTrigger>
           <TabsTrigger value="monitoring" className="shrink-0 gap-2">
             <Activity className="size-4" /> Monitoring
           </TabsTrigger>
@@ -428,6 +433,17 @@ export default function ResourceDetail({
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="console" className="min-w-0 space-y-6 outline-none">
+          {project?.organizationId && (
+            <ConsoleTab
+              resource={resource}
+              organizationId={project.organizationId}
+              containers={containerList}
+              sshKeys={sshKeys}
+            />
+          )}
         </TabsContent>
 
         <TabsContent

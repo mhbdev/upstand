@@ -1988,41 +1988,63 @@ export class DockerService {
         }
       }
 
-      // Default to combined Service logs
-      if (resource.type === "compose") {
-        // Compose Stack combined logs: find services and get logs for first running container
-        const containers = await this.getContainers(resource);
-        if (containers.length > 0) {
-          return await this.getLogs(
-            resource,
-            containers[0].id,
-            tail,
-            since,
-            filter,
-          );
-        }
-        return "No active stack containers found to read logs from.";
+      // Default to combined/multiplexed logs if no specific containerId is requested
+      const containers = await this.getContainers(resource);
+      if (containers.length > 0) {
+        const logsPromises = containers.map(async (con) => {
+          try {
+            const rawLogs = await this.getLogs(
+              resource,
+              con.id,
+              tail,
+              since,
+              undefined,
+            );
+            return rawLogs
+              .split(/\r?\n/)
+              .filter(Boolean)
+              .map((line) => {
+                const match = line.match(/^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(.*)$/);
+                if (match) {
+                  const timestamp = match[1];
+                  const message = match[2];
+                  return {
+                    timestamp,
+                    line: `${timestamp} [${con.name}] ${message}`,
+                  };
+                }
+                return {
+                  timestamp: "",
+                  line: `[${con.name}] ${line}`,
+                };
+              });
+          } catch (err: any) {
+            return [
+              {
+                timestamp: "",
+                line: `[${con.name}] Error fetching logs: ${err.message}`,
+              },
+            ];
+          }
+        });
+
+        const results = await Promise.all(logsPromises);
+        const allLines = results.flat();
+
+        // Sort chronologically. If timestamp is missing, place it at the end.
+        allLines.sort((a, b) => {
+          if (!a.timestamp && !b.timestamp) return 0;
+          if (!a.timestamp) return 1;
+          if (!b.timestamp) return -1;
+          return a.timestamp.localeCompare(b.timestamp);
+        });
+
+        const slicedLines = allLines.slice(-tail);
+        const combinedLogs = slicedLines.map((item) => item.line).join("\n");
+        return filterDockerLogs(combinedLogs, filter ?? {});
       }
 
-      try {
-        const service = this.docker.getService(serviceName);
-        const buffer = (await service.logs({
-          stdout: true,
-          stderr: true,
-          tail,
-          timestamps: true,
-          ...(since ? { since } : {}),
-        })) as any as Buffer;
-        return filterDockerLogs(this.cleanDockerLogs(buffer), filter ?? {});
-      } catch (err: any) {
-        if (
-          err.statusCode === 404 ||
-          err.message?.includes("no such service")
-        ) {
-          return `No logs found. The Swarm service '${serviceName}' has not been deployed yet, is starting up, or is stopped.`;
-        }
-        throw err;
-      }
+      return `No active containers found. The service '${serviceName}' may not be deployed yet, is starting up, or is stopped.`;
     } catch (err: any) {
       return `Failed to fetch logs: ${err.message}`;
     }
