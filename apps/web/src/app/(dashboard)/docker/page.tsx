@@ -341,7 +341,7 @@ export default function DockerInventoryPage() {
                 void inventoryQuery.refetch();
                 void containersQuery.refetch();
               }}
-              disabled={inventoryQuery.isPending}
+              disabled={inventoryQuery.isLoading}
             >
               <RefreshCw
                 className={`size-4 ${inventoryQuery.isFetching ? "animate-spin" : ""}`}
@@ -391,7 +391,7 @@ export default function DockerInventoryPage() {
                     </span>
                   </CardDescription>
                 </div>
-                {inventoryQuery.isPending && (
+                {inventoryQuery.isLoading && (
                   <Badge variant="outline" className="animate-pulse">
                     Loading Docker data…
                   </Badge>
@@ -399,7 +399,7 @@ export default function DockerInventoryPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              {inventoryQuery.isPending ? (
+              {inventoryQuery.isLoading ? (
                 kind === "info" || kind === "stats" ? (
                   <CardGridSkeleton count={3} />
                 ) : kind === "logs" ? (

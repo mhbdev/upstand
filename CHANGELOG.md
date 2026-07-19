@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.86 - 2026-07-20
+
+### Fixed
+
+- Fix stuck loading state on Docker page logs and live stats tabs by checking query loading status instead of query pending status when queries are disabled.
+
+
 ## 0.1.85 - 2026-07-19
 
 ### Added
