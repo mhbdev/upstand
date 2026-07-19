@@ -59,6 +59,7 @@ import { OrganizationSwitcher } from "@/components/auth/organization/organizatio
 import { UserButton } from "@/components/auth/user/user-button";
 import { GlobalSearch } from "@/components/global-search";
 import { ModeToggle } from "@/components/mode-toggle";
+import { ProjectsBreadcrumb } from "@/components/projects-breadcrumb";
 import { UpGalChat } from "@/components/upgal-chat";
 import { UpGalGuideOverlay } from "@/components/upgal-guide-overlay";
 import { UpGalTarget } from "@/components/upgal-target";
@@ -315,11 +316,19 @@ export default function DashboardLayout({
                   {activeOrg && (
                     <>
                       <BreadcrumbSeparator />
-                      <BreadcrumbItem>
-                        <BreadcrumbPage className="max-w-[min(48vw,16rem)] truncate">
-                          {currentNav?.title ?? activeOrg.name}
-                        </BreadcrumbPage>
-                      </BreadcrumbItem>
+                      {pathname === "/projects" ||
+                      pathname.startsWith("/projects/") ? (
+                        <ProjectsBreadcrumb
+                          activeOrg={activeOrg}
+                          pathname={pathname}
+                        />
+                      ) : (
+                        <BreadcrumbItem>
+                          <BreadcrumbPage className="max-w-[min(48vw,16rem)] truncate">
+                            {currentNav?.title ?? activeOrg.name}
+                          </BreadcrumbPage>
+                        </BreadcrumbItem>
+                      )}
                     </>
                   )}
                 </BreadcrumbList>
