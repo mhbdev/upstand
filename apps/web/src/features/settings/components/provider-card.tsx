@@ -61,7 +61,7 @@ export function ProviderCard({
 
   return (
     <Card className="border border-border/40 bg-card/25 shadow-sm">
-      <CardContent className="grid gap-5 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+      <CardContent className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             <p className="font-semibold text-foreground text-sm">

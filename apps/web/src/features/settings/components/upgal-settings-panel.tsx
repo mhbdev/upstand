@@ -85,7 +85,7 @@ export function UpGalSettingsPanel({
       ) : null}
 
       <Card className="border border-border/40 bg-card/25 shadow-sm">
-        <CardHeader className="pb-3">
+        <CardHeader>
           <CardTitle className="font-semibold text-sm">
             Configured providers
           </CardTitle>
