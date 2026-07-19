@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.87 - 2026-07-20
+
+### Added
+
+- Add Unified Live Stream Console & Terminal Split Screen view under Resource details, multiplexing and sorting logs across all running stack containers in real-time with color-coded service badges and hosting an interactive container terminal shell on the same pane.
+
 ## 0.1.86 - 2026-07-20
 
 ### Fixed
