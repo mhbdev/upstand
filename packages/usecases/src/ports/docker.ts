@@ -305,6 +305,18 @@ export interface DockerPrunePort {
   ): Promise<{ success: true; output: string[] }>;
 }
 
+export interface DockerExecPort {
+  execContainerCommand(
+    target: DockerInspectionTarget,
+    containerId: string,
+    command: string,
+  ): Promise<{ output: string }>;
+  execServerTerminalCommand(
+    target: DockerInspectionTarget,
+    command: string,
+  ): Promise<{ output: string }>;
+}
+
 export interface DockerArchiveTransferPort {
   uploadArchiveToVolume(
     target: DockerInspectionTarget,

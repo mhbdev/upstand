@@ -668,6 +668,8 @@ export const MCP_TOOL_CAPABILITIES = {
   delete_resource: "resource:delete",
   delete_project: "project:delete",
   prune_docker_resources: "server:update",
+  exec_container_command: "server:update",
+  exec_server_terminal_command: "server:update",
   get_project: "project:view",
   get_environment: "environment:view",
   get_resource: "resource:view",

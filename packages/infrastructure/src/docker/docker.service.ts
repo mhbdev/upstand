@@ -11,6 +11,7 @@ import {
   type Resource,
 } from "@upstand/domain";
 import { redis } from "@upstand/redis";
+import { assertSafeGitUrl } from "@upstand/usecases";
 import type {
   ContainerRuntimeStats,
   DockerRegistryAuth,
@@ -672,6 +673,7 @@ export class DockerService {
             GIT_SSH_COMMAND: `ssh -i "${sshKeyPath}" -o StrictHostKeyChecking=accept-new`,
           }
         : undefined;
+      assertSafeGitUrl(cloneUrl);
       onLog(`Cloning branch ${branch} into ${clonePath}...\n`);
       await this.runCommandAsync(
         "git",
@@ -682,6 +684,7 @@ export class DockerService {
           "--branch",
           branch,
           "--single-branch",
+          "--",
           cloneUrl,
           clonePath,
         ],
@@ -854,6 +857,7 @@ export class DockerService {
         }
       : undefined;
     try {
+      assertSafeGitUrl(cloneUrl);
       onLog(`Cloning branch ${branch} into ${clonePath}...\n`);
       await this.runCommandAsync(
         "git",
@@ -864,6 +868,7 @@ export class DockerService {
           "--branch",
           branch,
           "--single-branch",
+          "--",
           cloneUrl,
           clonePath,
         ],
@@ -916,13 +921,22 @@ export class DockerService {
     onLog(`Checking out source revision ${sourceRevision}...\n`);
     await this.runCommandAsync(
       "git",
-      ["-C", clonePath, "fetch", "--depth", "1", "origin", sourceRevision],
+      [
+        "-C",
+        clonePath,
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        "--",
+        sourceRevision,
+      ],
       onLog,
       environment,
     );
     await this.runCommandAsync(
       "git",
-      ["-C", clonePath, "checkout", "--detach", sourceRevision],
+      ["-C", clonePath, "checkout", "--detach", "--", sourceRevision],
       onLog,
       environment,
     );

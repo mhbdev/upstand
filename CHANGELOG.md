@@ -4,7 +4,18 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.87 - 2026-07-20
+## 0.1.88 - 2026-07-20
+
+### Added
+
+- Add `exec_container_command` and `exec_server_terminal_command` tools to UpGal agent, enabling approval-gated shell command execution inside Docker containers and terminal commands on local/remote server hosts.
+- Add rich context formatting and channel-specific interactive action buttons/keyboards (Telegram inline keyboards, Slack block buttons, Discord embed fields/links, Microsoft Teams adaptive card actions, Ntfy view headers, Pushover URLs, and rich HTML emails).
+
+### Security & Bug Fixes
+
+- Resolve CodeQL CWE-916 warning by migrating OAuth state signature and token lookup key derivation to `hkdfSync` key derivation.
+- Resolve CodeQL second-order command injection vulnerability by adding `git-url-sanitizer` validation (rejecting leading `-` flags, whitespace, and control characters) and inserting `--` options terminators across Git CLI commands.
+
 
 ### Added
 

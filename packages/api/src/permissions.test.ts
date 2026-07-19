@@ -38,6 +38,7 @@ mock.module("@upstand/db", () => {
     }),
     orderBy: mock(() => chain),
     limit: mock(() => chain),
+    // biome-ignore lint/suspicious/noThenProperty: mock thenable object
     then: mock((callback: any) => Promise.resolve(callback(mockDbRows))),
   };
 

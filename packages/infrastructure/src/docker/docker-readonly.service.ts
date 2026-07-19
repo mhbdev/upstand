@@ -1,11 +1,14 @@
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
+import { promisify } from "node:util";
 import type {
   DockerContainer,
   DockerContainerCommand,
   DockerContainerStats,
+  DockerExecPort,
   DockerImage,
   DockerInfo,
   DockerInspectionTarget,
@@ -21,6 +24,8 @@ import type Docker from "dockerode";
 import { Client } from "ssh2";
 import { DockerCleanupService } from "./docker-cleanup.service";
 import { getDockerInstance } from "./docker-client";
+
+const execFileAsync = promisify(execFile);
 
 const VOLUME_HELPER_IMAGE = "alpine:3.20";
 
@@ -92,7 +97,7 @@ function dockerInfo(raw: unknown): DockerInfo {
   };
 }
 
-export class DockerReadOnlyService {
+export class DockerReadOnlyService implements DockerExecPort {
   constructor(private readonly docker: Docker = getDockerInstance()) {}
 
   async controlContainer(
@@ -180,6 +185,55 @@ export class DockerReadOnlyService {
       output.push(`${action}: ${result.trim()}`);
     }
     return { success: true, output };
+  }
+
+  async execContainerCommand(
+    target: DockerInspectionTarget,
+    containerId: string,
+    command: string,
+  ): Promise<{ output: string }> {
+    assertIdentifier(containerId, "Container");
+    if (target.kind === "local") {
+      const container = this.docker.getContainer(containerId);
+      const exec = await container.exec({
+        Cmd: ["sh", "-c", command],
+        AttachStdout: true,
+        AttachStderr: true,
+      });
+      const stream = await exec.start({ Detach: false });
+      const output = await new Promise<string>((resolve, reject) => {
+        let text = "";
+        stream.on("data", (chunk: Buffer | string) => {
+          text += chunk.toString("utf8");
+        });
+        stream.on("end", () => resolve(text));
+        stream.on("error", reject);
+      });
+      return { output };
+    }
+    const output = await this.executeRemote(
+      target,
+      `docker exec ${containerId} sh -c ${shellQuote(command)}`,
+    );
+    return { output };
+  }
+
+  async execServerTerminalCommand(
+    target: DockerInspectionTarget,
+    command: string,
+  ): Promise<{ output: string }> {
+    if (target.kind === "local") {
+      const isWin = process.platform === "win32";
+      const file = isWin ? "cmd.exe" : "sh";
+      const args = isWin ? ["/c", command] : ["-c", command];
+      const { stdout, stderr } = await execFileAsync(file, args, {
+        timeout: 30_000,
+        maxBuffer: 1024 * 1024,
+      });
+      return { output: stdout || stderr };
+    }
+    const output = await this.executeRemote(target, command);
+    return { output };
   }
 
   async getInfo(target: DockerInspectionTarget): Promise<DockerInfo> {

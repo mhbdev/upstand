@@ -28,6 +28,8 @@ import {
   DeleteResourceUseCaseToken,
   DeployResourceUseCaseToken,
   DeployTemplateUseCaseToken,
+  ExecContainerCommandUseCaseToken,
+  ExecServerTerminalCommandUseCaseToken,
   GetAccountStatusUseCaseToken,
   GetBackupRunsUseCaseToken,
   GetBackupSchedulesUseCaseToken,
@@ -338,6 +340,16 @@ export const UPGAL_TOOL_METADATA = [
     "Prune unused Docker resources (images, volumes, containers, builder, system, or all) on a server after approval.",
     true,
   ],
+  [
+    "exec_container_command",
+    "Run a shell command inside a Docker container on a local or remote server after approval.",
+    true,
+  ],
+  [
+    "exec_server_terminal_command",
+    "Run a terminal/shell command on the server host or remote server after approval.",
+    true,
+  ],
   ["create_tag", "Create an organization tag after approval.", true],
   ["update_tag", "Update an organization tag after approval.", true],
   ["delete_tag", "Delete an organization tag after approval.", true],
@@ -590,6 +602,49 @@ const pruneDockerOutputSchema = z.object({
   output: z
     .array(z.string())
     .describe("Detailed output from each pruned resource class."),
+});
+const execContainerCommandSchema = z.object({
+  serverId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Server ID where the container is running; omit or use 'local' for local server.",
+    ),
+  containerId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Target Docker container ID."),
+  resourceId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Target resource ID to execute command in its primary container.",
+    ),
+  command: z
+    .string()
+    .min(1)
+    .describe("Shell command to execute inside the container."),
+});
+const execServerTerminalCommandSchema = z.object({
+  serverId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Server ID to execute terminal command on; omit or use 'local' for local host.",
+    ),
+  command: z
+    .string()
+    .min(1)
+    .describe("Terminal/shell command to execute on the server."),
+});
+const execCommandOutputSchema = z.object({
+  output: z
+    .string()
+    .describe("The output resulting from executing the command."),
 });
 const templateOutputSchema = z
   .object({
@@ -1412,6 +1467,26 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
           ...input,
         }),
       pruneDockerOutputSchema,
+    ),
+    exec_container_command: mutationTool(
+      "Run a shell command inside a Docker container. This requires approval.",
+      execContainerCommandSchema,
+      async (input) =>
+        run(ExecContainerCommandUseCaseToken).execute({
+          organizationId: context.organizationId,
+          ...input,
+        }),
+      execCommandOutputSchema,
+    ),
+    exec_server_terminal_command: mutationTool(
+      "Run a terminal command on the server. This requires approval.",
+      execServerTerminalCommandSchema,
+      async (input) =>
+        run(ExecServerTerminalCommandUseCaseToken).execute({
+          organizationId: context.organizationId,
+          ...input,
+        }),
+      execCommandOutputSchema,
     ),
   } as UpGalToolRegistry;
   return tools;

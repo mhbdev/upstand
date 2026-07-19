@@ -6,6 +6,7 @@ import type { CaddyServicePort } from "./ports/caddy";
 import type {
   DockerArchiveTransferPort,
   DockerContainerControllerPort,
+  DockerExecPort,
   DockerInventoryReaderPort,
   DockerPrunePort,
   DockerResourceControllerPort,
@@ -31,6 +32,7 @@ export const DockerContainerControllerToken =
 export const DockerResourceControllerToken =
   createToken<DockerResourceControllerPort>("DockerResourceController");
 export const DockerPruneToken = createToken<DockerPrunePort>("DockerPrune");
+export const DockerExecToken = createToken<DockerExecPort>("DockerExec");
 export const DockerArchiveTransferToken =
   createToken<DockerArchiveTransferPort>("DockerArchiveTransfer");
 export const PublishNotificationUseCaseToken =
@@ -141,6 +143,14 @@ export const GetDockerInventoryUseCaseToken =
 export const PruneDockerResourcesUseCaseToken =
   createToken<UseCases.PruneDockerResourcesUseCase>(
     "PruneDockerResourcesUseCase",
+  );
+export const ExecContainerCommandUseCaseToken =
+  createToken<UseCases.ExecContainerCommandUseCase>(
+    "ExecContainerCommandUseCase",
+  );
+export const ExecServerTerminalCommandUseCaseToken =
+  createToken<UseCases.ExecServerTerminalCommandUseCase>(
+    "ExecServerTerminalCommandUseCase",
   );
 export const CreateSshKeyUseCaseToken =
   createToken<UseCases.CreateSshKeyUseCase>("CreateSshKeyUseCase");

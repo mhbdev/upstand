@@ -42,6 +42,7 @@ export * from "./environment/get-environments.usecase";
 export * from "./git-provider/create-git-provider.usecase";
 export * from "./git-provider/delete-git-provider.usecase";
 export * from "./git-provider/get-git-providers.usecase";
+export * from "./git-provider/git-url-sanitizer";
 export * from "./git-provider/list-branches.usecase";
 export * from "./git-provider/list-repositories.usecase";
 export * from "./git-provider/oauth-state";
@@ -110,6 +111,8 @@ export * from "./schedule/schedule.usecases";
 export * from "./search/global-search.usecase";
 export * from "./server/create-server.usecase";
 export * from "./server/delete-server.usecase";
+export * from "./server/exec-container-command.usecase";
+export * from "./server/exec-server-terminal-command.usecase";
 // Servers
 export * from "./server/get-account-status.usecase";
 export * from "./server/get-docker-inventory.usecase";

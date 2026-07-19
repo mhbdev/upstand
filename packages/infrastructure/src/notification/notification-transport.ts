@@ -1,5 +1,6 @@
 import type { NotificationConfiguration } from "@upstand/domain";
 import type {
+  NotificationAction,
   NotificationMessage,
   NotificationTransport,
 } from "@upstand/usecases/notification/notification-transport.port";
@@ -90,6 +91,81 @@ function escapeHtml(value: string): string {
   });
 }
 
+function resolveNotificationActions(
+  message: NotificationMessage,
+): NotificationAction[] {
+  const actions: NotificationAction[] = [];
+  if (message.actions && Array.isArray(message.actions)) {
+    for (const action of message.actions) {
+      if (action.label && action.url) {
+        actions.push({ label: action.label, url: action.url });
+      }
+    }
+  }
+
+  const meta = message.metadata ?? {};
+  const baseUrl =
+    typeof meta.dashboardUrl === "string"
+      ? meta.dashboardUrl
+      : typeof meta.url === "string"
+        ? meta.url
+        : process.env.UPSTAND_BASE_URL || process.env.APP_URL || "";
+
+  if (
+    typeof meta.actionUrl === "string" &&
+    !actions.some((a) => a.url === meta.actionUrl)
+  ) {
+    actions.push({ label: "Open Link", url: meta.actionUrl });
+  }
+
+  if (
+    meta.resourceId &&
+    baseUrl &&
+    !actions.some((a) => a.url.includes(`/resources/${meta.resourceId}`))
+  ) {
+    const cleanBase = trimTrailingSlash(baseUrl);
+    actions.push({
+      label: "View Resource",
+      url: `${cleanBase}/resources/${meta.resourceId}`,
+    });
+  }
+
+  if (
+    meta.deploymentId &&
+    baseUrl &&
+    !actions.some((a) => a.url.includes("/deployments/"))
+  ) {
+    const cleanBase = trimTrailingSlash(baseUrl);
+    actions.push({
+      label: "View Deployment",
+      url: `${cleanBase}/deployments/${meta.deploymentId}`,
+    });
+  }
+
+  return actions;
+}
+
+function formatNotificationText(message: NotificationMessage): string {
+  const meta = message.metadata;
+  if (!meta || typeof meta !== "object") return message.message;
+  const lines: string[] = [message.message];
+
+  const metaFields: string[] = [];
+  if (meta.resourceName) metaFields.push(`Resource: ${meta.resourceName}`);
+  if (meta.projectName) metaFields.push(`Project: ${meta.projectName}`);
+  if (meta.environmentName)
+    metaFields.push(`Environment: ${meta.environmentName}`);
+  if (meta.resourceType) metaFields.push(`Type: ${meta.resourceType}`);
+  if (meta.commitSha)
+    metaFields.push(`Commit: ${String(meta.commitSha).slice(0, 7)}`);
+  if (meta.error) metaFields.push(`Error: ${meta.error}`);
+
+  if (metaFields.length > 0) {
+    lines.push("", ...metaFields.map((field) => `• ${field}`));
+  }
+  return lines.join("\n");
+}
+
 export class NotificationTransportRegistry implements NotificationTransport {
   async send(
     configuration: NotificationConfiguration,
@@ -127,22 +203,37 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "slack" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+    const blocks: any[] = [
+      {
+        type: "header",
+        text: { type: "plain_text", text: message.title, emoji: true },
+      },
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: bodyText },
+      },
+    ];
+
+    if (actions.length > 0) {
+      blocks.push({
+        type: "actions",
+        elements: actions.map((action) => ({
+          type: "button",
+          text: { type: "plain_text", text: action.label, emoji: true },
+          url: action.url,
+        })),
+      });
+    }
+
     const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `${message.title}\n${message.message}`,
+        text: `${message.title}\n${bodyText}`,
         ...(configuration.channel ? { channel: configuration.channel } : {}),
-        blocks: [
-          {
-            type: "header",
-            text: { type: "plain_text", text: message.title, emoji: true },
-          },
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: message.message },
-          },
-        ],
+        blocks,
       }),
     });
     await ensureSuccess(response, "Slack");
@@ -152,6 +243,21 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "telegram" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+
+    const replyMarkup =
+      actions.length > 0
+        ? {
+            inline_keyboard: [
+              actions.map((action) => ({
+                text: action.label,
+                url: action.url,
+              })),
+            ],
+          }
+        : undefined;
+
     const response = await fetchWithTimeout(
       `https://api.telegram.org/bot${configuration.botToken}/sendMessage`,
       {
@@ -159,8 +265,10 @@ export class NotificationTransportRegistry implements NotificationTransport {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: configuration.chatId,
-          text: `${message.title}\n\n${message.message}`,
+          text: `<b>${escapeHtml(message.title)}</b>\n\n${escapeHtml(bodyText)}`,
+          parse_mode: "HTML",
           disable_web_page_preview: true,
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
           ...(configuration.messageThreadId
             ? { message_thread_id: configuration.messageThreadId }
             : {}),
@@ -174,6 +282,35 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "discord" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const meta = message.metadata ?? {};
+    const isFailed =
+      message.title.toLowerCase().includes("fail") || !!meta.error;
+
+    const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+    if (meta.resourceName)
+      fields.push({
+        name: "Resource",
+        value: String(meta.resourceName),
+        inline: true,
+      });
+    if (meta.projectName)
+      fields.push({
+        name: "Project",
+        value: String(meta.projectName),
+        inline: true,
+      });
+    if (meta.environmentName)
+      fields.push({
+        name: "Environment",
+        value: String(meta.environmentName),
+        inline: true,
+      });
+    if (meta.error)
+      fields.push({ name: "Error", value: String(meta.error), inline: false });
+
+    const primaryUrl = actions[0]?.url;
+
     const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -182,7 +319,10 @@ export class NotificationTransportRegistry implements NotificationTransport {
           {
             title: message.title,
             description: message.message,
-            color: 0x2563eb,
+            url: primaryUrl,
+            color: isFailed ? 0xef4444 : 0x22c55e,
+            ...(fields.length > 0 ? { fields } : {}),
+            timestamp: new Date().toISOString(),
           },
         ],
       }),
@@ -194,12 +334,13 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "lark" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const bodyText = formatNotificationText(message);
     const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         msg_type: "text",
-        content: { text: `${message.title}\n${message.message}` },
+        content: { text: `${message.title}\n${bodyText}` },
       }),
     });
     await ensureSuccess(response, "Lark");
@@ -209,6 +350,14 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "teams" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+    const cardActions = actions.map((action) => ({
+      type: "Action.OpenUrl",
+      title: action.label,
+      url: action.url,
+    }));
+
     const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -229,8 +378,9 @@ export class NotificationTransportRegistry implements NotificationTransport {
                   weight: "Bolder",
                   wrap: true,
                 },
-                { type: "TextBlock", text: message.message, wrap: true },
+                { type: "TextBlock", text: bodyText, wrap: true },
               ],
+              ...(cardActions.length > 0 ? { actions: cardActions } : {}),
             },
           },
         ],
@@ -243,6 +393,8 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "email" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
     const transport = nodemailer.createTransport({
       host: configuration.smtpHost,
       port: configuration.smtpPort,
@@ -250,13 +402,20 @@ export class NotificationTransportRegistry implements NotificationTransport {
       auth: { user: configuration.username, pass: configuration.password },
     });
 
+    const actionButtonsHtml = actions
+      .map(
+        (a) =>
+          `<a href="${escapeHtml(a.url)}" style="display:inline-block;padding:10px 16px;margin-right:8px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">${escapeHtml(a.label)}</a>`,
+      )
+      .join(" ");
+
     try {
       await transport.sendMail({
         from: configuration.fromAddress,
         to: configuration.toAddresses.join(", "),
         subject: message.title,
-        text: message.message,
-        html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(message.message).replace(/\n/g, "<br />")}</p>`,
+        text: `${bodyText}\n\n${actions.map((a) => `${a.label}: ${a.url}`).join("\n")}`,
+        html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(bodyText).replace(/\n/g, "<br />")}</p>${actionButtonsHtml ? `<div style="margin-top:16px;">${actionButtonsHtml}</div>` : ""}`,
       });
     } finally {
       transport.close();
@@ -267,6 +426,16 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "resend" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+
+    const actionButtonsHtml = actions
+      .map(
+        (a) =>
+          `<a href="${escapeHtml(a.url)}" style="display:inline-block;padding:10px 16px;margin-right:8px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">${escapeHtml(a.label)}</a>`,
+      )
+      .join(" ");
+
     const response = await fetchWithTimeout("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -277,8 +446,8 @@ export class NotificationTransportRegistry implements NotificationTransport {
         from: configuration.fromAddress,
         to: configuration.toAddresses,
         subject: message.title,
-        text: message.message,
-        html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(message.message).replace(/\n/g, "<br />")}</p>`,
+        text: `${bodyText}\n\n${actions.map((a) => `${a.label}: ${a.url}`).join("\n")}`,
+        html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(bodyText).replace(/\n/g, "<br />")}</p>${actionButtonsHtml ? `<div style="margin-top:16px;">${actionButtonsHtml}</div>` : ""}`,
       }),
     });
     await ensureSuccess(response, "Resend");
@@ -288,6 +457,10 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "gotify" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+    const clickUrl = actions[0]?.url;
+
     const response = await fetchWithTimeout(
       `${trimTrailingSlash(configuration.serverUrl)}/message`,
       {
@@ -298,8 +471,15 @@ export class NotificationTransportRegistry implements NotificationTransport {
         },
         body: JSON.stringify({
           title: message.title,
-          message: message.message,
+          message: bodyText,
           priority: configuration.priority,
+          ...(clickUrl
+            ? {
+                extras: {
+                  "client::notification": { click: { url: clickUrl } },
+                },
+              }
+            : {}),
         }),
       },
     );
@@ -310,6 +490,12 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "ntfy" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+    const actionsHeader = actions
+      .map((a) => `action=view, label=${a.label}, url=${a.url}`)
+      .join("; ");
+
     const response = await fetchWithTimeout(
       `${trimTrailingSlash(configuration.serverUrl)}/${encodeURIComponent(configuration.topic)}`,
       {
@@ -317,11 +503,12 @@ export class NotificationTransportRegistry implements NotificationTransport {
         headers: {
           "X-Title": message.title,
           "X-Priority": String(configuration.priority),
+          ...(actionsHeader ? { "X-Actions": actionsHeader } : {}),
           ...(configuration.accessToken
             ? { Authorization: `Bearer ${configuration.accessToken}` }
             : {}),
         },
-        body: message.message,
+        body: bodyText,
       },
     );
     await ensureSuccess(response, "ntfy");
@@ -331,11 +518,17 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "mattermost" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+    const actionLinksText = actions
+      .map((a) => `[${a.label}](${a.url})`)
+      .join(" • ");
+
     const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `**${message.title}**\n${message.message}`,
+        text: `**${message.title}**\n${bodyText}${actionLinksText ? `\n\n${actionLinksText}` : ""}`,
         ...(configuration.channel
           ? { channel: `#${configuration.channel.replace(/^#/, "")}` }
           : {}),
@@ -349,13 +542,19 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "pushover" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
     const form = new URLSearchParams({
       token: configuration.apiToken,
       user: configuration.userKey,
       title: message.title,
-      message: message.message,
+      message: bodyText,
       priority: String(configuration.priority),
     });
+    if (actions[0]) {
+      form.set("url", actions[0].url);
+      form.set("url_title", actions[0].label);
+    }
     if (configuration.priority === 2) {
       form.set("retry", String(configuration.retry));
       form.set("expire", String(configuration.expire));
@@ -376,6 +575,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     configuration: Extract<NotificationConfiguration, { type: "custom" }>,
     message: NotificationMessage,
   ): Promise<void> {
+    const actions = resolveNotificationActions(message);
     const response = await fetchWithTimeout(configuration.endpoint, {
       method: "POST",
       headers: {
@@ -385,6 +585,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
       body: JSON.stringify({
         title: message.title,
         message: message.message,
+        actions,
         timestamp: new Date().toISOString(),
         metadata: message.metadata ?? {},
       }),

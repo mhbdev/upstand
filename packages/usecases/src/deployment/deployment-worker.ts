@@ -5,6 +5,7 @@ import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
+import { assertSafeGitUrl } from "../git-provider/git-url-sanitizer";
 import { getInstallationToken } from "../git-provider/github-client";
 import type { NotificationPublisher } from "../notification/publish-notification.usecase";
 import { getDatabaseEnvironment } from "../resource/database-environment";
@@ -251,6 +252,8 @@ export class DeploymentWorker {
           resourceName: resource.name,
           deploymentId,
           resourceType: resource.type,
+          projectName: project.name,
+          environmentName: environment.name,
         },
       });
     };
@@ -726,6 +729,7 @@ export class DeploymentWorker {
             if (!cloneUrl) {
               throw new Error("Repository URL is empty in configuration");
             }
+            assertSafeGitUrl(cloneUrl);
 
             const sshKeyId = credentialsObj.sshKeyId;
             if (sshKeyId) {
@@ -976,6 +980,7 @@ async function resolveGitSource(
   } else if (resource.provider === "git") {
     cloneUrl = credentials.repositoryUrl || "";
     if (!cloneUrl) throw new Error("Repository URL is empty in configuration");
+    assertSafeGitUrl(cloneUrl);
 
     if (credentials.sshKeyId) {
       const sshKey = await uow.transaction((tx) =>

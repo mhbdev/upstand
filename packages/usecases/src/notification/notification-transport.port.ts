@@ -6,9 +6,15 @@ import type { NotificationConfiguration } from "@upstand/domain";
  * Provider-specific HTTP and SMTP behaviour belongs to infrastructure. Use
  * cases depend on this contract so they can be exercised without a network.
  */
+export interface NotificationAction {
+  label: string;
+  url: string;
+}
+
 export interface NotificationMessage {
   title: string;
   message: string;
+  actions?: NotificationAction[];
   metadata?: Record<string, unknown> | null;
 }
 

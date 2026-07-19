@@ -79,7 +79,7 @@ UpGal has access to the same organization-scoped information and actions exposed
 | Tags | `list_tags`, `get_resource_tags` | `create_tag`, `update_tag`, `delete_tag`, `assign_resource_tag`, `detach_resource_tag` |
 | Web | `search_web` (optional current public-web search) | — |
 | UI guidance | `guide_upstand` | — |
-| Docker | `list_docker_containers`, `list_docker_images`, `list_docker_volumes`, `list_docker_networks`, `list_docker_services`, `get_docker_logs` | `prune_docker_resources` |
+| Docker & Server | `list_docker_containers`, `list_docker_images`, `list_docker_volumes`, `list_docker_networks`, `list_docker_services`, `get_docker_logs` | `prune_docker_resources`, `exec_container_command`, `exec_server_terminal_command` |
 
 Resource configuration output is intentionally redacted: credentials, environment secrets, and build secrets are not returned to the model. All organization lookups are server-side and IDs are preferred over display names to avoid ambiguous actions.
 

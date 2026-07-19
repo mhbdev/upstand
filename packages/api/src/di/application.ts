@@ -341,6 +341,23 @@ export function registerApplicationFeatures(services: ServiceCollection) {
         c.resolve(dependencies.DockerPruneToken),
       ),
   );
+  services.addTransient(
+    dependencies.ExecContainerCommandUseCaseToken,
+    (c) =>
+      new dependencies.ExecContainerCommandUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerExecToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ExecServerTerminalCommandUseCaseToken,
+    (c) =>
+      new dependencies.ExecServerTerminalCommandUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerExecToken),
+      ),
+  );
 
   services.addTransient(
     dependencies.CreateSshKeyUseCaseToken,

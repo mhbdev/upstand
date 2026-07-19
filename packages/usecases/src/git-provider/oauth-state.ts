@@ -1,6 +1,6 @@
 import {
-  createHash,
   createHmac,
+  hkdfSync,
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
@@ -21,8 +21,20 @@ function stateSecret(): string {
   return secret;
 }
 
+function deriveStateSigningKey(): Buffer {
+  return Buffer.from(
+    hkdfSync(
+      "sha256",
+      stateSecret(),
+      "upstand-oauth-state-salt",
+      "upstand-oauth-state-signing-v1",
+      32,
+    ),
+  );
+}
+
 function sign(payload: string): string {
-  return createHmac("sha256", stateSecret())
+  return createHmac("sha256", deriveStateSigningKey())
     .update(payload)
     .digest("base64url");
 }
@@ -105,7 +117,16 @@ export function parseGitProviderOAuthState(state: string): {
 }
 
 export function gitProviderOAuthStateKey(state: string): string {
-  return `oauth:git-provider-state:${createHash("sha256").update(state).digest("hex")}`;
+  const derivedKey = Buffer.from(
+    hkdfSync(
+      "sha256",
+      state,
+      "upstand-oauth-state-key-salt",
+      "upstand-oauth-state-key-v1",
+      32,
+    ),
+  );
+  return `oauth:git-provider-state:${derivedKey.toString("hex")}`;
 }
 
 export const GIT_PROVIDER_OAUTH_STATE_TTL_SECONDS = STATE_TTL_SECONDS;
