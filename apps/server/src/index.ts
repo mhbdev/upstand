@@ -35,7 +35,7 @@ import { type ApiBindings, createContext } from "@upstand/api/context";
 import { getServiceProvider } from "@upstand/api/di";
 import { checkPermission } from "@upstand/api/permissions";
 import { appRouter } from "@upstand/api/routers/index";
-import { db } from "@upstand/db";
+import { closeDb, db } from "@upstand/db";
 import * as authSchema from "@upstand/db/schema/auth";
 import { scimProvider } from "@upstand/db/schema/scim";
 import { hasApiKeyPermission, isJsonObject } from "@upstand/domain";
@@ -76,6 +76,7 @@ import {
   type BetterAuthInstance,
   createAuthMiddleware,
 } from "evlog/better-auth";
+import { createFsDrain } from "evlog/fs";
 import { type EvlogVariables, evlog } from "evlog/hono";
 import { type Context, Hono } from "hono";
 import { upgradeWebSocket, websocket } from "hono/bun";
@@ -112,6 +113,7 @@ import { matchesTerminalSession, terminalBroker } from "./terminal-broker";
 
 initLogger({
   env: { service: "upstand-server" },
+  drain: createFsDrain({ maxFiles: 7 }),
 });
 
 await runDatabaseMigrations();
@@ -2756,6 +2758,7 @@ async function shutdown(signal: string): Promise<void> {
     });
   }
   await closeRedis(redis);
+  await closeDb();
   log.info({ message: "Graceful shutdown completed", signal });
   process.exit(result === "timeout" ? 1 : 0);
 }

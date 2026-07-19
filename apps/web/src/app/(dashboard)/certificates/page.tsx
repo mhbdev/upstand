@@ -13,13 +13,6 @@ import {
 } from "@upstand/ui/components/alert-dialog";
 import { Button } from "@upstand/ui/components/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@upstand/ui/components/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,

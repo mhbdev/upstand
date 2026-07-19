@@ -48,6 +48,11 @@ services:
         limits:
           cpus: "1.0"
           memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   redis:
     image: ${REDIS_IMAGE:-redis:8.8-alpine}
@@ -102,6 +107,11 @@ services:
         limits:
           cpus: "0.75"
           memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   server:
     image: ${UPSTAND_SERVER_IMAGE:?UPSTAND_SERVER_IMAGE is required}
@@ -181,6 +191,11 @@ services:
         limits:
           cpus: "1.0"
           memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   web:
     image: ${UPSTAND_WEB_IMAGE:?UPSTAND_WEB_IMAGE is required}
@@ -231,6 +246,11 @@ services:
         limits:
           cpus: "1.0"
           memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   fumadocs:
     image: ${UPSTAND_DOCS_IMAGE:?UPSTAND_DOCS_IMAGE is required}
@@ -280,6 +300,11 @@ services:
         limits:
           cpus: "0.50"
           memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 volumes:
   postgres_data:

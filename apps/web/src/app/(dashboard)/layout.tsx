@@ -17,7 +17,6 @@ import {
   ServerStack01Icon,
   Shield01Icon,
   SourceCodeIcon,
-  TagIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";

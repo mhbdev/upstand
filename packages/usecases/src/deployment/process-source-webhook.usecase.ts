@@ -224,7 +224,7 @@ function matchesTagPattern(
   pattern: string | null | undefined,
   tag: string,
 ): boolean {
-  if (!pattern || !pattern.trim()) {
+  if (!pattern?.trim()) {
     return true;
   }
   const escaped = pattern

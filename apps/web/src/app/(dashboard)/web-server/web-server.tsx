@@ -139,6 +139,7 @@ export default function WebServerDashboard(_props: {
     refetchInterval: 15000,
   });
 
+  // biome-ignore lint/correctness/noUnusedVariables: securityAudit is currently commented out in the UI below
   const { data: securityAudit, refetch: refetchSecurityAudit } = useQuery({
     ...trpc.webServer.securityAudit.queryOptions({
       organizationId,

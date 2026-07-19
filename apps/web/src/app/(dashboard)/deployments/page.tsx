@@ -9,8 +9,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
-import { Spinner } from "@upstand/ui/components/spinner";
 import {
   Table,
   TableBody,
@@ -25,12 +30,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@upstand/ui/components/field";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
@@ -38,9 +37,12 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { PageEmpty } from "@/components/dashboard/page-empty";
-import { TableSkeleton, CardGridSkeleton } from "@/components/dashboard/page-skeleton";
+import {
+  CardGridSkeleton,
+  TableSkeleton,
+} from "@/components/dashboard/page-skeleton";
+import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import {
   Activity,
   Clock,
@@ -202,7 +204,11 @@ export default function DeploymentsPage() {
       case "active":
         return <DeploymentStatusBadge status="running" />;
       default:
-        return <DeploymentStatusBadge status={state === "active" ? "running" : state} />;
+        return (
+          <DeploymentStatusBadge
+            status={state === "active" ? "running" : state}
+          />
+        );
     }
   };
 
@@ -433,7 +439,10 @@ export default function DeploymentsPage() {
             </CardHeader>
             <CardContent>
               {loadingServers ? (
-                <CardGridSkeleton count={2} className="grid gap-6 md:grid-cols-2" />
+                <CardGridSkeleton
+                  count={2}
+                  className="grid gap-6 md:grid-cols-2"
+                />
               ) : servers.length === 0 ? (
                 <PageEmpty
                   icon={Server}
@@ -489,7 +498,9 @@ export default function DeploymentsPage() {
                                 className="h-9 w-24"
                               />
                               <Button
-                                onClick={() => handleUpdateConcurrency(server.id)}
+                                onClick={() =>
+                                  handleUpdateConcurrency(server.id)
+                                }
                                 disabled={updateConcurrencyMutation.isPending}
                                 size="sm"
                               >
@@ -497,7 +508,8 @@ export default function DeploymentsPage() {
                               </Button>
                             </div>
                             <FieldDescription>
-                              Additional deployment triggers for this server will queue up and wait.
+                              Additional deployment triggers for this server
+                              will queue up and wait.
                             </FieldDescription>
                           </Field>
                         </FieldGroup>

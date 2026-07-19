@@ -1,8 +1,8 @@
-import { expect, test, describe } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
+  extractAndParametrizeEnvVars,
   parseResourceEnvironmentVariables,
   serializeResourceEnvironmentVariables,
-  extractAndParametrizeEnvVars,
 } from "./resource-environment";
 
 process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
@@ -44,7 +44,9 @@ services:
     const { composeFile, envVars } = extractAndParametrizeEnvVars(compose);
 
     expect(envVars).toEqual({ API_KEY: "my-secret", PORT: "3000" });
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Testing literal template variable replacement in YAML
     expect(composeFile).toContain("${API_KEY}");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Testing literal template variable replacement in YAML
     expect(composeFile).toContain("${PORT}");
     expect(composeFile).not.toContain("my-secret");
   });

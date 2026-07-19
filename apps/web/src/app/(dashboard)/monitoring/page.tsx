@@ -12,7 +12,6 @@ import {
 } from "@upstand/ui/components/card";
 import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -39,12 +38,8 @@ import {
   Activity,
   ArrowDownToLine,
   ArrowUpFromLine,
-  Cpu,
   Database,
-  HardDrive,
-  MemoryStick,
   Network,
-  Server,
 } from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";

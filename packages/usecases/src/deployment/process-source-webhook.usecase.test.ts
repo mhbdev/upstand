@@ -355,7 +355,11 @@ describe("source webhook processing", () => {
       const body = JSON.stringify({
         ref: "refs/heads/main",
         after: "abc123",
-        head_commit: { id: "abc123", message: "feat", modified: ["src/index.ts"] },
+        head_commit: {
+          id: "abc123",
+          message: "feat",
+          modified: ["src/index.ts"],
+        },
         repository: { full_name: "acme/example" },
         commits: [{ id: "abc123", modified: ["src/index.ts"] }],
       });

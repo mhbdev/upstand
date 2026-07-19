@@ -27,14 +27,6 @@ import {
   DialogTitle,
 } from "@upstand/ui/components/dialog";
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@upstand/ui/components/empty";
-import {
   Field,
   FieldContent,
   FieldDescription,
@@ -565,7 +557,11 @@ export default function NotificationsPage() {
     providerValues("slack"),
   );
 
-  const { data: channels = [], refetch, isPending: loadingChannels } = useQuery({
+  const {
+    data: channels = [],
+    refetch,
+    isPending: loadingChannels,
+  } = useQuery({
     ...trpc.notification.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
@@ -740,7 +736,11 @@ export default function NotificationsPage() {
         description="Route operational alerts to multiple channels. Credentials stay encrypted and delivery failures never block deployments."
         actions={
           <UpGalTarget definition={addNotificationTarget}>
-            <Button onClick={openCreate} disabled={!organizationId} className="gap-2 font-medium">
+            <Button
+              onClick={openCreate}
+              disabled={!organizationId}
+              className="gap-2 font-medium"
+            >
               <PlusIcon data-icon="inline-start" />
               Add Channel
             </Button>
@@ -756,7 +756,11 @@ export default function NotificationsPage() {
           title="No notification channels"
           description="Add Slack, email, webhooks, or any supported provider to receive deployment and operational alerts."
           action={
-            <Button onClick={openCreate} disabled={!organizationId} className="gap-2">
+            <Button
+              onClick={openCreate}
+              disabled={!organizationId}
+              className="gap-2"
+            >
               <PlusIcon data-icon="inline-start" />
               Add Channel
             </Button>
@@ -911,7 +915,9 @@ export default function NotificationsPage() {
         <DialogContent className="flex h-[min(92svh,900px)] w-[calc(100vw-1rem)] max-w-[min(96vw,960px)] flex-col gap-0 overflow-hidden p-0 sm:min-w-[min(42rem,calc(100vw-2rem))]">
           <DialogHeader className="shrink-0 border-border/60 border-b px-6 py-5">
             <DialogTitle>
-              {editing ? "Edit Notification Channel" : "Add Notification Channel"}
+              {editing
+                ? "Edit Notification Channel"
+                : "Add Notification Channel"}
             </DialogTitle>
             <DialogDescription>
               Select a provider, enter its connection details, then choose the

@@ -222,7 +222,7 @@ function RequestsTable({
   logs: ReturnType<typeof useAccessLogs>;
   onSelect: (entry: LogEntry) => void;
 }) {
-  const pageCount = logs.data?.pageCount ?? 1;
+  const _pageCount = logs.data?.pageCount ?? 1;
   return (
     <Card>
       <CardHeader className="gap-4 lg:flex-row lg:items-end lg:justify-between">

@@ -8,7 +8,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@upstand/ui/components/alert";
-import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -90,11 +89,6 @@ export default function RemoteServersPage() {
     isPending: loadingServers,
   } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
-    enabled: organizationState.status === "ready",
-  });
-
-  const { data: serverCount } = useQuery({
-    ...trpc.server.count.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
 

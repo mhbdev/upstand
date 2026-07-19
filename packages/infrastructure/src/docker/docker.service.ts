@@ -1528,9 +1528,15 @@ export class DockerService {
         : `Deploying Docker Swarm stack '${stackName}'...\n`,
     );
     const composeEnv = parseResourceEnvironmentVariables(resource.envVars);
-    await this.runCommandAsync("docker", composeCommand, onLog, composeEnv, {
-      redactions: Object.values(composeEnv),
-    });
+    await this.runCommandAsync(
+      "docker",
+      composeCommand,
+      onLog,
+      composeEnv as NodeJS.ProcessEnv,
+      {
+        redactions: Object.values(composeEnv),
+      },
+    );
 
     // Clean up
     fs.rmSync(composeDir, { recursive: true, force: true });

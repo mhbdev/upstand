@@ -63,6 +63,7 @@ const addGitProviderTarget = getUpGalTargetDefinition("add-git-provider");
 type ProviderType = "github" | "gitlab" | "bitbucket" | "gitea";
 
 export default function GitProviders({
+  // biome-ignore lint/correctness/noUnusedFunctionParameters: session is received but not used directly in this view
   session,
 }: {
   session: typeof authClient.$Infer.Session;
@@ -229,7 +230,7 @@ export default function GitProviders({
         ],
       };
       setManifest(JSON.stringify(manifestData));
-    } catch (e: any) {
+    } catch (_e: any) {
       toast.error("Failed to compile manifest setup details");
     }
   }, [orgId]);

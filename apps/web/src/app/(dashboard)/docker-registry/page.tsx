@@ -18,11 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@upstand/ui/components/field";
+import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
@@ -34,7 +30,6 @@ import {
 } from "@/components/dashboard/dashboard-page";
 import { PageEmpty } from "@/components/dashboard/page-empty";
 import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
-import { UpGalTarget } from "@/components/upgal-target";
 import {
   Database,
   Edit2,
@@ -42,6 +37,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "@/components/huge-icons";
+import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
@@ -76,7 +72,11 @@ export default function DockerRegistryPage() {
     setServerId("");
   };
 
-  const { data: registries, refetch, isPending: loadingRegistries } = useQuery({
+  const {
+    data: registries,
+    refetch,
+    isPending: loadingRegistries,
+  } = useQuery({
     ...trpc.dockerRegistry.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
@@ -174,6 +174,7 @@ export default function DockerRegistryPage() {
 
   const handleTestConnection = () => {
     testConnectionMutation.mutate({
+      organizationId,
       username: username || null,
       password: password || null,
       registryUrl: registryUrl || null,
@@ -185,9 +186,7 @@ export default function DockerRegistryPage() {
       <DashboardPageHeader
         title="Docker Registry"
         description="Configure external Docker registries to publish and pull images during deployments."
-        icon={
-          <Layers className="size-6 text-primary" />
-        }
+        icon={<Layers className="size-6 text-primary" />}
         actions={
           <UpGalTarget definition={createDockerRegistryTarget}>
             <Button onClick={openCreate} className="gap-2 font-medium">
@@ -366,7 +365,7 @@ export default function DockerRegistryPage() {
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
-                {(createMutation.isPending || updateMutation.isPending) ? (
+                {createMutation.isPending || updateMutation.isPending ? (
                   <>
                     <Spinner data-icon="inline-start" />
                     Saving…

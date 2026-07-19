@@ -19,8 +19,8 @@ import {
   DeployResourceInputSchema,
   type DeployResourceUseCase,
 } from "../resource/deploy-resource.usecase";
-import { getNativeTemplate, type NativeTemplate } from "./native-catalog";
 import { extractAndParametrizeEnvVars } from "../resource/resource-environment";
+import { getNativeTemplate, type NativeTemplate } from "./native-catalog";
 
 const TemplateTagsSchema = z
   .array(z.string().trim().min(1).max(64))

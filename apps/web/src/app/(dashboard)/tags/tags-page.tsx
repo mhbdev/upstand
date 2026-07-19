@@ -9,12 +9,7 @@ import {
 } from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@upstand/ui/components/card";
+import { CardContent } from "@upstand/ui/components/card";
 import {
   Dialog,
   DialogContent,

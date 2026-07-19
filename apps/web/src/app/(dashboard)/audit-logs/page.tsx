@@ -2,14 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
-import { Button } from "@upstand/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@upstand/ui/components/card";
+import { CardContent, CardHeader } from "@upstand/ui/components/card";
 import { Input } from "@upstand/ui/components/input";
 import {
   Select,
@@ -26,12 +19,7 @@ import {
 import { PageEmpty } from "@/components/dashboard/page-empty";
 import { PagePagination } from "@/components/dashboard/page-pagination";
 import { TableSkeleton } from "@/components/dashboard/page-skeleton";
-import {
-  ChevronLeft,
-  ChevronRight,
-  FileClock,
-  Search,
-} from "@/components/huge-icons";
+import { FileClock, Search } from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 

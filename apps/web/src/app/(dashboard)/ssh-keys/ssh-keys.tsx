@@ -18,12 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@upstand/ui/components/field";
+import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
@@ -38,7 +33,6 @@ import {
 } from "@/components/dashboard/dashboard-page";
 import { PageEmpty } from "@/components/dashboard/page-empty";
 import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
-import { UpGalTarget } from "@/components/upgal-target";
 import {
   AlertTriangleIcon,
   CheckCircle2,
@@ -48,6 +42,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "@/components/huge-icons";
+import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import type { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
@@ -274,9 +269,7 @@ export default function SSHKeys(_props: {
       <DashboardPageHeader
         title="SSH Keys"
         description="Create and manage SSH keys to securely access your servers and Git repositories."
-        icon={
-          <KeyRound className="size-6 text-primary" />
-        }
+        icon={<KeyRound className="size-6 text-primary" />}
         actions={
           <UpGalTarget definition={createSshKeyTarget}>
             <Button
@@ -304,10 +297,7 @@ export default function SSHKeys(_props: {
       ) : keys && keys.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
           {keys.map((key, index) => (
-            <Card
-              key={key.id}
-              className="border border-border/40 bg-card/30"
-            >
+            <Card key={key.id} className="border border-border/40 bg-card/30">
               <CardHeader className="flex flex-row items-start justify-between pb-3">
                 <div className="space-y-1">
                   <CardTitle className="flex items-center gap-2 font-bold text-base">
@@ -422,7 +412,9 @@ export default function SSHKeys(_props: {
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="edit-key-description">Description</FieldLabel>
+                <FieldLabel htmlFor="edit-key-description">
+                  Description
+                </FieldLabel>
                 <Input
                   id="edit-key-description"
                   value={editDescription}
@@ -446,7 +438,9 @@ export default function SSHKeys(_props: {
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="rotate-public-key">Replacement public key</FieldLabel>
+                <FieldLabel htmlFor="rotate-public-key">
+                  Replacement public key
+                </FieldLabel>
                 <Textarea
                   id="rotate-public-key"
                   value={rotationPublicKey}
@@ -572,7 +566,9 @@ export default function SSHKeys(_props: {
                     {generateMutation.isPending && (
                       <Spinner className="size-4" />
                     )}
-                    {generateMutation.isPending ? "Generating…" : "Generate Key"}
+                    {generateMutation.isPending
+                      ? "Generating…"
+                      : "Generate Key"}
                   </Button>
                 </UpGalTarget>
               </DialogFooter>
@@ -737,7 +733,9 @@ export default function SSHKeys(_props: {
               className="gap-2"
               onClick={handleCopyPrivateKey}
             >
-              <CheckCircle2 className={cn("size-4", !privateKeyCopied && "hidden")} />
+              <CheckCircle2
+                className={cn("size-4", !privateKeyCopied && "hidden")}
+              />
               <Copy className={cn("size-4", privateKeyCopied && "hidden")} />
               {privateKeyCopied ? "Copied" : "Copy Private Key"}
             </Button>

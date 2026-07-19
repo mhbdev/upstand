@@ -12,11 +12,11 @@ import {
   ConvertComposeInputSchema,
   DeleteResourceInputSchema,
   DeployResourceInputSchema,
+  extractAndParametrizeEnvVars,
   InspectComposeInputSchema,
   parseResourceCredentials,
   parseResourceEnvironmentVariables,
   UpdateResourceInputSchema,
-  extractAndParametrizeEnvVars,
 } from "@upstand/usecases";
 import {
   ControlResourceUseCaseToken,
@@ -271,7 +271,9 @@ export const composeRouter = router({
         const extracted = extractAndParametrizeEnvVars(composeFile);
         const resolvedComposeFile = extracted.composeFile;
 
-        const existingEnvVars = parseResourceEnvironmentVariables(resource.envVars);
+        const existingEnvVars = parseResourceEnvironmentVariables(
+          resource.envVars,
+        );
         newEnvVars = { ...extracted.envVars, ...existingEnvVars };
 
         let parsedInputCreds: Record<string, unknown> = {};

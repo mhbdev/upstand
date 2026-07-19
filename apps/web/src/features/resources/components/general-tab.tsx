@@ -2408,7 +2408,8 @@ export function GeneralTab({
                         className="border-border/40 bg-card/30"
                       />
                       <p className="text-[11px] text-muted-foreground">
-                        Optional. If empty, all tags will trigger a deployment. Supports wildcards like * (e.g. v*).
+                        Optional. If empty, all tags will trigger a deployment.
+                        Supports wildcards like * (e.g. v*).
                       </p>
                     </div>
                   )}
@@ -2606,7 +2607,8 @@ export function GeneralTab({
                         className="border-border/40 bg-card/30"
                       />
                       <p className="text-[11px] text-muted-foreground">
-                        Optional. If empty, all tags will trigger a deployment. Supports wildcards like * (e.g. v*).
+                        Optional. If empty, all tags will trigger a deployment.
+                        Supports wildcards like * (e.g. v*).
                       </p>
                     </div>
                   )}

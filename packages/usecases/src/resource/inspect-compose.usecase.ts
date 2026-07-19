@@ -151,7 +151,10 @@ function convert(
       const item = record(service);
       if (item.deploy !== undefined && typeof item.deploy === "object") {
         const deploy = record(item.deploy);
-        if (deploy.restart_policy !== undefined && typeof deploy.restart_policy === "object") {
+        if (
+          deploy.restart_policy !== undefined &&
+          typeof deploy.restart_policy === "object"
+        ) {
           const restartPolicy = record(deploy.restart_policy);
           if (typeof restartPolicy.condition === "string") {
             const cond = restartPolicy.condition;

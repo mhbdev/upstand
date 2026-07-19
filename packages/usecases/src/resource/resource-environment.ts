@@ -79,6 +79,7 @@ export function extractAndParametrizeEnvVars(composeFile: string): {
   composeFile: string;
   envVars: Record<string, string>;
 } {
+  let finalComposeFile = composeFile;
   const envVars: Record<string, string> = {};
   let parsed: any;
   try {
@@ -133,8 +134,8 @@ export function extractAndParametrizeEnvVars(composeFile: string): {
         }
       }
     }
-    composeFile = yaml.stringify(parsed);
+    finalComposeFile = yaml.stringify(parsed);
   }
 
-  return { composeFile, envVars };
+  return { composeFile: finalComposeFile, envVars };
 }
