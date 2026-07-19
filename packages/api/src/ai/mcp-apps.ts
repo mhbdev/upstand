@@ -10,7 +10,7 @@ import { z } from "zod";
 
 const serverSchema = z.object({
   id: z.string().trim().min(1).max(40),
-  url: z.string().url(),
+  url: z.url(),
   headers: z.record(z.string(), z.string()).optional(),
 });
 
