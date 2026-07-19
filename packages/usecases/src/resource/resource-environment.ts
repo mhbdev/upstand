@@ -2,6 +2,7 @@ import {
   decryptSecret,
   encryptSecret,
 } from "@upstand/platform/crypto/secret-box";
+import yaml from "yaml";
 import { z } from "zod";
 
 export const ResourceEnvironmentVariablesSchema = z.record(
@@ -72,4 +73,68 @@ export function serializeResourceEnvironmentVariables(
     variables = parseEnvironmentObject(value ?? {});
   }
   return JSON.stringify(encryptSecret(JSON.stringify(variables)));
+}
+
+export function extractAndParametrizeEnvVars(composeFile: string): {
+  composeFile: string;
+  envVars: Record<string, string>;
+} {
+  const envVars: Record<string, string> = {};
+  let parsed: any;
+  try {
+    parsed = yaml.parse(composeFile);
+  } catch {
+    return { composeFile, envVars };
+  }
+
+  if (parsed && typeof parsed === "object" && parsed.services) {
+    const services = parsed.services;
+    for (const serviceName of Object.keys(services)) {
+      const service = services[serviceName];
+      if (service && typeof service === "object" && service.environment) {
+        const environment = service.environment;
+        if (Array.isArray(environment)) {
+          const newEnvList: string[] = [];
+          for (const item of environment) {
+            if (typeof item === "string") {
+              const index = item.indexOf("=");
+              if (index > -1) {
+                const key = item.slice(0, index).trim();
+                const val = item.slice(index + 1).trim();
+                if (key) {
+                  envVars[key] = val;
+                  newEnvList.push(`${key}=\${${key}}`);
+                }
+              } else {
+                const key = item.trim();
+                if (key) {
+                  envVars[key] = "";
+                  newEnvList.push(`${key}=\${${key}}`);
+                }
+              }
+            } else {
+              newEnvList.push(item);
+            }
+          }
+          service.environment = newEnvList;
+        } else if (typeof environment === "object") {
+          const newEnvObj: Record<string, string> = {};
+          for (const [key, value] of Object.entries(environment)) {
+            const normalizedKey = key.trim();
+            if (normalizedKey) {
+              envVars[normalizedKey] =
+                value !== null && value !== undefined
+                  ? String(value).trim()
+                  : "";
+              newEnvObj[normalizedKey] = `\${${normalizedKey}}`;
+            }
+          }
+          service.environment = newEnvObj;
+        }
+      }
+    }
+    composeFile = yaml.stringify(parsed);
+  }
+
+  return { composeFile, envVars };
 }

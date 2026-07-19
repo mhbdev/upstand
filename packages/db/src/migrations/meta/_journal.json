@@ -267,6 +267,13 @@
       "when": 1784363575183,
       "tag": "0037_flat_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1784479740634,
+      "tag": "0038_strong_zaladane",
+      "breakpoints": true
     }
   ]
 }

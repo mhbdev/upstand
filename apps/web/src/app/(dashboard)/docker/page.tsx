@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Skeleton } from "@upstand/ui/components/skeleton";
 import {
   Table,
   TableBody,
@@ -34,6 +35,11 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import {
+  CardGridSkeleton,
+  TableSkeleton,
+} from "@/components/dashboard/page-skeleton";
 import { DockerContainerTerminalDialog } from "@/components/docker-container-terminal-dialog";
 import {
   Activity,
@@ -307,20 +313,13 @@ export default function DockerInventoryPage() {
         actions={
           <div className="flex items-center gap-2">
             <Select
-              items={[
-                { value: "local", label: "Local Docker Daemon" },
-                ...(serversQuery.data ?? []).map((server) => ({
-                  value: server.id,
-                  label: `${server.name} (${server.ipAddress})`,
-                })),
-              ]}
               value={serverId}
               onValueChange={(val) => {
                 setServerId(val ?? "local");
                 setContainerId("");
               }}
             >
-              <SelectTrigger className="w-64 bg-background">
+              <SelectTrigger className="w-64">
                 <Server className="mr-2 size-4 text-primary" />
                 <SelectValue placeholder="Docker Target" />
               </SelectTrigger>
@@ -379,7 +378,7 @@ export default function DockerInventoryPage() {
         {/* Tab Detail Panel */}
         <div className="min-w-0 space-y-6">
           <Card className="border-border/60 shadow-sm">
-            <CardHeader className="border-b bg-muted/10 pb-4">
+            <CardHeader className="border-b pb-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <CardTitle className="font-bold text-xl capitalize">
@@ -400,1007 +399,1061 @@ export default function DockerInventoryPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              {/* Kind: INFO / OVERVIEW */}
-              {kind === "info" && (
-                <div className="space-y-6">
-                  {inventoryQuery.data &&
-                  typeof inventoryQuery.data === "object" &&
-                  !Array.isArray(inventoryQuery.data) ? (
-                    (() => {
-                      const info = inventoryQuery.data as Record<string, any>;
-                      return (
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          <Card className="bg-muted/20">
-                            <CardHeader className="p-4">
-                              <CardDescription>System Hostname</CardDescription>
-                              <CardTitle className="text-lg">
-                                {String(info.name || "N/A")}
-                              </CardTitle>
-                            </CardHeader>
-                          </Card>
-                          <Card className="bg-muted/20">
-                            <CardHeader className="p-4">
-                              <CardDescription>
-                                Docker Engine Version
-                              </CardDescription>
-                              <CardTitle className="text-lg">
-                                {String(info.serverVersion || "N/A")}
-                              </CardTitle>
-                            </CardHeader>
-                          </Card>
-                          <Card className="bg-muted/20">
-                            <CardHeader className="p-4">
-                              <CardDescription>
-                                Operating System
-                              </CardDescription>
-                              <CardTitle className="overflow-hidden truncate text-ellipsis text-lg">
-                                {String(info.operatingSystem || "N/A")}
-                              </CardTitle>
-                            </CardHeader>
-                          </Card>
-                          <Card className="bg-muted/20">
-                            <CardHeader className="p-4">
-                              <CardDescription>Architecture</CardDescription>
-                              <CardTitle className="text-lg">
-                                {String(info.architecture || "N/A")}
-                              </CardTitle>
-                            </CardHeader>
-                          </Card>
-                          <Card className="bg-muted/20">
-                            <CardHeader className="p-4">
-                              <CardDescription>Swarm Status</CardDescription>
-                              <CardTitle className="text-lg capitalize">
-                                {String(info.swarmState || "N/A")}
-                              </CardTitle>
-                            </CardHeader>
-                          </Card>
-                          <Card className="bg-muted/20">
-                            <CardHeader className="p-4">
-                              <CardDescription>
-                                System Memory Limit
-                              </CardDescription>
-                              <CardTitle className="text-lg">
-                                {info.memoryBytes
-                                  ? formatBytes(Number(info.memoryBytes))
-                                  : "Unlimited"}
-                              </CardTitle>
-                            </CardHeader>
-                          </Card>
-                          <Card className="bg-muted/20 sm:col-span-2 lg:col-span-3">
-                            <CardContent className="flex items-center justify-around p-4">
-                              <div className="text-center">
-                                <span className="font-extrabold text-3xl text-primary">
-                                  {String(info.containers || 0)}
-                                </span>
-                                <p className="mt-1 text-muted-foreground text-xs">
-                                  Containers
-                                </p>
-                              </div>
-                              <div className="h-8 border-border border-l" />
-                              <div className="text-center">
-                                <span className="font-extrabold text-3xl text-primary">
-                                  {String(info.images || 0)}
-                                </span>
-                                <p className="mt-1 text-muted-foreground text-xs">
-                                  Images
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
+              {inventoryQuery.isPending ? (
+                kind === "info" || kind === "stats" ? (
+                  <CardGridSkeleton count={3} />
+                ) : kind === "logs" ? (
+                  <div className="flex flex-col gap-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                  </div>
+                ) : (
+                  <TableSkeleton columns={5} rows={5} />
+                )
+              ) : (
+                <>
+                  {/* Kind: INFO / OVERVIEW */}
+                  {kind === "info" && (
+                    <div className="space-y-6">
+                      {inventoryQuery.data &&
+                      typeof inventoryQuery.data === "object" &&
+                      !Array.isArray(inventoryQuery.data) ? (
+                        (() => {
+                          const info = inventoryQuery.data as Record<
+                            string,
+                            any
+                          >;
+                          return (
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                              <Card className="bg-muted/20">
+                                <CardHeader className="p-4">
+                                  <CardDescription>
+                                    System Hostname
+                                  </CardDescription>
+                                  <CardTitle className="text-lg">
+                                    {String(info.name || "N/A")}
+                                  </CardTitle>
+                                </CardHeader>
+                              </Card>
+                              <Card className="bg-muted/20">
+                                <CardHeader className="p-4">
+                                  <CardDescription>
+                                    Docker Engine Version
+                                  </CardDescription>
+                                  <CardTitle className="text-lg">
+                                    {String(info.serverVersion || "N/A")}
+                                  </CardTitle>
+                                </CardHeader>
+                              </Card>
+                              <Card className="bg-muted/20">
+                                <CardHeader className="p-4">
+                                  <CardDescription>
+                                    Operating System
+                                  </CardDescription>
+                                  <CardTitle className="overflow-hidden truncate text-ellipsis text-lg">
+                                    {String(info.operatingSystem || "N/A")}
+                                  </CardTitle>
+                                </CardHeader>
+                              </Card>
+                              <Card className="bg-muted/20">
+                                <CardHeader className="p-4">
+                                  <CardDescription>
+                                    Architecture
+                                  </CardDescription>
+                                  <CardTitle className="text-lg">
+                                    {String(info.architecture || "N/A")}
+                                  </CardTitle>
+                                </CardHeader>
+                              </Card>
+                              <Card className="bg-muted/20">
+                                <CardHeader className="p-4">
+                                  <CardDescription>
+                                    Swarm Status
+                                  </CardDescription>
+                                  <CardTitle className="text-lg capitalize">
+                                    {String(info.swarmState || "N/A")}
+                                  </CardTitle>
+                                </CardHeader>
+                              </Card>
+                              <Card className="bg-muted/20">
+                                <CardHeader className="p-4">
+                                  <CardDescription>
+                                    System Memory Limit
+                                  </CardDescription>
+                                  <CardTitle className="text-lg">
+                                    {info.memoryBytes
+                                      ? formatBytes(Number(info.memoryBytes))
+                                      : "Unlimited"}
+                                  </CardTitle>
+                                </CardHeader>
+                              </Card>
+                              <Card className="bg-muted/20 sm:col-span-2 lg:col-span-3">
+                                <CardContent className="flex items-center justify-around p-4">
+                                  <div className="text-center">
+                                    <span className="font-extrabold text-3xl text-primary">
+                                      {String(info.containers || 0)}
+                                    </span>
+                                    <p className="mt-1 text-muted-foreground text-xs">
+                                      Containers
+                                    </p>
+                                  </div>
+                                  <div className="h-8 border-border border-l" />
+                                  <div className="text-center">
+                                    <span className="font-extrabold text-3xl text-primary">
+                                      {String(info.images || 0)}
+                                    </span>
+                                    <p className="mt-1 text-muted-foreground text-xs">
+                                      Images
+                                    </p>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="py-8 text-center text-muted-foreground text-sm">
+                          Failed to load Docker daemon info or daemon is
+                          unreachable.
                         </div>
-                      );
-                    })()
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground text-sm">
-                      Failed to load Docker daemon info or daemon is
-                      unreachable.
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Kind: CONTAINERS */}
-              {kind === "containers" && (
-                <div className="space-y-4">
-                  {/* Container Filters */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Input
-                      className="max-w-xs"
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Filter by name, image, label..."
-                    />
-                    <Select
-                      items={[
-                        { value: "_all", label: "All States" },
-                        ...[
-                          "created",
-                          "running",
-                          "paused",
-                          "restarting",
-                          "removing",
-                          "exited",
-                          "dead",
-                        ].map((s) => ({ value: s, label: s })),
-                      ]}
-                      value={state || "_all"}
-                      onValueChange={(val) =>
-                        setState(val === "_all" || !val ? "" : val)
-                      }
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="All States" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_all">All States</SelectItem>
-                        {[
-                          "created",
-                          "running",
-                          "paused",
-                          "restarting",
-                          "removing",
-                          "exited",
-                          "dead",
-                        ].map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Kind: CONTAINERS */}
+                  {kind === "containers" && (
+                    <div className="space-y-4">
+                      {/* Container Filters */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Input
+                          className="max-w-xs"
+                          value={search}
+                          onChange={(event) => setSearch(event.target.value)}
+                          placeholder="Filter by name, image, label..."
+                        />
+                        <Select
+                          items={[
+                            { value: "_all", label: "All States" },
+                            ...[
+                              "created",
+                              "running",
+                              "paused",
+                              "restarting",
+                              "removing",
+                              "exited",
+                              "dead",
+                            ].map((s) => ({ value: s, label: s })),
+                          ]}
+                          value={state || "_all"}
+                          onValueChange={(val) =>
+                            setState(val === "_all" || !val ? "" : val)
+                          }
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="All States" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="_all">All States</SelectItem>
+                            {[
+                              "created",
+                              "running",
+                              "paused",
+                              "restarting",
+                              "removing",
+                              "exited",
+                              "dead",
+                            ].map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
 
-                    <div className="flex-1" />
+                        <div className="flex-1" />
 
-                    <div className="flex items-center gap-2 rounded-lg border border-dashed bg-muted/10 px-3 py-1.5 text-xs">
-                      <span className="font-medium text-muted-foreground">
-                        Upload path:
-                      </span>
-                      <Input
-                        className="h-7 w-24 px-2 font-mono text-[11px]"
-                        value={containerDestination}
-                        onChange={(e) =>
-                          setContainerDestination(e.target.value)
-                        }
-                        placeholder="/tmp"
-                      />
-                    </div>
-                  </div>
+                        <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-xs">
+                          <span className="font-medium text-muted-foreground">
+                            Upload path:
+                          </span>
+                          <Input
+                            className="h-7 w-24 px-2 font-mono text-[11px]"
+                            value={containerDestination}
+                            onChange={(e) =>
+                              setContainerDestination(e.target.value)
+                            }
+                            placeholder="/tmp"
+                          />
+                        </div>
+                      </div>
 
-                  {/* Container Grid Table */}
-                  {Array.isArray(inventoryQuery.data) &&
-                  inventoryQuery.data.length > 0 ? (
-                    <div className="overflow-hidden rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/10">
-                            <TableHead className="w-[100px]">State</TableHead>
-                            <TableHead>Container Name</TableHead>
-                            <TableHead>Image</TableHead>
-                            <TableHead>Ports</TableHead>
-                            <TableHead className="text-right">
-                              Actions
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(inventoryQuery.data as any[]).map((c) => {
-                            const isRunning = c.state === "running";
-                            let badgeVariant:
-                              | "default"
-                              | "secondary"
-                              | "destructive" = "secondary";
-                            if (isRunning) badgeVariant = "default";
-                            else if (
-                              c.state === "dead" ||
-                              c.state === "removing"
-                            )
-                              badgeVariant = "destructive";
+                      {/* Container Grid Table */}
+                      {Array.isArray(inventoryQuery.data) &&
+                      inventoryQuery.data.length > 0 ? (
+                        <div className="overflow-hidden rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="">
+                                <TableHead className="w-[100px]">
+                                  State
+                                </TableHead>
+                                <TableHead>Container Name</TableHead>
+                                <TableHead>Image</TableHead>
+                                <TableHead>Ports</TableHead>
+                                <TableHead className="text-right">
+                                  Actions
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(inventoryQuery.data as any[]).map((c) => {
+                                const isRunning = c.state === "running";
+                                let badgeVariant:
+                                  | "default"
+                                  | "secondary"
+                                  | "destructive" = "secondary";
+                                if (isRunning) badgeVariant = "default";
+                                else if (
+                                  c.state === "dead" ||
+                                  c.state === "removing"
+                                )
+                                  badgeVariant = "destructive";
 
-                            return (
-                              <TableRow
-                                key={c.id}
-                                className="font-sans hover:bg-muted/5"
-                              >
-                                <TableCell>
-                                  <Badge
-                                    variant={badgeVariant}
-                                    className={`select-none capitalize ${
-                                      isRunning
-                                        ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
-                                        : ""
-                                    }`}
+                                return (
+                                  <TableRow
+                                    key={c.id}
+                                    className="font-sans hover:bg-muted/5"
                                   >
-                                    {isRunning && (
-                                      <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                                    )}
-                                    {c.state}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="max-w-[160px] truncate font-semibold text-foreground">
-                                  {c.name}
-                                </TableCell>
-                                <TableCell
-                                  className="max-w-[180px] truncate font-mono text-muted-foreground text-xs"
-                                  title={c.image}
-                                >
-                                  {c.image}
-                                </TableCell>
-                                <TableCell
-                                  className="max-w-[140px] truncate font-mono text-muted-foreground text-xs"
-                                  title={c.ports}
-                                >
-                                  {c.ports || "—"}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="size-7"
-                                      disabled={
-                                        isRunning || controlContainer.isPending
-                                      }
-                                      onClick={() => {
-                                        controlContainer.mutate({
-                                          organizationId,
-                                          serverId,
-                                          containerId: c.id,
-                                          command: "start",
-                                        });
-                                      }}
-                                      title="Start Container"
-                                      aria-label={`Start container ${c.name}`}
+                                    <TableCell>
+                                      <Badge
+                                        variant={badgeVariant}
+                                        className={`select-none capitalize ${
+                                          isRunning
+                                            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                                            : ""
+                                        }`}
+                                      >
+                                        {isRunning && (
+                                          <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                                        )}
+                                        {c.state}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="max-w-[160px] truncate font-semibold text-foreground">
+                                      {c.name}
+                                    </TableCell>
+                                    <TableCell
+                                      className="max-w-[180px] truncate font-mono text-muted-foreground text-xs"
+                                      title={c.image}
                                     >
-                                      <Play className="size-3.5 text-emerald-500" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="size-7"
-                                      disabled={
-                                        !isRunning || controlContainer.isPending
-                                      }
-                                      onClick={() => {
-                                        controlContainer.mutate({
-                                          organizationId,
-                                          serverId,
-                                          containerId: c.id,
-                                          command: "stop",
-                                        });
-                                      }}
-                                      title="Stop Container"
-                                      aria-label={`Stop container ${c.name}`}
+                                      {c.image}
+                                    </TableCell>
+                                    <TableCell
+                                      className="max-w-[140px] truncate font-mono text-muted-foreground text-xs"
+                                      title={c.ports}
                                     >
-                                      <Square className="size-3.5 text-zinc-400" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="size-7"
-                                      disabled={controlContainer.isPending}
-                                      onClick={() => {
-                                        controlContainer.mutate({
-                                          organizationId,
-                                          serverId,
-                                          containerId: c.id,
-                                          command: "restart",
-                                        });
-                                      }}
-                                      title="Restart Container"
-                                      aria-label={`Restart container ${c.name}`}
-                                    >
-                                      <RotateCw className="size-3.5 text-amber-500" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="size-7"
-                                      onClick={() =>
-                                        setTerminalContainer({
-                                          id: c.id,
-                                          name: c.name,
-                                        })
-                                      }
-                                      title="Terminal Console"
-                                      aria-label={`Open terminal for container ${c.name}`}
-                                    >
-                                      <Terminal className="size-3.5 text-sky-500" />
-                                    </Button>
-                                    <label
-                                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                                      title="Upload Tar Archive"
-                                      aria-label={`Upload tar archive to container ${c.name}`}
-                                    >
-                                      <Upload className="size-3.5" />
-                                      <input
-                                        type="file"
-                                        accept=".tar,application/x-tar"
-                                        className="sr-only"
-                                        onChange={(event) => {
-                                          const file = event.target.files?.[0];
-                                          if (file)
-                                            void uploadContainer(c.id, file);
-                                          event.currentTarget.value = "";
-                                        }}
-                                      />
-                                    </label>
+                                      {c.ports || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="size-7"
+                                          disabled={
+                                            isRunning ||
+                                            controlContainer.isPending
+                                          }
+                                          onClick={() => {
+                                            controlContainer.mutate({
+                                              organizationId,
+                                              serverId,
+                                              containerId: c.id,
+                                              command: "start",
+                                            });
+                                          }}
+                                          title="Start Container"
+                                          aria-label={`Start container ${c.name}`}
+                                        >
+                                          <Play className="size-3.5 text-emerald-500" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="size-7"
+                                          disabled={
+                                            !isRunning ||
+                                            controlContainer.isPending
+                                          }
+                                          onClick={() => {
+                                            controlContainer.mutate({
+                                              organizationId,
+                                              serverId,
+                                              containerId: c.id,
+                                              command: "stop",
+                                            });
+                                          }}
+                                          title="Stop Container"
+                                          aria-label={`Stop container ${c.name}`}
+                                        >
+                                          <Square className="size-3.5 text-zinc-400" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="size-7"
+                                          disabled={controlContainer.isPending}
+                                          onClick={() => {
+                                            controlContainer.mutate({
+                                              organizationId,
+                                              serverId,
+                                              containerId: c.id,
+                                              command: "restart",
+                                            });
+                                          }}
+                                          title="Restart Container"
+                                          aria-label={`Restart container ${c.name}`}
+                                        >
+                                          <RotateCw className="size-3.5 text-amber-500" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="size-7"
+                                          onClick={() =>
+                                            setTerminalContainer({
+                                              id: c.id,
+                                              name: c.name,
+                                            })
+                                          }
+                                          title="Terminal Console"
+                                          aria-label={`Open terminal for container ${c.name}`}
+                                        >
+                                          <Terminal className="size-3.5 text-sky-500" />
+                                        </Button>
+                                        <label
+                                          className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                          title="Upload Tar Archive"
+                                          aria-label={`Upload tar archive to container ${c.name}`}
+                                        >
+                                          <Upload className="size-3.5" />
+                                          <input
+                                            type="file"
+                                            accept=".tar,application/x-tar"
+                                            className="sr-only"
+                                            onChange={(event) => {
+                                              const file =
+                                                event.target.files?.[0];
+                                              if (file)
+                                                void uploadContainer(
+                                                  c.id,
+                                                  file,
+                                                );
+                                              event.currentTarget.value = "";
+                                            }}
+                                          />
+                                        </label>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                          disabled={controlContainer.isPending}
+                                          onClick={() =>
+                                            setPendingRemoval({
+                                              kind: "container",
+                                              id: c.id,
+                                              label: c.name,
+                                            })
+                                          }
+                                          title="Force Remove"
+                                          aria-label={`Force remove container ${c.name}`}
+                                        >
+                                          <Trash2 className="size-3.5" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <PageEmpty
+                          icon={Server}
+                          title="No containers found"
+                          description="No Docker containers match the active filters or target daemon."
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kind: IMAGES */}
+                  {kind === "images" && (
+                    <div className="space-y-4">
+                      {Array.isArray(inventoryQuery.data) &&
+                      inventoryQuery.data.length > 0 ? (
+                        <div className="overflow-hidden rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="">
+                                <TableHead>Repository Tags</TableHead>
+                                <TableHead>Image ID</TableHead>
+                                <TableHead>Size</TableHead>
+                                <TableHead className="w-[100px] text-right">
+                                  Actions
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(inventoryQuery.data as any[]).map((img) => (
+                                <TableRow key={img.id}>
+                                  <TableCell className="font-sans font-semibold">
+                                    {img.tags && img.tags.length > 0
+                                      ? img.tags.join(", ")
+                                      : "<none>"}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-muted-foreground text-xs">
+                                    {img.id ? img.id.substring(0, 19) : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {img.sizeBytes
+                                      ? formatBytes(Number(img.sizeBytes))
+                                      : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right">
                                     <Button
                                       size="icon"
                                       variant="ghost"
                                       className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                      disabled={controlContainer.isPending}
+                                      disabled={controlResource.isPending}
                                       onClick={() =>
                                         setPendingRemoval({
-                                          kind: "container",
-                                          id: c.id,
-                                          label: c.name,
+                                          kind: "resource",
+                                          id: img.id,
+                                          label: img.id,
+                                          command: "remove-image",
                                         })
                                       }
-                                      title="Force Remove"
-                                      aria-label={`Force remove container ${c.name}`}
+                                      title="Remove Image"
+                                      aria-label={`Remove image ${img.id}`}
                                     >
                                       <Trash2 className="size-3.5" />
                                     </Button>
-                                  </div>
-                                </TableCell>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <PageEmpty
+                          icon={Layers}
+                          title="No images found"
+                          description="No Docker images are downloaded on the target daemon."
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kind: VOLUMES */}
+                  {kind === "volumes" && (
+                    <div className="space-y-4">
+                      {/* Volume path select */}
+                      <div className="mb-2 flex max-w-lg items-center gap-2 rounded-lg border border-dashed p-3 text-xs">
+                        <span className="font-medium text-muted-foreground">
+                          Tar upload destination folder:
+                        </span>
+                        <Input
+                          className="h-8 w-32 font-mono text-[11px]"
+                          value={volumeDestination}
+                          onChange={(event) =>
+                            setVolumeDestination(event.target.value)
+                          }
+                          placeholder="/"
+                        />
+                      </div>
+
+                      {Array.isArray(inventoryQuery.data) &&
+                      inventoryQuery.data.length > 0 ? (
+                        <div className="overflow-hidden rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="">
+                                <TableHead>Volume Name</TableHead>
+                                <TableHead>Driver</TableHead>
+                                <TableHead className="text-right">
+                                  Actions
+                                </TableHead>
                               </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(inventoryQuery.data as any[]).map((v) => (
+                                <TableRow key={v.name}>
+                                  <TableCell className="font-mono font-semibold text-xs">
+                                    {v.name}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {v.driver}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <label
+                                        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        title="Upload Tar Archive"
+                                        aria-label={`Upload tar archive to volume ${v.name}`}
+                                      >
+                                        <Upload className="size-3.5" />
+                                        <input
+                                          type="file"
+                                          accept=".tar,application/x-tar"
+                                          className="sr-only"
+                                          onChange={(event) => {
+                                            const file =
+                                              event.target.files?.[0];
+                                            if (file)
+                                              void uploadVolume(v.name, file);
+                                            event.currentTarget.value = "";
+                                          }}
+                                        />
+                                      </label>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                        disabled={controlResource.isPending}
+                                        onClick={() =>
+                                          setPendingRemoval({
+                                            kind: "resource",
+                                            id: v.name,
+                                            label: v.name,
+                                            command: "remove-volume",
+                                          })
+                                        }
+                                        title="Remove Volume"
+                                        aria-label={`Remove volume ${v.name}`}
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <PageEmpty
+                          icon={HardDrive}
+                          title="No volumes found"
+                          description="No Docker volumes are configured on the target daemon."
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kind: NETWORKS */}
+                  {kind === "networks" && (
+                    <div className="space-y-4">
+                      {Array.isArray(inventoryQuery.data) &&
+                      inventoryQuery.data.length > 0 ? (
+                        <div className="overflow-hidden rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="">
+                                <TableHead>Network Name</TableHead>
+                                <TableHead>Driver</TableHead>
+                                <TableHead>Scope</TableHead>
+                                <TableHead>Attachable</TableHead>
+                                <TableHead>Internal</TableHead>
+                                <TableHead className="w-[100px] text-right">
+                                  Actions
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(inventoryQuery.data as any[]).map((net) => (
+                                <TableRow key={net.id}>
+                                  <TableCell className="font-mono font-semibold text-xs">
+                                    {net.name}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {net.driver}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground capitalize">
+                                    {net.scope}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        net.attachable ? "default" : "secondary"
+                                      }
+                                    >
+                                      {net.attachable ? "yes" : "no"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        net.internal
+                                          ? "destructive"
+                                          : "secondary"
+                                      }
+                                    >
+                                      {net.internal ? "yes" : "no"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                      disabled={controlResource.isPending}
+                                      onClick={() =>
+                                        setPendingRemoval({
+                                          kind: "resource",
+                                          id: net.id,
+                                          label: net.name,
+                                          command: "remove-network",
+                                        })
+                                      }
+                                      title="Remove Network"
+                                      aria-label={`Remove network ${net.name}`}
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <PageEmpty
+                          icon={Network}
+                          title="No networks found"
+                          description="No Docker networks are configured on the target daemon."
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kind: SERVICES */}
+                  {kind === "services" && (
+                    <div className="space-y-4">
+                      {Array.isArray(inventoryQuery.data) &&
+                      inventoryQuery.data.length > 0 ? (
+                        <div className="overflow-hidden rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="">
+                                <TableHead>Service Name</TableHead>
+                                <TableHead>Mode</TableHead>
+                                <TableHead>Replicas</TableHead>
+                                <TableHead>Image</TableHead>
+                                <TableHead>Ports</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(inventoryQuery.data as any[]).map((srv) => (
+                                <TableRow key={srv.id}>
+                                  <TableCell className="font-semibold text-foreground">
+                                    {srv.name}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground capitalize">
+                                    {srv.mode}
+                                  </TableCell>
+                                  <TableCell className="font-mono">
+                                    {srv.replicas}
+                                  </TableCell>
+                                  <TableCell
+                                    className="max-w-[200px] truncate font-mono text-muted-foreground text-xs"
+                                    title={srv.image}
+                                  >
+                                    {srv.image}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-muted-foreground text-xs">
+                                    {srv.ports || "—"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <PageEmpty
+                          icon={Activity}
+                          title="No Swarm services active"
+                          description="No Docker Swarm services are active on this target. Swarm mode might be disabled."
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kind: LOGS */}
+                  {kind === "logs" && (
+                    <div className="space-y-4">
+                      {/* Logs Controls */}
+                      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                          <span className="mb-1 text-muted-foreground">
+                            Target Container
+                          </span>
+                          <Select
+                            items={availableContainers.map((c) => ({
+                              value: c.id,
+                              label: c.name,
+                            }))}
+                            value={containerId}
+                            onValueChange={(val) => {
+                              setContainerId(val ?? "");
+                              setServiceName("");
+                            }}
+                          >
+                            <SelectTrigger className="h-9 w-full bg-background">
+                              <SelectValue placeholder="Choose container" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {availableContainers.map((c) => (
+                                  <SelectItem key={c.id} value={c.id}>
+                                    {c.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </label>
+
+                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                          <span className="mb-1 text-muted-foreground">
+                            Service Name (Swarm)
+                          </span>
+                          <Input
+                            value={serviceName}
+                            onChange={(e) => {
+                              setServiceName(e.target.value);
+                              setContainerId("");
+                            }}
+                            placeholder="Service name"
+                            className="h-9"
+                          />
+                        </label>
+
+                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                          <span className="mb-1 text-muted-foreground">
+                            Lines limit (max 1000)
+                          </span>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={1000}
+                            value={tail}
+                            onChange={(e) => setTail(e.target.value)}
+                            className="h-9"
+                          />
+                        </label>
+
+                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                          <span className="mb-1 text-muted-foreground">
+                            Logs Since
+                          </span>
+                          <Input
+                            type="datetime-local"
+                            value={since}
+                            onChange={(e) => setSince(e.target.value)}
+                            className="h-9"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 border-t pt-3">
+                        <Input
+                          className="h-9 max-w-xs"
+                          value={logSearch}
+                          onChange={(e) => setLogSearch(e.target.value)}
+                          placeholder="Regex search logs..."
+                        />
+
+                        <div className="flex flex-wrap items-center gap-1.5 rounded-md border p-1 text-[11px]">
+                          {(
+                            [
+                              "error",
+                              "warning",
+                              "success",
+                              "info",
+                              "debug",
+                            ] as const
+                          ).map((level) => {
+                            const isSelected = logLevels.includes(level);
+                            return (
+                              <button
+                                key={level}
+                                type="button"
+                                onClick={() => {
+                                  setLogLevels((prev) =>
+                                    prev.includes(level)
+                                      ? prev.filter((l) => l !== level)
+                                      : [...prev, level],
+                                  );
+                                }}
+                                className={`rounded px-2 py-0.5 font-medium capitalize transition-colors ${
+                                  isSelected
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {level}
+                              </button>
                             );
                           })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-                      No containers found matching query.
+                        </div>
+
+                        <div className="flex-1" />
+
+                        <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                          <label className="flex cursor-pointer items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={autoScroll}
+                              onChange={(e) => setAutoScroll(e.target.checked)}
+                              className="rounded border bg-background"
+                            />
+                            <span>Auto-scroll</span>
+                          </label>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const logsText =
+                                typeof inventoryQuery.data === "string"
+                                  ? inventoryQuery.data
+                                  : "";
+                              if (logsText) {
+                                void copyText(logsText)
+                                  .then(() =>
+                                    toast.success("Logs copied to clipboard"),
+                                  )
+                                  .catch(() =>
+                                    toast.error("Failed to copy logs"),
+                                  );
+                              } else {
+                                toast.error("No logs to copy");
+                              }
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Terminal Console Logs Container */}
+                      <div className="relative">
+                        <pre
+                          ref={logContainerRef}
+                          className="h-[400px] select-text overflow-auto rounded-lg border border-border/60 bg-[#080c0a] p-4 font-mono text-[11px] text-slate-300 leading-relaxed shadow-inner"
+                        >
+                          {typeof inventoryQuery.data === "string" &&
+                          inventoryQuery.data
+                            ? stripAnsi(inventoryQuery.data)
+                            : containerId || serviceName
+                              ? "Querying logs or no logs match current filters..."
+                              : "Choose a container or input a service name above to inspect logs."}
+                        </pre>
+                      </div>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Kind: IMAGES */}
-              {kind === "images" && (
-                <div className="space-y-4">
-                  {Array.isArray(inventoryQuery.data) &&
-                  inventoryQuery.data.length > 0 ? (
-                    <div className="overflow-hidden rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/10">
-                            <TableHead>Repository Tags</TableHead>
-                            <TableHead>Image ID</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead className="w-[100px] text-right">
-                              Actions
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(inventoryQuery.data as any[]).map((img) => (
-                            <TableRow key={img.id}>
-                              <TableCell className="font-sans font-semibold">
-                                {img.tags && img.tags.length > 0
-                                  ? img.tags.join(", ")
-                                  : "<none>"}
-                              </TableCell>
-                              <TableCell className="font-mono text-muted-foreground text-xs">
-                                {img.id ? img.id.substring(0, 19) : "—"}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {img.sizeBytes
-                                  ? formatBytes(Number(img.sizeBytes))
-                                  : "—"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                  disabled={controlResource.isPending}
-                                  onClick={() =>
-                                    setPendingRemoval({
-                                      kind: "resource",
-                                      id: img.id,
-                                      label: img.id,
-                                      command: "remove-image",
-                                    })
-                                  }
-                                  title="Remove Image"
-                                  aria-label={`Remove image ${img.id}`}
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-                      No Docker images found.
-                    </div>
-                  )}
-                </div>
-              )}
+                  {/* Kind: LIVE STATS */}
+                  {kind === "stats" && (
+                    <div className="space-y-4">
+                      <div className="mb-4 flex max-w-sm items-center gap-3">
+                        <Select
+                          items={availableContainers.map((c) => ({
+                            value: c.id,
+                            label: c.name,
+                          }))}
+                          value={containerId}
+                          onValueChange={(val) => setContainerId(val ?? "")}
+                        >
+                          <SelectTrigger className="h-9 w-full bg-background">
+                            <SelectValue placeholder="Select container to monitor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {availableContainers.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.name}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-              {/* Kind: VOLUMES */}
-              {kind === "volumes" && (
-                <div className="space-y-4">
-                  {/* Volume path select */}
-                  <div className="mb-2 flex max-w-lg items-center gap-2 rounded-lg border border-dashed bg-muted/10 p-3 text-xs">
-                    <span className="font-medium text-muted-foreground">
-                      Tar upload destination folder:
-                    </span>
-                    <Input
-                      className="h-8 w-32 font-mono text-[11px]"
-                      value={volumeDestination}
-                      onChange={(event) =>
-                        setVolumeDestination(event.target.value)
-                      }
-                      placeholder="/"
-                    />
-                  </div>
+                      {containerId &&
+                      inventoryQuery.data &&
+                      typeof inventoryQuery.data === "object" &&
+                      !Array.isArray(inventoryQuery.data) ? (
+                        (() => {
+                          const stats = inventoryQuery.data as Record<
+                            string,
+                            any
+                          >;
+                          const cpuVal = Number(stats.cpuPercent) || 0;
+                          const memPercentVal =
+                            Number(stats.memoryPercent) || 0;
+                          const memUsed = Number(stats.memoryUsageBytes) || 0;
+                          const memLimit = Number(stats.memoryLimitBytes) || 0;
 
-                  {Array.isArray(inventoryQuery.data) &&
-                  inventoryQuery.data.length > 0 ? (
-                    <div className="overflow-hidden rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/10">
-                            <TableHead>Volume Name</TableHead>
-                            <TableHead>Driver</TableHead>
-                            <TableHead className="text-right">
-                              Actions
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(inventoryQuery.data as any[]).map((v) => (
-                            <TableRow key={v.name}>
-                              <TableCell className="font-mono font-semibold text-xs">
-                                {v.name}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {v.driver}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <label
-                                    className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                                    title="Upload Tar Archive"
-                                    aria-label={`Upload tar archive to volume ${v.name}`}
-                                  >
-                                    <Upload className="size-3.5" />
-                                    <input
-                                      type="file"
-                                      accept=".tar,application/x-tar"
-                                      className="sr-only"
-                                      onChange={(event) => {
-                                        const file = event.target.files?.[0];
-                                        if (file)
-                                          void uploadVolume(v.name, file);
-                                        event.currentTarget.value = "";
+                          return (
+                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                              {/* CPU card */}
+                              <Card className="border-border/40">
+                                <CardHeader className="p-4 pb-2">
+                                  <CardDescription className="flex items-center justify-between">
+                                    <span>CPU Usage</span>
+                                    <Cpu className="size-4 text-primary" />
+                                  </CardDescription>
+                                  <CardTitle className="mt-1 font-black text-2xl">
+                                    {cpuVal.toFixed(2)}%
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0">
+                                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                                    <div
+                                      className="h-full bg-emerald-500 transition-all duration-300"
+                                      style={{
+                                        width: `${Math.min(100, cpuVal)}%`,
                                       }}
                                     />
-                                  </label>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    disabled={controlResource.isPending}
-                                    onClick={() =>
-                                      setPendingRemoval({
-                                        kind: "resource",
-                                        id: v.name,
-                                        label: v.name,
-                                        command: "remove-volume",
-                                      })
-                                    }
-                                    title="Remove Volume"
-                                    aria-label={`Remove volume ${v.name}`}
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-                      No Docker volumes found.
-                    </div>
-                  )}
-                </div>
-              )}
+                                  </div>
+                                </CardContent>
+                              </Card>
 
-              {/* Kind: NETWORKS */}
-              {kind === "networks" && (
-                <div className="space-y-4">
-                  {Array.isArray(inventoryQuery.data) &&
-                  inventoryQuery.data.length > 0 ? (
-                    <div className="overflow-hidden rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/10">
-                            <TableHead>Network Name</TableHead>
-                            <TableHead>Driver</TableHead>
-                            <TableHead>Scope</TableHead>
-                            <TableHead>Attachable</TableHead>
-                            <TableHead>Internal</TableHead>
-                            <TableHead className="w-[100px] text-right">
-                              Actions
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(inventoryQuery.data as any[]).map((net) => (
-                            <TableRow key={net.id}>
-                              <TableCell className="font-mono font-semibold text-xs">
-                                {net.name}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {net.driver}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground capitalize">
-                                {net.scope}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    net.attachable ? "default" : "secondary"
-                                  }
-                                >
-                                  {net.attachable ? "yes" : "no"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    net.internal ? "destructive" : "secondary"
-                                  }
-                                >
-                                  {net.internal ? "yes" : "no"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                  disabled={controlResource.isPending}
-                                  onClick={() =>
-                                    setPendingRemoval({
-                                      kind: "resource",
-                                      id: net.id,
-                                      label: net.name,
-                                      command: "remove-network",
-                                    })
-                                  }
-                                  title="Remove Network"
-                                  aria-label={`Remove network ${net.name}`}
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-                      No Docker networks found.
-                    </div>
-                  )}
-                </div>
-              )}
+                              {/* Memory card */}
+                              <Card className="border-border/40">
+                                <CardHeader className="p-4 pb-2">
+                                  <CardDescription className="flex items-center justify-between">
+                                    <span>Memory Usage</span>
+                                    <HardDrive className="size-4 text-primary" />
+                                  </CardDescription>
+                                  <CardTitle className="mt-1 font-black text-2xl">
+                                    {memPercentVal.toFixed(2)}%
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0">
+                                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                                    <div
+                                      className="h-full bg-sky-500 transition-all duration-300"
+                                      style={{
+                                        width: `${Math.min(100, memPercentVal)}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="mt-2 flex justify-between font-mono text-[11px] text-muted-foreground">
+                                    <span>{formatBytes(memUsed)}</span>
+                                    <span>{formatBytes(memLimit)}</span>
+                                  </div>
+                                </CardContent>
+                              </Card>
 
-              {/* Kind: SERVICES */}
-              {kind === "services" && (
-                <div className="space-y-4">
-                  {Array.isArray(inventoryQuery.data) &&
-                  inventoryQuery.data.length > 0 ? (
-                    <div className="overflow-hidden rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/10">
-                            <TableHead>Service Name</TableHead>
-                            <TableHead>Mode</TableHead>
-                            <TableHead>Replicas</TableHead>
-                            <TableHead>Image</TableHead>
-                            <TableHead>Ports</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(inventoryQuery.data as any[]).map((srv) => (
-                            <TableRow key={srv.id}>
-                              <TableCell className="font-semibold text-foreground">
-                                {srv.name}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground capitalize">
-                                {srv.mode}
-                              </TableCell>
-                              <TableCell className="font-mono">
-                                {srv.replicas}
-                              </TableCell>
-                              <TableCell
-                                className="max-w-[200px] truncate font-mono text-muted-foreground text-xs"
-                                title={srv.image}
-                              >
-                                {srv.image}
-                              </TableCell>
-                              <TableCell className="font-mono text-muted-foreground text-xs">
-                                {srv.ports || "—"}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-                      No Swarm services active on target. Swarm mode might be
-                      disabled.
-                    </div>
-                  )}
-                </div>
-              )}
+                              {/* Process IDs */}
+                              <Card className="border-border/40">
+                                <CardHeader className="p-4 pb-2">
+                                  <CardDescription className="flex items-center justify-between">
+                                    <span>Active Processes</span>
+                                    <Activity className="size-4 text-primary" />
+                                  </CardDescription>
+                                  <CardTitle className="mt-1 font-black text-2xl">
+                                    {String(stats.pids || 0)}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0">
+                                  <p className="mt-3 text-[11px] text-muted-foreground">
+                                    Number of thread tasks running inside
+                                    container namespaces.
+                                  </p>
+                                </CardContent>
+                              </Card>
 
-              {/* Kind: LOGS */}
-              {kind === "logs" && (
-                <div className="space-y-4">
-                  {/* Logs Controls */}
-                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                    <label className="flex flex-col space-y-1 font-semibold text-xs">
-                      <span className="mb-1 text-muted-foreground">
-                        Target Container
-                      </span>
-                      <Select
-                        items={availableContainers.map((c) => ({
-                          value: c.id,
-                          label: c.name,
-                        }))}
-                        value={containerId}
-                        onValueChange={(val) => {
-                          setContainerId(val ?? "");
-                          setServiceName("");
-                        }}
-                      >
-                        <SelectTrigger className="h-9 w-full bg-background">
-                          <SelectValue placeholder="Choose container" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {availableContainers.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </label>
+                              {/* Network I/O */}
+                              <Card className="border-border/40 sm:col-span-2 md:col-span-1">
+                                <CardHeader className="p-4 pb-2">
+                                  <CardDescription>
+                                    Network I/O Traffic
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardContent className="mt-2 space-y-2 p-4 pt-0 font-mono text-xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="flex items-center gap-1 text-muted-foreground">
+                                      <ArrowDown className="size-3 text-emerald-500" />{" "}
+                                      Rx (Download)
+                                    </span>
+                                    <span className="font-semibold">
+                                      {formatBytes(
+                                        Number(stats.networkRxBytes) || 0,
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between border-t pt-2">
+                                    <span className="flex items-center gap-1 text-muted-foreground">
+                                      <ArrowUp className="size-3 text-sky-500" />{" "}
+                                      Tx (Upload)
+                                    </span>
+                                    <span className="font-semibold">
+                                      {formatBytes(
+                                        Number(stats.networkTxBytes) || 0,
+                                      )}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
 
-                    <label className="flex flex-col space-y-1 font-semibold text-xs">
-                      <span className="mb-1 text-muted-foreground">
-                        Service Name (Swarm)
-                      </span>
-                      <Input
-                        value={serviceName}
-                        onChange={(e) => {
-                          setServiceName(e.target.value);
-                          setContainerId("");
-                        }}
-                        placeholder="Service name"
-                        className="h-9"
-                      />
-                    </label>
-
-                    <label className="flex flex-col space-y-1 font-semibold text-xs">
-                      <span className="mb-1 text-muted-foreground">
-                        Lines limit (max 1000)
-                      </span>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        value={tail}
-                        onChange={(e) => setTail(e.target.value)}
-                        className="h-9"
-                      />
-                    </label>
-
-                    <label className="flex flex-col space-y-1 font-semibold text-xs">
-                      <span className="mb-1 text-muted-foreground">
-                        Logs Since
-                      </span>
-                      <Input
-                        type="datetime-local"
-                        value={since}
-                        onChange={(e) => setSince(e.target.value)}
-                        className="h-9"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 border-t pt-3">
-                    <Input
-                      className="h-9 max-w-xs"
-                      value={logSearch}
-                      onChange={(e) => setLogSearch(e.target.value)}
-                      placeholder="Regex search logs..."
-                    />
-
-                    <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-muted/10 p-1 text-[11px]">
-                      {(
-                        [
-                          "error",
-                          "warning",
-                          "success",
-                          "info",
-                          "debug",
-                        ] as const
-                      ).map((level) => {
-                        const isSelected = logLevels.includes(level);
-                        return (
-                          <button
-                            key={level}
-                            type="button"
-                            onClick={() => {
-                              setLogLevels((prev) =>
-                                prev.includes(level)
-                                  ? prev.filter((l) => l !== level)
-                                  : [...prev, level],
-                              );
-                            }}
-                            className={`rounded px-2 py-0.5 font-medium capitalize transition-colors ${
-                              isSelected
-                                ? "bg-primary text-primary-foreground"
-                                : "text-muted-foreground hover:bg-muted"
-                            }`}
-                          >
-                            {level}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex-1" />
-
-                    <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                      <label className="flex cursor-pointer items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={autoScroll}
-                          onChange={(e) => setAutoScroll(e.target.checked)}
-                          className="rounded border bg-background"
-                        />
-                        <span>Auto-scroll</span>
-                      </label>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const logsText =
-                            typeof inventoryQuery.data === "string"
-                              ? inventoryQuery.data
-                              : "";
-                          if (logsText) {
-                            void copyText(logsText)
-                              .then(() =>
-                                toast.success("Logs copied to clipboard"),
-                              )
-                              .catch(() => toast.error("Failed to copy logs"));
-                          } else {
-                            toast.error("No logs to copy");
-                          }
-                        }}
-                      >
-                        Copy
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Terminal Console Logs Container */}
-                  <div className="relative">
-                    <pre
-                      ref={logContainerRef}
-                      className="h-[400px] select-text overflow-auto rounded-lg border border-border/60 bg-[#080c0a] p-4 font-mono text-[11px] text-slate-300 leading-relaxed shadow-inner"
-                    >
-                      {typeof inventoryQuery.data === "string" &&
-                      inventoryQuery.data
-                        ? stripAnsi(inventoryQuery.data)
-                        : containerId || serviceName
-                          ? "Querying logs or no logs match current filters..."
-                          : "Choose a container or input a service name above to inspect logs."}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {/* Kind: LIVE STATS */}
-              {kind === "stats" && (
-                <div className="space-y-4">
-                  <div className="mb-4 flex max-w-sm items-center gap-3">
-                    <Select
-                      items={availableContainers.map((c) => ({
-                        value: c.id,
-                        label: c.name,
-                      }))}
-                      value={containerId}
-                      onValueChange={(val) => setContainerId(val ?? "")}
-                    >
-                      <SelectTrigger className="h-9 w-full bg-background">
-                        <SelectValue placeholder="Select container to monitor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {availableContainers.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {containerId &&
-                  inventoryQuery.data &&
-                  typeof inventoryQuery.data === "object" &&
-                  !Array.isArray(inventoryQuery.data) ? (
-                    (() => {
-                      const stats = inventoryQuery.data as Record<string, any>;
-                      const cpuVal = Number(stats.cpuPercent) || 0;
-                      const memPercentVal = Number(stats.memoryPercent) || 0;
-                      const memUsed = Number(stats.memoryUsageBytes) || 0;
-                      const memLimit = Number(stats.memoryLimitBytes) || 0;
-
-                      return (
-                        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                          {/* CPU card */}
-                          <Card className="border-border/40 bg-muted/10">
-                            <CardHeader className="p-4 pb-2">
-                              <CardDescription className="flex items-center justify-between">
-                                <span>CPU Usage</span>
-                                <Cpu className="size-4 text-primary" />
-                              </CardDescription>
-                              <CardTitle className="mt-1 font-black text-2xl">
-                                {cpuVal.toFixed(2)}%
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-                                <div
-                                  className="h-full bg-emerald-500 transition-all duration-300"
-                                  style={{ width: `${Math.min(100, cpuVal)}%` }}
-                                />
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          {/* Memory card */}
-                          <Card className="border-border/40 bg-muted/10">
-                            <CardHeader className="p-4 pb-2">
-                              <CardDescription className="flex items-center justify-between">
-                                <span>Memory Usage</span>
-                                <HardDrive className="size-4 text-primary" />
-                              </CardDescription>
-                              <CardTitle className="mt-1 font-black text-2xl">
-                                {memPercentVal.toFixed(2)}%
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-                                <div
-                                  className="h-full bg-sky-500 transition-all duration-300"
-                                  style={{
-                                    width: `${Math.min(100, memPercentVal)}%`,
-                                  }}
-                                />
-                              </div>
-                              <div className="mt-2 flex justify-between font-mono text-[11px] text-muted-foreground">
-                                <span>{formatBytes(memUsed)}</span>
-                                <span>{formatBytes(memLimit)}</span>
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          {/* Process IDs */}
-                          <Card className="border-border/40 bg-muted/10">
-                            <CardHeader className="p-4 pb-2">
-                              <CardDescription className="flex items-center justify-between">
-                                <span>Active Processes</span>
-                                <Activity className="size-4 text-primary" />
-                              </CardDescription>
-                              <CardTitle className="mt-1 font-black text-2xl">
-                                {String(stats.pids || 0)}
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                              <p className="mt-3 text-[11px] text-muted-foreground">
-                                Number of thread tasks running inside container
-                                namespaces.
-                              </p>
-                            </CardContent>
-                          </Card>
-
-                          {/* Network I/O */}
-                          <Card className="border-border/40 bg-muted/10 sm:col-span-2 md:col-span-1">
-                            <CardHeader className="p-4 pb-2">
-                              <CardDescription>
-                                Network I/O Traffic
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="mt-2 space-y-2 p-4 pt-0 font-mono text-xs">
-                              <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-1 text-muted-foreground">
-                                  <ArrowDown className="size-3 text-emerald-500" />{" "}
-                                  Rx (Download)
-                                </span>
-                                <span className="font-semibold">
-                                  {formatBytes(
-                                    Number(stats.networkRxBytes) || 0,
-                                  )}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between border-t pt-2">
-                                <span className="flex items-center gap-1 text-muted-foreground">
-                                  <ArrowUp className="size-3 text-sky-500" /> Tx
-                                  (Upload)
-                                </span>
-                                <span className="font-semibold">
-                                  {formatBytes(
-                                    Number(stats.networkTxBytes) || 0,
-                                  )}
-                                </span>
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          {/* Block I/O */}
-                          <Card className="border-border/40 bg-muted/10 sm:col-span-2">
-                            <CardHeader className="p-4 pb-2">
-                              <CardDescription>Disk Block I/O</CardDescription>
-                            </CardHeader>
-                            <CardContent className="mt-3 flex gap-6 p-4 pt-0 font-mono text-xs">
-                              <div className="flex-1 space-y-1">
-                                <span className="text-muted-foreground">
-                                  Total Read Bytes
-                                </span>
-                                <p className="mt-1 font-bold text-base text-foreground">
-                                  {formatBytes(
-                                    Number(stats.blockReadBytes) || 0,
-                                  )}
-                                </p>
-                              </div>
-                              <div className="h-10 border-border/60 border-l" />
-                              <div className="flex-1 space-y-1">
-                                <span className="text-muted-foreground">
-                                  Total Written Bytes
-                                </span>
-                                <p className="mt-1 font-bold text-base text-foreground">
-                                  {formatBytes(
-                                    Number(stats.blockWriteBytes) || 0,
-                                  )}
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
+                              {/* Block I/O */}
+                              <Card className="border-border/40 sm:col-span-2">
+                                <CardHeader className="p-4 pb-2">
+                                  <CardDescription>
+                                    Disk Block I/O
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardContent className="mt-3 flex gap-6 p-4 pt-0 font-mono text-xs">
+                                  <div className="flex-1 space-y-1">
+                                    <span className="text-muted-foreground">
+                                      Total Read Bytes
+                                    </span>
+                                    <p className="mt-1 font-bold text-base text-foreground">
+                                      {formatBytes(
+                                        Number(stats.blockReadBytes) || 0,
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div className="h-10 border-border/60 border-l" />
+                                  <div className="flex-1 space-y-1">
+                                    <span className="text-muted-foreground">
+                                      Total Written Bytes
+                                    </span>
+                                    <p className="mt-1 font-bold text-base text-foreground">
+                                      {formatBytes(
+                                        Number(stats.blockWriteBytes) || 0,
+                                      )}
+                                    </p>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+                          {containerId
+                            ? "Stats streaming offline or pending container read..."
+                            : "Select a running container above to inspect realtime CPU, memory, block and network statistics."}
                         </div>
-                      );
-                    })()
-                  ) : (
-                    <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-                      {containerId
-                        ? "Stats streaming offline or pending container read..."
-                        : "Select a running container above to inspect realtime CPU, memory, block and network statistics."}
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -1410,7 +1463,7 @@ export default function DockerInventoryPage() {
             <button
               type="button"
               onClick={() => setShowRawJson(!showRawJson)}
-              className="flex w-full items-center justify-between bg-muted/10 p-4 font-semibold text-muted-foreground text-xs transition-all hover:bg-muted/20"
+              className="flex w-full items-center justify-between p-4 font-semibold text-muted-foreground text-xs transition-all hover:bg-muted/20"
             >
               <span className="flex items-center gap-1.5">
                 <Code className="size-4" />

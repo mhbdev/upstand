@@ -1,11 +1,5 @@
 "use client";
 
-import {
-  Alert02Icon,
-  Copy01Icon,
-  Layers01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -74,7 +68,11 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageSkeleton } from "@/components/dashboard/page-skeleton";
 import {
+  AlertTriangleIcon,
+  Copy,
+  Layers,
   RefreshCw,
   Server,
   Shield,
@@ -334,7 +332,7 @@ export default function DockerSwarmPage() {
     return (
       <DashboardPage className="gap-4">
         <Alert>
-          <HugeiconsIcon icon={Alert02Icon} />
+          <AlertTriangleIcon />
           <AlertTitle>Select an organization</AlertTitle>
           <AlertDescription>
             Docker Swarm is a host-level capability. Select the organization
@@ -346,36 +344,30 @@ export default function DockerSwarmPage() {
   }
 
   if (swarmInfoQuery.isLoading) {
-    return (
-      <div className="flex min-h-60 items-center justify-center">
-        <Spinner className="size-8" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (
     <DashboardPage className="gap-6">
       <DashboardPageHeader
         title="Docker Swarm"
-        icon={
-          <HugeiconsIcon icon={Layers01Icon} className="size-6 text-primary" />
-        }
+        icon={<Layers className="size-6 text-primary" />}
         description="Manage the manager node, workload scheduling, and joining credentials for this Docker Swarm cluster."
         actions={
           <Button
             variant="outline"
+            size="icon"
             onClick={refreshCluster}
             disabled={swarmInfoQuery.isFetching}
           >
             <RefreshCw data-icon="inline-start" />
-            Refresh status
           </Button>
         }
       />
 
       {swarmInfo?.error ? (
         <Alert variant="destructive">
-          <HugeiconsIcon icon={Alert02Icon} />
+          <AlertTriangleIcon />
           <AlertTitle>Docker engine is unavailable</AlertTitle>
           <AlertDescription>{swarmInfo.error}</AlertDescription>
         </Alert>
@@ -765,17 +757,14 @@ export default function DockerSwarmPage() {
                         <StatCard
                           label="Services"
                           value={`${tasksQuery.data?.totalServices || 0}`}
-                          compact
                         />
                         <StatCard
                           label="Running tasks"
                           value={`${tasksQuery.data?.runningTasks || 0}`}
-                          compact
                         />
                         <StatCard
                           label="Pending tasks"
                           value={`${tasksQuery.data?.pendingTasks || 0}`}
-                          compact
                         />
                       </div>
                       {tasksQuery.isLoading ? (
@@ -891,7 +880,6 @@ function StatCard({
   label,
   value,
   detail,
-  compact = false,
 }: {
   label: string;
   value: string;
@@ -900,7 +888,7 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardHeader className={compact ? "pb-2" : "pb-3"}>
+      <CardHeader>
         <CardDescription>{label}</CardDescription>
         <CardTitle className="break-all text-xl capitalize">{value}</CardTitle>
       </CardHeader>
@@ -936,8 +924,8 @@ function JoinCommand({
         {command}
       </code>
       <Button size="sm" className="self-start" onClick={() => onCopy(command)}>
-        <HugeiconsIcon icon={Copy01Icon} data-icon="inline-start" />
-        Copy command
+        <Copy data-icon="inline-start" />
+        Copy Command
       </Button>
     </div>
   );

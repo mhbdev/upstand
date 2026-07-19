@@ -215,6 +215,7 @@ export function GeneralTab({
   const [autoDeploy, setAutoDeploy] = useState(true);
 
   // Specific Provider States
+  const [tagPattern, setTagPattern] = useState("");
   const [githubAccount, setGithubAccount] = useState("");
   const [githubRepo, setGithubRepo] = useState("");
   const [githubBranch, setGithubBranch] = useState("");
@@ -428,6 +429,7 @@ export function GeneralTab({
           setProviderType(provider as ResourceProvider);
         }
         setDockerRegistryId(config.registryId ?? "");
+        setTagPattern(resource.tagPattern ?? "");
         setBuildRegistryId(
           resource.buildRegistryId ?? config.buildRegistryId ?? "",
         );
@@ -630,7 +632,7 @@ export function GeneralTab({
     const updatePayload = {
       id: resource.id,
       provider,
-      ...(resource.type === "application"
+      ...(resource.type === "application" || resource.type === "compose"
         ? {
             triggerType:
               providerType === "docker" || providerType === "raw"
@@ -640,6 +642,12 @@ export function GeneralTab({
                   : githubTriggerType === "On Tag"
                     ? ("tag" as const)
                     : ("push" as const),
+            tagPattern:
+              providerType === "git" && gitTriggerType === "tag"
+                ? tagPattern.trim() || null
+                : providerType !== "git" && githubTriggerType === "On Tag"
+                  ? tagPattern.trim() || null
+                  : null,
             watchPaths:
               providerType === "git" ? gitWatchPaths : githubWatchPaths,
           }
@@ -652,6 +660,7 @@ export function GeneralTab({
             rollbackRegistryId: rollbackRegistryId || null,
           }
         : {}),
+      ...(resource.type === "compose" ? { composeType } : {}),
       credentials: JSON.stringify(config),
     };
 
@@ -2388,6 +2397,22 @@ export function GeneralTab({
                     </Select>
                   </div>
 
+                  {githubTriggerType === "On Tag" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="github-tag-pattern">Tag Pattern</Label>
+                      <Input
+                        id="github-tag-pattern"
+                        value={tagPattern}
+                        onChange={(e) => setTagPattern(e.target.value)}
+                        placeholder="e.g. v*, release-v1.* (optional)"
+                        className="border-border/40 bg-card/30"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Optional. If empty, all tags will trigger a deployment. Supports wildcards like * (e.g. v*).
+                      </p>
+                    </div>
+                  )}
+
                   {/* Watch Paths */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5">
@@ -2569,6 +2594,22 @@ export function GeneralTab({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {gitTriggerType === "tag" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="git-tag-pattern">Tag Pattern</Label>
+                      <Input
+                        id="git-tag-pattern"
+                        value={tagPattern}
+                        onChange={(e) => setTagPattern(e.target.value)}
+                        placeholder="e.g. v*, release-v1.* (optional)"
+                        className="border-border/40 bg-card/30"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Optional. If empty, all tags will trigger a deployment. Supports wildcards like * (e.g. v*).
+                      </p>
+                    </div>
+                  )}
 
                   {/* Watch Paths */}
                   <div className="space-y-2">

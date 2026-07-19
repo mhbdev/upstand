@@ -259,4 +259,117 @@ describe("source webhook processing", () => {
     expect(result.queued).toBe(1);
     expect(queued).toEqual(["image"]);
   });
+
+  describe("tag trigger and tag pattern matching", () => {
+    function tagResource(overrides: Record<string, unknown> = {}) {
+      return resource("api", "org-1", {
+        triggerType: "tag",
+        tagPattern: null,
+        credentials: JSON.stringify({
+          autoDeploy: true,
+          githubAccount: "provider-1",
+          repository: "acme/example",
+          branch: "main",
+        }),
+        watchPaths: "[]",
+        ...overrides,
+      });
+    }
+
+    function tagHarness(resourceOverrides: Record<string, unknown> = {}) {
+      const queued: string[] = [];
+      const svc = tagResource(resourceOverrides);
+      const uow = {
+        gitProviderRepository: {
+          findById: async () => ({
+            id: "provider-1",
+            organizationId: "org-1",
+            provider: "github",
+            config: JSON.stringify({ webhookSecret: "secret" }),
+          }),
+        },
+        resourceRepository: { findMany: async () => [svc] },
+        environmentRepository: {
+          findById: async () => ({ id: "env-api", projectId: "project-1" }),
+        },
+        projectRepository: {
+          findById: async () => ({ id: "project-1", organizationId: "org-1" }),
+        },
+      } as any;
+      const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
+        execute: async ({ resourceId }: { resourceId: string }) =>
+          queued.push(resourceId),
+      }));
+      return { useCase, queued };
+    }
+
+    function tagEvent(ref: string) {
+      const body = JSON.stringify({
+        ref,
+        after: "abc123",
+        head_commit: { id: "abc123", message: "release", modified: [] },
+        repository: { full_name: "acme/example" },
+        commits: [{ id: "abc123", modified: [] }],
+      });
+      return {
+        providerId: "provider-1",
+        provider: "github" as const,
+        bodyText: body,
+        headers: {
+          "x-github-event": "push",
+          "x-hub-signature-256": signed(body),
+        },
+      };
+    }
+
+    test("queues deployment when tag event arrives and no pattern is set", async () => {
+      const { useCase, queued } = tagHarness();
+      const result = await useCase.execute(tagEvent("refs/tags/v1.0.0"));
+      expect(result.queued).toBe(1);
+      expect(queued).toEqual(["api"]);
+    });
+
+    test("queues deployment when tag matches the pattern", async () => {
+      const { useCase, queued } = tagHarness({ tagPattern: "v*" });
+      const result = await useCase.execute(tagEvent("refs/tags/v1.2.3"));
+      expect(result.queued).toBe(1);
+      expect(queued).toEqual(["api"]);
+    });
+
+    test("does not queue when tag does not match the pattern", async () => {
+      const { useCase, queued } = tagHarness({ tagPattern: "release-*" });
+      const result = await useCase.execute(tagEvent("refs/tags/v1.0.0"));
+      expect(result.queued).toBe(0);
+      expect(queued).toEqual([]);
+    });
+
+    test("queues when pattern with wildcard matches a longer tag", async () => {
+      const { useCase, queued } = tagHarness({ tagPattern: "v1.*" });
+      const result = await useCase.execute(tagEvent("refs/tags/v1.99.0"));
+      expect(result.queued).toBe(1);
+      expect(queued).toEqual(["api"]);
+    });
+
+    test("does not queue a push event when trigger type is tag", async () => {
+      const { useCase, queued } = tagHarness();
+      const body = JSON.stringify({
+        ref: "refs/heads/main",
+        after: "abc123",
+        head_commit: { id: "abc123", message: "feat", modified: ["src/index.ts"] },
+        repository: { full_name: "acme/example" },
+        commits: [{ id: "abc123", modified: ["src/index.ts"] }],
+      });
+      const result = await useCase.execute({
+        providerId: "provider-1",
+        provider: "github" as const,
+        bodyText: body,
+        headers: {
+          "x-github-event": "push",
+          "x-hub-signature-256": signed(body),
+        },
+      });
+      expect(result.queued).toBe(0);
+      expect(queued).toEqual([]);
+    });
+  });
 });

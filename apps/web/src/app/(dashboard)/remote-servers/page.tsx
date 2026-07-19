@@ -1,15 +1,5 @@
 "use client";
 
-import {
-  Alert02Icon,
-  CloudServerIcon,
-  Delete02Icon,
-  Edit02Icon,
-  Key01Icon,
-  PlusSignIcon,
-  ServerStack01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import type { ServerType } from "@upstand/domain";
@@ -18,6 +8,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@upstand/ui/components/alert";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -53,10 +44,19 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { PageEmpty } from "@/components/dashboard/page-empty";
+import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import {
   StatusBadge,
   type StatusTone,
 } from "@/components/dashboard/status-badge";
+import {
+  AlertTriangleIcon,
+  Edit2,
+  KeyRound,
+  PlusIcon,
+  ServerIcon,
+  Trash2Icon,
+} from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
@@ -84,7 +84,11 @@ export default function RemoteServersPage() {
     name: string;
   } | null>(null);
 
-  const { data: servers, refetch } = useQuery({
+  const {
+    data: servers,
+    refetch,
+    isPending: loadingServers,
+  } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
@@ -270,18 +274,16 @@ export default function RemoteServersPage() {
   return (
     <DashboardPage>
       <DashboardPageHeader
-        title={
-          typeof serverCount === "number"
-            ? `Remote Servers (${serverCount})`
-            : "Remote Servers"
+        title="Remote Servers"
+        description={
+          <span className="flex items-center gap-2">
+            <span>
+              Add isolated deploy, build, and database hosts with role-specific
+              provisioning.
+            </span>
+          </span>
         }
-        description="Add isolated deploy, build, and database hosts with role-specific provisioning."
-        icon={
-          <HugeiconsIcon
-            icon={CloudServerIcon}
-            className="size-6 text-primary"
-          />
-        }
+        icon={<ServerIcon className="size-6 text-primary" />}
         actions={
           <UpGalTarget definition={createServerTarget}>
             <Button
@@ -291,14 +293,16 @@ export default function RemoteServersPage() {
               }}
               className="gap-2 self-start sm:self-auto"
             >
-              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              <PlusIcon data-icon="inline-start" />
               Create Server
             </Button>
           </UpGalTarget>
         }
       />
 
-      {servers && servers.length > 0 ? (
+      {loadingServers ? (
+        <CardGridSkeleton count={3} />
+      ) : servers && servers.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {servers.map((srv) => {
             const matchedKey = sshKeys?.find((k) => k.id === srv.sshKeyId);
@@ -322,27 +326,26 @@ export default function RemoteServersPage() {
                     <div className="flex shrink-0 items-center gap-1">
                       <Button
                         variant="ghost"
-                        size="icon"
+                        size="icon-sm"
                         aria-label={`Edit ${srv.name}`}
                         onClick={() => handleEdit(srv)}
-                        className="size-8"
                       >
-                        <HugeiconsIcon icon={Edit02Icon} />
+                        <Edit2 />
                       </Button>
                       <Button
                         variant="ghost"
-                        size="icon"
+                        size="icon-sm"
                         aria-label={`Delete ${srv.name}`}
                         onClick={() => handleDelete(srv.id, srv.name)}
-                        className="size-8 text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive"
                       >
-                        <HugeiconsIcon icon={Delete02Icon} />
+                        <Trash2Icon />
                       </Button>
                     </div>
                   </div>
                   {srv.setupError && (
                     <Alert variant="destructive" className="mt-1 p-3">
-                      <HugeiconsIcon icon={Alert02Icon} />
+                      <AlertTriangleIcon />
                       <AlertTitle>Setup failed</AlertTitle>
                       <AlertDescription className="break-words">
                         {srv.setupError}
@@ -366,7 +369,7 @@ export default function RemoteServersPage() {
                         Role
                       </dt>
                       <dd className="mt-1 flex items-center gap-1 font-medium capitalize">
-                        <HugeiconsIcon icon={CloudServerIcon} />
+                        <ServerIcon />
                         {srv.serverType}
                       </dd>
                     </div>
@@ -375,7 +378,7 @@ export default function RemoteServersPage() {
                         SSH Key
                       </dt>
                       <dd className="mt-1 flex items-center gap-1 truncate font-medium">
-                        <HugeiconsIcon icon={Key01Icon} />
+                        <KeyRound />
                         {matchedKey?.name || "None"}
                       </dd>
                     </div>
@@ -422,7 +425,7 @@ export default function RemoteServersPage() {
         </div>
       ) : (
         <PageEmpty
-          icon={ServerStack01Icon}
+          icon={ServerIcon}
           title="No remote servers yet"
           description="Add a remote server to deploy resources, run builds, and inspect infrastructure from Upstand."
           action={
@@ -433,8 +436,8 @@ export default function RemoteServersPage() {
                   setDialogOpen(true);
                 }}
               >
-                <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
-                Create server
+                <PlusIcon data-icon="inline-start" />
+                Create Server
               </Button>
             </UpGalTarget>
           }
@@ -448,10 +451,7 @@ export default function RemoteServersPage() {
         <DialogContent className="overflow-hidden rounded-2xl border-border/40 bg-card/95 backdrop-blur-md sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
-              <HugeiconsIcon
-                icon={CloudServerIcon}
-                className="size-5 animate-pulse text-primary"
-              />
+              <ServerIcon className="size-5 animate-pulse text-primary" />
               Server Validation:{" "}
               {servers?.find((s) => s.id === inspectServerId)?.name}
             </DialogTitle>
@@ -775,7 +775,7 @@ export default function RemoteServersPage() {
 
             {setupMutation.isError && (
               <Alert variant="destructive">
-                <HugeiconsIcon icon={Alert02Icon} />
+                <AlertTriangleIcon />
                 <AlertTitle className="break-words">
                   {setupMutation.error.message}
                 </AlertTitle>

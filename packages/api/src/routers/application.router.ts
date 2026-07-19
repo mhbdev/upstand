@@ -56,6 +56,7 @@ const UpdateApplicationInputSchema = UpdateResourceInputSchema.pick({
   triggerType: true,
   watchPaths: true,
   credentials: true,
+  tagPattern: true,
 }).extend({
   advancedConfig: ResourceAdvancedConfigSchema.optional(),
   envVars: z.record(z.string(), z.string()).optional(),
@@ -114,6 +115,7 @@ function publicApplication(resource: Resource) {
     serverId: resource.serverId,
     buildServerId: resource.buildServerId,
     triggerType: resource.triggerType ?? "push",
+    tagPattern: resource.tagPattern ?? null,
     watchPaths: parseWatchPaths(resource.watchPaths),
     webhookTokenPrefix: resource.webhookTokenPrefix,
     createdAt: resource.createdAt,

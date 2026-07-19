@@ -146,6 +146,31 @@ function convert(
         delete item.restart;
       }
     }
+  } else if (target === "compose") {
+    for (const service of Object.values(services)) {
+      const item = record(service);
+      if (item.deploy !== undefined && typeof item.deploy === "object") {
+        const deploy = record(item.deploy);
+        if (deploy.restart_policy !== undefined && typeof deploy.restart_policy === "object") {
+          const restartPolicy = record(deploy.restart_policy);
+          if (typeof restartPolicy.condition === "string") {
+            const cond = restartPolicy.condition;
+            item.restart =
+              cond === "none"
+                ? "no"
+                : cond === "on-failure"
+                  ? "on-failure"
+                  : "always";
+          }
+          delete deploy.restart_policy;
+        }
+        if (Object.keys(deploy).length === 0) {
+          delete item.deploy;
+        } else {
+          item.deploy = deploy;
+        }
+      }
+    }
   }
   result.services = services;
   return result;

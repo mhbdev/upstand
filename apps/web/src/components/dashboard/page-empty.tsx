@@ -1,4 +1,4 @@
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Empty,
   EmptyContent,
@@ -11,13 +11,13 @@ import { cn } from "@upstand/ui/lib/utils";
 import type { ReactNode } from "react";
 
 export function PageEmpty({
-  icon,
+  icon: Icon,
   title,
   description,
   action,
   className,
 }: {
-  icon?: IconSvgElement;
+  icon?: any;
   title: string;
   description: string;
   action?: ReactNode;
@@ -26,9 +26,16 @@ export function PageEmpty({
   return (
     <Empty className={cn(className)}>
       <EmptyHeader>
-        {icon ? (
+        {Icon ? (
           <EmptyMedia variant="icon">
-            <HugeiconsIcon icon={icon} aria-hidden="true" />
+            {typeof Icon === "function" ||
+            (typeof Icon === "object" &&
+              Icon !== null &&
+              "$$typeof" in Icon) ? (
+              <Icon className="size-6" aria-hidden="true" />
+            ) : (
+              <HugeiconsIcon icon={Icon} aria-hidden="true" />
+            )}
           </EmptyMedia>
         ) : null}
         <EmptyTitle>{title}</EmptyTitle>

@@ -220,6 +220,20 @@ function matchesPath(pattern: string, file: string): boolean {
   return new RegExp(`^${escaped}$`).test(file);
 }
 
+function matchesTagPattern(
+  pattern: string | null | undefined,
+  tag: string,
+): boolean {
+  if (!pattern || !pattern.trim()) {
+    return true;
+  }
+  const escaped = pattern
+    .trim()
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`).test(tag);
+}
+
 function resourceConfig(resource: Resource): JsonRecord {
   return asRecord(parseResourceCredentials(resource.credentials));
 }
@@ -269,9 +283,15 @@ function matchesResource(
     if (trigger === "tag" && !parsed.isTag) return false;
     if (trigger === "push" && parsed.isTag) return false;
 
-    const configuredBranch = readString(config.branch);
-    if (configuredBranch && parsed.ref && configuredBranch !== parsed.ref)
-      return false;
+    if (trigger === "tag") {
+      if (parsed.ref && !matchesTagPattern(resource.tagPattern, parsed.ref)) {
+        return false;
+      }
+    } else {
+      const configuredBranch = readString(config.branch);
+      if (configuredBranch && parsed.ref && configuredBranch !== parsed.ref)
+        return false;
+    }
   }
 
   let typedWatchPaths: unknown = resource.watchPaths;

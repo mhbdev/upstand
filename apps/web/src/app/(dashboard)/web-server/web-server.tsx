@@ -1,15 +1,5 @@
 "use client";
 
-import {
-  ArrowRight01Icon,
-  Certificate01Icon,
-  CheckmarkCircle02Icon,
-  Copy01Icon,
-  Delete02Icon,
-  PlusSignIcon,
-  ServerStack01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
@@ -53,6 +43,17 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageSkeleton } from "@/components/dashboard/page-skeleton";
+import {
+  ArrowRightIcon as ArrowRight,
+  CheckCircle2,
+  Copy,
+  PlusIcon,
+  RefreshCw,
+  ServerIcon,
+  ShieldCheck,
+  Trash2Icon,
+} from "@/components/huge-icons";
 import { SelfUpdateDialog } from "@/components/self-update-dialog";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
@@ -596,18 +597,13 @@ export default function WebServerDashboard(_props: {
     <DashboardPage>
       {/* Page Header */}
       <DashboardPageHeader
-        title="Web Server (Caddy)"
+        title="Web Server"
         description="Configure dynamic domain routing, global SSL settings, ACME Let's Encrypt certificates, and review proxy access logs."
-        icon={
-          <HugeiconsIcon
-            icon={ServerStack01Icon}
-            className="size-6 text-primary"
-          />
-        }
+        icon={<ServerIcon className="size-6 text-primary" />}
         actions={
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => {
               refetchInfo();
               refetchCaddyLogs();
@@ -615,19 +611,17 @@ export default function WebServerDashboard(_props: {
             }}
             className="text-xs"
           >
-            Refresh Status
+            <RefreshCw />
           </Button>
         }
       />
 
       {loadingInfo ? (
-        <div className="flex min-h-60 items-center justify-center">
-          <Spinner className="size-8" />
-        </div>
+        <PageSkeleton />
       ) : (
         <div className="space-y-6">
-          <Card className="border border-border/40 bg-card/20 shadow-sm">
-            <CardHeader className="pb-3">
+          {/* <Card className="border border-border/40 bg-card/20 shadow-sm">
+            <CardHeader>
               <CardTitle className="flex items-center justify-between font-semibold text-lg">
                 <span>Security audit</span>
                 {securityAudit && (
@@ -645,7 +639,7 @@ export default function WebServerDashboard(_props: {
                 networking, and proxy exposure.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 border-border/10 border-t pt-5">
+            <CardContent className="space-y-2 border-border/10 border-t">
               {(securityAudit?.checks ?? []).map((check) => (
                 <div
                   key={check.id}
@@ -671,10 +665,10 @@ export default function WebServerDashboard(_props: {
                 </div>
               ))}
             </CardContent>
-          </Card>
+          </Card> */}
 
           <Card className="border border-border/40 bg-card/20 shadow-sm">
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardTitle className="font-semibold text-lg">
                 Web-server backups
               </CardTitle>
@@ -684,7 +678,7 @@ export default function WebServerDashboard(_props: {
                 destructive and requires an explicit confirmation.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 border-border/10 border-t pt-5">
+            <CardContent className="space-y-4 border-border/10 border-t">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2">
                   <Label htmlFor="web-backup-destination">Destination</Label>
@@ -852,19 +846,16 @@ export default function WebServerDashboard(_props: {
 
           {/* ─── WEB SERVER OPERATIONS PANEL ────────────────────────────────── */}
           <Card className="border border-border/40 bg-card/20 shadow-sm">
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardTitle className="flex items-center gap-2 font-semibold text-lg">
-                <HugeiconsIcon
-                  icon={ServerStack01Icon}
-                  className="size-5 text-primary"
-                />
+                <ServerIcon className="size-5 text-primary" />
                 Web Server Control Panel
               </CardTitle>
               <CardDescription className="text-xs">
                 Reload, configure, or clean the proxy and node services.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6 border-border/10 border-t pt-5">
+            <CardContent className="space-y-6 border-border/10 border-t">
               {/* Dropdowns Row */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {/* Server Dropdown */}
@@ -876,10 +867,7 @@ export default function WebServerDashboard(_props: {
                         className="w-full justify-between border-border/60 font-semibold"
                       >
                         Server
-                        <HugeiconsIcon
-                          icon={ArrowRight01Icon}
-                          className="size-4 rotate-90 opacity-60"
-                        />
+                        <ArrowRight className="size-4 rotate-90 opacity-60" />
                       </Button>
                     }
                   />
@@ -936,10 +924,7 @@ export default function WebServerDashboard(_props: {
                         className="w-full justify-between border-border/60 font-semibold"
                       >
                         Caddy
-                        <HugeiconsIcon
-                          icon={ArrowRight01Icon}
-                          className="size-4 rotate-90 opacity-60"
-                        />
+                        <ArrowRight className="size-4 rotate-90 opacity-60" />
                       </Button>
                     }
                   />
@@ -978,10 +963,7 @@ export default function WebServerDashboard(_props: {
                         className="w-full justify-between border-border/60 font-semibold"
                       >
                         Space
-                        <HugeiconsIcon
-                          icon={ArrowRight01Icon}
-                          className="size-4 rotate-90 opacity-60"
-                        />
+                        <ArrowRight className="size-4 rotate-90 opacity-60" />
                       </Button>
                     }
                   />
@@ -1076,7 +1058,7 @@ export default function WebServerDashboard(_props: {
                       disabled={!info?.settings?.serverIp}
                       aria-label="Copy server IP"
                     >
-                      <HugeiconsIcon icon={Copy01Icon} className="size-3" />
+                      <Copy className="size-3" />
                     </Button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1143,7 +1125,7 @@ export default function WebServerDashboard(_props: {
             {/* Uptime and stats */}
             <div className="space-y-6 lg:col-span-1">
               <Card className="border border-border/40 bg-card/20 shadow-sm">
-                <CardHeader className="pb-3">
+                <CardHeader>
                   <CardTitle className="font-semibold text-lg">
                     Server Status
                   </CardTitle>
@@ -1374,10 +1356,7 @@ export default function WebServerDashboard(_props: {
                             ])
                           }
                         >
-                          <HugeiconsIcon
-                            icon={PlusSignIcon}
-                            data-icon="inline-start"
-                          />
+                          <PlusIcon data-icon="inline-start" />
                           Add middleware
                         </Button>
                       </div>
@@ -1436,7 +1415,7 @@ export default function WebServerDashboard(_props: {
                                   )
                                 }
                               >
-                                <HugeiconsIcon icon={Delete02Icon} />
+                                <Trash2Icon />
                               </Button>
                             </div>
                           ))}
@@ -1463,10 +1442,7 @@ export default function WebServerDashboard(_props: {
               <Card className="border border-border/40 bg-card/20 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 font-semibold text-lg">
-                    <HugeiconsIcon
-                      icon={Certificate01Icon}
-                      className="size-5 text-primary"
-                    />
+                    <ShieldCheck className="size-5 text-primary" />
                     HTTPS &amp; Certificates
                   </CardTitle>
                   <CardDescription className="text-xs">
@@ -1519,7 +1495,7 @@ export default function WebServerDashboard(_props: {
 
               {/* Compiled Caddyfile Preview Card */}
               <Card className="border border-border/40 bg-card/20 shadow-sm">
-                <CardHeader className="pb-3">
+                <CardHeader>
                   <CardTitle className="font-semibold text-lg">
                     Main Caddyfile
                   </CardTitle>
@@ -1601,10 +1577,11 @@ export default function WebServerDashboard(_props: {
                   disabled={!caddyLogs}
                   className="gap-1 text-xs"
                 >
-                  <HugeiconsIcon
-                    icon={caddyLogsCopied ? CheckmarkCircle02Icon : Copy01Icon}
-                    className="size-3.5"
-                  />
+                  {caddyLogsCopied ? (
+                    <CheckCircle2 className="size-3.5" />
+                  ) : (
+                    <Copy className="size-3.5" />
+                  )}
                   {caddyLogsCopied ? "Copied" : "Copy"}
                 </Button>
               </div>
@@ -1847,7 +1824,7 @@ export default function WebServerDashboard(_props: {
                 className="gap-1 text-xs"
                 onClick={handleAddPort}
               >
-                <HugeiconsIcon icon={PlusSignIcon} className="size-3.5" />
+                <PlusIcon className="size-3.5" />
                 Add Mapping
               </Button>
             </div>
@@ -1929,7 +1906,7 @@ export default function WebServerDashboard(_props: {
                       onClick={() => handleRemovePort(idx)}
                       className="mt-4 size-9 shrink-0 text-destructive hover:bg-destructive/10"
                     >
-                      <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+                      <Trash2Icon />
                     </Button>
                   </div>
                 ))}

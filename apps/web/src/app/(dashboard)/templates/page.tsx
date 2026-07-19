@@ -27,6 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Checkbox } from "@upstand/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -35,15 +36,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@upstand/ui/components/empty";
 import { Input } from "@upstand/ui/components/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@upstand/ui/components/input-group";
 import { Label } from "@upstand/ui/components/label";
 import {
   Select,
@@ -55,12 +54,15 @@ import {
 } from "@upstand/ui/components/select";
 import { Separator } from "@upstand/ui/components/separator";
 import { Textarea } from "@upstand/ui/components/textarea";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import { PagePagination } from "@/components/dashboard/page-pagination";
+import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import {
   AlertCircle,
   ArrowLeft,
@@ -78,6 +80,7 @@ import {
   Trash2,
   Upload,
   WandSparkles,
+  X,
 } from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { UpGalTarget } from "@/components/upgal-target";
@@ -224,6 +227,14 @@ export default function TemplatesPage() {
     setMode("studio");
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCatalogPage(1);
+    setTemplatePage(1);
+  };
+
+  const handleClearSearch = () => handleSearchChange("");
+
   const create = useMutation({
     ...trpc.template.create.mutationOptions(),
     onSuccess: () => {
@@ -304,6 +315,10 @@ export default function TemplatesPage() {
       generationPrompt.trim().length >= 8 &&
       !generate.isPending,
   );
+  const serviceCount = useMemo(
+    () => getServiceCount(composeFile),
+    [composeFile],
+  );
 
   const importComposeFile = async (file: File) => {
     if (!/\.(ya?ml)$/i.test(file.name)) {
@@ -358,19 +373,19 @@ export default function TemplatesPage() {
     <DashboardPage className="gap-5 sm:gap-6">
       <DashboardPageHeader
         title="Templates"
-        icon={<Boxes className="size-6 text-primary" />}
+        icon={<Boxes className="size-6 text-primary" aria-hidden="true" />}
         description="Build reusable Compose blueprints, generate safe drafts with UpGal, and deploy them to any environment."
         actions={
           <>
             {mode === "studio" && (
               <Button variant="outline" onClick={() => setMode("library")}>
-                <ArrowLeft data-icon="inline-start" />
+                <ArrowLeft data-icon="inline-start" aria-hidden="true" />
                 Back to catalog
               </Button>
             )}
             <UpGalTarget definition={createTemplateTarget}>
               <Button onClick={openNewEditor}>
-                <Plus data-icon="inline-start" />
+                <Plus data-icon="inline-start" aria-hidden="true" />
                 New template
               </Button>
             </UpGalTarget>
@@ -382,17 +397,17 @@ export default function TemplatesPage() {
         <MetricCard
           label="Saved templates"
           value={templates.data?.total ?? 0}
-          icon={<Boxes />}
+          icon={<Boxes aria-hidden="true" />}
         />
         <MetricCard
           label="Built-in catalog"
           value={catalog.data?.total ?? 0}
-          icon={<FilePlus2 />}
+          icon={<FilePlus2 aria-hidden="true" />}
         />
         <MetricCard
           label="AI generation"
           value={aiReady ? "Ready" : "Setup needed"}
-          icon={<Sparkles />}
+          icon={<Sparkles aria-hidden="true" />}
           accent={!aiReady}
         />
       </div>
@@ -466,7 +481,7 @@ export default function TemplatesPage() {
                       size="sm"
                       onClick={() => importInputRef.current?.click()}
                     >
-                      <Upload data-icon="inline-start" />
+                      <Upload data-icon="inline-start" aria-hidden="true" />
                       Import YAML
                     </Button>
                     <input
@@ -498,10 +513,9 @@ export default function TemplatesPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
                   <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                    <Code2 className="size-4" />
-                    {getServiceCount(composeFile)} service
-                    {getServiceCount(composeFile) === 1 ? "" : "s"} detected in
-                    draft
+                    <Code2 className="size-4" aria-hidden="true" />
+                    {serviceCount} service{serviceCount === 1 ? "" : "s"}{" "}
+                    detected in draft
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -522,6 +536,7 @@ export default function TemplatesPage() {
                         <Loader2
                           className="animate-spin"
                           data-icon="inline-start"
+                          aria-hidden="true"
                         />
                       )}
                       {editingId ? "Update template" : "Save template"}
@@ -536,7 +551,10 @@ export default function TemplatesPage() {
             <Card className="border-primary/25 bg-primary/[0.035]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <WandSparkles className="size-4 text-primary" />
+                  <WandSparkles
+                    className="size-4 text-primary"
+                    aria-hidden="true"
+                  />
                   Generate with UpGal
                 </CardTitle>
                 <CardDescription>
@@ -547,7 +565,7 @@ export default function TemplatesPage() {
               <CardContent className="space-y-3">
                 {!aiReady && !aiSettings.isPending && (
                   <Alert>
-                    <AlertCircle className="size-4" />
+                    <AlertCircle className="size-4" aria-hidden="true" />
                     <AlertTitle>AI provider not configured</AlertTitle>
                     <AlertDescription>
                       Add a provider in{" "}
@@ -597,15 +615,16 @@ export default function TemplatesPage() {
                     <Loader2
                       className="animate-spin"
                       data-icon="inline-start"
+                      aria-hidden="true"
                     />
                   ) : (
-                    <Sparkles data-icon="inline-start" />
+                    <Sparkles data-icon="inline-start" aria-hidden="true" />
                   )}
                   {generate.isPending ? "Generating draft…" : "Generate draft"}
                 </Button>
                 {generatedModel && (
                   <p className="flex items-center gap-1.5 text-emerald-600 text-xs dark:text-emerald-400">
-                    <Check className="size-3.5" />
+                    <Check className="size-3.5" aria-hidden="true" />
                     Generated and validated with {generatedModel}. Review before
                     saving.
                   </p>
@@ -622,7 +641,7 @@ export default function TemplatesPage() {
                   label="Name the blueprint"
                 />
                 <ChecklistItem
-                  done={getServiceCount(composeFile) > 0}
+                  done={serviceCount > 0}
                   label="Define at least one service"
                 />
                 <ChecklistItem
@@ -639,51 +658,8 @@ export default function TemplatesPage() {
         </section>
       ) : (
         <>
-          <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.08] via-background to-background">
-            <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              <div className="max-w-2xl">
-                <Badge
-                  variant="outline"
-                  className="mb-3 border-primary/30 bg-background/60 text-primary"
-                >
-                  Template studio
-                </Badge>
-                <h2 className="font-semibold text-xl tracking-tight sm:text-2xl">
-                  Turn infrastructure ideas into repeatable launches.
-                </h2>
-                <p className="mt-2 text-muted-foreground text-sm leading-relaxed">
-                  Start from a safe blueprint, import an existing Compose file,
-                  or ask UpGal to draft one for review. Every saved template
-                  stays private to this organization.
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <Button onClick={openNewEditor}>
-                  <Plus data-icon="inline-start" /> Build from scratch
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => importInputRef.current?.click()}
-                >
-                  <Upload data-icon="inline-start" /> Import file
-                </Button>
-                <input
-                  ref={importInputRef}
-                  type="file"
-                  accept=".yaml,.yml,application/yaml,text/yaml"
-                  className="sr-only"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void importComposeFile(file);
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
-            <CardHeader className="gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle>Built-in catalog</CardTitle>
                 <CardDescription className="mt-1">
@@ -692,20 +668,16 @@ export default function TemplatesPage() {
                   catalog.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                <span className="size-2 rounded-full bg-emerald-500" />
-                Live catalog
-              </div>
             </CardHeader>
             <CardContent>
               {catalog.isPending ? (
-                <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground text-sm">
-                  <Loader2 className="size-4 animate-spin" /> Loading built-in
-                  catalog…
-                </div>
+                <CardGridSkeleton
+                  count={4}
+                  className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                />
               ) : catalog.isError ? (
                 <Alert variant="destructive">
-                  <AlertCircle />
+                  <AlertCircle aria-hidden="true" />
                   <AlertTitle>Catalog unavailable</AlertTitle>
                   <AlertDescription>
                     The built-in catalog could not be loaded. Saved templates
@@ -713,7 +685,7 @@ export default function TemplatesPage() {
                   </AlertDescription>
                 </Alert>
               ) : catalog.data?.items.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
                   {catalog.data.items.map((template) => (
                     <article
                       key={template.id}
@@ -770,26 +742,25 @@ export default function TemplatesPage() {
                             setAppName(slug(template.name));
                           }}
                         >
-                          <Rocket data-icon="inline-start" /> Deploy
+                          <Rocket data-icon="inline-start" aria-hidden="true" />{" "}
+                          Deploy
                         </Button>
                       </div>
                     </article>
                   ))}
                 </div>
               ) : (
-                <Empty className="min-h-40 border">
-                  <EmptyHeader>
-                    <EmptyTitle>No catalog matches</EmptyTitle>
-                    <EmptyDescription>
-                      Try a different search term.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
+                <PageEmpty
+                  icon={Search}
+                  title="No catalog matches"
+                  description="Try a different search term."
+                />
               )}
               {catalog.data && catalog.data.pageCount > 1 && (
-                <Pagination
+                <PagePagination
+                  className="mt-2"
                   page={catalog.data.page}
-                  pageCount={catalog.data.pageCount}
+                  pageSize={12}
                   total={catalog.data.total}
                   onPageChange={setCatalogPage}
                 />
@@ -798,33 +769,43 @@ export default function TemplatesPage() {
           </Card>
 
           <Card>
-            <CardHeader className="gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle>Your catalog</CardTitle>
                 <CardDescription className="mt-1">
                   Saved blueprints are scoped to the active organization.
                 </CardDescription>
               </div>
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
+              <InputGroup className="w-full sm:w-72">
+                <InputGroupInput
                   value={search}
-                  onChange={(event) => {
-                    setSearch(event.target.value);
-                    setCatalogPage(1);
-                    setTemplatePage(1);
-                  }}
+                  onChange={(event) => handleSearchChange(event.target.value)}
                   placeholder="Search templates"
-                  className="pl-9"
                   aria-label="Search templates"
                 />
-              </div>
+                <InputGroupAddon align="inline-start">
+                  <Search className="size-4" aria-hidden="true" />
+                </InputGroupAddon>
+                {search ? (
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      type="button"
+                      size="icon-xs"
+                      aria-label="Clear search"
+                      onClick={handleClearSearch}
+                    >
+                      <X className="size-3.5" aria-hidden="true" />
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                ) : null}
+              </InputGroup>
             </CardHeader>
             <CardContent>
               {templates.isPending ? (
-                <div className="flex items-center justify-center gap-2 py-14 text-muted-foreground text-sm">
-                  <Loader2 className="size-4 animate-spin" /> Loading catalog…
-                </div>
+                <CardGridSkeleton
+                  count={4}
+                  className="grid gap-3 lg:grid-cols-2"
+                />
               ) : templates.data?.items.length ? (
                 <div className="grid gap-3 lg:grid-cols-2">
                   {templates.data.items.map((template) => (
@@ -835,7 +816,7 @@ export default function TemplatesPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">
                           <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                            <Code2 className="size-4" />
+                            <Code2 className="size-4" aria-hidden="true" />
                           </div>
                           <div className="min-w-0">
                             <h3 className="truncate font-medium">
@@ -873,14 +854,22 @@ export default function TemplatesPage() {
                             variant="ghost"
                             onClick={() => openEditor(template)}
                           >
-                            <Pencil data-icon="inline-start" /> Edit
+                            <Pencil
+                              data-icon="inline-start"
+                              aria-hidden="true"
+                            />{" "}
+                            Edit
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => exportTemplate(template)}
                           >
-                            <Download data-icon="inline-start" /> Export
+                            <Download
+                              data-icon="inline-start"
+                              aria-hidden="true"
+                            />{" "}
+                            Export
                           </Button>
                           <Button
                             size="sm"
@@ -891,7 +880,11 @@ export default function TemplatesPage() {
                               setAppName(slug(template.name));
                             }}
                           >
-                            <Rocket data-icon="inline-start" /> Deploy
+                            <Rocket
+                              data-icon="inline-start"
+                              aria-hidden="true"
+                            />{" "}
+                            Deploy
                           </Button>
                           <Button
                             size="icon-sm"
@@ -904,7 +897,7 @@ export default function TemplatesPage() {
                               })
                             }
                           >
-                            <Trash2 />
+                            <Trash2 aria-hidden="true" />
                           </Button>
                         </div>
                       </div>
@@ -912,35 +905,28 @@ export default function TemplatesPage() {
                   ))}
                 </div>
               ) : (
-                <Empty className="min-h-64 border">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <Boxes />
-                    </EmptyMedia>
-                    <EmptyTitle>
-                      {search
-                        ? "No matching templates"
-                        : "Your catalog is empty"}
-                    </EmptyTitle>
-                    <EmptyDescription>
-                      {search
-                        ? "Try another search term."
-                        : "Create a template or import a Compose file to get started."}
-                    </EmptyDescription>
-                  </EmptyHeader>
-                  {!search && (
-                    <EmptyContent>
+                <PageEmpty
+                  icon={search ? Search : Plus}
+                  title={search ? "No templates match" : "No templates yet"}
+                  description={
+                    search
+                      ? "Try another search term."
+                      : "Create a template or import a Compose file to get started."
+                  }
+                  action={
+                    !search ? (
                       <Button onClick={openNewEditor}>
-                        <Plus data-icon="inline-start" /> Create first template
+                        <Plus data-icon="inline-start" aria-hidden="true" />{" "}
+                        Create Template
                       </Button>
-                    </EmptyContent>
-                  )}
-                </Empty>
+                    ) : undefined
+                  }
+                />
               )}
               {templates.data && templates.data.pageCount > 1 && (
-                <Pagination
+                <PagePagination
                   page={templates.data.page}
-                  pageCount={templates.data.pageCount}
+                  pageSize={12}
                   total={templates.data.total}
                   onPageChange={setTemplatePage}
                 />
@@ -973,7 +959,11 @@ export default function TemplatesPage() {
               }
             >
               {remove.isPending && (
-                <Loader2 className="animate-spin" data-icon="inline-start" />
+                <Loader2
+                  className="animate-spin"
+                  data-icon="inline-start"
+                  aria-hidden="true"
+                />
               )}
               Delete template
             </AlertDialogAction>
@@ -1042,7 +1032,7 @@ function MetricCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center justify-between p-4">
+      <CardContent className="flex items-center justify-between">
         <div>
           <p className="text-muted-foreground text-xs">{label}</p>
           <p
@@ -1095,47 +1085,6 @@ function GithubMark() {
   );
 }
 
-function Pagination({
-  page,
-  pageCount,
-  total,
-  onPageChange,
-}: {
-  page: number;
-  pageCount: number;
-  total: number;
-  onPageChange: (page: number) => void;
-}) {
-  return (
-    <nav
-      aria-label="Template catalog pages"
-      className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4"
-    >
-      <p className="text-muted-foreground text-xs">
-        Page {page} of {pageCount} · {total} total
-      </p>
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          Previous
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={page >= pageCount}
-          onClick={() => onPageChange(page + 1)}
-        >
-          Next
-        </Button>
-      </div>
-    </nav>
-  );
-}
-
 function ChecklistItem({ done, label }: { done: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -1143,7 +1092,7 @@ function ChecklistItem({ done, label }: { done: boolean; label: string }) {
         className={`flex size-5 items-center justify-center rounded-full border ${done ? "border-emerald-500 bg-emerald-500 text-white" : "text-muted-foreground"}`}
       >
         {done ? (
-          <Check className="size-3" />
+          <Check className="size-3" aria-hidden="true" />
         ) : (
           <span className="size-1.5 rounded-full bg-current" />
         )}
@@ -1151,6 +1100,28 @@ function ChecklistItem({ done, label }: { done: boolean; label: string }) {
       <span className={done ? "text-foreground" : "text-muted-foreground"}>
         {label}
       </span>
+    </div>
+  );
+}
+
+function SectionHeading({
+  step,
+  title,
+  description,
+}: {
+  step: number;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-medium text-[11px] text-primary">
+        {step}
+      </span>
+      <div>
+        <h3 className="font-medium text-sm">{title}</h3>
+        <p className="mt-1 text-muted-foreground text-xs">{description}</p>
+      </div>
     </div>
   );
 }
@@ -1253,13 +1224,11 @@ function DeployDialog({
         </div>
         <div className="space-y-5">
           <section className="space-y-3">
-            <div>
-              <h3 className="font-medium text-sm">1. Choose a destination</h3>
-              <p className="mt-1 text-muted-foreground text-xs">
-                Select the project and environment that will own the new
-                resource.
-              </p>
-            </div>
+            <SectionHeading
+              step={1}
+              title="Choose a destination"
+              description="Select the project and environment that will own the new resource."
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectField
                 label="Project"
@@ -1290,13 +1259,11 @@ function DeployDialog({
           </section>
           <Separator />
           <section className="space-y-3">
-            <div>
-              <h3 className="font-medium text-sm">2. Name the resource</h3>
-              <p className="mt-1 text-muted-foreground text-xs">
-                These names identify the resource and its stable Compose app key
-                in the dashboard.
-              </p>
-            </div>
+            <SectionHeading
+              step={2}
+              title="Name the resource"
+              description="These names identify the resource and its stable Compose app key in the dashboard."
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="deploy-resource-name">Resource name</Label>
@@ -1320,14 +1287,12 @@ function DeployDialog({
           </section>
           <Separator />
           <section className="space-y-3">
-            <div>
-              <h3 className="font-medium text-sm">3. Configure runtime</h3>
-              <p className="mt-1 text-muted-foreground text-xs">
-                Leave targets automatic unless this stack needs a specific
-                server role.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <SectionHeading
+              step={3}
+              title="Configure runtime"
+              description="Leave targets automatic unless this stack needs a specific server role."
+            />
+            <div className="grid gap-4 sm:grid-cols-3">
               <SelectField
                 label="Deployment target"
                 value={serverId || "_automatic"}
@@ -1371,22 +1336,21 @@ function DeployDialog({
                 ]}
                 placeholder="Select mode"
               />
-              <label className="flex items-start gap-3 rounded-xl border p-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={randomize}
-                  onChange={(event) => onRandomizeChange(event.target.checked)}
-                  className="mt-0.5 accent-primary"
-                />
-                <span>
-                  <span className="block font-medium">Isolate names</span>
-                  <span className="text-muted-foreground text-xs">
-                    Avoid service, network, and volume collisions when the
-                    template is deployed more than once.
-                  </span>
-                </span>
-              </label>
             </div>
+            <Label className="flex items-start gap-3 rounded-xl border p-3 text-sm">
+              <Checkbox
+                checked={randomize}
+                onCheckedChange={(value) => onRandomizeChange(value)}
+                className="mt-0.5 accent-primary"
+              />
+              <span>
+                <span className="block font-medium">Isolate names</span>
+                <span className="text-muted-foreground text-xs">
+                  Avoid service, network, and volume collisions when the
+                  template is deployed more than once.
+                </span>
+              </span>
+            </Label>
           </section>
         </div>
         <DialogFooter className="flex-wrap items-center justify-between border-t pt-4 sm:justify-between">
@@ -1399,9 +1363,13 @@ function DeployDialog({
             </Button>
             <Button disabled={!canDeploy || isPending} onClick={onDeploy}>
               {isPending ? (
-                <Loader2 className="animate-spin" data-icon="inline-start" />
+                <Loader2
+                  className="animate-spin"
+                  data-icon="inline-start"
+                  aria-hidden="true"
+                />
               ) : (
-                <Rocket data-icon="inline-start" />
+                <Rocket data-icon="inline-start" aria-hidden="true" />
               )}
               Queue deployment
             </Button>

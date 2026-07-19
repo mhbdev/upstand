@@ -37,6 +37,7 @@ export const resource = pgTable("resource", {
   libsqlGrpcPort: integer("libsql_grpc_port"),
   libsqlAdminPort: integer("libsql_admin_port"),
   triggerType: text("trigger_type").default("push").notNull(),
+  tagPattern: text("tag_pattern"),
   webhookTokenHash: text("webhook_token_hash").unique(),
   webhookTokenPrefix: text("webhook_token_prefix"),
   serverId: text("server_id"),

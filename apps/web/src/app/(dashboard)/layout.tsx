@@ -3,6 +3,7 @@
 import {
   AnalyticsUpIcon,
   ArrowRight01Icon,
+  BookmarkIcon,
   Certificate01Icon,
   CloudIcon,
   CloudServerIcon,
@@ -16,6 +17,7 @@ import {
   ServerStack01Icon,
   Shield01Icon,
   SourceCodeIcon,
+  TagIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -114,7 +116,7 @@ const NAVIGATION_GROUPS = [
         icon: Notification01Icon,
       },
       { title: "Audit Logs", href: "/audit-logs", icon: FileSecurityIcon },
-      { title: "Tags", href: "/tags", icon: Folder01Icon },
+      { title: "Tags", href: "/tags", icon: BookmarkIcon },
     ],
   },
 ];
@@ -219,8 +221,11 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, isPending: sessionPending } = authClient.useSession();
-  const { data: activeOrg, isPending: activeOrgPending } =
-    authClient.useActiveOrganization();
+  const {
+    data: activeOrg,
+    isPending: activeOrgPending,
+    refetch: refetchActiveOrg,
+  } = authClient.useActiveOrganization();
   const { data: organizations, isPending: organizationsPending } =
     authClient.useListOrganizations();
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
@@ -245,9 +250,13 @@ export default function DashboardLayout({
         (o) => o.metadata?.isPersonal || o.name.toLowerCase() === "personal",
       );
       const targetOrg = personal || organizations[0];
-      authClient.organization.setActive({
-        organizationId: targetOrg.id,
-      });
+      authClient.organization
+        .setActive({
+          organizationId: targetOrg.id,
+        })
+        .then(() => {
+          void refetchActiveOrg();
+        });
     }
   }, [
     session,
@@ -256,6 +265,7 @@ export default function DashboardLayout({
     organizationsPending,
     activeOrg,
     activeOrgPending,
+    refetchActiveOrg,
   ]);
 
   useEffect(() => {

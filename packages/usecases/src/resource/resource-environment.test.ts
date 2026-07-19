@@ -1,7 +1,8 @@
-import { expect, test } from "bun:test";
+import { expect, test, describe } from "bun:test";
 import {
   parseResourceEnvironmentVariables,
   serializeResourceEnvironmentVariables,
+  extractAndParametrizeEnvVars,
 } from "./resource-environment";
 
 process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
@@ -27,4 +28,60 @@ test("legacy plaintext resource environment variables remain readable", () => {
       JSON.stringify({ LEGACY_TOKEN: "still-deployable" }),
     ),
   ).toEqual({ LEGACY_TOKEN: "still-deployable" });
+});
+
+describe("extractAndParametrizeEnvVars", () => {
+  test("extracts env vars from map-style compose environment", () => {
+    const compose = `
+services:
+  web:
+    image: nginx
+    environment:
+      API_KEY: my-secret
+      PORT: "3000"
+`.trim();
+
+    const { composeFile, envVars } = extractAndParametrizeEnvVars(compose);
+
+    expect(envVars).toEqual({ API_KEY: "my-secret", PORT: "3000" });
+    expect(composeFile).toContain("${API_KEY}");
+    expect(composeFile).toContain("${PORT}");
+    expect(composeFile).not.toContain("my-secret");
+  });
+
+  test("extracts env vars from list-style compose environment", () => {
+    const compose = `
+services:
+  app:
+    image: myapp
+    environment:
+      - DATABASE_URL=postgres://db:5432/prod
+      - DEBUG=false
+`.trim();
+
+    const { envVars } = extractAndParametrizeEnvVars(compose);
+
+    expect(envVars).toEqual({
+      DATABASE_URL: "postgres://db:5432/prod",
+      DEBUG: "false",
+    });
+  });
+
+  test("returns original compose file unchanged when parsing fails", () => {
+    const invalid = "NOT VALID YAML: {{{";
+    const { composeFile, envVars } = extractAndParametrizeEnvVars(invalid);
+    expect(composeFile).toBe(invalid);
+    expect(envVars).toEqual({});
+  });
+
+  test("returns empty envVars for a compose file with no environment section", () => {
+    const compose = `
+services:
+  db:
+    image: postgres:16
+`.trim();
+
+    const { envVars } = extractAndParametrizeEnvVars(compose);
+    expect(envVars).toEqual({});
+  });
 });

@@ -307,6 +307,7 @@ export const ResourceSchema = z.object({
   libsqlAdminPort: z.number().int().min(1).max(65535).nullable().optional(),
   credentials: z.string().nullable().optional(),
   triggerType: z.enum(["push", "tag"]).optional(),
+  tagPattern: z.string().nullable().optional(),
   watchPaths: z.string().optional(),
   webhookTokenHash: z.string().nullable().optional(),
   webhookTokenPrefix: z.string().nullable().optional(),
@@ -348,6 +349,7 @@ export interface CreateResourceDTO {
   libsqlAdminPort?: number | null;
   credentials?: string | null;
   triggerType?: "push" | "tag";
+  tagPattern?: string | null;
   watchPaths?: string;
   webhookTokenHash?: string | null;
   webhookTokenPrefix?: string | null;

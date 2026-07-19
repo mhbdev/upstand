@@ -1,11 +1,5 @@
 "use client";
 
-import {
-  Delete02Icon,
-  PencilEdit02Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import {
@@ -45,6 +39,13 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { PageEmpty } from "@/components/dashboard/page-empty";
+import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
+import {
+  BookmarkIcon,
+  Edit2,
+  PlusIcon,
+  Trash2Icon,
+} from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
@@ -68,10 +69,12 @@ export default function TagsPage() {
     id: string;
     name: string;
   } | null>(null);
+
   const tags = useQuery({
     ...trpc.tag.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
+
   const create = useMutation({
     ...trpc.tag.create.mutationOptions(),
     onSuccess: () => {
@@ -83,6 +86,7 @@ export default function TagsPage() {
     },
     onError: (error) => toast.error(error.message),
   });
+
   const update = useMutation({
     ...trpc.tag.update.mutationOptions(),
     onSuccess: () => {
@@ -95,6 +99,7 @@ export default function TagsPage() {
     },
     onError: (error) => toast.error(error.message),
   });
+
   const remove = useMutation({
     ...trpc.tag.remove.mutationOptions(),
     onSuccess: () => {
@@ -104,6 +109,7 @@ export default function TagsPage() {
     },
     onError: (error) => toast.error(error.message),
   });
+
   const parsedColor = TagColorSchema.safeParse(color);
   const colorIsValid = parsedColor.success;
 
@@ -112,6 +118,7 @@ export default function TagsPage() {
       <DashboardPageHeader
         title="Tags"
         description="Organize resources with reusable organization-scoped labels."
+        icon={<BookmarkIcon className="size-6 text-primary" />}
         actions={
           <UpGalTarget definition={createTagTarget}>
             <Button
@@ -121,78 +128,74 @@ export default function TagsPage() {
                 setColor(DEFAULT_TAG_COLOR);
                 setOpen(true);
               }}
+              className="gap-2 font-medium"
             >
-              <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
-              New tag
+              <PlusIcon data-icon="inline-start" />
+              Create Tag
             </Button>
           </UpGalTarget>
         }
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>Organization tags</CardTitle>
-          <p className="text-muted-foreground text-sm">
-            Use tags to create a shared vocabulary across resources,
-            environments, and operations.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {tags.isLoading ? (
-            <Spinner />
-          ) : tags.data?.length ? (
-            tags.data.map((tag) => (
-              <div
-                key={tag.id}
-                className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3"
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <Badge variant="secondary" className="max-w-40 truncate">
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: tag.color }}
-                      aria-hidden="true"
-                    />
-                    {tag.name}
-                  </Badge>
-                  <span className="text-muted-foreground text-xs">
-                    {tag.color}
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Edit ${tag.name}`}
-                    onClick={() => {
-                      setEditingTag({
-                        id: tag.id,
-                        name: tag.name,
-                        color: tag.color,
-                      });
-                      setName(tag.name);
-                      setColor(tag.color);
-                      setOpen(true);
-                    }}
-                  >
-                    <HugeiconsIcon icon={PencilEdit02Icon} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Delete ${tag.name}`}
-                    onClick={() =>
-                      setDeleteTarget({ id: tag.id, name: tag.name })
-                    }
-                  >
-                    <HugeiconsIcon icon={Delete02Icon} />
-                  </Button>
-                </div>
+      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {tags.isLoading ? (
+          <div className="col-span-full">
+            <CardGridSkeleton count={3} />
+          </div>
+        ) : tags.data?.length ? (
+          tags.data.map((tag) => (
+            <div
+              key={tag.id}
+              className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <Badge variant="secondary" className="max-w-40 truncate">
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: tag.color }}
+                    aria-hidden="true"
+                  />
+                  {tag.name}
+                </Badge>
+                <span className="text-muted-foreground text-xs">
+                  {tag.color}
+                </span>
               </div>
-            ))
-          ) : (
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Edit ${tag.name}`}
+                  onClick={() => {
+                    setEditingTag({
+                      id: tag.id,
+                      name: tag.name,
+                      color: tag.color,
+                    });
+                    setName(tag.name);
+                    setColor(tag.color);
+                    setOpen(true);
+                  }}
+                >
+                  <Edit2 />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Delete ${tag.name}`}
+                  onClick={() =>
+                    setDeleteTarget({ id: tag.id, name: tag.name })
+                  }
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2Icon />
+                </Button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="col-span-full">
             <PageEmpty
-              className="col-span-full"
-              icon={PlusSignIcon}
+              icon={BookmarkIcon}
               title="No tags yet"
               description="Create a shared label to organize resources, environments, and operations."
               action={
@@ -204,23 +207,21 @@ export default function TagsPage() {
                       setColor(DEFAULT_TAG_COLOR);
                       setOpen(true);
                     }}
+                    className="gap-2"
                   >
-                    <HugeiconsIcon
-                      icon={PlusSignIcon}
-                      data-icon="inline-start"
-                    />
-                    New tag
+                    <PlusIcon data-icon="inline-start" />
+                    Create Tag
                   </Button>
                 </UpGalTarget>
               }
             />
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </CardContent>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingTag ? "Edit tag" : "Create tag"}</DialogTitle>
+            <DialogTitle>{editingTag ? "Edit Tag" : "Create Tag"}</DialogTitle>
           </DialogHeader>
           <form
             className="flex flex-col gap-4"
@@ -290,7 +291,7 @@ export default function TagsPage() {
             <DialogFooter>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 onClick={() => setOpen(false)}
               >
                 Cancel
@@ -305,10 +306,16 @@ export default function TagsPage() {
                     !colorIsValid
                   }
                 >
-                  {(create.isPending || update.isPending) && (
-                    <Spinner data-icon="inline-start" />
+                  {create.isPending || update.isPending ? (
+                    <>
+                      <Spinner data-icon="inline-start" />
+                      Saving…
+                    </>
+                  ) : editingTag ? (
+                    "Save Changes"
+                  ) : (
+                    "Create Tag"
                   )}
-                  {editingTag ? "Save changes" : "Create tag"}
                 </Button>
               </UpGalTarget>
             </DialogFooter>
@@ -318,7 +325,7 @@ export default function TagsPage() {
       <ConfirmActionDialog
         open={deleteTarget !== null}
         onOpenChange={(nextOpen) => !nextOpen && setDeleteTarget(null)}
-        title={`Delete ${deleteTarget?.name ?? "tag"}?`}
+        title={`Delete ${deleteTarget?.name ?? "Tag"}?`}
         description={`${deleteTarget?.name ?? "This tag"} will be removed from the organization and detached from resources. This action cannot be undone.`}
         actionLabel="Delete Tag"
         pending={remove.isPending}

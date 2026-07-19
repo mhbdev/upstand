@@ -3,9 +3,27 @@
 import { Cancel01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@upstand/ui/components/button";
-import { Input } from "@upstand/ui/components/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@upstand/ui/components/input-group";
 import { cn } from "@upstand/ui/lib/utils";
 import type { ReactNode } from "react";
+
+export interface PageToolbarProps {
+  children?: ReactNode;
+  className?: string;
+  /** Current search value. Toolbar renders the search field only when this is defined. */
+  search?: string;
+  searchLabel?: string;
+  searchPlaceholder?: string;
+  onSearchChange?: (value: string) => void;
+  onClearSearch?: () => void;
+  onClearFilters?: () => void;
+  hasActiveFilters?: boolean;
+}
 
 export function PageToolbar({
   children,
@@ -17,57 +35,45 @@ export function PageToolbar({
   onClearSearch,
   onClearFilters,
   hasActiveFilters = false,
-}: {
-  children?: ReactNode;
-  className?: string;
-  search?: string;
-  searchLabel?: string;
-  searchPlaceholder?: string;
-  onSearchChange?: (value: string) => void;
-  onClearSearch?: () => void;
-  onClearFilters?: () => void;
-  hasActiveFilters?: boolean;
-}) {
+}: PageToolbarProps) {
   const hasSearch = typeof search === "string" && Boolean(onSearchChange);
-  const handleSearchChange = onSearchChange;
 
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3",
-        className,
-      )}
-    >
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {hasSearch ? (
-        <div className="relative min-w-56 flex-1 sm:max-w-sm">
-          <HugeiconsIcon
-            icon={Search01Icon}
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
+        <InputGroup className="min-w-56 flex-1 sm:max-w-sm">
+          <InputGroupInput
             type="search"
             value={search}
-            onChange={(event) => handleSearchChange?.(event.target.value)}
+            onChange={(event) => onSearchChange?.(event.target.value)}
             placeholder={searchPlaceholder}
             aria-label={searchLabel}
-            className="pr-9 pl-9"
+            className={cn(
+              "[&::-webkit-search-cancel-button]:hidden",
+              "[&::-webkit-search-decoration]:hidden",
+              "[&::-ms-clear]:hidden [&::-ms-reveal]:hidden",
+            )}
           />
+          <InputGroupAddon align="inline-start">
+            <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+          </InputGroupAddon>
           {search ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="absolute top-1/2 right-1 -translate-y-1/2"
-              onClick={onClearSearch}
-              aria-label={`Clear ${searchLabel.toLowerCase()}`}
-            >
-              <HugeiconsIcon icon={Cancel01Icon} aria-hidden="true" />
-            </Button>
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                type="button"
+                size="icon-xs"
+                aria-label={`Clear ${searchLabel.toLowerCase()}`}
+                onClick={onClearSearch}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} aria-hidden="true" />
+              </InputGroupButton>
+            </InputGroupAddon>
           ) : null}
-        </div>
+        </InputGroup>
       ) : null}
+
       {children}
+
       {hasActiveFilters && onClearFilters ? (
         <Button
           type="button"

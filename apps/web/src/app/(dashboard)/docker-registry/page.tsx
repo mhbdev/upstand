@@ -1,13 +1,5 @@
 "use client";
 
-import {
-  ContainerIcon,
-  Database01Icon,
-  Delete02Icon,
-  Edit02Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import { Button } from "@upstand/ui/components/button";
@@ -22,11 +14,17 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
+import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
@@ -35,7 +33,15 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { PageEmpty } from "@/components/dashboard/page-empty";
+import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import { UpGalTarget } from "@/components/upgal-target";
+import {
+  Database,
+  Edit2,
+  Layers,
+  PlusIcon,
+  Trash2Icon,
+} from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
@@ -60,7 +66,17 @@ export default function DockerRegistryPage() {
     name: string;
   } | null>(null);
 
-  const { data: registries = [], refetch } = useQuery({
+  const resetForm = () => {
+    setEditingId(null);
+    setName("");
+    setUsername("");
+    setPassword("");
+    setImagePrefix("");
+    setRegistryUrl("");
+    setServerId("");
+  };
+
+  const { data: registries, refetch, isPending: loadingRegistries } = useQuery({
     ...trpc.dockerRegistry.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
@@ -68,7 +84,7 @@ export default function DockerRegistryPage() {
   const createMutation = useMutation({
     ...trpc.dockerRegistry.create.mutationOptions(),
     onSuccess: () => {
-      toast.success("Docker Registry added successfully!");
+      toast.success("Docker registry added successfully!");
       setDialogOpen(false);
       resetForm();
       refetch();
@@ -81,7 +97,7 @@ export default function DockerRegistryPage() {
   const deleteMutation = useMutation({
     ...trpc.dockerRegistry.delete.mutationOptions(),
     onSuccess: () => {
-      toast.success("Docker Registry deleted");
+      toast.success("Docker registry deleted");
       setDeleteTarget(null);
       refetch();
     },
@@ -93,7 +109,7 @@ export default function DockerRegistryPage() {
   const updateMutation = useMutation({
     ...trpc.dockerRegistry.update.mutationOptions(),
     onSuccess: () => {
-      toast.success("Docker Registry updated successfully!");
+      toast.success("Docker registry updated successfully!");
       setDialogOpen(false);
       resetForm();
       refetch();
@@ -112,55 +128,11 @@ export default function DockerRegistryPage() {
       }
     },
     onError: (err: any) => {
-      toast.error(err.message || "Test connection failed");
+      toast.error(err.message || "Unable to test connection");
     },
   });
 
-  const resetForm = () => {
-    setName("");
-    setUsername("");
-    setPassword("");
-    setImagePrefix("");
-    setRegistryUrl("");
-    setServerId("");
-  };
-
-  const handleTestConnection = () => {
-    testConnectionMutation.mutate({
-      organizationId,
-      username,
-      password,
-      registryUrl,
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name) {
-      toast.error("Name is required");
-      return;
-    }
-    const payload = {
-      organizationId,
-      name,
-      username: username || null,
-      imagePrefix: imagePrefix || null,
-      registryUrl: registryUrl || null,
-      serverId: serverId || null,
-    };
-    if (editingId) {
-      updateMutation.mutate({
-        id: editingId,
-        ...payload,
-        ...(password ? { password } : {}),
-      });
-    } else {
-      createMutation.mutate({ ...payload, password: password || null });
-    }
-  };
-
   const openCreate = () => {
-    setEditingId(null);
     resetForm();
     setDialogOpen(true);
   };
@@ -177,8 +149,35 @@ export default function DockerRegistryPage() {
   };
 
   const handleDelete = (id: string) => {
-    const registry = registries.find((item: any) => item.id === id);
+    const registry = registries?.find((item: any) => item.id === id);
     setDeleteTarget(registry ? { id: registry.id, name: registry.name } : null);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      organizationId,
+      name,
+      username: username || null,
+      password: password || null,
+      imagePrefix: imagePrefix || null,
+      registryUrl: registryUrl || null,
+      serverId: serverId || null,
+    };
+
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const handleTestConnection = () => {
+    testConnectionMutation.mutate({
+      username: username || null,
+      password: password || null,
+      registryUrl: registryUrl || null,
+    });
   };
 
   return (
@@ -187,26 +186,28 @@ export default function DockerRegistryPage() {
         title="Docker Registry"
         description="Configure external Docker registries to publish and pull images during deployments."
         icon={
-          <HugeiconsIcon icon={ContainerIcon} className="size-6 text-primary" />
+          <Layers className="size-6 text-primary" />
         }
         actions={
           <UpGalTarget definition={createDockerRegistryTarget}>
             <Button onClick={openCreate} className="gap-2 font-medium">
-              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              <PlusIcon data-icon="inline-start" />
               Add External Registry
             </Button>
           </UpGalTarget>
         }
       />
 
-      {registries && registries.length > 0 ? (
+      {loadingRegistries ? (
+        <CardGridSkeleton count={3} />
+      ) : registries && registries.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {registries.map((reg: any) => (
             <Card
               key={reg.id}
               className="relative overflow-hidden border-border/40 bg-card/30"
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="space-y-1">
                   <CardTitle className="font-semibold text-base">
                     {reg.name}
@@ -215,24 +216,23 @@ export default function DockerRegistryPage() {
                     {reg.registryUrl || "Docker Hub"}
                   </CardDescription>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex shrink-0 items-center gap-1.5">
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="icon-sm"
                     onClick={() => openEdit(reg)}
-                    className="size-8"
                     aria-label={`Edit registry ${reg.name}`}
                   >
-                    <HugeiconsIcon icon={Edit02Icon} className="size-4" />
+                    <Edit2 />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="icon-sm"
                     onClick={() => handleDelete(reg.id)}
-                    className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     aria-label={`Delete registry ${reg.name}`}
                   >
-                    <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+                    <Trash2Icon />
                   </Button>
                 </div>
               </CardHeader>
@@ -257,13 +257,13 @@ export default function DockerRegistryPage() {
         </div>
       ) : (
         <PageEmpty
-          icon={Database01Icon}
+          icon={Database}
           title="No Docker registries yet"
           description="Add a registry such as GHCR, Amazon ECR, or a self-hosted registry to configure deployment pipelines."
           action={
-            <Button onClick={openCreate}>
-              <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
-              Add external registry
+            <Button onClick={openCreate} className="gap-2">
+              <PlusIcon data-icon="inline-start" />
+              Add External Registry
             </Button>
           }
         />
@@ -281,91 +281,103 @@ export default function DockerRegistryPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Registry Name</Label>
-              <Input
-                id="name"
-                required
-                placeholder="My Registry"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="name">Registry Name</FieldLabel>
+                <Input
+                  id="name"
+                  required
+                  placeholder="My Registry"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                placeholder="e.g. janesmith"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="username">Username</FieldLabel>
+                <Input
+                  id="username"
+                  placeholder="e.g. janesmith"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password / Token</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="password">Password / Token</FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="imagePrefix">Image Prefix</Label>
-              <Input
-                id="imagePrefix"
-                placeholder="e.g. my-company"
-                value={imagePrefix}
-                onChange={(e) => setImagePrefix(e.target.value)}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="imagePrefix">Image Prefix</FieldLabel>
+                <Input
+                  id="imagePrefix"
+                  placeholder="e.g. my-company"
+                  value={imagePrefix}
+                  onChange={(e) => setImagePrefix(e.target.value)}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="registryUrl">Registry URL</Label>
-              <Input
-                id="registryUrl"
-                placeholder="e.g. https://ghcr.io"
-                value={registryUrl}
-                onChange={(e) => setRegistryUrl(e.target.value)}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="registryUrl">Registry URL</FieldLabel>
+                <Input
+                  id="registryUrl"
+                  placeholder="e.g. https://ghcr.io"
+                  value={registryUrl}
+                  onChange={(e) => setRegistryUrl(e.target.value)}
+                />
+              </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="serverId">Server (Optional)</Label>
-              <Input
-                id="serverId"
-                placeholder="Server ID"
-                value={serverId}
-                onChange={(e) => setServerId(e.target.value)}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="serverId">Server (Optional)</FieldLabel>
+                <Input
+                  id="serverId"
+                  placeholder="Server ID"
+                  value={serverId}
+                  onChange={(e) => setServerId(e.target.value)}
+                />
+              </Field>
+            </FieldGroup>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <DialogFooter className="gap-2 pt-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleTestConnection}
                 disabled={testConnectionMutation.isPending}
               >
-                {testConnectionMutation.isPending
-                  ? "Testing..."
-                  : "Test Registry"}
+                {testConnectionMutation.isPending ? (
+                  <>
+                    <Spinner data-icon="inline-start" />
+                    Testing…
+                  </>
+                ) : (
+                  "Test Registry"
+                )}
               </Button>
               <Button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
-                {createMutation.isPending || updateMutation.isPending
-                  ? "Saving..."
-                  : editingId
-                    ? "Save"
-                    : "Create"}
+                {(createMutation.isPending || updateMutation.isPending) ? (
+                  <>
+                    <Spinner data-icon="inline-start" />
+                    Saving…
+                  </>
+                ) : editingId ? (
+                  "Save Changes"
+                ) : (
+                  "Create Registry"
+                )}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

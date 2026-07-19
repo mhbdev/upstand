@@ -16,6 +16,7 @@ import {
   parseResourceCredentials,
   parseResourceEnvironmentVariables,
   UpdateResourceInputSchema,
+  extractAndParametrizeEnvVars,
 } from "@upstand/usecases";
 import {
   ControlResourceUseCaseToken,
@@ -55,6 +56,11 @@ const UpdateComposeInputSchema = UpdateResourceInputSchema.pick({
   description: true,
   serverId: true,
   buildServerId: true,
+  provider: true,
+  credentials: true,
+  triggerType: true,
+  watchPaths: true,
+  tagPattern: true,
 }).extend({
   composeFile: z.string().min(1).optional(),
   composeType: ResourceComposeTypeSchema.optional(),
@@ -66,6 +72,23 @@ const UpdateComposeInputSchema = UpdateResourceInputSchema.pick({
 const RandomizeComposeInputSchema = z.object({
   id: z.string().min(1),
 });
+
+function parseWatchPaths(value: string[] | string | undefined): string[] {
+  if (Array.isArray(value))
+    return value.filter((item) => item.trim().length > 0);
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (item): item is string =>
+            typeof item === "string" && item.trim().length > 0,
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 function composePayload(resource: Resource) {
   let composeFile = "";
@@ -100,6 +123,9 @@ function composePayload(resource: Resource) {
     envVarsConfigured: Object.keys(envVars).length > 0,
     domains,
     serverId: resource.serverId,
+    triggerType: resource.triggerType ?? "push",
+    tagPattern: resource.tagPattern ?? null,
+    watchPaths: parseWatchPaths(resource.watchPaths),
     createdAt: resource.createdAt,
     updatedAt: resource.updatedAt,
   };
@@ -231,7 +257,9 @@ export const composeRouter = router({
     .mutation(async ({ ctx, input }) => {
       const resource = await authorizedCompose(ctx, input.id, "update");
       const { composeFile, advancedConfig, envVars, domains, ...patch } = input;
-      let credentials: string | undefined;
+      let credentials = input.credentials;
+      let newEnvVars: Record<string, string> | undefined;
+
       if (composeFile !== undefined) {
         let current: Record<string, unknown> = {};
         try {
@@ -239,8 +267,31 @@ export const composeRouter = router({
         } catch {
           current = {};
         }
-        credentials = JSON.stringify({ ...current, composeFile });
+
+        const extracted = extractAndParametrizeEnvVars(composeFile);
+        const resolvedComposeFile = extracted.composeFile;
+
+        const existingEnvVars = parseResourceEnvironmentVariables(resource.envVars);
+        newEnvVars = { ...extracted.envVars, ...existingEnvVars };
+
+        let parsedInputCreds: Record<string, unknown> = {};
+        if (input.credentials) {
+          try {
+            parsedInputCreds = JSON.parse(input.credentials);
+          } catch {}
+        }
+        credentials = JSON.stringify({
+          ...current,
+          ...parsedInputCreds,
+          composeFile: resolvedComposeFile,
+        });
       }
+
+      let finalEnvVars = envVars;
+      if (newEnvVars) {
+        finalEnvVars = { ...newEnvVars, ...envVars };
+      }
+
       try {
         const updated = await ctx.scope
           .resolve(UpdateResourceUseCaseToken)
@@ -250,7 +301,7 @@ export const composeRouter = router({
             ...(advancedConfig
               ? { advancedConfig: JSON.stringify(advancedConfig) }
               : {}),
-            ...(envVars ? { envVars: JSON.stringify(envVars) } : {}),
+            ...(finalEnvVars ? { envVars: JSON.stringify(finalEnvVars) } : {}),
             ...(domains ? { domains: JSON.stringify(domains) } : {}),
           });
         if (!updated)

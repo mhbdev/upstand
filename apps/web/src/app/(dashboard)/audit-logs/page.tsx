@@ -23,6 +23,9 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import { PagePagination } from "@/components/dashboard/page-pagination";
+import { TableSkeleton } from "@/components/dashboard/page-skeleton";
 import {
   ChevronLeft,
   ChevronRight,
@@ -96,23 +99,16 @@ export default function AuditLogsPage() {
     }),
     enabled: organizationState.status === "ready",
   });
-  const totalPages = Math.max(1, Math.ceil((logs.data?.total ?? 0) / pageSize));
 
   return (
     <DashboardPage>
       <DashboardPageHeader
-        title="Audit logs"
+        title="Audit Logs"
         icon={<FileClock className="size-6 text-primary" />}
         description="A complete, organization-scoped history of dashboard and API activity."
       />
-      <Card>
-        <CardHeader className="gap-4 border-b sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <CardTitle>Activity history</CardTitle>
-            <CardDescription>
-              Sensitive request values are redacted before they are stored.
-            </CardDescription>
-          </div>
+      <div>
+        <CardHeader className="gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex flex-wrap gap-2 sm:justify-end">
             <div className="relative w-full sm:w-56">
               <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
@@ -127,10 +123,6 @@ export default function AuditLogsPage() {
               />
             </div>
             <Select
-              items={ACTIONS.map((item) => ({
-                value: item,
-                label: item === "all" ? "All actions" : item,
-              }))}
               value={action}
               onValueChange={(value) => {
                 if (value) {
@@ -151,10 +143,6 @@ export default function AuditLogsPage() {
               </SelectContent>
             </Select>
             <Select
-              items={RESOURCE_TYPES.map((item) => ({
-                value: item,
-                label: item === "all" ? "All resources" : item,
-              }))}
               value={resourceType}
               onValueChange={(value) => {
                 if (value) {
@@ -177,15 +165,13 @@ export default function AuditLogsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {logs.isPending ? (
-            <div className="p-8 text-center text-muted-foreground">
-              Loading audit logs…
-            </div>
-          ) : null}
+          {logs.isPending ? <TableSkeleton rows={5} /> : null}
           {!logs.isPending && (logs.data?.items.length ?? 0) === 0 ? (
-            <div className="p-12 text-center text-muted-foreground">
-              No audit events match these filters.
-            </div>
+            <PageEmpty
+              icon={FileClock}
+              title="No audit events found"
+              description="No events match your current search queries or filters."
+            />
           ) : null}
           {(logs.data?.items.length ?? 0) > 0 ? (
             <div className="divide-y">
@@ -242,36 +228,17 @@ export default function AuditLogsPage() {
               ))}
             </div>
           ) : null}
-          <div className="flex items-center justify-between border-t px-6 py-3 text-muted-foreground text-sm">
-            <span>
-              {logs.data?.total ?? 0} event{logs.data?.total === 1 ? "" : "s"}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={page <= 1}
-                onClick={() => setPage((value) => value - 1)}
-                aria-label="Previous page"
-              >
-                <ChevronLeft />
-              </Button>
-              <span>
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={page >= totalPages}
-                onClick={() => setPage((value) => value + 1)}
-                aria-label="Next page"
-              >
-                <ChevronRight />
-              </Button>
-            </div>
-          </div>
+          {logs.data && logs.data.items.length > 0 && (
+            <PagePagination
+              className="px-4"
+              page={page}
+              pageSize={pageSize}
+              total={logs.data.total}
+              onPageChange={setPage}
+            />
+          )}
         </CardContent>
-      </Card>
+      </div>
     </DashboardPage>
   );
 }

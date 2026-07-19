@@ -1,15 +1,17 @@
 "use client";
 
-import {
-  Alert02Icon,
-  Delete02Icon,
-  Folder01Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@upstand/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -18,17 +20,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
+import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
+import { PageToolbar } from "@/components/dashboard/page-toolbar";
+import {
+  AlertTriangleIcon,
+  CopyIcon,
+  FolderIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import type { authClient } from "@/lib/auth-client";
@@ -40,12 +57,24 @@ const createProjectSubmitTarget = getUpGalTargetDefinition(
   "create-project-submit",
 );
 
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+interface Project {
+  id: string;
+  name: string;
+  createdAt: Date | string;
+}
+
 function ProjectCard({
   project,
   onDelete,
   onDuplicate,
 }: {
-  project: { id: string; name: string; createdAt: Date | string };
+  project: Project;
   onDelete: () => void;
   onDuplicate: () => void;
 }) {
@@ -54,33 +83,57 @@ function ProjectCard({
     enabled: !!project.id,
   });
 
-  const envCount = envs?.length ?? 0;
-  const totalResources =
-    envs?.reduce((acc: number, curr: any) => acc + curr.resourceCount, 0) ?? 0;
+  const { envCount, totalResources } = useMemo(() => {
+    return {
+      envCount: envs?.length ?? 0,
+      totalResources:
+        envs?.reduce((acc, curr) => acc + curr.resourceCount, 0) ?? 0,
+    };
+  }, [envs]);
+
+  const formattedDate = useMemo(
+    () => dateFormatter.format(new Date(project.createdAt)),
+    [project.createdAt],
+  );
+
+  const handleDuplicate = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDuplicate();
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete();
+  };
 
   return (
-    <div className="group relative flex flex-col justify-between border border-border/40 bg-card/30 p-5 transition-all duration-300 hover:border-primary/50 hover:bg-accent/5 hover:shadow-lg">
-      <Link
-        href={`/projects/${project.id}` as any}
-        className="absolute inset-0"
-        aria-label={`Open project ${project.name}`}
-      />
-      <div>
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary/10">
-            <HugeiconsIcon
-              icon={Folder01Icon}
-              className="size-4 text-primary"
-            />
+    <Card size="sm" className="flex flex-col justify-between">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
+            <FolderIcon className="size-4 text-primary" aria-hidden="true" />
           </div>
-          <h3 className="line-clamp-1 flex-1 font-semibold text-foreground transition-colors group-hover:text-primary">
-            {project.name}
-          </h3>
-          <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-[10px] text-emerald-500 uppercase tracking-wider">
-            Active
-          </span>
+          <div className="min-w-0">
+            <CardTitle className="truncate text-base">
+              <Link
+                href={`/projects/${project.id}` as any}
+                className="hover:underline"
+              >
+                {project.name}
+              </Link>
+            </CardTitle>
+            <CardDescription className="mt-1 line-clamp-2 text-xs">
+              Created {formattedDate}
+            </CardDescription>
+          </div>
         </div>
-        <div className="mt-4 flex gap-4 text-muted-foreground text-xs">
+        <Badge variant="success">Active</Badge>
+      </CardHeader>
+
+      <CardContent className="pt-0">
+        <div className="flex gap-4 text-muted-foreground text-xs">
           <div>
             <span className="font-semibold text-foreground">{envCount}</span>{" "}
             {envCount === 1 ? "environment" : "environments"}
@@ -92,43 +145,43 @@ function ProjectCard({
             {totalResources === 1 ? "resource" : "resources"}
           </div>
         </div>
-      </div>
-      <div className="mt-6 flex items-center justify-between border-border/30 border-t pt-3">
-        <span className="text-[11px] text-muted-foreground">
-          Created{" "}
-          {new Date(project.createdAt).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </span>
-        <div className="relative z-10 flex items-center gap-1 opacity-0 transition-all group-hover:opacity-100">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDuplicate();
-            }}
-          >
-            Duplicate
-          </Button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-            aria-label={`Delete project ${project.name}`}
-          >
-            <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-          </button>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+
+      <CardFooter className="flex items-center justify-end gap-2 pt-0">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleDuplicate}
+                aria-label={`Duplicate project ${project.name}`}
+              >
+                <CopyIcon aria-hidden="true" />
+              </Button>
+            }
+          />
+          <TooltipContent>Duplicate</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleDelete}
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                aria-label={`Delete project ${project.name}`}
+              >
+                <Trash2Icon aria-hidden="true" />
+              </Button>
+            }
+          />
+          <TooltipContent>Delete</TooltipContent>
+        </Tooltip>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -163,7 +216,7 @@ function DuplicateProjectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Duplicate project</DialogTitle>
+          <DialogTitle>Duplicate Project</DialogTitle>
           <DialogDescription>
             Copy environments and resource configuration without copying runtime
             deployments.
@@ -181,19 +234,23 @@ function DuplicateProjectDialog({
               });
           }}
         >
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="duplicate-project-name">New project name</Label>
-            <Input
-              id="duplicate-project-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              autoFocus
-            />
-          </div>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="duplicate-project-name">
+                New Project Name
+              </FieldLabel>
+              <Input
+                id="duplicate-project-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoFocus
+              />
+            </Field>
+          </FieldGroup>
           <DialogFooter>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               onClick={() => onOpenChange(false)}
             >
               Cancel
@@ -211,23 +268,19 @@ function DuplicateProjectDialog({
 
 function EmptyProjects({ onNew }: { onNew: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 border border-border/40 border-dashed bg-card/10 px-8 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-        <HugeiconsIcon icon={Folder01Icon} className="size-7 text-primary" />
-      </div>
-      <div className="space-y-1">
-        <p className="font-semibold text-foreground">No projects yet</p>
-        <p className="max-w-xs text-muted-foreground text-sm">
-          Create your first project to start deploying apps and services.
-        </p>
-      </div>
-      <UpGalTarget definition={createProjectTarget}>
-        <Button onClick={onNew} size="sm" className="mt-1 gap-2">
-          <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-          New Project
-        </Button>
-      </UpGalTarget>
-    </div>
+    <PageEmpty
+      icon={FolderIcon}
+      title="No projects yet"
+      description="Create your first project to start deploying apps and services."
+      action={
+        <UpGalTarget definition={createProjectTarget}>
+          <Button onClick={onNew} size="sm" className="mt-1 gap-2">
+            <PlusIcon data-icon="inline-start" />
+            Create Project
+          </Button>
+        </UpGalTarget>
+      }
+    />
   );
 }
 
@@ -258,7 +311,9 @@ function CreateProjectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-2xl border border-border bg-card shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="font-bold text-xl">New Project</DialogTitle>
+          <DialogTitle className="font-bold text-xl">
+            Create Project
+          </DialogTitle>
           <DialogDescription className="text-muted-foreground text-sm">
             Projects group your environments, apps, and services together.
           </DialogDescription>
@@ -269,26 +324,28 @@ function CreateProjectDialog({
             if (name.trim())
               mutation.mutate({ name: name.trim(), organizationId });
           }}
-          className="space-y-4 pt-2"
+          className="flex flex-col gap-4"
         >
-          <div className="space-y-2">
-            <Label htmlFor="proj-name">Project Name</Label>
-            <UpGalTarget definition={projectNameTarget}>
-              <Input
-                id="proj-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Production Web App"
-                autoComplete="off"
-                autoFocus
-                className="border-border/40 focus:border-primary"
-              />
-            </UpGalTarget>
-          </div>
-          <DialogFooter className="gap-2 pt-2">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="proj-name">Project Name</FieldLabel>
+              <UpGalTarget definition={projectNameTarget}>
+                <Input
+                  id="proj-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Production Web App"
+                  autoComplete="off"
+                  autoFocus
+                  className="border-border/40 focus:border-primary"
+                />
+              </UpGalTarget>
+            </Field>
+          </FieldGroup>
+          <DialogFooter className="gap-2">
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               onClick={() => onOpenChange(false)}
             >
               Cancel
@@ -362,12 +419,12 @@ function DeleteProjectDialog({
           <DialogTitle className="flex items-center gap-2 font-bold text-xl">
             {hasBusyEnvironments ? (
               <span className="flex items-center gap-2 text-amber-500">
-                <HugeiconsIcon icon={Alert02Icon} className="size-5" />
+                <AlertTriangleIcon className="size-5" />
                 Cannot Delete Project
               </span>
             ) : (
               <span className="flex items-center gap-2 text-destructive">
-                <HugeiconsIcon icon={Alert02Icon} className="size-5" />
+                <AlertTriangleIcon className="size-5" />
                 Delete Project
               </span>
             )}
@@ -395,11 +452,11 @@ function DeleteProjectDialog({
         </DialogHeader>
 
         {hasBusyEnvironments && (
-          <div className="my-2 space-y-2 border border-amber-500/10 bg-amber-500/5 p-4">
+          <div className="my-2 flex flex-col gap-2 border border-amber-500/10 bg-amber-500/5 p-4">
             <h4 className="font-semibold text-amber-500 text-xs uppercase tracking-wider">
               Environments with Resources
             </h4>
-            <ul className="space-y-1.5 text-sm">
+            <ul className="flex flex-col gap-1.5 text-sm">
               {envsWithResources.map((env) => (
                 <li
                   key={env.id}
@@ -416,10 +473,10 @@ function DeleteProjectDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 pt-2">
+        <DialogFooter className="gap-2">
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             onClick={() => onOpenChange(false)}
           >
             {hasBusyEnvironments ? "Close" : "Cancel"}
@@ -478,9 +535,6 @@ export default function Projects(_props: {
       proj.name.toLowerCase().includes(searchQuery.toLowerCase()),
     ) ?? [];
 
-  // Calculate totals
-  const _totalProjects = projects?.length ?? 0;
-
   return (
     <DashboardPage>
       {/* Header section */}
@@ -495,36 +549,32 @@ export default function Projects(_props: {
             .
           </>
         }
-        icon={
-          <HugeiconsIcon icon={Folder01Icon} className="size-6 text-primary" />
-        }
+        icon={<FolderIcon className="size-6 text-primary" />}
         actions={
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search projects…"
-              className="w-full min-w-0 border-border/40 bg-card/30 sm:w-64"
-            />
-            <UpGalTarget definition={createProjectTarget}>
-              <Button
-                onClick={() => setCreateProjectOpen(true)}
-                className="gap-2 font-medium"
-                disabled={!organizationId}
-              >
-                <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-                New Project
-              </Button>
-            </UpGalTarget>
-          </div>
+          <UpGalTarget definition={createProjectTarget}>
+            <Button
+              onClick={() => setCreateProjectOpen(true)}
+              className="gap-2 font-medium"
+              disabled={!organizationId}
+            >
+              <PlusIcon data-icon="inline-start" />
+              Create Project
+            </Button>
+          </UpGalTarget>
         }
+      />
+
+      <PageToolbar
+        search={searchQuery}
+        searchPlaceholder="Search projects…"
+        onSearchChange={setSearchQuery}
+        onClearSearch={() => setSearchQuery("")}
+        hasActiveFilters={Boolean(searchQuery)}
       />
 
       {/* Projects Grid */}
       {loadingProjects ? (
-        <div className="flex min-h-60 items-center justify-center">
-          <Spinner className="size-8" />
-        </div>
+        <CardGridSkeleton count={3} />
       ) : filteredProjects.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredProjects.map((proj) => (

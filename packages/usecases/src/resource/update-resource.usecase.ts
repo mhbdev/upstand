@@ -59,6 +59,7 @@ export const UpdateResourceInputSchema = z.object({
   composeType: ResourceComposeTypeSchema.optional(),
   credentials: z.string().optional(),
   triggerType: z.enum(["push", "tag"]).optional(),
+  tagPattern: z.string().nullable().optional(),
   watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
   buildSecrets: z.string().optional(),
@@ -267,17 +268,25 @@ export class UpdateResourceUseCase {
       }
     }
     if (input.triggerType !== undefined) {
-      if (resource.type !== "application") {
+      if (resource.type !== "application" && resource.type !== "compose") {
         throw new ValidationError(
-          "Trigger settings can only be changed on application resources",
+          "Trigger settings can only be changed on application or compose resources",
         );
       }
       patch.triggerType = input.triggerType;
     }
-    if (input.watchPaths !== undefined) {
-      if (resource.type !== "application") {
+    if (input.tagPattern !== undefined) {
+      if (resource.type !== "application" && resource.type !== "compose") {
         throw new ValidationError(
-          "Watch paths can only be changed on application resources",
+          "Tag pattern can only be changed on application or compose resources",
+        );
+      }
+      patch.tagPattern = input.tagPattern;
+    }
+    if (input.watchPaths !== undefined) {
+      if (resource.type !== "application" && resource.type !== "compose") {
+        throw new ValidationError(
+          "Watch paths can only be changed on application or compose resources",
         );
       }
       patch.watchPaths = JSON.stringify(input.watchPaths);

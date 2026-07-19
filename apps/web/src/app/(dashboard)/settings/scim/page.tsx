@@ -19,14 +19,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
+import { Skeleton } from "@upstand/ui/components/skeleton";
+import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
-import { Copy, KeyRound, RotateCw, Trash2 } from "@/components/huge-icons";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import { Copy, KeyRound, RotateCw, Trash2Icon } from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl } from "@/lib/server-url";
@@ -38,10 +42,12 @@ export default function ScimSettingsPage() {
   const [providerId, setProviderId] = useState("identity-provider");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<string | null>(null);
+
   const providersQuery = useQuery({
     ...trpc.scim.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
+
   const create = useMutation({
     ...trpc.scim.create.mutationOptions(),
     onSuccess: (result) => {
@@ -52,6 +58,7 @@ export default function ScimSettingsPage() {
     },
     onError: (error) => toast.error(error.message),
   });
+
   const rotate = useMutation({
     ...trpc.scim.rotate.mutationOptions(),
     onSuccess: (result) => {
@@ -61,6 +68,7 @@ export default function ScimSettingsPage() {
     },
     onError: (error) => toast.error(error.message),
   });
+
   const remove = useMutation({
     ...trpc.scim.remove.mutationOptions(),
     onSuccess: () => {
@@ -79,38 +87,64 @@ export default function ScimSettingsPage() {
   return (
     <DashboardPage className="flex-1">
       <DashboardPageHeader
-        title="SCIM Provisioning"
+        title="SCIM"
         icon={<KeyRound className="size-6 text-primary" />}
         description="Provision and deactivate organization members from an identity provider using SCIM 2.0."
       />
       <Card>
         <CardHeader>
-          <CardTitle>Create provider token</CardTitle>
+          <CardTitle>Create Provider Token</CardTitle>
           <CardDescription>
             Tokens are hashed at rest and shown only once after creation or
             rotation. Use the endpoint shown below with a bearer token.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              name="scim-provider-id"
-              autoComplete="off"
-              value={providerId}
-              onChange={(event) => setProviderId(event.target.value)}
-              placeholder="identity-provider"
-            />
-            <Button
-              disabled={
-                !organizationId || !providerId.trim() || create.isPending
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (organizationId && providerId.trim()) {
+                create.mutate({
+                  organizationId,
+                  providerId: providerId.trim(),
+                });
               }
-              onClick={() =>
-                create.mutate({ organizationId, providerId: providerId.trim() })
-              }
-            >
-              Create token
-            </Button>
-          </div>
+            }}
+            className="flex flex-col gap-4"
+          >
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="scim-provider-id">Provider ID</FieldLabel>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="scim-provider-id"
+                    name="scim-provider-id"
+                    autoComplete="off"
+                    value={providerId}
+                    onChange={(event) => setProviderId(event.target.value)}
+                    placeholder="identity-provider"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={
+                      !organizationId || !providerId.trim() || create.isPending
+                    }
+                  >
+                    {create.isPending ? (
+                      <>
+                        <Spinner data-icon="inline-start" />
+                        Creating…
+                      </>
+                    ) : (
+                      "Create Token"
+                    )}
+                  </Button>
+                </div>
+              </Field>
+            </FieldGroup>
+          </form>
+
           {newToken && (
             <div
               className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3"
@@ -126,7 +160,7 @@ export default function ScimSettingsPage() {
                 />
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="icon-sm"
                   onClick={() => void copyToken()}
                   aria-label="Copy SCIM token"
                 >
@@ -140,59 +174,72 @@ export default function ScimSettingsPage() {
           )}
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Active provider tokens</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {providersQuery.isPending ? (
-            <p className="text-muted-foreground text-sm">Loading providers…</p>
-          ) : null}
-          {(providersQuery.data ?? []).map((provider) => (
-            <div
-              key={provider.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-            >
-              <div>
-                <div className="font-medium">{provider.providerId}</div>
-                <div className="font-mono text-muted-foreground text-xs">
-                  {provider.tokenPrefix}… · /api/scim/v2.0/{organizationId}
+      <div>
+        {providersQuery.isPending
+          ? Array.from({ length: 2 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-3 w-1/2" />
                 </div>
               </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    rotate.mutate({ organizationId, id: provider.id })
-                  }
-                >
-                  <RotateCw className="mr-1 size-3" /> Rotate
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setPendingRevoke(provider.id)}
-                >
-                  <Trash2 data-icon="inline-start" /> Revoke
-                </Button>
+            ))
+          : null}
+        {(providersQuery.data ?? []).map((provider) => (
+          <div
+            key={provider.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+          >
+            <div>
+              <div className="font-medium">{provider.providerId}</div>
+              <div className="font-mono text-muted-foreground text-xs">
+                {provider.tokenPrefix}… · /api/scim/v2.0/{organizationId}
               </div>
             </div>
-          ))}
-          {!providersQuery.isPending && providersQuery.data?.length === 0 && (
-            <p className="text-muted-foreground text-sm">
-              No SCIM providers configured.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  rotate.mutate({ organizationId, id: provider.id })
+                }
+                disabled={rotate.isPending}
+              >
+                {rotate.isPending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <RotateCw className="mr-1 size-3" />
+                )}
+                Rotate Token
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setPendingRevoke(provider.id)}
+              >
+                <Trash2Icon data-icon="inline-start" /> Revoke Token
+              </Button>
+            </div>
+          </div>
+        ))}
+        {!providersQuery.isPending && providersQuery.data?.length === 0 && (
+          <PageEmpty
+            icon={KeyRound}
+            title="No SCIM providers configured"
+            description="Generate a token above to connect an external identity provider."
+          />
+        )}
+      </div>
       <AlertDialog
         open={pendingRevoke !== null}
         onOpenChange={(open) => !open && setPendingRevoke(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke this SCIM provider?</AlertDialogTitle>
+            <AlertDialogTitle>Revoke SCIM Provider?</AlertDialogTitle>
             <AlertDialogDescription>
               Provisioning requests will fail immediately and cannot be
               authenticated with this token again.
@@ -207,7 +254,7 @@ export default function ScimSettingsPage() {
                 setPendingRevoke(null);
               }}
             >
-              Revoke provider
+              Revoke Provider
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

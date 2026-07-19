@@ -149,16 +149,16 @@ export function GlobalSearch() {
     <>
       <button
         type="button"
-        className="flex size-9 shrink-0 items-center justify-center gap-2 rounded-3xl border bg-input/40 px-0 text-muted-foreground text-sm hover:bg-accent sm:h-9 sm:w-56 sm:justify-start sm:px-3"
+        className="flex size-9 shrink-0 items-center justify-center gap-2 rounded-3xl border bg-input/40 px-0 text-muted-foreground text-sm hover:bg-accent lg:h-9 lg:w-56 lg:justify-start lg:px-3"
         onClick={() => setOpen(true)}
         aria-label="Open global search"
         aria-keyshortcuts="Control+K Meta+K"
       >
         <HugeiconsIcon icon={Search01Icon} className="size-4 shrink-0" />
-        <span className="hidden flex-1 truncate text-left sm:block">
+        <span className="hidden flex-1 truncate text-left lg:block">
           Search…
         </span>
-        <kbd className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] sm:block">
+        <kbd className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] lg:block">
           ⌘K
         </kbd>
       </button>

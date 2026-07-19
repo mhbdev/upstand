@@ -56,6 +56,17 @@ networks:
     expect(result.composeFile).toContain("condition: any");
   });
 
+  test("converts Swarm stack restart_policy to Docker Compose restart", async () => {
+    const result = await useCase.convert({
+      composeFile:
+        "services:\n  web:\n    image: nginx\n    deploy:\n      restart_policy:\n        condition: on-failure\n",
+      target: "compose",
+    });
+
+    expect(result.composeFile).not.toContain("restart_policy");
+    expect(result.composeFile).toContain("restart: on-failure");
+  });
+
   test("rejects malformed documents and documents without services", async () => {
     await expect(
       useCase.execute({ composeFile: "services: [" }),

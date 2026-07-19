@@ -20,6 +20,7 @@ import {
   type DeployResourceUseCase,
 } from "../resource/deploy-resource.usecase";
 import { getNativeTemplate, type NativeTemplate } from "./native-catalog";
+import { extractAndParametrizeEnvVars } from "../resource/resource-environment";
 
 const TemplateTagsSchema = z
   .array(z.string().trim().min(1).max(64))
@@ -257,6 +258,9 @@ export class DeployTemplateUseCase {
       throw new Error("Environment is not part of the active organization");
     }
 
+    const { composeFile: parametrizedCompose, envVars: defaultEnvVars } =
+      extractAndParametrizeEnvVars(composeFile);
+
     const resource = await this.createResource.execute(
       CreateResourceInputSchema.parse({
         environmentId: input.environmentId,
@@ -269,8 +273,9 @@ export class DeployTemplateUseCase {
         credentials: JSON.stringify({
           provider: "raw",
           autoDeploy: false,
-          composeFile,
+          composeFile: parametrizedCompose,
         }),
+        envVars: defaultEnvVars,
       }),
     );
 

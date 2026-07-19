@@ -1,16 +1,5 @@
 "use client";
 
-import {
-  Alert02Icon,
-  CheckmarkCircle02Icon,
-  Copy01Icon,
-  Delete02Icon,
-  Edit02Icon,
-  Key01Icon,
-  PlusSignIcon,
-  ShieldKeyIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import { Button } from "@upstand/ui/components/button";
@@ -29,6 +18,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
@@ -42,7 +37,17 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { PageEmpty } from "@/components/dashboard/page-empty";
+import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import { UpGalTarget } from "@/components/upgal-target";
+import {
+  AlertTriangleIcon,
+  CheckCircle2,
+  Copy,
+  Edit2,
+  KeyRound,
+  PlusIcon,
+  Trash2Icon,
+} from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import type { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
@@ -143,7 +148,7 @@ export default function SSHKeys(_props: {
       refetch();
     },
     onError: (err) => {
-      toast.error(err.message || "Failed to generate SSH Key");
+      toast.error(err.message || "Failed to generate SSH key");
     },
   });
 
@@ -151,13 +156,13 @@ export default function SSHKeys(_props: {
   const createMutation = useMutation({
     ...trpc.sshKey.create.mutationOptions(),
     onSuccess: () => {
-      toast.success("SSH Key added successfully");
+      toast.success("SSH key added successfully");
       setAddKeyOpen(false);
       resetForm();
       refetch();
     },
     onError: (err) => {
-      toast.error(err.message || "Failed to add SSH Key");
+      toast.error(err.message || "Failed to add SSH key");
     },
   });
 
@@ -165,26 +170,26 @@ export default function SSHKeys(_props: {
   const deleteMutation = useMutation({
     ...trpc.sshKey.delete.mutationOptions(),
     onSuccess: () => {
-      toast.success("SSH Key deleted successfully");
+      toast.success("SSH key deleted successfully");
       setSelectedKey(null);
       setDeleteKeyOpen(false);
       refetch();
     },
     onError: (err) => {
-      toast.error(err.message || "Failed to delete SSH Key");
+      toast.error(err.message || "Failed to delete SSH key");
     },
   });
 
   const updateMutation = useMutation({
     ...trpc.sshKey.update.mutationOptions(),
     onSuccess: () => {
-      toast.success("SSH Key updated successfully");
+      toast.success("SSH key updated successfully");
       setEditKeyOpen(false);
       resetEditForm();
       refetch();
     },
     onError: (err) => {
-      toast.error(err.message || "Failed to update SSH Key");
+      toast.error(err.message || "Failed to update SSH key");
     },
   });
 
@@ -268,9 +273,9 @@ export default function SSHKeys(_props: {
       {/* Header */}
       <DashboardPageHeader
         title="SSH Keys"
-        description="Create and manage SSH Keys to securely access your servers and Git repositories."
+        description="Create and manage SSH keys to securely access your servers and Git repositories."
         icon={
-          <HugeiconsIcon icon={Key01Icon} className="size-6 text-primary" />
+          <KeyRound className="size-6 text-primary" />
         }
         actions={
           <UpGalTarget definition={createSshKeyTarget}>
@@ -282,7 +287,7 @@ export default function SSHKeys(_props: {
               }}
               className="gap-2 font-medium"
             >
-              <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+              <PlusIcon data-icon="inline-start" />
               Add SSH Key
             </Button>
           </UpGalTarget>
@@ -291,11 +296,9 @@ export default function SSHKeys(_props: {
 
       {/* Main List */}
       {loadingKeys ? (
-        <div className="flex min-h-60 items-center justify-center">
-          <Spinner className="size-8" />
-        </div>
+        <CardGridSkeleton count={2} className="grid gap-4 md:grid-cols-2" />
       ) : !orgId ? (
-        <div className="py-12 text-center text-muted-foreground">
+        <div className="py-12 text-center text-muted-foreground text-sm">
           Please select an organization to view SSH keys.
         </div>
       ) : keys && keys.length > 0 ? (
@@ -303,7 +306,7 @@ export default function SSHKeys(_props: {
           {keys.map((key, index) => (
             <Card
               key={key.id}
-              className="border border-border/40 bg-card/30 transition-all duration-300 hover:border-primary/45"
+              className="border border-border/40 bg-card/30"
             >
               <CardHeader className="flex flex-row items-start justify-between pb-3">
                 <div className="space-y-1">
@@ -326,30 +329,31 @@ export default function SSHKeys(_props: {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => {
                       setEditingKey({ id: key.id, name: key.name });
                       setEditName(key.name);
                       setEditDescription(key.description ?? "");
                       setEditKeyOpen(true);
                     }}
-                    className="p-1.5 text-muted-foreground transition-all hover:bg-muted/50 hover:text-foreground"
                     aria-label={`Edit ${key.name}`}
                   >
-                    <HugeiconsIcon icon={Edit02Icon} className="size-4" />
-                  </button>
-                  <button
-                    type="button"
+                    <Edit2 />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => {
                       setSelectedKey({ id: key.id, name: key.name });
                       setDeleteKeyOpen(true);
                     }}
-                    className="p-1.5 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     aria-label={`Delete ${key.name}`}
                   >
-                    <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                  </button>
+                    <Trash2Icon />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
@@ -367,7 +371,7 @@ export default function SSHKeys(_props: {
         </div>
       ) : (
         <PageEmpty
-          icon={Key01Icon}
+          icon={KeyRound}
           title="No SSH keys yet"
           description="Add an SSH key to reuse it across Git providers, deployments, and servers."
           action={
@@ -379,14 +383,15 @@ export default function SSHKeys(_props: {
                   setAddKeyOpen(true);
                 }}
               >
-                <HugeiconsIcon icon={PlusSignIcon} data-icon="inline-start" />
-                Add SSH key
+                <PlusIcon data-icon="inline-start" />
+                Add SSH Key
               </Button>
             </UpGalTarget>
           }
         />
       )}
 
+      {/* Edit SSH Key Dialog */}
       <Dialog
         open={editKeyOpen}
         onOpenChange={(open) => {
@@ -397,10 +402,7 @@ export default function SSHKeys(_props: {
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-bold text-xl">
-              <HugeiconsIcon
-                icon={Edit02Icon}
-                className="size-5 text-primary"
-              />
+              <Edit2 className="size-5 text-primary" />
               Edit SSH Key
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
@@ -408,61 +410,63 @@ export default function SSHKeys(_props: {
               Rotation replaces the stored encrypted private key.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-key-name">Name</Label>
-              <Input
-                id="edit-key-name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-key-description">Description</Label>
-              <Input
-                id="edit-key-description"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-              />
-            </div>
-            <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-muted-foreground text-xs">
-              Leave the rotation fields empty to keep the current key. If you
-              rotate, both key halves are required and will be verified.
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="rotate-private-key">
-                Replacement private key
-              </Label>
-              <Textarea
-                id="rotate-private-key"
-                value={rotationPrivateKey}
-                onChange={(e) => setRotationPrivateKey(e.target.value)}
-                rows={4}
-                className="resize-none break-all font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="rotate-public-key">Replacement public key</Label>
-              <Textarea
-                id="rotate-public-key"
-                value={rotationPublicKey}
-                onChange={(e) => setRotationPublicKey(e.target.value)}
-                rows={2}
-                className="resize-none break-all font-mono text-xs"
-              />
-            </div>
+          <form onSubmit={handleUpdate} className="flex flex-col gap-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="edit-key-name">Name</FieldLabel>
+                <Input
+                  id="edit-key-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="edit-key-description">Description</FieldLabel>
+                <Input
+                  id="edit-key-description"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                />
+              </Field>
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-muted-foreground text-xs">
+                Leave the rotation fields empty to keep the current key. If you
+                rotate, both key halves are required and will be verified.
+              </div>
+              <Field>
+                <FieldLabel htmlFor="rotate-private-key">
+                  Replacement private key
+                </FieldLabel>
+                <Textarea
+                  id="rotate-private-key"
+                  value={rotationPrivateKey}
+                  onChange={(e) => setRotationPrivateKey(e.target.value)}
+                  rows={4}
+                  className="resize-none break-all font-mono text-xs"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="rotate-public-key">Replacement public key</FieldLabel>
+                <Textarea
+                  id="rotate-public-key"
+                  value={rotationPublicKey}
+                  onChange={(e) => setRotationPublicKey(e.target.value)}
+                  rows={2}
+                  className="resize-none break-all font-mono text-xs"
+                />
+              </Field>
+            </FieldGroup>
             <DialogFooter className="gap-2">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 onClick={() => setEditKeyOpen(false)}
               >
                 Cancel
               </Button>
               <Button type="submit" disabled={updateMutation.isPending}>
                 {updateMutation.isPending && <Spinner className="size-4" />}
-                {updateMutation.isPending ? "Saving..." : "Save changes"}
+                {updateMutation.isPending ? "Saving…" : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>
@@ -480,7 +484,7 @@ export default function SSHKeys(_props: {
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-bold text-xl">
-              <HugeiconsIcon icon={Key01Icon} className="size-5 text-primary" />
+              <KeyRound className="size-5 text-primary" />
               Add SSH Key
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
@@ -521,50 +525,40 @@ export default function SSHKeys(_props: {
           </div>
 
           {addKeyMode === "generate" ? (
-            <form onSubmit={handleGenerate} className="space-y-4 pt-1">
-              <div className="space-y-2">
-                <Label htmlFor="gen-key-name">Name</Label>
-                <UpGalTarget definition={sshKeyNameTarget}>
-                  <Input
-                    id="gen-key-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Hetzner Production VPS"
-                    autoComplete="off"
-                    required
-                  />
-                </UpGalTarget>
-              </div>
+            <form onSubmit={handleGenerate} className="flex flex-col gap-4">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="key-name">Name</FieldLabel>
+                  <UpGalTarget definition={sshKeyNameTarget}>
+                    <Input
+                      id="key-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. My Server Key"
+                      autoComplete="off"
+                      required
+                    />
+                  </UpGalTarget>
+                </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="gen-key-desc">Description</Label>
-                <UpGalTarget definition={sshKeyDescriptionTarget}>
-                  <Input
-                    id="gen-key-desc"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Used for private git access"
-                    autoComplete="off"
-                  />
-                </UpGalTarget>
-              </div>
-
-              <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-                <HugeiconsIcon
-                  icon={ShieldKeyIcon}
-                  className="mt-0.5 size-4 shrink-0 text-primary"
-                />
-                <p className="text-muted-foreground">
-                  We'll generate a real ED25519 key pair on the server. The
-                  private key is shown to you once, immediately after generation
-                  — save it somewhere safe, since we can't show it to you again.
-                </p>
-              </div>
+                <Field>
+                  <FieldLabel htmlFor="key-description">Description</FieldLabel>
+                  <UpGalTarget definition={sshKeyDescriptionTarget}>
+                    <Input
+                      id="key-description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Optional details about this key"
+                      autoComplete="off"
+                    />
+                  </UpGalTarget>
+                </Field>
+              </FieldGroup>
 
               <DialogFooter className="gap-2 pt-2">
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => setAddKeyOpen(false)}
                 >
                   Cancel
@@ -578,80 +572,80 @@ export default function SSHKeys(_props: {
                     {generateMutation.isPending && (
                       <Spinner className="size-4" />
                     )}
-                    {generateMutation.isPending
-                      ? "Generating..."
-                      : "Generate Key"}
+                    {generateMutation.isPending ? "Generating…" : "Generate Key"}
                   </Button>
                 </UpGalTarget>
               </DialogFooter>
             </form>
           ) : (
-            <form onSubmit={handleImport} className="space-y-4 pt-1">
-              <div className="space-y-2">
-                <Label htmlFor="key-name">Name</Label>
-                <UpGalTarget definition={sshKeyNameTarget}>
-                  <Input
-                    id="key-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Hetzner Production VPS"
-                    autoComplete="off"
-                    required
-                  />
-                </UpGalTarget>
-              </div>
+            <form onSubmit={handleImport} className="flex flex-col gap-4">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="key-name-import">Name</FieldLabel>
+                  <UpGalTarget definition={sshKeyNameTarget}>
+                    <Input
+                      id="key-name-import"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Work Laptop Key"
+                      autoComplete="off"
+                      required
+                    />
+                  </UpGalTarget>
+                </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="key-desc">Description</Label>
-                <UpGalTarget definition={sshKeyDescriptionTarget}>
-                  <Input
-                    id="key-desc"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Used for private git access"
-                    autoComplete="off"
-                  />
-                </UpGalTarget>
-              </div>
+                <Field>
+                  <FieldLabel htmlFor="key-desc">Description</FieldLabel>
+                  <UpGalTarget definition={sshKeyDescriptionTarget}>
+                    <Input
+                      id="key-desc"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Used for private git access"
+                      autoComplete="off"
+                    />
+                  </UpGalTarget>
+                </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="private-key">Private Key</Label>
-                <UpGalTarget definition={sshKeyPrivateKeyTarget}>
-                  <Textarea
-                    id="private-key"
-                    value={privateKey}
-                    onChange={(e) => setPrivateKey(e.target.value)}
-                    rows={4}
-                    placeholder="-----BEGIN OPENSSH PRIVATE KEY-----…"
-                    className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
-                    required
-                  />
-                </UpGalTarget>
-              </div>
+                <Field>
+                  <FieldLabel htmlFor="private-key">Private Key</FieldLabel>
+                  <UpGalTarget definition={sshKeyPrivateKeyTarget}>
+                    <Textarea
+                      id="private-key"
+                      value={privateKey}
+                      onChange={(e) => setPrivateKey(e.target.value)}
+                      rows={4}
+                      placeholder="-----BEGIN OPENSSH PRIVATE KEY-----…"
+                      className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
+                      required
+                    />
+                  </UpGalTarget>
+                </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="public-key">Public Key</Label>
-                <UpGalTarget definition={sshKeyPublicKeyTarget}>
-                  <Textarea
-                    id="public-key"
-                    value={publicKey}
-                    onChange={(e) => setPublicKey(e.target.value)}
-                    rows={2}
-                    placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5…"
-                    className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
-                    required
-                  />
-                </UpGalTarget>
-                <p className="text-[11px] text-muted-foreground">
-                  We verify the private and public key actually match before
-                  storing them.
-                </p>
-              </div>
+                <Field>
+                  <FieldLabel htmlFor="public-key">Public Key</FieldLabel>
+                  <UpGalTarget definition={sshKeyPublicKeyTarget}>
+                    <Textarea
+                      id="public-key"
+                      value={publicKey}
+                      onChange={(e) => setPublicKey(e.target.value)}
+                      rows={2}
+                      placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5…"
+                      className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
+                      required
+                    />
+                  </UpGalTarget>
+                  <p className="text-[11px] text-muted-foreground">
+                    We verify the private and public key actually match before
+                    storing them.
+                  </p>
+                </Field>
+              </FieldGroup>
 
               <DialogFooter className="gap-2 pt-2">
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => setAddKeyOpen(false)}
                 >
                   Cancel
@@ -685,10 +679,7 @@ export default function SSHKeys(_props: {
         <DialogContent className="max-w-lg rounded-2xl border border-primary/30 bg-card shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-bold text-xl">
-              <HugeiconsIcon
-                icon={ShieldKeyIcon}
-                className="size-5 text-primary"
-              />
+              <KeyRound className="size-5 text-primary" />
               Save your private key
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
@@ -701,38 +692,37 @@ export default function SSHKeys(_props: {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest">
-                Private Key
-              </Label>
-              <Textarea
-                readOnly
-                value={revealedKey?.privateKey ?? ""}
-                rows={6}
-                className="select-all resize-none break-all border border-border/40 p-3 font-mono text-[10px]"
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
+          <div className="flex flex-col gap-3">
+            <FieldGroup>
+              <Field>
+                <FieldLabel className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest">
+                  Private Key
+                </FieldLabel>
+                <Textarea
+                  readOnly
+                  value={revealedKey?.privateKey ?? ""}
+                  rows={6}
+                  className="select-all resize-none break-all border border-border/40 p-3 font-mono text-[10px]"
+                  onFocus={(e) => e.target.select()}
+                />
+              </Field>
 
-            <div className="space-y-1.5">
-              <Label className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest">
-                Public Key
-              </Label>
-              <Textarea
-                readOnly
-                value={revealedKey?.publicKey ?? ""}
-                rows={2}
-                className="select-all resize-none break-all border border-border/40 p-3 font-mono text-[10px]"
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
+              <Field>
+                <FieldLabel className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest">
+                  Public Key
+                </FieldLabel>
+                <Textarea
+                  readOnly
+                  value={revealedKey?.publicKey ?? ""}
+                  rows={2}
+                  className="select-all resize-none break-all border border-border/40 p-3 font-mono text-[10px]"
+                  onFocus={(e) => e.target.select()}
+                />
+              </Field>
+            </FieldGroup>
 
             <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs">
-              <HugeiconsIcon
-                icon={Alert02Icon}
-                className="mt-0.5 size-4 shrink-0 text-destructive"
-              />
+              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
               <p className="text-muted-foreground">
                 Closing this dialog without saving the private key means it's
                 gone for good — you'd need to generate a new key pair.
@@ -743,14 +733,12 @@ export default function SSHKeys(_props: {
           <DialogFooter className="gap-2 pt-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="outline"
               className="gap-2"
               onClick={handleCopyPrivateKey}
             >
-              <HugeiconsIcon
-                icon={privateKeyCopied ? CheckmarkCircle02Icon : Copy01Icon}
-                className="size-4"
-              />
+              <CheckCircle2 className={cn("size-4", !privateKeyCopied && "hidden")} />
+              <Copy className={cn("size-4", privateKeyCopied && "hidden")} />
               {privateKeyCopied ? "Copied" : "Copy Private Key"}
             </Button>
             <Button
@@ -760,10 +748,10 @@ export default function SSHKeys(_props: {
               onClick={() => {
                 setRevealedKey(null);
                 setPrivateKeyCopied(false);
-                toast.success("SSH Key generated successfully");
+                toast.success("SSH key generated successfully");
               }}
             >
-              I've saved it
+              I Saved It
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -775,7 +763,7 @@ export default function SSHKeys(_props: {
           setDeleteKeyOpen(open);
           if (!open) setSelectedKey(null);
         }}
-        title="Delete SSH key?"
+        title="Delete SSH Key?"
         description={
           <>
             This will permanently delete <strong>{selectedKey?.name}</strong>.
@@ -783,7 +771,7 @@ export default function SSHKeys(_props: {
             be undone.
           </>
         }
-        actionLabel="Delete key"
+        actionLabel="Delete Key"
         pending={deleteMutation.isPending}
         onConfirm={() => {
           if (selectedKey) deleteMutation.mutate({ id: selectedKey.id });

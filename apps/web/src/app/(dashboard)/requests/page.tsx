@@ -13,19 +13,13 @@ import {
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@upstand/ui/components/pagination";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Separator } from "@upstand/ui/components/separator";
 import {
   Sheet,
   SheetContent,
@@ -33,6 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@upstand/ui/components/sheet";
+import { Skeleton } from "@upstand/ui/components/skeleton";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import {
@@ -57,9 +52,9 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PagePagination } from "@/components/dashboard/page-pagination";
 import {
   Activity,
-  CheckCircle2,
   Copy,
   Download,
   Eye,
@@ -318,11 +313,15 @@ function RequestsTable({
             </TableHeader>
             <TableBody>
               {logs.isPending ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center">
-                    <Spinner className="mx-auto" />
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
               ) : logs.data?.entries.length ? (
                 logs.data.entries.map((entry) => (
                   <TableRow
@@ -380,35 +379,12 @@ function RequestsTable({
             </TableBody>
           </Table>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-muted-foreground text-xs">
-            {logs.data?.total ?? 0} requests · page {logs.page} of {pageCount}
-          </p>
-          <Pagination className="mx-0 w-auto justify-end">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    logs.setPage(Math.max(1, logs.page - 1));
-                  }}
-                  aria-disabled={logs.page <= 1}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    logs.setPage(Math.min(pageCount, logs.page + 1));
-                  }}
-                  aria-disabled={logs.page >= pageCount}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+        <PagePagination
+          page={logs.page}
+          pageSize={25}
+          total={logs.data?.total ?? 0}
+          onPageChange={logs.setPage}
+        />
       </CardContent>
     </Card>
   );
@@ -468,40 +444,38 @@ export default function RequestsPage() {
   return (
     <DashboardPage className="gap-6">
       <DashboardPageHeader
-        title="Request Monitoring"
+        title="Requests"
         icon={<Activity className="size-6 text-primary" />}
         description="Inspect HTTP traffic served by Caddy without duplicating deployment queue history."
         actions={
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => {
               void status.refetch();
               void logs.refetch();
             }}
           >
-            <RefreshCw data-icon="inline-start" /> Refresh
+            <RefreshCw data-icon="inline-start" />
           </Button>
         }
       />
       <Card>
-        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="rounded-full bg-primary/10 p-2 text-primary">
-              <Activity className="size-5" aria-hidden="true" />
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-primary/10 p-2 text-primary">
+                <Activity className="size-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="font-semibold">Caddy access logs</h2>
+                <p className="max-w-2xl text-muted-foreground text-sm">
+                  Store structured request logs in a managed Docker volume.
+                  Turning this on reloads Caddy and keeps the last 7 rolled
+                  files.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="font-semibold">Caddy access logs</h2>
-              <p className="max-w-2xl text-muted-foreground text-sm">
-                Store structured request logs in a managed Docker volume.
-                Turning this on reloads Caddy and keeps the last 7 rolled files.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant={active ? "default" : "secondary"}>
-              {active ? "Active" : "Inactive"}
-            </Badge>
             <Switch
               checked={active}
               onCheckedChange={toggle}
@@ -509,79 +483,62 @@ export default function RequestsPage() {
               aria-label="Enable Caddy access logs"
             />
           </div>
+
+          {active && (
+            <div className="flex flex-col gap-2">
+              <Separator />
+              <div className="mt-4">
+                <Label htmlFor="access-log-cleanup">Log cleanup schedule</Label>
+                <p
+                  id="access-log-cleanup-help"
+                  className="mt-1 text-muted-foreground text-xs"
+                >
+                  Cron schedule for rotating old access-log files.
+                </p>
+              </div>
+              <div className="flex w-full gap-2 sm:max-w-sm">
+                <Input
+                  id="access-log-cleanup"
+                  value={cleanupCron}
+                  onChange={(event) => setCleanupCron(event.target.value)}
+                  placeholder="0 3 * * *"
+                  aria-describedby="access-log-cleanup-help"
+                />
+                <Button
+                  variant="outline"
+                  disabled={cleanupMutation.isPending || !cleanupCron.trim()}
+                  onClick={async () => {
+                    try {
+                      await cleanupMutation.mutateAsync({
+                        cron: cleanupCron.trim(),
+                      });
+                      await status.refetch();
+                      toast.success("Cleanup schedule updated");
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Unable to update cleanup schedule",
+                      );
+                    }
+                  }}
+                >
+                  {cleanupMutation.isPending ? (
+                    <>
+                      <Spinner data-icon="inline-start" />
+                      Saving…
+                    </>
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
       {active ? (
-        <Card>
-          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <Label htmlFor="access-log-cleanup">Log cleanup schedule</Label>
-              <p
-                id="access-log-cleanup-help"
-                className="mt-1 text-muted-foreground text-xs"
-              >
-                Cron schedule for rotating old access-log files.
-              </p>
-            </div>
-            <div className="flex w-full gap-2 sm:max-w-sm">
-              <Input
-                id="access-log-cleanup"
-                value={cleanupCron}
-                onChange={(event) => setCleanupCron(event.target.value)}
-                placeholder="0 3 * * *"
-                aria-describedby="access-log-cleanup-help"
-              />
-              <Button
-                variant="outline"
-                disabled={cleanupMutation.isPending || !cleanupCron.trim()}
-                onClick={async () => {
-                  try {
-                    await cleanupMutation.mutateAsync({
-                      cron: cleanupCron.trim(),
-                    });
-                    await status.refetch();
-                    toast.success("Cleanup schedule updated");
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Unable to update cleanup schedule",
-                    );
-                  }
-                }}
-              >
-                {cleanupMutation.isPending ? <Spinner /> : "Save"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-      {active ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Selected range</CardDescription>
-                <CardTitle className="text-xl">
-                  {logs.data?.total ?? 0}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-muted-foreground text-xs">
-                matching requests
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Log volume</CardDescription>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <CheckCircle2 className="size-5 text-primary" /> Persistent
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-muted-foreground text-xs">
-                survives Caddy restarts
-              </CardContent>
-            </Card>
-          </div>
           <Card>
             <CardHeader>
               <CardTitle>Request distribution</CardTitle>
@@ -697,8 +654,14 @@ export default function RequestsPage() {
               and detailed HTTP entries.
             </p>
             <Button onClick={toggle} disabled={pending}>
-              {pending ? <Spinner data-icon="inline-start" /> : null} Enable
-              monitoring
+              {pending ? (
+                <>
+                  <Spinner data-icon="inline-start" />
+                  Enabling…
+                </>
+              ) : (
+                "Enable Monitoring"
+              )}
             </Button>
           </CardContent>
         </Card>

@@ -63,6 +63,8 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import type { HugeIcon } from "@/components/huge-icons";
 import {
   Bell,
@@ -71,6 +73,7 @@ import {
   Mail,
   MessageCircle,
   MessageSquare,
+  PlusIcon,
   Radio,
   Send,
   Users,
@@ -562,7 +565,7 @@ export default function NotificationsPage() {
     providerValues("slack"),
   );
 
-  const { data: channels = [], refetch } = useQuery({
+  const { data: channels = [], refetch, isPending: loadingChannels } = useQuery({
     ...trpc.notification.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
@@ -737,31 +740,28 @@ export default function NotificationsPage() {
         description="Route operational alerts to multiple channels. Credentials stay encrypted and delivery failures never block deployments."
         actions={
           <UpGalTarget definition={addNotificationTarget}>
-            <Button onClick={openCreate} disabled={!organizationId}>
-              Add notification
+            <Button onClick={openCreate} disabled={!organizationId} className="gap-2 font-medium">
+              <PlusIcon data-icon="inline-start" />
+              Add Channel
             </Button>
           </UpGalTarget>
         }
       />
 
-      {channels.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Bell aria-hidden="true" />
-            </EmptyMedia>
-            <EmptyTitle>No notification channels</EmptyTitle>
-            <EmptyDescription>
-              Add Slack, email, webhooks, or any supported provider to receive
-              deployment and operational alerts.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button onClick={openCreate} disabled={!organizationId}>
-              Add your first channel
+      {loadingChannels ? (
+        <CardGridSkeleton count={3} />
+      ) : channels.length === 0 ? (
+        <PageEmpty
+          icon={Bell}
+          title="No notification channels"
+          description="Add Slack, email, webhooks, or any supported provider to receive deployment and operational alerts."
+          action={
+            <Button onClick={openCreate} disabled={!organizationId} className="gap-2">
+              <PlusIcon data-icon="inline-start" />
+              Add Channel
             </Button>
-          </EmptyContent>
-        </Empty>
+          }
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {channels.map((channel) => (
@@ -799,10 +799,14 @@ export default function NotificationsPage() {
                   onClick={() => testChannel.mutate({ id: channel.id })}
                   disabled={testChannel.isPending}
                 >
-                  {testChannel.isPending && (
-                    <Spinner data-icon="inline-start" />
+                  {testChannel.isPending ? (
+                    <>
+                      <Spinner data-icon="inline-start" />
+                      Testing…
+                    </>
+                  ) : (
+                    "Test Channel"
                   )}
-                  Test
                 </Button>
                 <Button
                   variant="outline"
@@ -812,7 +816,7 @@ export default function NotificationsPage() {
                     setDialogOpen(true);
                   }}
                 >
-                  Edit
+                  Edit Channel
                 </Button>
                 <Button
                   variant="destructive"
@@ -822,7 +826,7 @@ export default function NotificationsPage() {
                   }
                   disabled={removeChannel.isPending}
                 >
-                  Remove
+                  Remove Channel
                 </Button>
               </CardFooter>
             </Card>
@@ -884,7 +888,14 @@ export default function NotificationsPage() {
                     disabled={retryDelivery.isPending}
                     onClick={() => retryDelivery.mutate({ id: delivery.id })}
                   >
-                    Retry delivery
+                    {retryDelivery.isPending ? (
+                      <>
+                        <Spinner data-icon="inline-start" />
+                        Retrying…
+                      </>
+                    ) : (
+                      "Retry Delivery"
+                    )}
                   </Button>
                 )}
               </div>
@@ -900,7 +911,7 @@ export default function NotificationsPage() {
         <DialogContent className="flex h-[min(92svh,900px)] w-[calc(100vw-1rem)] max-w-[min(96vw,960px)] flex-col gap-0 overflow-hidden p-0 sm:min-w-[min(42rem,calc(100vw-2rem))]">
           <DialogHeader className="shrink-0 border-border/60 border-b px-6 py-5">
             <DialogTitle>
-              {editing ? "Edit notification" : "Add notification"}
+              {editing ? "Edit Notification Channel" : "Add Notification Channel"}
             </DialogTitle>
             <DialogDescription>
               Select a provider, enter its connection details, then choose the
@@ -917,10 +928,6 @@ export default function NotificationsPage() {
                   Provider
                 </FieldLabel>
                 <Select
-                  items={providerOptions.map(([value, item]) => ({
-                    value,
-                    label: item.label,
-                  }))}
                   value={provider}
                   onValueChange={(next) =>
                     changeProvider(next as NotificationProviderType)
@@ -991,8 +998,16 @@ export default function NotificationsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending && <Spinner data-icon="inline-start" />}
-                {editing ? "Save changes" : "Create notification"}
+                {isPending ? (
+                  <>
+                    <Spinner data-icon="inline-start" />
+                    Saving…
+                  </>
+                ) : editing ? (
+                  "Save Changes"
+                ) : (
+                  "Create Channel"
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -1002,7 +1017,7 @@ export default function NotificationsPage() {
       <ConfirmActionDialog
         open={removeTarget !== null}
         onOpenChange={(open) => !open && setRemoveTarget(null)}
-        title={`Remove ${removeTarget?.name ?? "notification channel"}?`}
+        title={`Remove ${removeTarget?.name ?? "Notification Channel"}?`}
         description={`${removeTarget?.name ?? "This notification channel"} will stop receiving operational alerts. This action cannot be undone.`}
         actionLabel="Remove Channel"
         pending={removeChannel.isPending}

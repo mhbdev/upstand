@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import {
@@ -33,6 +34,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageSkeleton } from "@/components/dashboard/page-skeleton";
 import {
   Activity,
   ArrowDownToLine,
@@ -205,7 +207,7 @@ function StatCard({
   value,
 }: {
   description: string;
-  icon: typeof Activity;
+  icon?: typeof Activity;
   label: string;
   value: string;
 }) {
@@ -215,7 +217,7 @@ function StatCard({
         <CardTitle className="font-medium text-muted-foreground text-sm">
           {label}
         </CardTitle>
-        <Icon className="size-4 text-primary" aria-hidden="true" />
+        {Icon && <Icon className="size-4 text-primary" aria-hidden="true" />}
       </CardHeader>
       <CardContent>
         <p className="font-semibold text-xl tabular-nums tracking-tight">
@@ -361,9 +363,7 @@ export default function MonitoringPage() {
   if (organizationPending || (runtimeQuery.isPending && !stats)) {
     return (
       <DashboardPage>
-        <div className="flex min-h-60 items-center justify-center">
-          <Spinner />
-        </div>
+        <PageSkeleton />
       </DashboardPage>
     );
   }
@@ -393,21 +393,12 @@ export default function MonitoringPage() {
   return (
     <DashboardPage className="gap-6">
       <DashboardPageHeader
-        title="Server Monitoring"
+        title="Monitoring"
         icon={<Activity className="size-6 text-primary" />}
         description={`Live and persisted host telemetry for ${stats?.serverName ?? "the selected server"}. ${range.label} of history is available.`}
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Select
-              items={[
-                { value: "local", label: "Local Server" },
-                ...(serversQuery.data ?? [])
-                  .filter((server) => server.status === "ready")
-                  .map((server) => ({
-                    value: server.id,
-                    label: server.name,
-                  })),
-              ]}
               value={selectedServerId}
               onValueChange={(value) => value && setSelectedServerId(value)}
             >
@@ -429,12 +420,11 @@ export default function MonitoringPage() {
               </SelectContent>
             </Select>
             <Select
-              items={RANGE_OPTIONS}
               value={rangeKey}
               onValueChange={(value) => value && setRangeKey(value as RangeKey)}
             >
               <SelectTrigger
-                className="h-9 w-[150px]"
+                className="h-9 w-37.5"
                 aria-label="Monitoring time range"
               >
                 <SelectValue />
@@ -447,15 +437,12 @@ export default function MonitoringPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Badge variant="outline">
-              Docker {stats?.dockerVersion ?? "unknown"}
-            </Badge>
           </div>
         }
       />
 
       <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-medium">Monitoring agent</p>
             <p className="truncate text-muted-foreground text-sm">
@@ -497,19 +484,16 @@ export default function MonitoringPage() {
           label="Workload CPU"
           value={`${stats?.cpu ?? latest?.cpu ?? 0}%`}
           description={`${stats?.cpuCores ?? 0} host cores available`}
-          icon={Cpu}
         />
         <StatCard
           label="Workload memory"
           value={`${stats?.memoryPercent ?? latest?.memory ?? 0}%`}
           description={`${formatBytes((stats?.memoryUsage ?? 0) * 1024 * 1024)} used`}
-          icon={MemoryStick}
         />
         <StatCard
           label="Active containers"
           value={String(stats?.activeContainers ?? containers.length)}
           description="Running workloads"
-          icon={Server}
         />
         <StatCard
           label="Docker storage"
@@ -519,13 +503,16 @@ export default function MonitoringPage() {
               (stats?.dockerVolumeBytes ?? 0),
           )}
           description="Images, containers, and volumes"
-          icon={HardDrive}
         />
         <StatCard
           label="Host uptime"
           value={formatUptime(latest?.uptime ?? 0)}
           description={latest?.os ?? "Waiting for host metadata"}
-          icon={Activity}
+        />
+        <StatCard
+          label="Docker"
+          value={`Docker ${stats?.dockerVersion ?? "unknown"}`}
+          description={""}
         />
       </section>
 
@@ -539,7 +526,7 @@ export default function MonitoringPage() {
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+            className="flex flex-col gap-4 sm:flex-row sm:items-end"
             onSubmit={(event) => {
               event.preventDefault();
               if (!activeOrganization?.id) return;
@@ -551,49 +538,55 @@ export default function MonitoringPage() {
               });
             }}
           >
-            <div className="grid gap-2">
-              <Label htmlFor="monitoring-cpu-threshold">
-                CPU threshold (%)
-              </Label>
-              <Input
-                id="monitoring-cpu-threshold"
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                value={cpuThreshold}
-                onChange={(event) =>
-                  setCpuThreshold(Number(event.target.value))
-                }
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="monitoring-memory-threshold">
-                Memory threshold (%)
-              </Label>
-              <Input
-                id="monitoring-memory-threshold"
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                value={memoryThreshold}
-                onChange={(event) =>
-                  setMemoryThreshold(Number(event.target.value))
-                }
-              />
-            </div>
+            <FieldGroup className="grid gap-4 sm:flex-1 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="monitoring-cpu-threshold">
+                  CPU Threshold (%)
+                </FieldLabel>
+                <Input
+                  id="monitoring-cpu-threshold"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={cpuThreshold}
+                  onChange={(event) =>
+                    setCpuThreshold(Number(event.target.value))
+                  }
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="monitoring-memory-threshold">
+                  Memory Threshold (%)
+                </FieldLabel>
+                <Input
+                  id="monitoring-memory-threshold"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={memoryThreshold}
+                  onChange={(event) =>
+                    setMemoryThreshold(Number(event.target.value))
+                  }
+                />
+              </Field>
+            </FieldGroup>
             <Button
               type="submit"
               disabled={
                 updateMonitoringSettings.isPending ||
                 monitoringSettingsQuery.isPending
               }
+              className="sm:shrink-0"
             >
               {updateMonitoringSettings.isPending ? (
-                <Spinner />
+                <>
+                  <Spinner data-icon="inline-start" />
+                  Saving…
+                </>
               ) : (
-                "Save thresholds"
+                "Save Thresholds"
               )}
             </Button>
           </form>

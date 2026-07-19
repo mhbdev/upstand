@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from "@upstand/ui/components/card";
 import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
 import {
   Table,
@@ -26,6 +25,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@upstand/ui/components/field";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
@@ -34,6 +39,8 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { PageToolbar } from "@/components/dashboard/page-toolbar";
+import { PageEmpty } from "@/components/dashboard/page-empty";
+import { TableSkeleton, CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import {
   Activity,
   Clock,
@@ -179,27 +186,30 @@ export default function DeploymentsPage() {
     setCancelTarget({ serverId, jobId, label });
   };
 
-  // Filter deployments
+  // Filter history
   const filteredDeployments = deployments.filter((dep) => {
-    const query = searchQuery.toLowerCase();
+    const term = searchQuery.toLowerCase();
     return (
-      dep.resourceName.toLowerCase().includes(query) ||
-      dep.title.toLowerCase().includes(query) ||
-      dep.status.toLowerCase().includes(query) ||
-      dep.serverName?.toLowerCase().includes(query)
+      dep.resourceName.toLowerCase().includes(term) ||
+      dep.projectName.toLowerCase().includes(term) ||
+      dep.environmentName.toLowerCase().includes(term) ||
+      dep.title?.toLowerCase().includes(term)
     );
   });
 
   const getQueueStateBadge = (state: string) => {
-    return (
-      <DeploymentStatusBadge status={state === "active" ? "running" : state} />
-    );
+    switch (state) {
+      case "active":
+        return <DeploymentStatusBadge status="running" />;
+      default:
+        return <DeploymentStatusBadge status={state === "active" ? "running" : state} />;
+    }
   };
 
   return (
     <DashboardPage className="flex-1">
       <DashboardPageHeader
-        title="Deployments & Queues"
+        title="Deployments"
         icon={<Activity className="size-6 text-primary" />}
         description="Observe build histories, monitor live queues, and manage server-level concurrency."
         actions={
@@ -259,14 +269,13 @@ export default function DeploymentsPage() {
             </CardHeader>
             <CardContent>
               {loadingDeployments ? (
-                <div className="flex h-32 items-center justify-center">
-                  <Spinner className="size-6 text-primary" />
-                </div>
+                <TableSkeleton columns={7} rows={5} />
               ) : filteredDeployments.length === 0 ? (
-                <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
-                  <Activity className="mb-2 size-8 stroke-[1.5]" />
-                  <p>No deployments found.</p>
-                </div>
+                <PageEmpty
+                  icon={Activity}
+                  title="No deployments found"
+                  description="All deployments executed across the server infrastructure will appear here."
+                />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -344,14 +353,13 @@ export default function DeploymentsPage() {
             </CardHeader>
             <CardContent>
               {loadingQueue ? (
-                <div className="flex h-32 items-center justify-center">
-                  <Spinner className="size-6 text-primary" />
-                </div>
+                <TableSkeleton columns={7} rows={5} />
               ) : queueJobs.length === 0 ? (
-                <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
-                  <Clock className="mb-2 size-8 stroke-[1.5]" />
-                  <p>Queue is empty.</p>
-                </div>
+                <PageEmpty
+                  icon={Clock}
+                  title="Queue is empty"
+                  description="Currently active or waiting deployments in BullMQ will appear here."
+                />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -391,14 +399,14 @@ export default function DeploymentsPage() {
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
-                              size="icon"
+                              size="icon-sm"
                               onClick={() =>
                                 handleCancelJob(job.serverId, job.id, job.label)
                               }
-                              className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={cancelJobMutation.isPending}
                             >
-                              <Trash2 className="size-4" />
+                              <Trash2 />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -425,14 +433,13 @@ export default function DeploymentsPage() {
             </CardHeader>
             <CardContent>
               {loadingServers ? (
-                <div className="flex h-32 items-center justify-center">
-                  <Spinner className="size-6 text-primary" />
-                </div>
+                <CardGridSkeleton count={2} className="grid gap-6 md:grid-cols-2" />
               ) : servers.length === 0 ? (
-                <div className="flex h-32 flex-col items-center justify-center text-muted-foreground">
-                  <Server className="mb-2 size-8 stroke-[1.5]" />
-                  <p>No active servers detected.</p>
-                </div>
+                <PageEmpty
+                  icon={Server}
+                  title="No active servers detected"
+                  description="Configure server concurrency settings once a server is connected."
+                />
               ) : (
                 <div className="grid gap-6 md:grid-cols-2">
                   {servers.map((server) => (
@@ -456,47 +463,44 @@ export default function DeploymentsPage() {
                           <Server className="size-5 text-muted-foreground/60" />
                         </div>
 
-                        <div className="space-y-2 pt-2">
-                          <Label
-                            htmlFor={`concurrency-${server.id}`}
-                            className="font-semibold text-xs"
-                          >
-                            Max Parallel Builds
-                          </Label>
-                          <div className="flex items-center gap-3">
-                            <Input
-                              id={`concurrency-${server.id}`}
-                              type="number"
-                              min="1"
-                              max="16"
-                              value={concurrencyInputs[server.id] ?? 1}
-                              onChange={(e) => {
-                                setDirtyConcurrency((current) => ({
-                                  ...current,
-                                  [server.id]: true,
-                                }));
-                                setConcurrencyInputs({
-                                  ...concurrencyInputs,
-                                  [server.id]:
-                                    Number.parseInt(e.target.value, 10) || 1,
-                                });
-                              }}
-                              className="h-9 w-24"
-                            />
-                            <Button
-                              onClick={() => handleUpdateConcurrency(server.id)}
-                              disabled={updateConcurrencyMutation.isPending}
-                              size="sm"
-                              className="h-9 gap-1.5"
-                            >
-                              Save
-                            </Button>
-                          </div>
-                          <p className="mt-1 text-[10px] text-muted-foreground">
-                            Additional deployment triggers for this server will
-                            queue up and wait.
-                          </p>
-                        </div>
+                        <FieldGroup className="pt-2">
+                          <Field>
+                            <FieldLabel htmlFor={`concurrency-${server.id}`}>
+                              Max Parallel Builds
+                            </FieldLabel>
+                            <div className="flex items-center gap-3">
+                              <Input
+                                id={`concurrency-${server.id}`}
+                                type="number"
+                                min="1"
+                                max="16"
+                                value={concurrencyInputs[server.id] ?? 1}
+                                onChange={(e) => {
+                                  setDirtyConcurrency((current) => ({
+                                    ...current,
+                                    [server.id]: true,
+                                  }));
+                                  setConcurrencyInputs({
+                                    ...concurrencyInputs,
+                                    [server.id]:
+                                      Number.parseInt(e.target.value, 10) || 1,
+                                  });
+                                }}
+                                className="h-9 w-24"
+                              />
+                              <Button
+                                onClick={() => handleUpdateConcurrency(server.id)}
+                                disabled={updateConcurrencyMutation.isPending}
+                                size="sm"
+                              >
+                                Save
+                              </Button>
+                            </div>
+                            <FieldDescription>
+                              Additional deployment triggers for this server will queue up and wait.
+                            </FieldDescription>
+                          </Field>
+                        </FieldGroup>
                       </CardContent>
                     </Card>
                   ))}
@@ -517,14 +521,14 @@ export default function DeploymentsPage() {
       <ConfirmActionDialog
         open={cancelTarget !== null}
         onOpenChange={(open) => !open && setCancelTarget(null)}
-        title="Cancel deployment?"
+        title="Cancel Deployment?"
         description={
           <>
             This will cancel <strong>{cancelTarget?.label}</strong> and remove
             it from the deployment queue. This action cannot be undone.
           </>
         }
-        actionLabel="Cancel deployment"
+        actionLabel="Cancel Deployment"
         pending={cancelJobMutation.isPending}
         onConfirm={() => {
           if (!cancelTarget) return;
