@@ -926,7 +926,7 @@ export function GeneralTab({
                   if (value) setDeploymentServerId(value);
                 }}
               >
-                <SelectTrigger id="deployment-server" className="bg-background">
+                <SelectTrigger id="deployment-server">
                   <SelectValue placeholder="Use local Swarm manager" />
                 </SelectTrigger>
                 <SelectContent>
@@ -958,7 +958,7 @@ export function GeneralTab({
                   if (value) setBuildServerId(value);
                 }}
               >
-                <SelectTrigger id="build-server" className="bg-background">
+                <SelectTrigger id="build-server">
                   <SelectValue placeholder="Build on deployment server" />
                 </SelectTrigger>
                 <SelectContent>
@@ -996,7 +996,7 @@ export function GeneralTab({
                     setBuildRegistryId(value === "none" ? "" : (value ?? ""))
                   }
                 >
-                  <SelectTrigger id="build-registry" className="bg-background">
+                  <SelectTrigger id="build-registry">
                     <SelectValue placeholder="Choose a registry for build transfer" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1079,10 +1079,7 @@ export function GeneralTab({
                       setCustomDatabaseImage("");
                     }}
                   >
-                    <SelectTrigger
-                      id="database-engine"
-                      className="bg-background"
-                    >
+                    <SelectTrigger id="database-engine">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1121,10 +1118,7 @@ export function GeneralTab({
                       }
                     }}
                   >
-                    <SelectTrigger
-                      id="database-image"
-                      className="bg-background"
-                    >
+                    <SelectTrigger id="database-image">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1381,10 +1375,7 @@ export function GeneralTab({
                       setComposeType(value as ResourceComposeType)
                     }
                   >
-                    <SelectTrigger
-                      id="compose-deployment-mode"
-                      className="bg-background"
-                    >
+                    <SelectTrigger id="compose-deployment-mode">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1435,7 +1426,6 @@ export function GeneralTab({
                     })
                   }
                   placeholder=". or apps/web"
-                  className="bg-background"
                 />
                 <p className="text-muted-foreground text-xs">
                   Repository subdirectory used as the source root for the
@@ -1511,7 +1501,6 @@ export function GeneralTab({
                           })
                         }
                         placeholder="Dockerfile"
-                        className="bg-background"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1528,7 +1517,6 @@ export function GeneralTab({
                           })
                         }
                         placeholder="."
-                        className="bg-background"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1548,7 +1536,6 @@ export function GeneralTab({
                           })
                         }
                         placeholder="production"
-                        className="bg-background"
                       />
                     </div>
                   </div>
@@ -1684,10 +1671,7 @@ export function GeneralTab({
                       }
                     }}
                   >
-                    <SelectTrigger
-                      id="railpack-version"
-                      className="bg-background"
-                    >
+                    <SelectTrigger id="railpack-version">
                       <SelectValue placeholder="Select Railpack version" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1712,7 +1696,6 @@ export function GeneralTab({
                         })
                       }
                       placeholder="0.15.4"
-                      className="bg-background"
                       aria-label="Custom Railpack version"
                     />
                   )}
@@ -1735,7 +1718,6 @@ export function GeneralTab({
                       })
                     }
                     placeholder="dist"
-                    className="bg-background"
                   />
                 </div>
               )}
@@ -1756,10 +1738,7 @@ export function GeneralTab({
                       });
                     }}
                   >
-                    <SelectTrigger
-                      id="heroku-version"
-                      className="bg-background"
-                    >
+                    <SelectTrigger id="heroku-version">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1795,7 +1774,6 @@ export function GeneralTab({
                         })
                       }
                       placeholder="dist"
-                      className="bg-background"
                     />
                   </div>
                   <Field orientation="horizontal" className="w-full sm:w-auto">
