@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/utils/trpc";
 
@@ -24,6 +25,7 @@ export function useResourceDetail({
   logsSince?: number;
 }) {
   const router = useRouter();
+  const [isDeleted, setIsDeleted] = useState(false);
 
   const projectQuery = useQuery({
     ...trpc.project.get.queryOptions({ id: projectId }),
@@ -63,29 +65,31 @@ export function useResourceDetail({
 
   const resourceQuery = useQuery({
     ...trpc.resource.get.queryOptions({ id: resourceId }),
-    refetchInterval: 3000,
+    enabled: !isDeleted,
+    refetchInterval: isDeleted ? false : 3000,
   });
 
   const routingTargetsQuery = useQuery({
     ...trpc.resource.getRoutingTargets.queryOptions({ id: resourceId }),
-    enabled: !!resourceId,
+    enabled: !isDeleted && !!resourceId,
     staleTime: 15_000,
   });
 
   const liveContainersQuery = useQuery({
     ...trpc.resource.getContainers.queryOptions({ id: resourceId }),
-    refetchInterval: 5000,
+    enabled: !isDeleted,
+    refetchInterval: isDeleted ? false : 5000,
   });
 
   const secretsQuery = useQuery({
     ...trpc.resource.getSecrets.queryOptions({ id: resourceId }),
-    enabled: Boolean(resourceId),
+    enabled: !isDeleted && Boolean(resourceId),
   });
 
   const deploymentsQuery = useQuery({
     ...trpc.deployment.getByResource.queryOptions({ resourceId }),
-    enabled: Boolean(resourceId),
-    refetchInterval: 3000,
+    enabled: !isDeleted && Boolean(resourceId),
+    refetchInterval: isDeleted ? false : 3000,
   });
 
   const logsQuery = useQuery({
@@ -95,13 +99,14 @@ export function useResourceDetail({
         selectedLogContainerId === "all" ? undefined : selectedLogContainerId,
       since: logsSince,
     }),
-    refetchInterval: 4000,
+    enabled: !isDeleted,
+    refetchInterval: isDeleted ? false : 4000,
   });
 
   const statsQuery = useQuery({
     ...trpc.resource.getStats.queryOptions({ id: resourceId }),
-    refetchInterval: statsIntervalEnabled ? 5000 : false,
-    enabled: !!resourceId && statsIntervalEnabled,
+    refetchInterval: isDeleted ? false : (statsIntervalEnabled ? 5000 : false),
+    enabled: !isDeleted && !!resourceId && statsIntervalEnabled,
   });
 
   const containerLogsQuery = useQuery({
@@ -110,8 +115,8 @@ export function useResourceDetail({
       containerId: selectedContainerId || undefined,
       since: logsSince,
     }),
-    enabled: containerModalOpen && !!selectedContainerId,
-    refetchInterval: containerModalOpen ? 3000 : false,
+    enabled: !isDeleted && containerModalOpen && !!selectedContainerId,
+    refetchInterval: isDeleted ? false : (containerModalOpen ? 3000 : false),
   });
 
   // Mutations
@@ -169,6 +174,7 @@ export function useResourceDetail({
   const deleteResourceMutation = useMutation({
     ...trpc.resource.delete.mutationOptions(),
     onSuccess: () => {
+      setIsDeleted(true);
       toast.success("Resource deleted successfully");
       router.push(`/projects/${projectId}/${environmentId}` as Route);
     },
