@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.91 - 2026-07-20
+
+### Security & Bug Fixes
+
+- Resolve CodeQL `js/shell-command-constructed-from-input` security alerts (#7, #8, #9, #10) in `docker-readonly.service.ts` by escaping `request.since`, `request.containerId`, `request.serviceName`, and `containerId` in `getLogs` and `getContainerStats` with `shellQuote`.
+- Resolve CodeQL `js/insufficient-password-hash` (CWE-916) heuristic alert (#31) in `oauth-state.ts` by replacing `createHmac` with RFC 5869 `hkdfSync` key derivation for state MAC generation.
+
 ## 0.1.90 - 2026-07-20
 
 ### Fixed

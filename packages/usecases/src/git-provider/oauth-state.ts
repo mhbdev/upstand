@@ -1,9 +1,4 @@
-import {
-  createHmac,
-  hkdfSync,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
 
 const STATE_TTL_SECONDS = 10 * 60;
 const STATE_VERSION = "v1";
@@ -21,24 +16,17 @@ function stateSecret(): string {
   return secret;
 }
 
-function deriveStateSigningKey(): Buffer {
-  return Buffer.from(
+function computeStateMac(tokenPayload: string): string {
+  const macBuffer = Buffer.from(
     hkdfSync(
       "sha256",
+      tokenPayload,
       stateSecret(),
-      "upstand-oauth-state-salt",
-      "upstand-oauth-state-signing-v1",
+      "upstand-oauth-state-mac-v1",
       32,
     ),
   );
-}
-
-function computeStateMac(tokenPayload: string): string {
-  const secretKey = deriveStateSigningKey();
-  const payloadBytes = Buffer.from(tokenPayload, "utf8");
-  return createHmac("sha256", secretKey)
-    .update(payloadBytes)
-    .digest("base64url");
+  return macBuffer.toString("base64url");
 }
 
 export function createGitProviderOAuthState(

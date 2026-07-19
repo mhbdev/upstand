@@ -507,10 +507,16 @@ export class DockerReadOnlyService implements DockerExecPort {
         : String(buffer);
       return filterDockerLogs(logs, request);
     }
-    const since = request.since ? ` --since ${request.since}` : "";
+    const safeTail = Math.max(1, Math.min(10000, Number(request.tail) || 100));
+    const safeSince = request.since
+      ? ` --since ${shellQuote(String(request.since))}`
+      : "";
+    const safeTarget = request.containerId
+      ? shellQuote(request.containerId)
+      : shellQuote(request.serviceName || "");
     const command = request.containerId
-      ? `docker logs --tail ${request.tail} --timestamps${since} ${request.containerId}`
-      : `docker service logs --tail ${request.tail} --timestamps${since} ${request.serviceName}`;
+      ? `docker logs --tail ${safeTail} --timestamps${safeSince} ${safeTarget}`
+      : `docker service logs --tail ${safeTail} --timestamps${safeSince} ${safeTarget}`;
     return filterDockerLogs(await this.executeRemote(target, command), request);
   }
 
@@ -520,10 +526,11 @@ export class DockerReadOnlyService implements DockerExecPort {
   ): Promise<DockerContainerStats> {
     assertIdentifier(containerId, "Docker container");
     if (target.kind === "remote") {
+      const safeContainer = shellQuote(containerId);
       const [row] = parseJsonLines(
         await this.executeRemote(
           target,
-          `docker stats --no-stream --format '{{json .}}' ${containerId}`,
+          `docker stats --no-stream --format '{{json .}}' ${safeContainer}`,
         ),
       );
       if (!row) throw new Error("Docker container stats were not returned.");
