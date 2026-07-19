@@ -11,8 +11,6 @@ export class GetProjectUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: GetProjectInput): Promise<Project | null> {
-    return this.uow.transaction(async (tx) => {
-      return await tx.projectRepository.findById(input.id);
-    });
+    return await this.uow.projectRepository.findById(input.id);
   }
 }

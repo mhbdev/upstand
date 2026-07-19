@@ -1633,7 +1633,7 @@ async function handleScimCreateUser(c: Context<AppEnv>) {
             .trim()
             .toLowerCase()
         : "";
-  const parsedEmail = z.string().email().safeParse(email);
+  const parsedEmail = z.email().safeParse(email);
   if (!parsedEmail.success)
     return scimError(c, 400, "SCIM userName must be an email");
 

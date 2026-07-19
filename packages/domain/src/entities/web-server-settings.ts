@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const WebServerSettingsSchema = z.object({
   id: z.string(),
-  letsEncryptEmail: z.string().email().nullable().optional(),
+  letsEncryptEmail: z.email().nullable().optional(),
   httpPort: z.number().int().min(1).max(65535),
   httpsPort: z.number().int().min(1).max(65535),
   enableHttp3: z.boolean(),

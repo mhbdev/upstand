@@ -15,8 +15,9 @@ Remote servers are independent Docker engines. Upstand communicates with them en
 - **SSH Transport**: The Docker CLI on the control plane uses ephemeral SSH configurations (`ssh://user@ip`) to deploy services and inspect states.
 - **No Password Storage**: Upstand relies exclusively on SSH private key authentication. Root passwords are never stored.
 
-```mermaid
-graph LR
+<Mermaid 
+    chart="
+flowchart LR
     Control[Upstand Manager] -->|SSH Transport| Server1[Remote Server 1]
     Control -->|SSH Transport| Server2[Remote Server 2]
     Control -->|Raft / Swarm overlay| Node1[Cluster Worker Node]
@@ -29,8 +30,8 @@ graph LR
     subgraph Clustered Workloads
     Control
     Node1
-    end
-```
+    end"
+/>
 
 ---
 

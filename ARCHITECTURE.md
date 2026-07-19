@@ -22,6 +22,48 @@ repository, Redis, and platform concerns have separate packages because each
 has one cohesive purpose; they are all classified as outer infrastructure in
 the boundary policy.
 
+## Architecture & Dependency Flow
+
+```mermaid
+flowchart TD
+    subgraph Hosts ["Host Applications (Outer Edge)"]
+        Web[apps/web]
+        Server[apps/server]
+        Fumadocs[apps/fumadocs]
+        Monitoring[apps/monitoring]
+    end
+
+    subgraph Composition ["Composition Layer"]
+        API["@upstand/api"]
+        Auth["@upstand/auth"]
+    end
+
+    subgraph Infrastructure ["Infrastructure & Adapters"]
+        Infra["@upstand/infrastructure"]
+        Repos["@upstand/repositories"]
+        DB["@upstand/db"]
+        Redis["@upstand/redis"]
+        Platform["@upstand/platform"]
+    end
+
+    subgraph Application ["Application Layer"]
+        UseCases["@upstand/usecases"]
+    end
+
+    subgraph Domain ["Domain Layer (Core)"]
+        Dom["@upstand/domain"]
+    end
+
+    Hosts --> Composition
+    Composition --> UseCases
+    Composition --> Infrastructure
+    Infrastructure --> UseCases
+    Infrastructure --> Dom
+    UseCases --> Dom
+    Platform -.-> UseCases
+    Platform -.-> Repos
+```
+
 ## Rules enforced in CI
 
 - `packages/config/src/architecture.test.ts` verifies package classification,

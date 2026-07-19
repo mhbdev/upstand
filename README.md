@@ -43,11 +43,42 @@ It is built as a Bun/TypeScript monorepo leveraging Next.js, Hono, tRPC, Drizzle
 
 ---
 
+## System Architecture
+
+```mermaid
+flowchart TD
+    Client([User Browser / API Client]) -->|HTTPS / tRPC| Web[apps/web\nNext.js Dashboard]
+    Client -->|HTTPS / REST & WS| Server[apps/server\nHono API & WS Broker]
+    
+    subgraph ControlPlane [Upstand Control Plane]
+        Web --> Server
+        Server --> Auth[packages/auth\nBetter Auth]
+        Server --> API[packages/api\ntRPC Router]
+        Server --> UpGal[UpGal AI Engine\nToolLoopAgent]
+        UpGal -->|Execute Tools| API
+        API --> UseCases[packages/usecases\nApplication Workflows]
+        UseCases --> Domain[packages/domain\nBusiness Logic & Ports]
+        UseCases --> DB[(packages/db\nPostgreSQL)]
+        UseCases --> Queue[(packages/redis\nRedis / BullMQ)]
+    end
+
+    subgraph Infrastructure [Target Nodes & Workloads]
+        Queue --> Worker[Deployment Worker Queue]
+        Worker -->|Docker Socket / Swarm API| DockerEngine[Docker Swarm Engine]
+        Worker -->|SSH Key Tunnel| RemoteHost[Remote Docker Hosts]
+        Server -->|Atomic Config & Reloads| Caddy[Caddy Reverse Proxy]
+        Caddy -->|Auto HTTPS Routing| Workloads[Containerized Apps & DBs]
+    end
+```
+
+---
+
 ## Repository Map
 
 ```text
 apps/web/               Next.js dashboard console & UI components
 apps/server/            Hono API, tRPC routes, terminal broker, and worker queues
+apps/monitoring/        System metrics collector & daemon watcher
 apps/fumadocs/          Documentation site (Fumadocs)
 packages/domain/        Core business rules, entities, and repository ports
 packages/usecases/      Use case workflows and operational logic
@@ -60,6 +91,7 @@ packages/auth/          Better Auth configuration and authentication adapters
 packages/api/           tRPC router definitions and Hono bindings
 packages/ui/            Shared design primitives and design tokens
 packages/env/           Zod-validated environment configurations
+packages/config/        Shared TypeScript, Biome, and Architecture boundary rules
 install.sh              Production installer script
 docker-compose.local.yml Local development database/queue services
 docker-compose.prod.yml  Production Swarm stack configuration

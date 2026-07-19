@@ -44,7 +44,7 @@ const HttpUrlSchema = z
     "Only HTTP(S) URLs are supported",
   );
 
-const EmailAddressSchema = z.string().email();
+const EmailAddressSchema = z.email();
 
 export const NotificationConfigurationSchema = z.discriminatedUnion("type", [
   z.object({

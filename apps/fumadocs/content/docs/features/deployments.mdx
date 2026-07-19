@@ -11,6 +11,31 @@ Upstand orchestrates your services by dividing them into three distinct resource
 
 Applications build from Git repositories (GitHub, GitLab, Bitbucket, Gitea, or generic URLs) or deploy directly from pre-built container registry images.
 
+### Build & Deployment Pipeline
+
+<Mermaid 
+    chart="
+sequenceDiagram
+    autonumber
+    actor User as User / Webhook
+    participant API as Hono API
+    participant Queue as Redis Queue (BullMQ)
+    participant Worker as Deployment Worker
+    participant Swarm as Docker Swarm Engine
+    participant Caddy as Caddy Proxy
+
+    User->>API: Trigger Build (Git Push / Dashboard)
+    API->>Queue: Enqueue Job (deployments-queue-<nodeId>)
+    Queue->>Worker: Pick Job & Acquire Resource Lock
+    Worker->>Worker: Clone Git Repo & Execute Builder (Dockerfile / Nixpacks)
+    Worker->>Swarm: Push Image & Perform Rolling Service Update
+    Worker->>Caddy: Compile & Dry-Run Validate Caddyfile
+    Caddy-->>Worker: Dry-Run Passed -> Apply Atomic Reload
+    Worker->>Queue: Release Resource Lock & Mark Deployment Complete
+    Worker->>User: Notify Status (WebSocket / Webhook)
+"
+/>
+
 ### Serialization & Concurrency
 - **Build Queues**: Each server node hosts an isolated build queue (`deployments-queue-<nodeId>`).
 - **Resource Locking**: Redis locks serialize builds per resource to prevent overlapping builds from conflicting.

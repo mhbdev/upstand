@@ -130,7 +130,7 @@ export const memberRouter = router({
     .input(
       baseInput.extend({
         name: z.string().trim().min(1).max(120),
-        email: z.string().email(),
+        email: z.email(),
         password: z.string().min(8).max(200),
         role: z.enum(["member", "admin"]),
         permissions: permissionsSchema,
@@ -212,7 +212,7 @@ export const memberRouter = router({
   invite: twoFactorVerifiedProcedure
     .input(
       baseInput.extend({
-        email: z.string().email(),
+        email: z.email(),
         role: z.enum(["member", "admin"]),
         permissions: permissionsSchema,
         customRoleId: z.string().min(1).optional(),

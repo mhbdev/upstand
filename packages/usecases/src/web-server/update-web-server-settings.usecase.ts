@@ -27,7 +27,7 @@ export const AccessLogCleanupCronSchema = z
   });
 
 export const UpdateWebServerSettingsInputSchema = z.object({
-  letsEncryptEmail: z.string().email().nullable().optional(),
+  letsEncryptEmail: z.email().nullable().optional(),
   httpPort: z.number().int().min(1).max(65535).optional(),
   httpsPort: z.number().int().min(1).max(65535).optional(),
   enableHttp3: z.boolean().optional(),

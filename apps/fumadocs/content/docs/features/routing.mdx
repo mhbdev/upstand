@@ -77,13 +77,14 @@ The global Web Server settings page exposes a CodeMirror editor for:
 
 To prevent outages, Upstand validates all configurations before reloading Caddy:
 
-```mermaid
-graph TD
+<Mermaid 
+    chart="
+flowchart TD
     User[Update Route] --> Compile[Compile Caddyfile]
     Compile --> Validate[Format & Dry-Run Validate Caddyfile]
     Validate -->|Pass| Reload[Zero-Downtime Reload Caddy]
     Validate -->|Fail| Restore[Restore Previous Working Caddyfile]
-    Restore --> Error[Report Validation Error to User]
-```
+    Restore --> Error[Report Validation Error to User]"
+/>
 
 If Caddy rejects the formatted configuration, the reload is aborted, the previous working file remains active, and the database mutation is rejected.

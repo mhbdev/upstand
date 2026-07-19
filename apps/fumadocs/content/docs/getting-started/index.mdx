@@ -7,10 +7,7 @@ Welcome to **Upstand**, a modern, container-first self-hosted Platform-as-a-Serv
 
 Upstand consolidates server management, SSL termination, Git build queues, backups, and user authentication into a unified, secure dashboard, backed by **UpGal**, your AI operations assistant.
 
-![Upstand Dashboard Home - Light Mode](/images/dashboard_hero.svg)
-
-> [!TIP]
-> **Getting Real Screenshots:** If you are running the dashboard locally in light mode, capture a screenshot of your main dashboard and save it to `apps/fumadocs/public/images/dashboard_hero.svg` to replace this placeholder!
+![Upstand Dashboard Overview](/images/dashboard_hero.svg)
 
 ---
 
@@ -20,17 +17,17 @@ Upstand is engineered following a clean package-based architecture. A high-perfo
 
 <Mermaid 
     chart="
-graph TD
+flowchart TD
     Admin([Platform Administrator]) -->|HTTPS / tRPC| Web[Next.js Dashboard UI]
     Web --> Server[Hono API / tRPC Controller]
     Web --> UpGal[UpGal AI Engine]
-    UpGal --> Server
-    Server --> DB[(PostgreSQL Database)]
+    UpGal -->|Tool Loop| Server
+    Server --> DB[(PostgreSQL System DB)]
     Server --> Queue[(Redis / BullMQ Queue)]
-    Queue --> Worker[Deployment Worker]
-    Worker -->|Docker Socket| Engine[Docker Swarm Engine]
-    Worker -->|Write Config| Caddy[Caddy Reverse Proxy]
-    Engine -->|Overlay Network| Containers[App/DB Swarm Tasks]"
+    Queue --> Worker[Deployment Worker Queue]
+    Worker -->|Docker Socket / SSH| Engine[Docker Swarm Engine]
+    Worker -->|Atomic Reloads| Caddy[Caddy Proxy]
+    Engine -->|Overlay Network| Containers[App & DB Containers]"
 />
 
 ---
