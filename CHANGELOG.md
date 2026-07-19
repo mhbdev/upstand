@@ -4,6 +4,22 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.83 - 2026-07-19
+
+### Added
+
+- Add git provider tag pattern support for deployments.
+- Add page pagination and page skeleton dashboard UI components.
+
+### Changed
+
+- Align audit logs, certificates, deployments, registries, swarm, docker pages, git providers, layout, monitoring, notifications, projects, remote servers, requests, SCIM/SSO settings, SSH keys, tags, templates, and web server pages with the standardized UI layouts, PageToolbar, PageEmpty, StatusBadge, and ConfirmActionDialog components.
+
+### Fixed
+
+- Resolve various TypeScript, typechecking, and biome linting/formatting errors across packages and apps.
+- Stabilize database schema migration checks.
+
 ## 0.1.81 - 2026-07-19
 
 ### Fixed
