@@ -34,7 +34,7 @@
     "@upstand/usecases": "workspace:*",
     "ai": "^7.0.22",
     "better-auth": "catalog:",
-    "bullmq": "^5.80.8",
+    "bullmq": "^5.80.9",
     "drizzle-orm": "catalog:",
     "evlog": "catalog:",
     "trpc-to-openapi": "^3.3.0",

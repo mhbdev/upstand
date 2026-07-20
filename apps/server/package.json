@@ -37,7 +37,7 @@
     "@types/bun": "catalog:",
     "@types/ssh2": "^1.15.5",
     "@upstand/config": "workspace:*",
-    "tsdown": "^0.22.9",
+    "tsdown": "^0.22.12",
     "typescript": "catalog:"
   }
 }
