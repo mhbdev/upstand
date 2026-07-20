@@ -107,7 +107,14 @@ ensure_stack_file() {
 detect_advertise_address() {
   local address="${SWARM_ADVERTISE_ADDR:-}"
   if [[ -z "$address" ]]; then
-    address="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+    local detected
+    detected="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+    if [[ "$INTERACTIVE" == true ]]; then
+      read -r -p "Swarm Advertise IP Address [${detected}]: " input_address
+      address="${input_address:-$detected}"
+    else
+      address="$detected"
+    fi
   fi
   [[ -n "$address" ]] || fail "set SWARM_ADVERTISE_ADDR to a routable private or public IPv4/IPv6 address"
   [[ "$address" != 127.* && "$address" != "0.0.0.0" && "$address" != "::1" && "$address" != "::" ]] || fail "SWARM_ADVERTISE_ADDR must not be loopback or unspecified"
@@ -226,14 +233,31 @@ write_environment() {
   UPSTAND_MONITORING_IMAGE="${requested_monitoring_image:-${UPSTAND_MONITORING_IMAGE:-}}"
   UPSTAND_AUTO_UPDATE="${requested_auto_update:-${UPSTAND_AUTO_UPDATE:-false}}"
 
-  : "${BETTER_AUTH_URL:?set BETTER_AUTH_URL to the HTTPS API origin}"
-  : "${CORS_ORIGIN:?set CORS_ORIGIN to the HTTPS dashboard origin}"
-  : "${NEXT_PUBLIC_SERVER_URL:?set NEXT_PUBLIC_SERVER_URL to the HTTPS API origin}"
-  [[ "$BETTER_AUTH_URL" == https://* ]] || fail "BETTER_AUTH_URL must use HTTPS"
-  [[ "$CORS_ORIGIN" == https://* ]] || fail "CORS_ORIGIN must use HTTPS"
-  [[ "$NEXT_PUBLIC_SERVER_URL" == https://* ]] || fail "NEXT_PUBLIC_SERVER_URL must use HTTPS"
+  local advertise_ip
+  advertise_ip="$(detect_advertise_address)"
+
+  if [[ -z "$BETTER_AUTH_URL" ]]; then
+    BETTER_AUTH_URL="http://${advertise_ip}:3000"
+  fi
+  if [[ -z "$CORS_ORIGIN" ]]; then
+    CORS_ORIGIN="http://${advertise_ip}:3001"
+  fi
+  if [[ -z "$NEXT_PUBLIC_SERVER_URL" ]]; then
+    NEXT_PUBLIC_SERVER_URL="http://${advertise_ip}:3000"
+  fi
+
+  [[ "$BETTER_AUTH_URL" == http://* || "$BETTER_AUTH_URL" == https://* ]] || fail "BETTER_AUTH_URL must use HTTP or HTTPS"
+  [[ "$CORS_ORIGIN" == http://* || "$CORS_ORIGIN" == https://* ]] || fail "CORS_ORIGIN must use HTTP or HTTPS"
+  [[ "$NEXT_PUBLIC_SERVER_URL" == http://* || "$NEXT_PUBLIC_SERVER_URL" == https://* ]] || fail "NEXT_PUBLIC_SERVER_URL must use HTTP or HTTPS"
+
   UPSTAND_DASHBOARD_HOST="${CORS_ORIGIN#https://}"
+  UPSTAND_DASHBOARD_HOST="${UPSTAND_DASHBOARD_HOST#http://}"
+  UPSTAND_DASHBOARD_HOST="${UPSTAND_DASHBOARD_HOST%%:*}"
+
   UPSTAND_API_HOST="${BETTER_AUTH_URL#https://}"
+  UPSTAND_API_HOST="${UPSTAND_API_HOST#http://}"
+  UPSTAND_API_HOST="${UPSTAND_API_HOST%%:*}"
+
   [[ "$UPSTAND_DASHBOARD_HOST" != */* && "$UPSTAND_API_HOST" != */* ]] || fail "dashboard and API origins must not include a path"
 
   if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE$UPSTAND_MONITORING_IMAGE" ]]; then

@@ -76,3 +76,27 @@ Use these reference charts and commands to diagnose and recover from common Upst
     bun db:generate
     ```
   - The script automatically provisions local mock environment variables for Better Auth. If overridden, manually supply valid `BETTER_AUTH_URL`, `CORS_ORIGIN`, `BETTER_AUTH_SECRET`, and `DATABASE_URL` values to the command context.
+
+---
+
+## 6. Resetting Two-Factor Authentication (2FA)
+
+**Symptom**: An administrator or user has lost access to their TOTP authenticator application or backup codes and cannot complete sign-in.
+
+- **Fix**: Execute the administrative CLI tool inside the running server container to disable 2FA for the target user.
+
+  1. Locate the running `upstand_server` container on your Swarm manager:
+     ```bash
+     docker ps | grep upstand_server
+     ```
+
+  2. Run the CLI tool interactively to select the user and reset their 2FA state:
+     ```bash
+     docker exec -it <container-id> bun apps/server/dist/cli.mjs reset-2fa
+     ```
+     *The tool will display a numbered list of all users with active Two-Factor Authentication. Enter the number corresponding to the target user.*
+
+  3. Alternatively, bypass the interactive prompt by passing the user's email directly:
+     ```bash
+     docker exec -it <container-id> bun apps/server/dist/cli.mjs reset-2fa --email=operator@example.com
+     ```

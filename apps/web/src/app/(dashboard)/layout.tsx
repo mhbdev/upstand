@@ -307,7 +307,6 @@ export default function DashboardLayout({
           <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 sm:flex-nowrap sm:px-4 sm:py-0">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger />
-              <Separator orientation="vertical" className="my-auto h-6" />
               <Breadcrumb className="min-w-0">
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden sm:inline-flex">

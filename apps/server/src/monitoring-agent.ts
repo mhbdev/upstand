@@ -46,11 +46,18 @@ export async function initializeMonitoring(): Promise<void> {
       const info = await me.inspect();
       const networks = Object.keys(info.NetworkSettings.Networks || {});
       networkMode = networks.find((n) => n !== "bridge") || networks[0];
-    } catch (error) {
-      log.warn({
-        message: "Could not detect container network for monitoring agent",
-        err: error instanceof Error ? error.message : String(error),
-      });
+    } catch (error: any) {
+      if (error.statusCode === 404) {
+        log.info({
+          message:
+            "Monitoring agent running in host mode (not inside a Docker container)",
+        });
+      } else {
+        log.warn({
+          message: "Could not detect container network for monitoring agent",
+          err: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     const callbackHost = networkMode ? "upstand_server" : "127.0.0.1";

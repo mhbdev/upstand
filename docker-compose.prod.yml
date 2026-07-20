@@ -191,6 +191,8 @@ services:
         limits:
           cpus: "1.0"
           memory: 2G
+    ports:
+      - ${UPSTAND_SERVER_PORT:-3000}:3000
     logging:
       driver: "json-file"
       options:
@@ -246,6 +248,8 @@ services:
         limits:
           cpus: "1.0"
           memory: 1G
+    ports:
+      - ${UPSTAND_WEB_PORT:-3001}:3001
     logging:
       driver: "json-file"
       options:
@@ -300,6 +304,8 @@ services:
         limits:
           cpus: "0.50"
           memory: 512M
+    ports:
+      - ${UPSTAND_DOCS_PORT:-4000}:4000
     logging:
       driver: "json-file"
       options:

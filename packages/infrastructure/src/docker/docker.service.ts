@@ -274,11 +274,27 @@ export class DockerService {
 
   async initializeSwarm(targetDocker?: Docker): Promise<void> {
     const docker = targetDocker || this.docker;
-    const info = await docker.info();
+    let info = await docker.info();
     if (!isSwarmActive(info)) {
-      throw new ConflictError(
-        "Docker Swarm is inactive. Initialize it from the Docker Swarm dashboard with a routable advertise address before deploying resources.",
-      );
+      if (process.env.NODE_ENV === "development") {
+        try {
+          await docker.swarmInit({
+            AdvertiseAddr: "127.0.0.1",
+            ListenAddr: "0.0.0.0:2377",
+          });
+          info = await docker.info();
+        } catch (error) {
+          throw new ConflictError(
+            `Docker Swarm is inactive and auto-initialization failed: ${
+              error instanceof Error ? error.message : String(error)
+            }. Please initialize a cluster manually before managing it.`,
+          );
+        }
+      } else {
+        throw new ConflictError(
+          "Docker Swarm is inactive. Initialize it from the Docker Swarm dashboard with a routable advertise address before deploying resources.",
+        );
+      }
     }
     if (!isManager(info)) {
       throw new ConflictError(

@@ -27,7 +27,8 @@ function inferApiOrigin(protocol: string, hostname: string, port = ""): string {
   const apiHostname = hostname.startsWith("app.")
     ? `api.${hostname.slice("app.".length)}`
     : hostname;
-  const apiPort = isLoopbackHost(hostname) ? "3000" : port;
+  const apiPort =
+    port === "3001" ? "3000" : isLoopbackHost(hostname) ? "3000" : port;
   const portSuffix = apiPort ? `:${apiPort}` : "";
 
   return new URL(`${protocol}//${apiHostname}${portSuffix}`).origin;

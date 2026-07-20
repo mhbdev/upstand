@@ -782,13 +782,45 @@ export const webServerRouter = router({
     }
   }),
 
-  updateServerIp: twoFactorVerifiedProcedure.mutation(async ({ ctx }) => {
-    await requireActiveOrganizationPermission(ctx, "server:update");
-    const uow = ctx.scope.resolve(UnitOfWorkToken);
-    try {
-      const res = await fetch("https://api.ipify.org?format=json");
-      const data = (await res.json()) as { ip: string };
-      const ip = data.ip;
+  updateServerIp: twoFactorVerifiedProcedure
+    .input(
+      z
+        .object({
+          ip: z.string().min(1).optional(),
+        })
+        .optional(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireActiveOrganizationPermission(ctx, "server:update");
+      const uow = ctx.scope.resolve(UnitOfWorkToken);
+      let ip = input?.ip;
+      if (!ip) {
+        try {
+          const res = await fetch("https://api.ipify.org?format=json");
+          const data = (await res.json()) as { ip: string };
+          ip = data.ip;
+        } catch (error: any) {
+          try {
+            const os = await import("node:os");
+            const interfaces = os.networkInterfaces();
+            for (const name of Object.keys(interfaces)) {
+              for (const net of interfaces[name] || []) {
+                if (net.family === "IPv4" && !net.internal) {
+                  ip = net.address;
+                  break;
+                }
+              }
+              if (ip) break;
+            }
+          } catch {}
+          if (!ip) {
+            throw new Error(
+              error?.message ||
+                "Failed to query server public IP and no local IP detected",
+            );
+          }
+        }
+      }
 
       let settings = await uow.webServerSettingsRepository.findGlobal();
       if (!settings) {
@@ -796,10 +828,7 @@ export const webServerRouter = router({
       }
       await uow.webServerSettingsRepository.updateGlobal({ serverIp: ip });
       return { success: true, ip };
-    } catch (error: any) {
-      throw new Error(error?.message || "Failed to query server public IP");
-    }
-  }),
+    }),
 
   getUpdateData: twoFactorVerifiedProcedure.query(async ({ ctx }) => {
     await requireActiveOrganizationPermission(ctx, "server:view");

@@ -99,3 +99,124 @@ To maintain uptime, the Hono API integrates an in-process rate-limiting fallback
 - **Redis Offline Fallback**: Switches to a local, memory-bounded token bucket limiter.
 - **Emergency Limits**: Unauthenticated endpoints allow up to 20 requests/min; sensitive mutation routes allow 15/min; authenticated reads allow 30/min per active identity.
 - The `/health/ready` endpoint flags whether this local fallback mode is currently active.
+
+---
+
+## Swarm Advertise Address Configuration
+
+During Docker Swarm initialization, Docker requires a routable IP address or interface using the `--advertise-addr` parameter to bind cluster communications.
+
+### Automatic Detection
+By default, the installer automatically detects the server's primary IP address using standard routing lookup:
+```bash
+ip -4 route get 1.1.1.1
+```
+
+### Manual IP Override
+If you have multiple network interfaces, run behind a firewall/NAT, or want to specify a manual IP, set the `SWARM_ADVERTISE_ADDR` environment variable before running the installer:
+```bash
+export SWARM_ADVERTISE_ADDR=192.168.1.50
+curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash
+```
+
+Alternatively, run the installer with the `--interactive` flag to be prompted for the IP address interactively:
+```bash
+curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash -s -- --interactive
+```
+
+---
+
+## Manual Installation
+
+If you prefer to set up Docker Swarm, configuration directories, and dependencies manually:
+
+### 1. Initialize Docker Swarm manually
+Run the following command on your manager server, specifying the advertise IP address:
+```bash
+sudo docker swarm init --advertise-addr <your-server-ip>
+sudo docker swarm update --task-history-limit 1
+```
+
+### 2. Create the attachable overlay network
+Initialize the shared container communication network:
+```bash
+sudo docker network create --driver overlay --attachable --label com.upstand.managed=true upstand-network
+```
+
+### 3. Setup configuration and secrets directories
+Create the standard directory layout for config and secrets:
+```bash
+sudo mkdir -p /etc/upstand/secrets
+sudo chmod 700 /etc/upstand /etc/upstand/secrets
+```
+
+Store your database, redis, and session encryption credentials as secure docker secrets files:
+```bash
+openssl rand -hex 32 | sudo tee /etc/upstand/secrets/postgres_password >/dev/null
+openssl rand -hex 32 | sudo tee /etc/upstand/secrets/redis_password >/dev/null
+openssl rand -hex 32 | sudo tee /etc/upstand/secrets/better_auth_secret >/dev/null
+openssl rand -base64 32 | tr -d '\n' | sudo tee /etc/upstand/secrets/ssh_key_encryption_key >/dev/null
+sudo chmod 600 /etc/upstand/secrets/*
+```
+
+### 4. Create the Environment File
+Create `/etc/upstand/.env` with the following variables configured:
+```bash
+DOCKER_NETWORK=upstand-network
+BETTER_AUTH_URL=https://api.yourdomain.com
+CORS_ORIGIN=https://app.yourdomain.com
+NEXT_PUBLIC_SERVER_URL=https://api.yourdomain.com
+UPSTAND_DASHBOARD_HOST=app.yourdomain.com
+UPSTAND_API_HOST=api.yourdomain.com
+UPSTAND_DOCS_HOST=docs.yourdomain.com
+TRUSTED_PROXY_CIDRS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+
+# Specify the target image digests to pin
+UPSTAND_SERVER_IMAGE=ghcr.io/mhbdev/upstand-server@sha256:<digest>
+UPSTAND_MONITORING_IMAGE=ghcr.io/mhbdev/upstand-monitoring@sha256:<digest>
+UPSTAND_WEB_IMAGE=ghcr.io/mhbdev/upstand-web@sha256:<digest>
+UPSTAND_DOCS_IMAGE=ghcr.io/mhbdev/upstand-fumadocs@sha256:<digest>
+EOF
+```
+
+### 5. Deploy the Stack
+Fetch the `docker-compose.prod.yml` and deploy it as a Docker Stack:
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/docker-compose.prod.yml -o /etc/upstand/docker-compose.yml
+sudo chmod 600 /etc/upstand/docker-compose.yml
+
+# Export environment variables and deploy
+set -a && source /etc/upstand/.env && set +a
+sudo docker stack deploy --compose-file /etc/upstand/docker-compose.yml upstand
+```
+
+---
+
+## Uninstalling Upstand
+
+To completely remove the Upstand control plane, services, and associated data volumes from your server:
+
+### 1. Remove the Docker Stack
+This tears down all running containers, services, and routing rules:
+```bash
+sudo docker stack rm upstand
+```
+
+### 2. Delete configuration and persistent volumes
+> [!CAUTION]
+> **Data Loss:** This will permanently delete your Postgres database, Redis store, and Caddy runtime state. Backup any important data before running this.
+```bash
+sudo rm -rf /etc/upstand
+sudo docker volume rm upstand_postgres_data upstand_redis_data upstand_caddy_data upstand_caddy_config
+```
+
+### 3. Remove the Docker Overlay Network
+```bash
+sudo docker network rm upstand-network
+```
+
+### 4. Leave Docker Swarm
+If this server is not hosting any other Swarm services, leave the Swarm cluster:
+```bash
+sudo docker swarm leave --force
+```

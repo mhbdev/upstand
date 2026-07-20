@@ -208,7 +208,42 @@ app.use("*", async (c, next) => {
 app.use(
   "/*",
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: (origin, c) => {
+      if (!origin) return undefined;
+
+      // Trust the configured CORS_ORIGIN
+      if (origin === env.CORS_ORIGIN) return origin;
+
+      try {
+        const originUrl = new URL(origin);
+        // Trust loopback / localhost origins for development ease
+        if (
+          originUrl.hostname === "localhost" ||
+          originUrl.hostname === "127.0.0.1" ||
+          originUrl.hostname === "::1" ||
+          originUrl.hostname === "[::1]" ||
+          originUrl.hostname.startsWith("127.")
+        ) {
+          return origin;
+        }
+
+        // Trust if it's the same host as the Hono request (same domain/IP, just different port)
+        const requestUrl = new URL(c.req.url);
+        if (originUrl.hostname === requestUrl.hostname) {
+          return origin;
+        }
+
+        // Also trust if it matches the hostname of the configured CORS_ORIGIN
+        const configuredCorsUrl = new URL(env.CORS_ORIGIN);
+        if (originUrl.hostname === configuredCorsUrl.hostname) {
+          return origin;
+        }
+      } catch {
+        // Fallback
+      }
+
+      return env.CORS_ORIGIN;
+    },
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
     exposeHeaders: [

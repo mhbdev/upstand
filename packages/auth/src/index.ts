@@ -85,7 +85,35 @@ export function createAuth(options: {
 
   const auth = betterAuth({
     database,
-    trustedOrigins: [configuration.corsOrigin, configuration.betterAuthUrl],
+    trustedOrigins: (request?: Request) => {
+      const origins = [configuration.corsOrigin, configuration.betterAuthUrl];
+      if (request) {
+        try {
+          const url = new URL(request.url);
+          origins.push(url.origin);
+
+          const forwardedHost = request.headers.get("x-forwarded-host");
+          if (forwardedHost) {
+            const proto = request.headers.get("x-forwarded-proto") || "https";
+            origins.push(`${proto}://${forwardedHost}`);
+          }
+
+          const host = request.headers.get("host");
+          if (host) {
+            const proto = request.headers.get("x-forwarded-proto") || "https";
+            origins.push(`${proto}://${host}`);
+          }
+
+          const originHeader = request.headers.get("origin");
+          if (originHeader) {
+            origins.push(originHeader);
+          }
+        } catch {
+          // Ignore malformed request URLs
+        }
+      }
+      return Array.from(new Set(origins.filter(Boolean)));
+    },
     emailAndPassword: {
       enabled: true,
       // The dashboard's local bootstrap and normal sign-up flow expect the
@@ -125,6 +153,7 @@ export function createAuth(options: {
     },
     advanced: {
       useSecureCookies: configuration.nodeEnv === "production",
+      trustedProxyHeaders: true,
       crossSubDomainCookies: sharedCookieDomain
         ? {
             enabled: true,

@@ -896,7 +896,18 @@ export default function WebServerDashboard(_props: {
                         GPU Setup
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => updateServerIpMutation.mutate()}
+                        onClick={() => {
+                          const currentIp = info?.settings?.serverIp || "";
+                          const ip = prompt(
+                            "Enter Server IP Address (leave empty to auto-detect):",
+                            currentIp,
+                          );
+                          if (ip !== null) {
+                            updateServerIpMutation.mutate(
+                              ip.trim() ? { ip: ip.trim() } : {},
+                            );
+                          }
+                        }}
                       >
                         Update Server IP
                       </DropdownMenuItem>

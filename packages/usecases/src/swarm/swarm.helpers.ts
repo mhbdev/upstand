@@ -147,12 +147,28 @@ export function isManager(info: DockerSwarmInfo): boolean {
 export async function requireActiveManager(
   docker: Docker,
 ): Promise<DockerSwarmInfo> {
-  const info = (await docker.info()) as DockerSwarmInfo;
+  let info = (await docker.info()) as DockerSwarmInfo;
 
   if (!isSwarmActive(info)) {
-    throw new ConflictError(
-      "Docker Swarm is inactive. Initialize a cluster before managing it.",
-    );
+    if (process.env.NODE_ENV === "development") {
+      try {
+        await docker.swarmInit({
+          AdvertiseAddr: "127.0.0.1",
+          ListenAddr: "0.0.0.0:2377",
+        });
+        info = (await docker.info()) as DockerSwarmInfo;
+      } catch (error) {
+        throw new ConflictError(
+          `Docker Swarm is inactive and auto-initialization failed: ${
+            error instanceof Error ? error.message : String(error)
+          }. Initialize a cluster before managing it.`,
+        );
+      }
+    } else {
+      throw new ConflictError(
+        "Docker Swarm is inactive. Initialize a cluster before managing it.",
+      );
+    }
   }
 
   if (!isManager(info)) {

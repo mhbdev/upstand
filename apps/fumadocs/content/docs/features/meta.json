@@ -5,6 +5,7 @@
     "routing",
     "servers",
     "monitoring",
+    "multi-tenancy",
     "terminal-logs",
     "templates",
     "template-catalog"

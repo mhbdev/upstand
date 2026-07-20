@@ -19,3 +19,7 @@ export const env = createEnv({
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,
 });
+
+if (!process.env.NODE_ENV) {
+  (process.env as any).NODE_ENV = env.NODE_ENV;
+}

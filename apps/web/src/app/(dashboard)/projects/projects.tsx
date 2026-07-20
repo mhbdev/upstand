@@ -551,26 +551,30 @@ export default function Projects(_props: {
         }
         icon={<FolderIcon className="size-6 text-primary" />}
         actions={
-          <UpGalTarget definition={createProjectTarget}>
-            <Button
-              onClick={() => setCreateProjectOpen(true)}
-              className="gap-2 font-medium"
-              disabled={!organizationId}
-            >
-              <PlusIcon data-icon="inline-start" />
-              Create Project
-            </Button>
-          </UpGalTarget>
+          filteredProjects.length > 0 && (
+            <UpGalTarget definition={createProjectTarget}>
+              <Button
+                onClick={() => setCreateProjectOpen(true)}
+                className="gap-2 font-medium"
+                disabled={!organizationId}
+              >
+                <PlusIcon data-icon="inline-start" />
+                Create Project
+              </Button>
+            </UpGalTarget>
+          )
         }
       />
 
-      <PageToolbar
-        search={searchQuery}
-        searchPlaceholder="Search projects…"
-        onSearchChange={setSearchQuery}
-        onClearSearch={() => setSearchQuery("")}
-        hasActiveFilters={Boolean(searchQuery)}
-      />
+      {filteredProjects.length > 0 && (
+        <PageToolbar
+          search={searchQuery}
+          searchPlaceholder="Search projects…"
+          onSearchChange={setSearchQuery}
+          onClearSearch={() => setSearchQuery("")}
+          hasActiveFilters={Boolean(searchQuery)}
+        />
+      )}
 
       {/* Projects Grid */}
       {loadingProjects ? (

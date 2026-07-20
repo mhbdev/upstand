@@ -1,6 +1,11 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@upstand/ui/components/alert";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -15,7 +20,12 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@upstand/ui/components/field";
-import { Input } from "@upstand/ui/components/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@upstand/ui/components/input-group";
 import {
   Table,
   TableBody,
@@ -42,9 +52,9 @@ import {
   CardGridSkeleton,
   TableSkeleton,
 } from "@/components/dashboard/page-skeleton";
-import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import {
   Activity,
+  AlertTriangleIcon,
   Clock,
   RefreshCw,
   Server,
@@ -63,7 +73,6 @@ export default function DeploymentsPage() {
   const organizationState = useRequiredActiveOrganization();
   const organizationId = organizationState.organizationId as string;
   const [activeTab, setActiveTab] = useState("history");
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
   const [concurrencyInputs, setConcurrencyInputs] = useState<
     Record<string, number>
@@ -188,17 +197,6 @@ export default function DeploymentsPage() {
     setCancelTarget({ serverId, jobId, label });
   };
 
-  // Filter history
-  const filteredDeployments = deployments.filter((dep) => {
-    const term = searchQuery.toLowerCase();
-    return (
-      dep.resourceName.toLowerCase().includes(term) ||
-      dep.projectName.toLowerCase().includes(term) ||
-      dep.environmentName.toLowerCase().includes(term) ||
-      dep.title?.toLowerCase().includes(term)
-    );
-  });
-
   const getQueueStateBadge = (state: string) => {
     switch (state) {
       case "active":
@@ -234,17 +232,9 @@ export default function DeploymentsPage() {
         }
       />
 
-      <PageToolbar
-        search={searchQuery}
-        searchPlaceholder="Search deployments…"
-        onSearchChange={setSearchQuery}
-        onClearSearch={() => setSearchQuery("")}
-        hasActiveFilters={Boolean(searchQuery)}
-      />
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="border-b pb-px">
-          <TabsList className="mb-4">
+        <div className="pb-px">
+          <TabsList>
             <TabsTrigger value="history" className="gap-2">
               <Activity className="size-4" />
               History
@@ -263,20 +253,18 @@ export default function DeploymentsPage() {
         {/* Tab 1: History */}
         <TabsContent value="history" className="space-y-4">
           <Card className="border-muted/40 shadow-sm">
-            <CardHeader className="pb-4">
-              <div>
-                <CardTitle className="font-semibold text-lg">
-                  Deployment History
-                </CardTitle>
-                <CardDescription>
-                  All deployments executed across the server infrastructure.
-                </CardDescription>
-              </div>
+            <CardHeader>
+              <CardTitle className="font-semibold text-lg">
+                Deployment History
+              </CardTitle>
+              <CardDescription>
+                All deployments executed across the server infrastructure.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingDeployments ? (
                 <TableSkeleton columns={7} rows={5} />
-              ) : filteredDeployments.length === 0 ? (
+              ) : deployments.length === 0 ? (
                 <PageEmpty
                   icon={Activity}
                   title="No deployments found"
@@ -297,7 +285,7 @@ export default function DeploymentsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredDeployments.map((dep) => (
+                      {deployments.map((dep) => (
                         <TableRow key={dep.id} className="hover:bg-muted/10">
                           <TableCell className="font-semibold text-foreground">
                             {dep.resourceName}
@@ -316,7 +304,7 @@ export default function DeploymentsPage() {
                           <TableCell className="font-mono text-xs">
                             {dep.serverName}
                           </TableCell>
-                          <TableCell className="max-w-[180px] truncate">
+                          <TableCell className="max-w-45 truncate">
                             {dep.title}
                           </TableCell>
                           <TableCell>
@@ -395,7 +383,7 @@ export default function DeploymentsPage() {
                           <TableCell className="font-mono text-xs">
                             {job.serverName}
                           </TableCell>
-                          <TableCell className="max-w-[180px] truncate">
+                          <TableCell className="max-w-45 truncate">
                             {job.label}
                           </TableCell>
                           <TableCell>{getQueueStateBadge(job.state)}</TableCell>
@@ -427,6 +415,18 @@ export default function DeploymentsPage() {
 
         {/* Tab 3: Concurrency */}
         <TabsContent value="concurrency" className="space-y-4">
+          <Alert className="w-full border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50">
+            <AlertTriangleIcon />
+            <AlertTitle>
+              Running multiple builds at once increases CPU, memory and disk
+              usage on each server.
+            </AlertTitle>
+            <AlertDescription>
+              Each concurrent build runs its own builder and image build, so set
+              this based on the resources the machine can handle — too high a
+              value can exhaust memory and make deployments fail.
+            </AlertDescription>
+          </Alert>
           <Card className="border-muted/40 shadow-sm">
             <CardHeader>
               <CardTitle className="font-semibold text-lg">
@@ -456,7 +456,7 @@ export default function DeploymentsPage() {
                       key={server.id}
                       className="border bg-card/50 transition-all hover:bg-card"
                     >
-                      <CardContent className="space-y-4 pt-6">
+                      <CardContent className="space-y-4">
                         <div className="flex items-start justify-between">
                           <div>
                             <h3 className="font-semibold text-base text-foreground">
@@ -477,8 +477,8 @@ export default function DeploymentsPage() {
                             <FieldLabel htmlFor={`concurrency-${server.id}`}>
                               Max Parallel Builds
                             </FieldLabel>
-                            <div className="flex items-center gap-3">
-                              <Input
+                            <InputGroup>
+                              <InputGroupInput
                                 id={`concurrency-${server.id}`}
                                 type="number"
                                 min="1"
@@ -497,16 +497,19 @@ export default function DeploymentsPage() {
                                 }}
                                 className="h-9 w-24"
                               />
-                              <Button
-                                onClick={() =>
-                                  handleUpdateConcurrency(server.id)
-                                }
-                                disabled={updateConcurrencyMutation.isPending}
-                                size="sm"
-                              >
-                                Save
-                              </Button>
-                            </div>
+                              <InputGroupAddon align="inline-end">
+                                <InputGroupButton
+                                  variant="default"
+                                  onClick={() =>
+                                    handleUpdateConcurrency(server.id)
+                                  }
+                                  disabled={updateConcurrencyMutation.isPending}
+                                  size="xs"
+                                >
+                                  Save
+                                </InputGroupButton>
+                              </InputGroupAddon>
+                            </InputGroup>
                             <FieldDescription>
                               Additional deployment triggers for this server
                               will queue up and wait.

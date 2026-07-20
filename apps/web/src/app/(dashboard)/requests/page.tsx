@@ -1,5 +1,6 @@
 "use client";
 
+import { Activity01FreeIcons } from "@hugeicons/core-free-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
@@ -52,6 +53,7 @@ import {
   DashboardPage,
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
+import { PageEmpty } from "@/components/dashboard/page-empty";
 import { PagePagination } from "@/components/dashboard/page-pagination";
 import {
   Activity,
@@ -460,83 +462,87 @@ export default function RequestsPage() {
           </Button>
         }
       />
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="rounded-full bg-primary/10 p-2 text-primary">
-                <Activity className="size-5" aria-hidden="true" />
+      {active && (
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-primary/10 p-2 text-primary">
+                  <Activity className="size-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="font-semibold">Caddy access logs</h2>
+                  <p className="max-w-2xl text-muted-foreground text-sm">
+                    Store structured request logs in a managed Docker volume.
+                    Turning this on reloads Caddy and keeps the last 7 rolled
+                    files.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-semibold">Caddy access logs</h2>
-                <p className="max-w-2xl text-muted-foreground text-sm">
-                  Store structured request logs in a managed Docker volume.
-                  Turning this on reloads Caddy and keeps the last 7 rolled
-                  files.
-                </p>
-              </div>
+              <Switch
+                checked={active}
+                onCheckedChange={toggle}
+                disabled={pending}
+                aria-label="Enable Caddy access logs"
+              />
             </div>
-            <Switch
-              checked={active}
-              onCheckedChange={toggle}
-              disabled={pending}
-              aria-label="Enable Caddy access logs"
-            />
-          </div>
 
-          {active && (
-            <div className="flex flex-col gap-2">
-              <Separator />
-              <div className="mt-4">
-                <Label htmlFor="access-log-cleanup">Log cleanup schedule</Label>
-                <p
-                  id="access-log-cleanup-help"
-                  className="mt-1 text-muted-foreground text-xs"
-                >
-                  Cron schedule for rotating old access-log files.
-                </p>
+            {active && (
+              <div className="flex flex-col gap-2">
+                <Separator />
+                <div className="mt-4">
+                  <Label htmlFor="access-log-cleanup">
+                    Log cleanup schedule
+                  </Label>
+                  <p
+                    id="access-log-cleanup-help"
+                    className="mt-1 text-muted-foreground text-xs"
+                  >
+                    Cron schedule for rotating old access-log files.
+                  </p>
+                </div>
+                <div className="flex w-full gap-2 sm:max-w-sm">
+                  <Input
+                    id="access-log-cleanup"
+                    value={cleanupCron}
+                    onChange={(event) => setCleanupCron(event.target.value)}
+                    placeholder="0 3 * * *"
+                    aria-describedby="access-log-cleanup-help"
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={cleanupMutation.isPending || !cleanupCron.trim()}
+                    onClick={async () => {
+                      try {
+                        await cleanupMutation.mutateAsync({
+                          cron: cleanupCron.trim(),
+                        });
+                        await status.refetch();
+                        toast.success("Cleanup schedule updated");
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Unable to update cleanup schedule",
+                        );
+                      }
+                    }}
+                  >
+                    {cleanupMutation.isPending ? (
+                      <>
+                        <Spinner data-icon="inline-start" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                </div>
               </div>
-              <div className="flex w-full gap-2 sm:max-w-sm">
-                <Input
-                  id="access-log-cleanup"
-                  value={cleanupCron}
-                  onChange={(event) => setCleanupCron(event.target.value)}
-                  placeholder="0 3 * * *"
-                  aria-describedby="access-log-cleanup-help"
-                />
-                <Button
-                  variant="outline"
-                  disabled={cleanupMutation.isPending || !cleanupCron.trim()}
-                  onClick={async () => {
-                    try {
-                      await cleanupMutation.mutateAsync({
-                        cron: cleanupCron.trim(),
-                      });
-                      await status.refetch();
-                      toast.success("Cleanup schedule updated");
-                    } catch (error) {
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Unable to update cleanup schedule",
-                      );
-                    }
-                  }}
-                >
-                  {cleanupMutation.isPending ? (
-                    <>
-                      <Spinner data-icon="inline-start" />
-                      Saving…
-                    </>
-                  ) : (
-                    "Save"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {active ? (
         <>
           <Card>
@@ -642,17 +648,12 @@ export default function RequestsPage() {
           <AccessLogDetail entry={selected} onClose={() => setSelected(null)} />
         </>
       ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
-            <Activity
-              className="size-10 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <h2 className="font-semibold">Request monitoring is off</h2>
-            <p className="max-w-lg text-muted-foreground text-sm">
-              Enable Caddy access logs to start collecting request distribution
-              and detailed HTTP entries.
-            </p>
+        <PageEmpty
+          icon={Activity01FreeIcons}
+          title="Request monitoring is off"
+          description="Enable Caddy access logs to start collecting request distribution
+              and detailed HTTP entries."
+          action={
             <Button onClick={toggle} disabled={pending}>
               {pending ? (
                 <>
@@ -663,8 +664,8 @@ export default function RequestsPage() {
                 "Enable Monitoring"
               )}
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       )}
     </DashboardPage>
   );

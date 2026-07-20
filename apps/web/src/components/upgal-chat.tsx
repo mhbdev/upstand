@@ -559,13 +559,13 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
       {!open ? (
         <Button
           aria-label="Open UpGal assistant"
-          className="fixed right-5 bottom-5 z-[70] size-14 rounded-full shadow-lg"
+          className="fixed right-5 bottom-5 z-70 size-14 rounded-full shadow-lg"
           onClick={() => setOpen(true)}
         >
           <MessageCircle className="size-6" />
         </Button>
       ) : (
-        <section className="fixed inset-x-3 bottom-3 z-[70] flex h-[min(720px,calc(100svh-24px))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:inset-x-auto sm:right-5 sm:w-[440px]">
+        <section className="fixed inset-x-3 bottom-3 z-70 flex h-[min(720px,calc(100svh-24px))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:inset-x-auto sm:right-5 sm:w-110">
           <header className="flex items-center gap-3 border-b px-4 py-3">
             <div className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Bot className="size-5" />

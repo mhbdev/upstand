@@ -151,7 +151,7 @@ export function SettingsDialog() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          className="!p-0 h-dvh max-h-dvh w-screen max-w-none overflow-hidden rounded-none border-0 md:h-[min(90dvh,620px)] md:max-h-none md:w-[min(90vw,860px)] md:max-w-none md:border"
+          className="h-dvh max-h-dvh w-screen max-w-none overflow-hidden rounded-none border-0 p-0! md:h-[min(90dvh,620px)] md:max-h-none md:w-[min(90vw,860px)] md:max-w-none md:border"
         >
           <DialogTitle className="sr-only">Settings</DialogTitle>
           <DialogDescription className="sr-only">
