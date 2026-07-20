@@ -208,7 +208,7 @@ export default function AuditLogsPage() {
             </Select>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="mt-2 p-0">
           {logs.isPending ? <TableSkeleton rows={5} /> : null}
           {!logs.isPending && (logs.data?.items.length ?? 0) === 0 ? (
             <PageEmpty
