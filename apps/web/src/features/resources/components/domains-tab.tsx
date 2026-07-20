@@ -258,25 +258,101 @@ export function DomainsTab({
     null,
   );
   const domainVersion = resource?.domains ?? "";
+
+  interface DnsStatus {
+    status: "idle" | "checking" | "verified" | "cdn" | "invalid" | "failed";
+    message: string;
+    cdnProvider?: string | null;
+    resolvedIps?: string[];
+  }
+  const [dnsStatusMap, setDnsStatusMap] = useState<Record<string, DnsStatus>>(
+    {},
+  );
+
   const validateDomain = useMutation({
     ...trpc.domain.validate.mutationOptions(),
-    onSuccess: (result) => {
-      toast.success(
-        result.cdnProvider
-          ? `${result.host} is behind ${result.cdnProvider}`
-          : result.isValid
-            ? `${result.host} resolves successfully`
-            : `${result.host} did not resolve to the expected target`,
-      );
+    onSuccess: (result, variables) => {
+      const host = variables.host;
+      const expectedIp = variables.expectedIp;
+      if (result.cdnProvider) {
+        setDnsStatusMap((prev) => ({
+          ...prev,
+          [host]: {
+            status: "cdn",
+            message:
+              result.warning || `${host} is behind ${result.cdnProvider}`,
+            cdnProvider: result.cdnProvider,
+            resolvedIps: result.resolvedIps,
+          },
+        }));
+        toast.success(`DNS check: ${host} is behind ${result.cdnProvider}`, {
+          description: `Resolves to CDN IPs: ${result.resolvedIps?.join(", ")}`,
+        });
+      } else if (result.isValid) {
+        setDnsStatusMap((prev) => ({
+          ...prev,
+          [host]: {
+            status: "verified",
+            message: "DNS resolves successfully to the expected target IP.",
+            resolvedIps: result.resolvedIps,
+          },
+        }));
+        toast.success(`DNS check: ${host} resolves successfully`, {
+          description: expectedIp
+            ? `Resolves to expected IP: ${expectedIp}`
+            : `Resolves to: ${result.resolvedIps?.join(", ")}`,
+        });
+      } else {
+        const msg =
+          result.warning ||
+          `Domain did not resolve to expected IP: ${expectedIp}`;
+        setDnsStatusMap((prev) => ({
+          ...prev,
+          [host]: {
+            status: "invalid",
+            message: msg,
+            resolvedIps: result.resolvedIps,
+          },
+        }));
+        toast.error(`DNS check: ${host} is unverified`, {
+          description: msg,
+        });
+      }
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error, variables) => {
+      const host = variables.host;
+      setDnsStatusMap((prev) => ({
+        ...prev,
+        [host]: {
+          status: "failed",
+          message: error.message || "DNS resolution failed.",
+        },
+      }));
+      toast.error(`DNS check failed for ${host}`, {
+        description: error.message,
+      });
+    },
   });
   const webServerSettings = useQuery({
     ...trpc.webServer.getSettings.queryOptions(),
   });
 
   const validateHost = (host: string) => {
-    validateDomain.mutate({ organizationId, host });
+    const resourceServer = servers.find(
+      (server) => server.id === resource.serverId,
+    );
+    const defaultIp = resourceServer?.ipAddress?.match(
+      /^(?:\d{1,3}\.){3}\d{1,3}$/,
+    )?.[0];
+    const configuredIp = webServerSettings.data?.settings.serverIp?.trim();
+    const expectedIp = configuredIp || defaultIp;
+
+    setDnsStatusMap((prev) => ({
+      ...prev,
+      [host]: { status: "checking", message: "Verifying DNS records..." },
+    }));
+
+    validateDomain.mutate({ organizationId, host, expectedIp });
   };
 
   useEffect(() => {
@@ -557,6 +633,7 @@ export function DomainsTab({
                     <TableHead>Route</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Security</TableHead>
+                    <TableHead>DNS Status</TableHead>
                     <TableHead className="w-40 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -597,16 +674,104 @@ export function DomainsTab({
                             : "HTTP only"}
                         </Badge>
                       </TableCell>
+                      <TableCell className="min-w-44">
+                        {(() => {
+                          const statusInfo = dnsStatusMap[item.host];
+                          if (!statusInfo) {
+                            return (
+                              <Badge
+                                variant="outline"
+                                className="cursor-default"
+                              >
+                                <span className="mr-1.5 size-1.5 rounded-full bg-muted-foreground/50" />
+                                Unchecked
+                              </Badge>
+                            );
+                          }
+                          switch (statusInfo.status) {
+                            case "checking":
+                              return (
+                                <Badge
+                                  variant="info"
+                                  className="animate-pulse cursor-default"
+                                >
+                                  <span className="mr-1.5 size-1.5 animate-ping rounded-full bg-info" />
+                                  Checking...
+                                </Badge>
+                              );
+                            case "verified":
+                              return (
+                                <Badge
+                                  variant="success"
+                                  className="cursor-help"
+                                  title={`${statusInfo.message}${statusInfo.resolvedIps ? ` Resolved IPs: ${statusInfo.resolvedIps.join(", ")}` : ""}`}
+                                >
+                                  <span className="mr-1.5 size-1.5 rounded-full bg-success" />
+                                  Verified
+                                </Badge>
+                              );
+                            case "cdn":
+                              return (
+                                <Badge
+                                  variant="info"
+                                  className="cursor-help"
+                                  title={`${statusInfo.message}${statusInfo.resolvedIps ? ` Resolved IPs: ${statusInfo.resolvedIps.join(", ")}` : ""}`}
+                                >
+                                  <span className="mr-1.5 size-1.5 rounded-full bg-info" />
+                                  {statusInfo.cdnProvider || "CDN"}
+                                </Badge>
+                              );
+                            case "invalid":
+                              return (
+                                <Badge
+                                  variant="warning"
+                                  className="cursor-help"
+                                  title={`${statusInfo.message}${statusInfo.resolvedIps ? ` Resolved IPs: ${statusInfo.resolvedIps.join(", ")}` : ""}`}
+                                >
+                                  <span className="mr-1.5 size-1.5 rounded-full bg-warning" />
+                                  Unverified IP
+                                </Badge>
+                              );
+                            case "failed":
+                              return (
+                                <Badge
+                                  variant="destructive"
+                                  className="cursor-help"
+                                  title={statusInfo.message}
+                                >
+                                  <span className="mr-1.5 size-1.5 rounded-full bg-destructive" />
+                                  Unresolved
+                                </Badge>
+                              );
+                            default:
+                              return null;
+                          }
+                        })()}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          onClick={() => validateHost(item.host)}
-                          variant="ghost"
-                          size="sm"
-                          disabled={validateDomain.isPending}
-                        >
-                          DNS check
-                        </Button>
+                        {(() => {
+                          const isCheckingRow =
+                            validateDomain.isPending &&
+                            validateDomain.variables?.host === item.host;
+                          return (
+                            <Button
+                              type="button"
+                              onClick={() => validateHost(item.host)}
+                              variant="ghost"
+                              size="sm"
+                              disabled={isCheckingRow}
+                            >
+                              {isCheckingRow ? (
+                                <>
+                                  <span className="mr-1.5 size-3 animate-spin rounded-full border border-current border-t-transparent" />
+                                  Checking
+                                </>
+                              ) : (
+                                "DNS check"
+                              )}
+                            </Button>
+                          );
+                        })()}
                         <Button
                           type="button"
                           onClick={() => editDomain(idx)}
