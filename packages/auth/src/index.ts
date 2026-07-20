@@ -103,11 +103,6 @@ export function createAuth(options: {
             const proto = request.headers.get("x-forwarded-proto") || "https";
             origins.push(`${proto}://${host}`);
           }
-
-          const originHeader = request.headers.get("origin");
-          if (originHeader) {
-            origins.push(originHeader);
-          }
         } catch {
           // Ignore malformed request URLs
         }

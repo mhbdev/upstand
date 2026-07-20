@@ -4,6 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.92 - 2026-07-20
+
+### Improved
+- Redesigned the audit logs list UI into a structured, responsive, and compact table layout.
+- Added a details drawer (`Sheet`) for deep inspection of individual audit records, featuring actor/IP copy actions and raw JSON metadata copying/downloading.
+- Configured dynamic CORS origin verification in the Hono API server.
+- Configured dynamic `trustedOrigins` and dynamic base URL resolution (via `trustedProxyHeaders: true`) in Better Auth, ensuring login and session management work flawlessly on both dynamic raw server IPs/ports and custom domains.
+
 ## 0.1.91 - 2026-07-20
 
 ### Security & Bug Fixes
