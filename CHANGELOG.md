@@ -4,6 +4,11 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.93 - 2026-07-20
+
+### Fixed
+- Fix Next.js web application Docker image build by adding the `--webpack` flag to match the custom webpack config in `next.config.ts`.
+
 ## 0.1.92 - 2026-07-20
 
 ### Improved

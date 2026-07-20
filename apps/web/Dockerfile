@@ -17,7 +17,7 @@ ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
 ARG NEXT_PUBLIC_UPSTAND_VERSION=development
 ENV NEXT_PUBLIC_UPSTAND_VERSION=${NEXT_PUBLIC_UPSTAND_VERSION}
 ENV NODE_ENV=production
-RUN cd apps/web && node node_modules/next/dist/bin/next build
+RUN cd apps/web && node node_modules/next/dist/bin/next build --webpack
 RUN mkdir -p apps/web/public
 
 FROM node:24-slim AS runner
