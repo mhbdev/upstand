@@ -131,7 +131,6 @@ jobs:
             ghcr.io/${{ steps.meta.outputs.repo }}-${{ matrix.name }}:${{ steps.meta.outputs.tag }}
           build-args: ${{ matrix.build_args }}
           cache-from: type=gha,scope=${{ matrix.scope }}
-          cache-to: type=gha,scope=${{ matrix.scope }},mode=max
           provenance: mode=max
           sbom: true
 

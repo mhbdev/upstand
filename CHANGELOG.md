@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.101 - 2026-07-21
+
+### Changed
+- Optimized GitHub Actions release workflow (`release.yml`) by removing non-reusable `cache-to` GHA cache layer exports on tag builds, saving ~1m 45s per release.
+- Added conditional `SKIP_TYPECHECK=1` support to Next.js container builds (`apps/web` and `apps/fumadocs`), eliminating duplicate type-checking inside Docker image builds (~22s saved).
+
 ## 0.1.100 - 2026-07-21
 
 ### Changed

@@ -7,6 +7,7 @@ FROM node:24-slim AS builder
 COPY --from=oven/bun:1.3.14 /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 ENV SKIP_ENV_VALIDATION=1
+ENV SKIP_TYPECHECK=1
 
 COPY --from=pruner /out/json/ ./
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --ignore-scripts --frozen-lockfile
