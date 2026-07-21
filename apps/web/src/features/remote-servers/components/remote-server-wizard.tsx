@@ -179,6 +179,10 @@ export function RemoteServerWizard({
     },
   });
 
+  const scanHostKeyMutation = useMutation({
+    ...trpc.server.scanHostKey.mutationOptions(),
+  });
+
   const createServerMutation = useMutation({
     ...trpc.server.create.mutationOptions(),
     onSuccess: (newServer) => {
@@ -276,17 +280,41 @@ export function RemoteServerWizard({
       return;
     }
 
-    createServerMutation.mutate({
-      organizationId,
-      name: name.trim(),
-      description: description.trim() || null,
-      serverType,
-      sshKeyId: selectedSshKeyId || activeSshKey?.id || "",
-      ipAddress: ipAddress.trim(),
-      port,
-      username: username.trim() || "root",
-      enableDockerCleanup,
-    });
+    toast.loading("Scanning remote server SSH host key...", { id: "host-key-scan" });
+
+    scanHostKeyMutation.mutate(
+      {
+        ipAddress: ipAddress.trim(),
+        port,
+      },
+      {
+        onSuccess: (data) => {
+          toast.success(
+            `Trusted host key fingerprint (${data.algorithm}): ${data.fingerprint}`,
+            { id: "host-key-scan" },
+          );
+
+          createServerMutation.mutate({
+            organizationId,
+            name: name.trim(),
+            description: description.trim() || null,
+            serverType,
+            sshKeyId: selectedSshKeyId || activeSshKey?.id || "",
+            ipAddress: ipAddress.trim(),
+            port,
+            username: username.trim() || "root",
+            enableDockerCleanup,
+            sshHostKeyFingerprint: data.fingerprint,
+          });
+        },
+        onError: (err) => {
+          toast.error(
+            `Could not retrieve server SSH host key: ${err.message || "Connection refused"}. Please check if the IP and SSH port are correct and try again.`,
+            { id: "host-key-scan", duration: 6000 },
+          );
+        },
+      },
+    );
   };
 
   const handleClose = () => {
@@ -345,53 +373,57 @@ export function RemoteServerWizard({
 
           {/* Desktop Responsive Stepper Bar */}
           <nav aria-label="Wizard Steps" className="mt-5 hidden sm:block">
-            <ol className="grid grid-cols-6 gap-2">
-              {stepTitles.map((s) => {
+            <ol className="flex items-center justify-between gap-1.5">
+              {stepTitles.map((s, idx) => {
                 const isActive = step === s.num;
                 const isPassed = step > s.num;
                 return (
-                  <li
-                    key={s.num}
-                    onClick={() => {
-                      if (s.num < step || (s.num <= 3 && !createdServerId)) {
-                        setStep(s.num as WizardStep);
-                      }
-                    }}
-                    className={cn(
-                      "flex cursor-pointer flex-col items-center text-center transition-all",
-                      isActive
-                        ? "opacity-100"
-                        : isPassed
-                          ? "opacity-90 hover:opacity-100"
-                          : "opacity-40",
-                    )}
-                  >
-                    <div className="flex w-full items-center">
+                  <div key={s.num} className="flex flex-1 items-center last:flex-initial">
+                    <li
+                      onClick={() => {
+                        if (s.num < step || (s.num <= 3 && !createdServerId)) {
+                          setStep(s.num as WizardStep);
+                        }
+                      }}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 transition-all",
+                        isActive
+                          ? "opacity-100"
+                          : isPassed
+                            ? "opacity-90 hover:opacity-100"
+                            : "opacity-40",
+                      )}
+                    >
                       <div
                         className={cn(
-                          "flex size-7 shrink-0 items-center justify-center rounded-full font-semibold text-xs transition-all",
+                          "flex size-7 shrink-0 items-center justify-center rounded-full font-bold text-xs transition-all",
                           isActive
                             ? "bg-primary text-primary-foreground shadow-md ring-4 ring-primary/20"
                             : isPassed
-                              ? "bg-primary/80 text-primary-foreground"
+                              ? "bg-primary text-primary-foreground"
                               : "bg-muted text-muted-foreground",
                         )}
                       >
-                        {isPassed ? <CheckIcon className="size-3.5" /> : s.num}
+                        {isPassed ? <CheckIcon className="size-4" /> : s.num}
                       </div>
-                      {s.num < 6 && (
-                        <div
-                          className={cn(
-                            "h-0.5 w-full transition-colors",
-                            isPassed ? "bg-primary/80" : "bg-muted",
-                          )}
-                        />
-                      )}
-                    </div>
-                    <span className="mt-1.5 truncate font-medium text-xs">
-                      {s.title}
-                    </span>
-                  </li>
+                      <div className="flex flex-col text-left">
+                        <span className="font-semibold text-[11px] text-foreground leading-none">
+                          {s.title}
+                        </span>
+                        <span className="mt-0.5 text-[9px] text-muted-foreground font-medium leading-none">
+                          {s.sub}
+                        </span>
+                      </div>
+                    </li>
+                    {idx < stepTitles.length - 1 && (
+                      <div
+                        className={cn(
+                          "mx-2 h-0.5 flex-1 transition-colors",
+                          isPassed ? "bg-primary/50" : "bg-border/30",
+                        )}
+                      />
+                    )}
+                  </div>
                 );
               })}
             </ol>

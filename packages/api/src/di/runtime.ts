@@ -134,6 +134,10 @@ export function registerRuntime(services: ServiceCollection) {
       ),
   );
   services.addTransient(
+    dependencies.ScanServerHostKeyUseCaseToken,
+    () => new dependencies.ScanServerHostKeyUseCase(),
+  );
+  services.addTransient(
     dependencies.GetServerHistoricalMetricsUseCaseToken,
     (c) =>
       new dependencies.GetServerHistoricalMetricsUseCase(

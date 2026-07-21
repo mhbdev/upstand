@@ -51,3 +51,70 @@ export function hostVerifierForFingerprint(expected: string) {
   return (received: string | Buffer): boolean =>
     verifyHostKeyFingerprint(normalized, received);
 }
+
+import { Client } from "ssh2";
+import crypto from "node:crypto";
+
+export function scanHostKey(
+  host: string,
+  port = 22,
+  timeout = 10000,
+): Promise<{ fingerprint: string; algorithm: string; key: string }> {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    let resolved = false;
+
+    const cleanup = () => {
+      conn.end();
+      resolved = true;
+    };
+
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        cleanup();
+        reject(new Error("Connection timeout scanning host key"));
+      }
+    }, timeout);
+
+    conn.on("error", (err: Error) => {
+      if (!resolved) {
+        clearTimeout(timer);
+        cleanup();
+        reject(err);
+      }
+    });
+
+    conn.on("ready", () => {
+      if (!resolved) {
+        clearTimeout(timer);
+        cleanup();
+        reject(new Error("Connection established but no host key was verified"));
+      }
+    });
+
+    conn.connect({
+      host,
+      port,
+      username: "root",
+      readyTimeout: timeout,
+      hostVerifier: (keyBuf: Buffer) => {
+        try {
+          const algLen = keyBuf.readUInt32BE(0);
+          const algorithm = keyBuf.subarray(4, 4 + algLen).toString("utf8");
+          const key = keyBuf.toString("base64");
+          const fingerprint = "SHA256:" + crypto.createHash("sha256").update(keyBuf).digest("base64");
+          
+          clearTimeout(timer);
+          cleanup();
+          resolve({ fingerprint, algorithm, key });
+        } catch (e) {
+          clearTimeout(timer);
+          cleanup();
+          reject(e);
+        }
+        return false;
+      },
+    });
+  });
+}
+

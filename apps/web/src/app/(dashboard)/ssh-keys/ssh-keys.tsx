@@ -23,6 +23,14 @@ import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Textarea } from "@upstand/ui/components/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -98,6 +106,7 @@ export default function SSHKeys(_props: {
   // Form State
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [algorithm, setAlgorithm] = useState<"ed25519" | "rsa">("ed25519");
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
   const [editName, setEditName] = useState("");
@@ -110,6 +119,7 @@ export default function SSHKeys(_props: {
   const resetForm = () => {
     setName("");
     setDescription("");
+    setAlgorithm("ed25519");
     setPrivateKey("");
     setPublicKey("");
   };
@@ -202,6 +212,7 @@ export default function SSHKeys(_props: {
       organizationId: orgId,
       name: name.trim(),
       description: description.trim() || undefined,
+      algorithm,
     });
   };
 
@@ -546,6 +557,32 @@ export default function SSHKeys(_props: {
                       autoComplete="off"
                     />
                   </UpGalTarget>
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="key-algorithm">Key Type</FieldLabel>
+                  <Select
+                    items={[
+                      { value: "ed25519", label: "ED25519 (Recommended)" },
+                      { value: "rsa", label: "RSA 2048-bit" },
+                    ]}
+                    value={algorithm}
+                    onValueChange={(val) => val && setAlgorithm(val as "ed25519" | "rsa")}
+                  >
+                    <SelectTrigger id="key-algorithm">
+                      <SelectValue placeholder="Select key type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="ed25519">
+                          ED25519 (Recommended)
+                        </SelectItem>
+                        <SelectItem value="rsa">
+                          RSA 2048-bit
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </Field>
               </FieldGroup>
 

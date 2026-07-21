@@ -115,6 +115,10 @@ export default function RemoteServersPage() {
     },
   });
 
+  const scanHostKeyMutation = useMutation({
+    ...trpc.server.scanHostKey.mutationOptions(),
+  });
+
   const deleteMutation = useMutation({
     ...trpc.server.delete.mutationOptions(),
     onSuccess: () => {
@@ -183,7 +187,31 @@ export default function RemoteServersPage() {
     if (editingServerId) {
       updateMutation.mutate({ ...input, id: editingServerId });
     } else {
-      createMutation.mutate(input);
+      toast.loading("Scanning remote server SSH host key...", { id: "host-key-scan" });
+      scanHostKeyMutation.mutate(
+        {
+          ipAddress: ipAddress.trim(),
+          port,
+        },
+        {
+          onSuccess: (data) => {
+            toast.success(
+              `Trusted host key fingerprint (${data.algorithm}): ${data.fingerprint}`,
+              { id: "host-key-scan" },
+            );
+            createMutation.mutate({
+              ...input,
+              sshHostKeyFingerprint: data.fingerprint,
+            });
+          },
+          onError: (err) => {
+            toast.error(
+              `Could not retrieve server SSH host key: ${err.message || "Connection refused"}. Please check if the IP and SSH port are correct and try again.`,
+              { id: "host-key-scan", duration: 6000 },
+            );
+          },
+        },
+      );
     }
   };
 

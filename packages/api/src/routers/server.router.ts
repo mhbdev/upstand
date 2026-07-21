@@ -26,6 +26,7 @@ import {
   GetServersUseCaseToken,
   GetServerUseCaseToken,
   SetupServerUseCaseToken,
+  ScanServerHostKeyUseCaseToken,
   UnitOfWorkToken,
   UpdateMonitoringSettingsUseCaseToken,
   UpdateServerUseCaseToken,
@@ -299,6 +300,29 @@ export const serverRouter = router({
       );
 
       const useCase = ctx.scope.resolve(SetupServerUseCaseToken);
+      try {
+        return await useCase.execute(input);
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+            cause: error,
+          });
+        }
+        handleUseCaseError(error);
+      }
+    }),
+
+  scanHostKey: twoFactorVerifiedProcedure
+    .input(
+      z.object({
+        ipAddress: z.string().min(1, "IP address is required"),
+        port: z.number().default(22),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const useCase = ctx.scope.resolve(ScanServerHostKeyUseCaseToken);
       try {
         return await useCase.execute(input);
       } catch (error) {

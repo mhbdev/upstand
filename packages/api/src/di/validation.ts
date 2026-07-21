@@ -142,6 +142,7 @@ const STARTUP_TOKENS: readonly Token[] = [
   dependencies.GetDeploymentServerSettingsUseCaseToken,
   dependencies.GetResourceUseCaseToken,
   dependencies.SetupServerUseCaseToken,
+  dependencies.ScanServerHostKeyUseCaseToken,
   dependencies.ProjectRepositoryToken,
   dependencies.GetProjectUseCaseToken,
   dependencies.GetServersUseCaseToken,

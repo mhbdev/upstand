@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.103 - 2026-07-21
+
+### Added
+- **Multi-Algorithm SSH Key Generation**: Upgraded SSH key generation to support both modern, secure **ED25519** and legacy compatibility **RSA (2048-bit)** key pairs. Added a dropdown/selector in both the main SSH Keys manager panel and the remote server onboarding wizard.
+- **Automated SSH Host Key Scanning & Verification**: Introduced a native, secure, async `scanHostKey` endpoint that queries the remote server's SSH fingerprint before adding it. Both the server wizard and the server manager now auto-scan and trust the host key during server creation, fixing the `"Trust the server SSH host key before provisioning it"` error without requiring any manual terminal commands.
+
 ## 0.1.102 - 2026-07-21
 
 ### Fixed
