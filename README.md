@@ -145,3 +145,9 @@ curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | 
 ```
 
 For detailed guides, refer to the local documentation site (`apps/fumadocs`) or navigate to `/docs/getting-started` once deployed.
+
+### Contributors 🤝
+
+<a href="https://github.com/mhbdev/upstand/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=mhbdev/upstand" alt="Contributors" />
+</a>
