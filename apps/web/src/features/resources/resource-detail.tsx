@@ -239,9 +239,11 @@ export default function ResourceDetail({
           <TabsTrigger value="environment" className="shrink-0 gap-2">
             <Code className="size-4" /> Environment
           </TabsTrigger>
-          <TabsTrigger value="advanced" className="shrink-0 gap-2">
-            <Settings className="size-4" /> Advanced
-          </TabsTrigger>
+          {resource.type !== "database" && (
+            <TabsTrigger value="advanced" className="shrink-0 gap-2">
+              <Settings className="size-4" /> Advanced
+            </TabsTrigger>
+          )}
           {resource.type !== "database" && (
             <TabsTrigger value="domains" className="shrink-0 gap-2">
               <Globe className="size-4" /> Domains
@@ -269,9 +271,11 @@ export default function ResourceDetail({
           <TabsTrigger value="tags" className="shrink-0 gap-2">
             <BookmarkIcon className="size-4" /> Tags
           </TabsTrigger>
-          <TabsTrigger value="crons" className="shrink-0 gap-2">
-            <Clock className="size-4" /> Cron Jobs
-          </TabsTrigger>
+          {resource.type !== "database" && (
+            <TabsTrigger value="crons" className="shrink-0 gap-2">
+              <Clock className="size-4" /> Cron Jobs
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general" className="min-w-0 space-y-6 outline-none">
@@ -307,16 +311,18 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        <TabsContent
-          value="advanced"
-          className="min-w-0 space-y-6 outline-none"
-        >
-          <ResourceAdvancedSettings
-            resourceId={resourceId}
-            resourceType={resource.type}
-            advancedConfig={resource.advancedConfig}
-          />
-        </TabsContent>
+        {resource.type !== "database" && (
+          <TabsContent
+            value="advanced"
+            className="min-w-0 space-y-6 outline-none"
+          >
+            <ResourceAdvancedSettings
+              resourceId={resourceId}
+              resourceType={resource.type}
+              advancedConfig={resource.advancedConfig}
+            />
+          </TabsContent>
+        )}
 
         {resource.type !== "database" && (
           <TabsContent
@@ -472,9 +478,11 @@ export default function ResourceDetail({
             />
           )}
         </TabsContent>
-        <TabsContent value="crons" className="min-w-0 space-y-6 outline-none">
-          <CronJobsTab resource={resource} />
-        </TabsContent>
+        {resource.type !== "database" && (
+          <TabsContent value="crons" className="min-w-0 space-y-6 outline-none">
+            <CronJobsTab resource={resource} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

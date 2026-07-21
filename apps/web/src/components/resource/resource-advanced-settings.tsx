@@ -117,6 +117,17 @@ export function ResourceAdvancedSettings({
 
   const update = useMutation(trpc.resource.update.mutationOptions());
 
+  const visibleTabs = useMemo(() => {
+    if (resourceType === "compose") {
+      return TABS.filter((tab) => ["general", "json"].includes(tab.value));
+    }
+    return TABS;
+  }, [resourceType]);
+
+  const visibleTabValues = useMemo(() => {
+    return new Set<string>(visibleTabs.map((t) => t.value));
+  }, [visibleTabs]);
+
   // Re-initialise when the server prop changes (e.g. after a refetch).
   useEffect(() => {
     setConfig(initial);
@@ -184,7 +195,7 @@ export function ResourceAdvancedSettings({
         {/* Tab list — scrolls horizontally on mobile */}
         <div className="overflow-x-auto">
           <TabsList variant="line" className="w-max min-w-full">
-            {TABS.map(({ value, label, icon: Icon }) => (
+            {visibleTabs.map(({ value, label, icon: Icon }) => (
               <TabsTrigger key={value} value={value}>
                 <Icon data-icon="inline-start" />
                 {label}
@@ -194,45 +205,59 @@ export function ResourceAdvancedSettings({
         </div>
 
         {/* ── General & Runtime ── */}
-        <TabsContent value="general" className="mt-4 outline-none">
-          <GeneralCard {...cardProps} />
-        </TabsContent>
+        {visibleTabValues.has("general") && (
+          <TabsContent value="general" className="mt-4 outline-none">
+            <GeneralCard {...cardProps} />
+          </TabsContent>
+        )}
 
         {/* ── Resources & Limits ── */}
-        <TabsContent value="resources" className="mt-4 outline-none">
-          <ResourcesCard {...cardProps} />
-        </TabsContent>
+        {visibleTabValues.has("resources") && (
+          <TabsContent value="resources" className="mt-4 outline-none">
+            <ResourcesCard {...cardProps} />
+          </TabsContent>
+        )}
 
         {/* ── Ports & Storage ── */}
-        <TabsContent value="ports" className="mt-4 outline-none">
-          <PortsVolumesCard {...cardProps} />
-        </TabsContent>
+        {visibleTabValues.has("ports") && (
+          <TabsContent value="ports" className="mt-4 outline-none">
+            <PortsVolumesCard {...cardProps} />
+          </TabsContent>
+        )}
 
         {/* ── Health & Deployment ── */}
-        <TabsContent value="health" className="mt-4 outline-none">
-          <HealthcheckDeploymentCard {...cardProps} />
-        </TabsContent>
+        {visibleTabValues.has("health") && (
+          <TabsContent value="health" className="mt-4 outline-none">
+            <HealthcheckDeploymentCard {...cardProps} />
+          </TabsContent>
+        )}
 
         {/* ── Security ── */}
-        <TabsContent value="security" className="mt-4 outline-none">
-          <SecurityCard {...cardProps} />
-        </TabsContent>
+        {visibleTabValues.has("security") && (
+          <TabsContent value="security" className="mt-4 outline-none">
+            <SecurityCard {...cardProps} />
+          </TabsContent>
+        )}
 
         {/* ── Environment & Labels ── */}
-        <TabsContent value="env" className="mt-4 outline-none">
-          <EnvLabelsCard {...cardProps} />
-        </TabsContent>
+        {visibleTabValues.has("env") && (
+          <TabsContent value="env" className="mt-4 outline-none">
+            <EnvLabelsCard {...cardProps} />
+          </TabsContent>
+        )}
 
         {/* ── Raw JSON ── */}
-        <TabsContent value="json" className="mt-4 outline-none">
-          <RawJsonCard
-            rawJson={rawJson}
-            isValid={isJsonValid}
-            isSaving={update.isPending}
-            onChange={setRawJson}
-            onSave={saveRawJson}
-          />
-        </TabsContent>
+        {visibleTabValues.has("json") && (
+          <TabsContent value="json" className="mt-4 outline-none">
+            <RawJsonCard
+              rawJson={rawJson}
+              isValid={isJsonValid}
+              isSaving={update.isPending}
+              onChange={setRawJson}
+              onSave={saveRawJson}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Global save footer (visible on all non-JSON tabs) ── */}

@@ -73,6 +73,19 @@ export function EnvironmentTab({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 border-border/20 border-t pt-4">
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-primary text-xs leading-relaxed">
+          <p className="mb-1 font-semibold text-sm">
+            Tip: Reference project environment variables
+          </p>
+          You can reference shared project-level variables in your values using
+          the syntax:
+          <code className="mx-1 rounded border border-border/20 bg-background/50 px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+            {"DATABASE_URL=${{project.DATABASE_URL}}"}
+          </code>
+          . These will be overridden with the actual value mapped in the
+          environment settings during deployment.
+        </div>
+
         {managedEntries.length > 0 ? (
           <div className="space-y-2 rounded-md border border-border/40 bg-muted/20 p-4">
             <div>

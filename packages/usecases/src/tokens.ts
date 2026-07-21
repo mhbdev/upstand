@@ -84,6 +84,8 @@ export const GetEnvironmentUseCaseToken =
   createToken<UseCases.GetEnvironmentUseCase>("GetEnvironmentUseCase");
 export const DeleteEnvironmentUseCaseToken =
   createToken<UseCases.DeleteEnvironmentUseCase>("DeleteEnvironmentUseCase");
+export const UpdateEnvironmentUseCaseToken =
+  createToken<UseCases.UpdateEnvironmentUseCase>("UpdateEnvironmentUseCase");
 export const CreateResourceUseCaseToken =
   createToken<UseCases.CreateResourceUseCase>("CreateResourceUseCase");
 export const GetResourcesUseCaseToken =

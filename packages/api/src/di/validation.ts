@@ -52,6 +52,7 @@ const STARTUP_TOKENS: readonly Token[] = [
   dependencies.AssignResourceTagUseCaseToken,
   dependencies.CreateCertificateUseCaseToken,
   dependencies.CreateEnvironmentUseCaseToken,
+  dependencies.UpdateEnvironmentUseCaseToken,
   dependencies.CreateGitProviderUseCaseToken,
   dependencies.DeleteCertificateUseCaseToken,
   dependencies.DeleteEnvironmentUseCaseToken,

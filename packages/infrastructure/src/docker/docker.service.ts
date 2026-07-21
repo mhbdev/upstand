@@ -2374,6 +2374,7 @@ export class DockerService {
       dockerImageBytes: sumDockerUsage(diskUsage.Images),
       dockerContainerBytes: sumDockerUsage(diskUsage.Containers),
       dockerVolumeBytes: sumDockerUsage(diskUsage.Volumes),
+      dockerBuildCacheBytes: sumDockerUsage(diskUsage.BuildCache),
     };
   }
 

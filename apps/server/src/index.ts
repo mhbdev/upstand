@@ -826,6 +826,19 @@ app.post("/api/monitoring/alerts", async (c) => {
     threshold,
   });
 
+  // Cooldown protection: suppress duplicate notification dispatches for 15 minutes per (serverId, type)
+  const cooldownKey = `monitoring-alert-cooldown:${serverId}:${type}`;
+  const acquireCooldown = await redis.set(cooldownKey, "1", "EX", 900, "NX");
+  if (acquireCooldown !== "OK") {
+    log.info({
+      message:
+        "Server threshold alert notification suppressed due to 15-minute cooldown",
+      serverId: settings.serverId,
+      type,
+    });
+    return c.json({ status: "acknowledged", throttled: true });
+  }
+
   const publisher = scope.resolve(PublishNotificationUseCaseToken);
 
   await publisher

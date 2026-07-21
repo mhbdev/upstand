@@ -21,9 +21,18 @@ export const stringValue = (
 
 export const sumDockerUsage = (value: unknown): number =>
   Array.isArray(value)
-    ? value.reduce(
-        (total, item) =>
-          isUnknownRecord(item) ? total + numberValue(item, "Size") : total,
-        0,
-      )
+    ? value.reduce((total, item) => {
+        if (!isUnknownRecord(item)) return total;
+        let size = numberValue(item, "Size");
+        if (size === 0) {
+          size = numberValue(item, "SizeRw");
+        }
+        if (size === 0 && isUnknownRecord(item.UsageData)) {
+          size = numberValue(item.UsageData, "Size");
+        }
+        if (size === 0 && isUnknownRecord(item.usageData)) {
+          size = numberValue(item.usageData, "Size");
+        }
+        return total + size;
+      }, 0)
     : 0;

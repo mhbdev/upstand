@@ -139,3 +139,55 @@ export function extractAndParametrizeEnvVars(composeFile: string): {
 
   return { composeFile: finalComposeFile, envVars };
 }
+
+/**
+ * PROJECT-LEVEL VARIABLE SUBSTITUTION
+ *
+ * Resources can reference project-level environment variables using the syntax:
+ *   DATABASE_URL=${{project.DATABASE_URL}}
+ *
+ * At deploy time, these placeholders are resolved against the current
+ * environment's project-level variables before the env vars are injected into
+ * the container. Unresolvable references evaluate to an empty string.
+ */
+
+/** Regex that matches ${{project.VAR_NAME}} with optional surrounding spaces. */
+const PROJECT_VAR_PATTERN =
+  /\$\{\{\s*project\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+
+/**
+ * Substitutes all `${{project.VAR_NAME}}` placeholders found in the *values*
+ * of `resourceEnvVars` with the corresponding value from `projectEnvVars`.
+ * Placeholders that have no matching project variable resolve to an empty string.
+ *
+ * Keys are never transformed.
+ */
+export function substituteProjectEnvVars(
+  resourceEnvVars: Record<string, string>,
+  projectEnvVars: Record<string, string>,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(resourceEnvVars)) {
+    result[key] = value.replace(
+      PROJECT_VAR_PATTERN,
+      (_match, varName: string) => projectEnvVars[varName] ?? "",
+    );
+  }
+  return result;
+}
+
+/**
+ * Parses the raw encrypted/serialised environment variable strings for both
+ * the resource and the project environment, then returns a merged record where
+ * `${{project.VAR_NAME}}` placeholders in resource values are resolved.
+ *
+ * This is the single entry point used by the deployment pipeline.
+ */
+export function resolveResourceEnvironmentVariables(
+  rawResourceEnvVars: string | null | undefined,
+  rawProjectEnvVars: string | null | undefined,
+): Record<string, string> {
+  const resourceVars = parseResourceEnvironmentVariables(rawResourceEnvVars);
+  const projectVars = parseResourceEnvironmentVariables(rawProjectEnvVars);
+  return substituteProjectEnvVars(resourceVars, projectVars);
+}

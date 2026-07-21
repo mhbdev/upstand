@@ -38,9 +38,42 @@ export const environment = pgTable(
   ],
 );
 
+/**
+ * Stores encrypted project-level environment variables for an environment.
+ * Variables are accessible to all resources inside the environment and can be
+ * referenced using the ${{project.VARIABLE_NAME}} syntax in resource env vars.
+ * This mirrors the resource_secret table pattern: one encrypted JSON document
+ * per environment, lazily created on first write.
+ */
+export const environmentSecret = pgTable("environment_secret", {
+  environmentId: text("environment_id")
+    .primaryKey()
+    .references(() => environment.id, { onDelete: "cascade" }),
+  version: integer("version").default(1).notNull(),
+  envVars: text("env_vars").notNull().default("{}"),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
 export const environmentRelations = relations(environment, ({ one }) => ({
   project: one(project, {
     fields: [environment.projectId],
     references: [project.id],
   }),
+  secrets: one(environmentSecret, {
+    fields: [environment.id],
+    references: [environmentSecret.environmentId],
+  }),
 }));
+
+export const environmentSecretRelations = relations(
+  environmentSecret,
+  ({ one }) => ({
+    environment: one(environment, {
+      fields: [environmentSecret.environmentId],
+      references: [environment.id],
+    }),
+  }),
+);

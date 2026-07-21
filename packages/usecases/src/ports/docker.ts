@@ -29,6 +29,7 @@ export interface ServerRuntimeStats {
   dockerImageBytes: number;
   dockerContainerBytes: number;
   dockerVolumeBytes: number;
+  dockerBuildCacheBytes: number;
 }
 
 export interface DockerRegistryAuth {

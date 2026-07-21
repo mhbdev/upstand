@@ -10,7 +10,7 @@ import {
   ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DATABASE_IMAGE_OPTIONS, type DatabaseType } from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -56,6 +56,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  KeyValueEditor,
+  keyValuePairsToRecord,
+  recordToKeyValuePairs,
+} from "@/components/shared/key-value-editor";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -1210,6 +1215,33 @@ export default function EnvironmentDetail({
       toast.error(err.message || "Failed to delete environment"),
   });
 
+  const queryClient = useQueryClient();
+  const [envList, setEnvList] = useState<Array<{ key: string; value: string }>>(
+    [],
+  );
+
+  const updateEnvMutation = useMutation({
+    ...trpc.environment.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Project environment variables saved successfully");
+      void queryClient.invalidateQueries({
+        queryKey: trpc.environment.get.queryKey({ id: environmentId }),
+      });
+    },
+    onError: (err) =>
+      toast.error(
+        err.message || "Failed to update project environment variables",
+      ),
+  });
+
+  useEffect(() => {
+    if (env?.envVars) {
+      setEnvList(recordToKeyValuePairs(env.envVars));
+    } else {
+      setEnvList([]);
+    }
+  }, [env?.envVars]);
+
   if (loadingEnv) {
     return (
       <div className="flex min-h-60 items-center justify-center">
@@ -1314,6 +1346,7 @@ export default function EnvironmentDetail({
       <Tabs defaultValue="resources" className="min-w-0 space-y-6">
         <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
           <TabsTrigger value="resources">Resources</TabsTrigger>
+          <TabsTrigger value="env-vars">Shared Variables</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -1342,6 +1375,60 @@ export default function EnvironmentDetail({
               No resources found in this environment.
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="env-vars" className="outline-none">
+          <div className="max-w-4xl space-y-6">
+            <Card className="border border-border/40 bg-card/20">
+              <CardHeader>
+                <CardTitle className="font-semibold text-lg">
+                  Project Environment Variables
+                </CardTitle>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Configure shared environment variables accessible to all
+                  resources in the <strong>{env.name}</strong> environment.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 border-border/20 border-t pt-4">
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-primary text-xs leading-relaxed">
+                  <p className="mb-1 font-semibold text-sm">
+                    How to reference in service environments:
+                  </p>
+                  To use these variables in your service environments, reference
+                  them using the syntax:
+                  <code className="mx-1 rounded border border-border/20 bg-background/50 px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                    {"DATABASE_URL=${{project.DATABASE_URL}}"}
+                  </code>
+                  . They will be resolved and replaced dynamically during
+                  deployment.
+                </div>
+
+                <KeyValueEditor
+                  value={envList}
+                  onChange={setEnvList}
+                  addLabel="Add shared variable"
+                />
+
+                <div className="flex justify-end border-border/20 border-t pt-4">
+                  <Button
+                    onClick={() => {
+                      updateEnvMutation.mutate({
+                        id: environmentId,
+                        envVars: keyValuePairsToRecord(envList),
+                      });
+                    }}
+                    disabled={updateEnvMutation.isPending}
+                    className="gap-2"
+                  >
+                    {updateEnvMutation.isPending && (
+                      <Spinner className="size-4" />
+                    )}
+                    Save Environment Variables
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="settings" className="outline-none">

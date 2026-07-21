@@ -432,6 +432,11 @@ const EVENT_OPTIONS: Array<{
     label: "Cluster token rotated",
     description: "When a worker or manager join token is rotated.",
   },
+  {
+    value: "server_threshold_alert",
+    label: "Server threshold alert",
+    description: "When host CPU or memory exceeds set alert thresholds.",
+  },
 ];
 
 function providerValues(

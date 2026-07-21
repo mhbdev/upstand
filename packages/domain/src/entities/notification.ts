@@ -137,7 +137,7 @@ export type NotificationConfiguration = z.infer<
 export const CreateNotificationChannelInputSchema = z.object({
   organizationId: z.string().min(1),
   name: z.string().trim().min(1).max(120),
-  events: z.array(NotificationEventTypeSchema).min(1).max(11),
+  events: z.array(NotificationEventTypeSchema).min(1).max(12),
   configuration: NotificationConfigurationSchema,
 });
 
@@ -148,7 +148,7 @@ export type CreateNotificationChannelInput = z.infer<
 export const UpdateNotificationChannelInputSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(120).optional(),
-  events: z.array(NotificationEventTypeSchema).min(1).max(11).optional(),
+  events: z.array(NotificationEventTypeSchema).min(1).max(12).optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),
 });
 
