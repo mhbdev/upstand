@@ -115,7 +115,9 @@ export function formatBulkEnv(pairs: KeyValuePair[]): string {
       if (!key) return "";
       const val = p.value;
       const needsQuotes = /\s|#|=|"|'/.test(val);
-      const displayVal = needsQuotes ? `"${val.replace(/"/g, '\\"')}"` : val;
+      const displayVal = needsQuotes
+        ? `"${val.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+        : val;
       return `${key}=${displayVal}`;
     })
     .filter(Boolean)

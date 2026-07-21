@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.95 - 2026-07-21
+
+### Security & Bug Fixes
+- Resolve CodeQL incomplete string escaping alerts (#35, #36) in `backups.ts` by escaping shell commands with robust single-quote tokenization.
+- Resolve CodeQL incomplete string escaping alert (#34) in `key-value-editor.tsx` by escaping backslashes prior to double quotes in formatted environment string variables.
+- Resolve CodeQL incomplete URL substring sanitization alerts (#32, #33) in `validate-domain.usecase.test.ts` by checking parsed URL hostnames instead of substring matching.
+
 ## 0.1.94 - 2026-07-21
 
 ### Added

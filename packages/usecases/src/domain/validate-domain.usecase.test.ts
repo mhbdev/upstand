@@ -32,15 +32,15 @@ describe("ValidateDomainUseCase", () => {
 
   beforeAll(() => {
     globalThis.fetch = (async (url: string | URL | Request) => {
-      const urlStr = url.toString();
+      const parsedUrl = new URL(url.toString());
       const headers = new Headers();
 
-      if (urlStr.includes("http-cf.example.com")) {
+      if (parsedUrl.hostname === "http-cf.example.com") {
         headers.set("cf-ray", "1234567890");
         headers.set("server", "cloudflare");
       }
 
-      if (urlStr.includes("http-arvan.example.com")) {
+      if (parsedUrl.hostname === "http-arvan.example.com") {
         headers.set("ar-ray", "abcdef1234");
         headers.set("server", "arvancloud");
       }

@@ -237,10 +237,11 @@ export function registerBackups(
               );
 
             try {
+              const escapedCommand = schedule.command.replace(/'/g, "'\\''");
               const execCmd =
                 schedule.shellType === "sh"
-                  ? `sh -c "${schedule.command.replace(/"/g, '\\"')}"`
-                  : `bash -c "${schedule.command.replace(/"/g, '\\"')}"`;
+                  ? `sh -c '${escapedCommand}'`
+                  : `bash -c '${escapedCommand}'`;
 
               const output = await dockerService.runCommandInResourceContainer(
                 resource,
