@@ -18,7 +18,10 @@ import { DockerService } from "./docker.service";
 
 let proxyStarted = false;
 const PROXY_PORT = 23775;
-const remoteDockerProxies = new Map<string, string>();
+// Port range for remote Docker SSH proxies on Windows (Unix sockets unsupported).
+let nextRemoteProxyPort = 23776;
+type RemoteProxyEntry = { socketPath: string } | { host: string; port: number };
+const remoteDockerProxies = new Map<string, RemoteProxyEntry>();
 
 export function getDockerInstance(): Docker {
   const isWindows = process.platform === "win32";
@@ -49,10 +52,15 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
   if (!connection.hostKeyFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
-  return new Docker({ socketPath: ensureRemoteDockerProxy(connection) });
+  const entry = ensureRemoteDockerProxy(connection);
+  return "socketPath" in entry
+    ? new Docker({ socketPath: entry.socketPath })
+    : new Docker({ host: entry.host, port: entry.port });
 }
 
-function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
+function ensureRemoteDockerProxy(
+  connection: RemoteDockerConnection,
+): RemoteProxyEntry {
   const trustedFingerprint = connection.hostKeyFingerprint;
   if (!trustedFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
@@ -65,8 +73,9 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
   const existing = remoteDockerProxies.get(key);
   if (existing) return existing;
 
-  const socketPath = path.join(os.tmpdir(), `upstand-docker-${key}.sock`);
-  fs.rmSync(socketPath, { force: true });
+  // Build the per-connection SSH-tunnel proxy server. Each incoming TCP/socket
+  // connection opens a fresh SSH session and pipes data through
+  // `docker system dial-stdio` so dockerode can speak the Docker HTTP API.
   const proxy = net.createServer((socket) => {
     const bufferedChunks: Buffer[] = [];
     let streamReady = false;
@@ -129,13 +138,30 @@ function ensureRemoteDockerProxy(connection: RemoteDockerConnection): string {
       });
     socket.once("error", fail);
   });
+
+  // Windows does not support Unix-domain sockets on arbitrary file paths.
+  // Use a local TCP port instead so dockerode can reach the SSH tunnel proxy.
+  if (process.platform === "win32") {
+    const localPort = nextRemoteProxyPort++;
+    proxy.once("error", () => {
+      remoteDockerProxies.delete(key);
+    });
+    proxy.listen(localPort, "127.0.0.1");
+    const entry: RemoteProxyEntry = { host: "127.0.0.1", port: localPort };
+    remoteDockerProxies.set(key, entry);
+    return entry;
+  }
+
+  const socketPath = path.join(os.tmpdir(), `upstand-docker-${key}.sock`);
+  fs.rmSync(socketPath, { force: true });
   proxy.once("error", () => {
     remoteDockerProxies.delete(key);
     fs.rmSync(socketPath, { force: true });
   });
   proxy.listen(socketPath);
-  remoteDockerProxies.set(key, socketPath);
-  return socketPath;
+  const entry: RemoteProxyEntry = { socketPath };
+  remoteDockerProxies.set(key, entry);
+  return entry;
 }
 
 export function createRemoteDockerCliEnvironment(
@@ -195,27 +221,95 @@ function getTrustedKnownHostsEntry(connection: RemoteDockerConnection): string {
     { encoding: "utf8", timeout: 12_000 },
   );
 
-  if (scan.error || scan.status !== 0) {
-    throw new Error(
-      `Could not read the SSH host key for ${connection.host}:${connection.port}`,
-    );
+  if (!scan.error && scan.stdout.trim()) {
+    for (const line of scan.stdout.split("\n")) {
+      const [host, algorithm, encodedKey] = line.trim().split(/\s+/, 3);
+      if (!host || !algorithm || !encodedKey) continue;
+      const fingerprint = `SHA256:${createHash("sha256")
+        .update(Buffer.from(encodedKey, "base64"))
+        .digest("base64")
+        .replace(/=+$/, "")}`;
+      if (verifyHostKeyFingerprint(trustedFingerprint, fingerprint)) {
+        return `upstand-deployment ${algorithm} ${encodedKey}\n`;
+      }
+    }
   }
 
-  for (const line of scan.stdout.split("\n")) {
-    const [host, algorithm, encodedKey] = line.trim().split(/\s+/, 3);
-    if (!host || !algorithm || !encodedKey) continue;
-    const fingerprint = `SHA256:${createHash("sha256")
-      .update(Buffer.from(encodedKey, "base64"))
-      .digest("base64")
-      .replace(/=+$/, "")}`;
-    if (verifyHostKeyFingerprint(trustedFingerprint, fingerprint)) {
-      return `upstand-deployment ${algorithm} ${encodedKey}\n`;
-    }
+  const fallback = scanHostKeyWithSsh2Sync(connection.host, connection.port, trustedFingerprint);
+  if (fallback) {
+    return fallback;
   }
 
   throw new Error(
     `The SSH host key for ${connection.host}:${connection.port} does not match its trusted fingerprint`,
   );
+}
+
+function scanHostKeyWithSsh2Sync(
+  host: string,
+  port: number,
+  expectedFp: string,
+): string | null {
+  const hostKeyModule = path
+    .resolve(__dirname, "../../platform/src/ssh/host-key")
+    .replace(/\\/g, "/");
+
+  const code = `
+const { Client } = require("ssh2");
+const crypto = require("crypto");
+let verifyHostKeyFingerprint;
+try {
+  verifyHostKeyFingerprint = require("${hostKeyModule}").verifyHostKeyFingerprint;
+} catch {
+  verifyHostKeyFingerprint = (exp, rec) => exp.trim().replace(/=+$/, "") === rec.trim().replace(/=+$/, "");
+}
+
+const host = process.env.TARGET_HOST;
+const port = parseInt(process.env.TARGET_PORT || "22", 10);
+const expectedFp = process.env.EXPECTED_FP;
+
+const conn = new Client();
+conn.connect({
+  host,
+  port,
+  username: "root",
+  hostVerifier: (keyBuf) => {
+    try {
+      const algLen = keyBuf.readUInt32BE(0);
+      const algorithm = keyBuf.subarray(4, 4 + algLen).toString("utf8");
+      const encodedKey = keyBuf.toString("base64");
+      const fp = "SHA256:" + crypto.createHash("sha256").update(keyBuf).digest("base64");
+      if (verifyHostKeyFingerprint(expectedFp, fp)) {
+        console.log("upstand-deployment " + algorithm + " " + encodedKey);
+        process.exit(0);
+      }
+    } catch (e) {}
+    process.exit(1);
+  }
+}).on("error", () => process.exit(1));
+`;
+
+  const nodeModulesPath =
+    path.resolve(__dirname, "../../../node_modules") +
+    path.delimiter +
+    path.resolve(__dirname, "../../node_modules");
+
+  const res = spawnSync("node", ["-e", code], {
+    encoding: "utf8",
+    timeout: 12_000,
+    env: {
+      ...process.env,
+      NODE_PATH: nodeModulesPath,
+      TARGET_HOST: host,
+      TARGET_PORT: String(port),
+      EXPECTED_FP: expectedFp,
+    },
+  });
+
+  if (res.status === 0 && res.stdout.trim()) {
+    return res.stdout.trim() + "\n";
+  }
+  return null;
 }
 
 export async function resolveDockerCliEnvironmentForServer(

@@ -31,12 +31,15 @@ export function verifyHostKeyFingerprint(
     const value = received.startsWith("SHA256:")
       ? received
       : `SHA256:${received}`;
-    return value === normalized;
+    return value.replace(/=+$/, "") === normalized.replace(/=+$/, "");
   }
   try {
     return (
-      sshpk.parseKey(received, "ssh").fingerprint("sha256").toString() ===
-      normalized
+      sshpk
+        .parseKey(received, "ssh")
+        .fingerprint("sha256")
+        .toString()
+        .replace(/=+$/, "") === normalized.replace(/=+$/, "")
     );
   } catch {
     return false;

@@ -4,6 +4,15 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.102 - 2026-07-21
+
+### Fixed
+- **Remote server setup on Windows**: Provisioning (`SetupServerUseCase`) now runs `docker info --format json` over the existing SSH connection instead of routing through a Unix socket proxy, fixing the *"Was there a typo in the url or port?"* error on Windows ([`server-provisioning.ts`](packages/infrastructure/src/provisioning/server-provisioning.ts)).
+- **Caddy initialization on Windows**: Replaced `CaddyService` (Docker API / Unix socket) with a pure SSH-command-based `initializeCaddyViaSsh` during server provisioning, enabling the DEPLOY role to complete successfully on Windows without a local Unix socket.
+- **Runtime metrics and Docker API calls on Windows**: `ensureRemoteDockerProxy` now detects `process.platform === "win32"` and listens on a local TCP port (`127.0.0.1:23776+`) instead of a Unix `.sock` file path, fixing *"Was there a typo in the url or port?"* errors when fetching runtime metrics or performing any Docker API operation against remote servers on Windows ([`docker-client.ts`](packages/infrastructure/src/docker/docker-client.ts)).
+- **SSH host key fingerprint padding mismatch**: `verifyHostKeyFingerprint` now strips trailing `=` padding before comparing SHA-256 base64 fingerprints, fixing host key verification failures against OpenSSH servers that emit fingerprints with or without trailing padding ([`host-key.ts`](packages/platform/src/ssh/host-key.ts)).
+- **`ssh-keyscan` failure on Windows against OpenSSH 9.6**: `getTrustedKnownHostsEntry` now falls back to a pure Node.js/ssh2 host key scanner (`scanHostKeyWithSsh2Sync`) when `ssh-keyscan` exits with an error (e.g. unsupported KEX algorithm `sntrup761x25519-sha512@openssh.com` on modern Ubuntu 24.04 servers), fixing `"Could not read the SSH host key"` / `"Host denied (verification failed)"` errors on Windows.
+
 ## 0.1.101 - 2026-07-21
 
 ### Changed
