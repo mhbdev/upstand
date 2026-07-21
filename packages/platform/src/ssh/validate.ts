@@ -39,3 +39,17 @@ export function algorithmOf(publicKeyLine: string): "ed25519" | "rsa" {
     ? "ed25519"
     : "rsa";
 }
+
+export function normalizePrivateKey(privateKeyPem: string): string {
+  try {
+    const priv = sshpk.parsePrivateKey(privateKeyPem, "auto");
+    if (priv.type === "ed25519") {
+      return priv.toString("openssh");
+    } else if (priv.type === "rsa") {
+      return priv.toString("pkcs1");
+    }
+    return privateKeyPem;
+  } catch {
+    return privateKeyPem;
+  }
+}

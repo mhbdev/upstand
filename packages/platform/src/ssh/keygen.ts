@@ -28,8 +28,11 @@ export function generateSshKeyPair(
     const openSshPub = parsedPublic.toString("ssh") + ` ${comment}`;
     const fingerprint = parsedPublic.fingerprint("sha256").toString();
 
+    const parsedPrivate = sshpk.parsePrivateKey(privateKey, "pem");
+    const formattedPrivateKey = parsedPrivate.toString("pkcs1");
+
     return {
-      privateKey,
+      privateKey: formattedPrivateKey,
       publicKey: openSshPub,
       fingerprint,
     };
@@ -49,8 +52,11 @@ export function generateSshKeyPair(
     const openSshPub = parsedPublic.toString("ssh") + ` ${comment}`;
     const fingerprint = parsedPublic.fingerprint("sha256").toString();
 
+    const parsedPrivate = sshpk.parsePrivateKey(privateKey, "pem");
+    const formattedPrivateKey = parsedPrivate.toString("openssh");
+
     return {
-      privateKey,
+      privateKey: formattedPrivateKey,
       publicKey: openSshPub,
       fingerprint,
     };

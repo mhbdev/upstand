@@ -4,6 +4,11 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.105 - 2026-07-21
+
+### Fixed
+- **Private key formatting compatibility**: Added auto-serialization of generated and imported private keys to standard PKCS#1 PEM (for RSA keys) and OpenSSH PEM (for ED25519 keys) using `sshpk` prior to database encryption. This prevents the `ssh2` parser from throwing `"Cannot parse privateKey: Unsupported key format"` errors which occurred when Node's native `generateKeyPairSync` outputs key pairs in raw PKCS#8 formatting.
+
 ## 0.1.104 - 2026-07-21
 
 ### Added
