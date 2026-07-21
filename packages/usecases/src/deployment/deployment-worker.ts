@@ -13,6 +13,7 @@ import type { DockerDeploymentService as DockerService } from "../resource/docke
 import { createRemoteServices } from "../resource/docker-client";
 import { parseResourceCredentials } from "../resource/resource-credentials";
 import { parseResourceEnvironmentVariables } from "../resource/resource-environment";
+import { SyncUpstandConfigUseCase } from "../schedule/sync-upstand-config.usecase";
 import {
   assertBuildServerSupportsResource,
   assertDeploymentServerSupportsResource,
@@ -784,6 +785,31 @@ export class DeploymentWorker {
           appendLog(
             "Build compiled successfully and Swarm Service registered.\n",
           );
+
+          try {
+            const clonePath = path.join(process.cwd(), ".builds", resource.id);
+            if (fs.existsSync(clonePath)) {
+              const upstandJsonPath = path.join(clonePath, "upstand.json");
+              const vercelJsonPath = path.join(clonePath, "vercel.json");
+              let configContent: string | null = null;
+              if (fs.existsSync(upstandJsonPath)) {
+                configContent = fs.readFileSync(upstandJsonPath, "utf-8");
+              } else if (fs.existsSync(vercelJsonPath)) {
+                configContent = fs.readFileSync(vercelJsonPath, "utf-8");
+              }
+
+              const syncUseCase = new SyncUpstandConfigUseCase(uow);
+              await syncUseCase.execute({
+                resourceId: resource.id,
+                configContentOrObject: configContent ?? { crons: [] },
+                onLog: appendLog,
+              });
+            }
+          } catch (syncErr: any) {
+            appendLog(
+              `Warning: Failed to sync upstand.json schedule configuration: ${syncErr.message}\n`,
+            );
+          }
         }
       }
 

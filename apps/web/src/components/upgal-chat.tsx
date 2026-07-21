@@ -26,6 +26,7 @@ import {
   PopoverTrigger,
 } from "@upstand/ui/components/popover";
 import { ScrollArea } from "@upstand/ui/components/scroll-area";
+import type { FileUIPart } from "ai";
 import {
   DefaultChatTransport,
   getToolName,
@@ -49,11 +50,54 @@ import {
 } from "@/components/ai-elements/message";
 import {
   PromptInput,
+  PromptInputActionAddAttachments,
+  PromptInputActionAddScreenshot,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
+  PromptInputAttachments,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputHeader,
+  PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
+  usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
+import type { UpGalDraftEventDetail } from "@/lib/upgal-events";
+
+function UpGalDraftHandler({ onOpen }: { onOpen: () => void }) {
+  const controller = usePromptInputController();
+
+  useEffect(() => {
+    const handleDraft = (e: Event) => {
+      const customEvent = e as CustomEvent<UpGalDraftEventDetail>;
+      const detail = customEvent.detail;
+      if (!detail) return;
+
+      onOpen();
+
+      if (detail.content || detail.filename) {
+        const filename = detail.filename || "attached-logs.txt";
+        const content = detail.content || "";
+        const mediaType = detail.mediaType || "text/plain";
+        const file = new File([content], filename, { type: mediaType });
+        controller.attachments.add([file]);
+      }
+
+      if (detail.prompt) {
+        controller.textInput.setInput(detail.prompt);
+      }
+    };
+
+    window.addEventListener("upgal:draft", handleDraft);
+    return () => window.removeEventListener("upgal:draft", handleDraft);
+  }, [controller, onOpen]);
+
+  return null;
+}
+
 import {
   Tool,
   ToolContent,
@@ -504,12 +548,13 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
     organizationId,
   ]);
 
-  async function send(text: string) {
+  async function send(text: string, files?: FileUIPart[]) {
     const trimmedText = text.trim();
-    if (!trimmedText || !organizationId) return;
+    if ((!trimmedText && (!files || files.length === 0)) || !organizationId)
+      return;
     const id = await ensureConversation();
     await chat.sendMessage(
-      { text: trimmedText },
+      { text: trimmedText, files },
       {
         body: {
           organizationId,
@@ -555,7 +600,8 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
   }
 
   return (
-    <>
+    <PromptInputProvider>
+      <UpGalDraftHandler onOpen={() => setOpen(true)} />
       {!open ? (
         <Button
           aria-label="Open UpGal assistant"
@@ -570,7 +616,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
             <div className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Bot className="size-5" />
             </div>
-            <div className="mr-auto">
+            <div className="mr-auto flex-1">
               <p className="font-semibold">UpGal</p>
               <p className="text-muted-foreground text-xs">
                 Your Upstand operations assistant
@@ -755,8 +801,11 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
           </Conversation>
           <PromptInput
             className="border-t p-3"
-            onSubmit={({ text }) => send(text)}
+            onSubmit={({ text, files }) => send(text, files)}
           >
+            <PromptInputHeader>
+              <PromptInputAttachments />
+            </PromptInputHeader>
             <PromptInputBody>
               <PromptInputTextarea
                 placeholder="Ask UpGal anything…"
@@ -765,6 +814,15 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
               />
             </PromptInputBody>
             <PromptInputFooter>
+              <PromptInputTools>
+                <PromptInputActionMenu>
+                  <PromptInputActionMenuTrigger />
+                  <PromptInputActionMenuContent>
+                    <PromptInputActionAddAttachments />
+                    <PromptInputActionAddScreenshot />
+                  </PromptInputActionMenuContent>
+                </PromptInputActionMenu>
+              </PromptInputTools>
               <span className="px-2 text-[11px] text-muted-foreground">
                 Shift + Enter for a new line
               </span>
@@ -807,6 +865,6 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </PromptInputProvider>
   );
 }

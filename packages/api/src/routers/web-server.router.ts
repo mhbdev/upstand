@@ -861,4 +861,66 @@ export const webServerRouter = router({
         handleUseCaseError(error);
       }
     }),
+
+  getSystemStatus: twoFactorVerifiedProcedure.query(async ({ ctx }) => {
+    await requireActiveOrganizationPermission(ctx, "server:view");
+
+    let dbConnected = false;
+    try {
+      const { pool } = await import("@upstand/db");
+      dbConnected = await Promise.race([
+        pool
+          .query("SELECT 1")
+          .then((res) => res !== null && res.rowCount !== null),
+        new Promise<boolean>((resolve) =>
+          setTimeout(() => resolve(false), 1000),
+        ),
+      ]);
+    } catch {
+      dbConnected = false;
+    }
+
+    let redisConnected = false;
+    try {
+      const { redis, pingRedis } = await import("@upstand/redis");
+      redisConnected = await Promise.race([
+        pingRedis(redis),
+        new Promise<boolean>((resolve) =>
+          setTimeout(() => resolve(false), 1000),
+        ),
+      ]);
+    } catch {
+      redisConnected = false;
+    }
+
+    const now = new Date();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const offsetMinutes = -now.getTimezoneOffset();
+    const sign = offsetMinutes >= 0 ? "+" : "-";
+    const absMinutes = Math.abs(offsetMinutes);
+    const hours = String(Math.floor(absMinutes / 60)).padStart(2, "0");
+    const mins = String(absMinutes % 60).padStart(2, "0");
+    const offsetStr = `UTC${sign}${hours}:${mins}`;
+
+    let timeZoneAbbr = "UTC";
+    try {
+      timeZoneAbbr =
+        new Intl.DateTimeFormat("en-US", {
+          timeZoneName: "short",
+          timeZone,
+        })
+          .formatToParts(now)
+          .find((p) => p.type === "timeZoneName")?.value || "UTC";
+    } catch {}
+
+    return {
+      database: dbConnected ? "connected" : "disconnected",
+      redis: redisConnected ? "connected" : "disconnected",
+      server: "connected",
+      serverTime: now.toISOString(),
+      timeZone: timeZoneAbbr,
+      timeZoneOffset: offsetStr,
+      timeZoneId: timeZone,
+    };
+  }),
 });

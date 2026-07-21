@@ -38,7 +38,7 @@ const QUICK_NAVIGATION = [
   {
     label: "Deployments",
     description: "Deployment history and status",
-    href: "/deployments",
+    href: "/observation?tab=deployments",
     icon: Rocket01Icon,
   },
   {

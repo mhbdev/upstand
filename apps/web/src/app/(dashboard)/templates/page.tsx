@@ -569,12 +569,19 @@ export default function TemplatesPage() {
                     <AlertTitle>AI provider not configured</AlertTitle>
                     <AlertDescription>
                       Add a provider in{" "}
-                      <a
-                        className="underline underline-offset-2"
-                        href="/settings/ai"
+                      <button
+                        type="button"
+                        className="underline underline-offset-2 hover:text-foreground"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent("open-settings-dialog", {
+                              detail: { page: "upgal" },
+                            }),
+                          );
+                        }}
                       >
                         AI settings
-                      </a>{" "}
+                      </button>{" "}
                       to generate drafts.
                     </AlertDescription>
                   </Alert>

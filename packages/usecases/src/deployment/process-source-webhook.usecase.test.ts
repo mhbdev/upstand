@@ -50,12 +50,16 @@ function harness() {
         config: JSON.stringify({ webhookSecret: "secret" }),
       }),
     },
-    resourceRepository: { findMany: async () => [service] },
-    environmentRepository: {
-      findById: async () => ({ id: "env-api", projectId: "project-1" }),
-    },
     projectRepository: {
-      findById: async () => ({ id: "project-1", organizationId: "org-1" }),
+      findByOrganizationId: async () => [
+        { id: "project-1", organizationId: "org-1" },
+      ],
+    },
+    environmentRepository: {
+      findByProjectId: async () => [{ id: "env-api", projectId: "project-1" }],
+    },
+    resourceRepository: {
+      findByEnvironmentId: async () => [service],
     },
   } as any;
   const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
@@ -139,12 +143,18 @@ describe("source webhook processing", () => {
           config: JSON.stringify({ webhookSecret: "secret" }),
         }),
       },
-      resourceRepository: { findMany: async () => [service] },
-      environmentRepository: {
-        findById: async () => ({ id: "env-api", projectId: "project-1" }),
-      },
       projectRepository: {
-        findById: async () => ({ id: "project-1", organizationId: "org-1" }),
+        findByOrganizationId: async () => [
+          { id: "project-1", organizationId: "org-1" },
+        ],
+      },
+      environmentRepository: {
+        findByProjectId: async () => [
+          { id: "env-api", projectId: "project-1" },
+        ],
+      },
+      resourceRepository: {
+        findByEnvironmentId: async () => [service],
       },
     } as any;
     const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
@@ -182,12 +192,18 @@ describe("source webhook processing", () => {
           config: JSON.stringify({ webhookSecret: "secret" }),
         }),
       },
-      resourceRepository: { findMany: async () => [service] },
-      environmentRepository: {
-        findById: async () => ({ id: "env-stack", projectId: "project-1" }),
-      },
       projectRepository: {
-        findById: async () => ({ id: "project-1", organizationId: "org-1" }),
+        findByOrganizationId: async () => [
+          { id: "project-1", organizationId: "org-1" },
+        ],
+      },
+      environmentRepository: {
+        findByProjectId: async () => [
+          { id: "env-stack", projectId: "project-1" },
+        ],
+      },
+      resourceRepository: {
+        findByEnvironmentId: async () => [service],
       },
     } as any;
     const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
@@ -232,12 +248,18 @@ describe("source webhook processing", () => {
           config: JSON.stringify({ webhookSecret: "secret" }),
         }),
       },
-      resourceRepository: { findMany: async () => [service] },
-      environmentRepository: {
-        findById: async () => ({ id: "env-image", projectId: "project-1" }),
-      },
       projectRepository: {
-        findById: async () => ({ id: "project-1", organizationId: "org-1" }),
+        findByOrganizationId: async () => [
+          { id: "project-1", organizationId: "org-1" },
+        ],
+      },
+      environmentRepository: {
+        findByProjectId: async () => [
+          { id: "env-image", projectId: "project-1" },
+        ],
+      },
+      resourceRepository: {
+        findByEnvironmentId: async () => [service],
       },
     } as any;
     const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
@@ -288,12 +310,18 @@ describe("source webhook processing", () => {
             config: JSON.stringify({ webhookSecret: "secret" }),
           }),
         },
-        resourceRepository: { findMany: async () => [svc] },
-        environmentRepository: {
-          findById: async () => ({ id: "env-api", projectId: "project-1" }),
-        },
         projectRepository: {
-          findById: async () => ({ id: "project-1", organizationId: "org-1" }),
+          findByOrganizationId: async () => [
+            { id: "project-1", organizationId: "org-1" },
+          ],
+        },
+        environmentRepository: {
+          findByProjectId: async () => [
+            { id: "env-api", projectId: "project-1" },
+          ],
+        },
+        resourceRepository: {
+          findByEnvironmentId: async () => [svc],
         },
       } as any;
       const useCase = new ProcessSourceWebhookUseCase(uow, () => ({

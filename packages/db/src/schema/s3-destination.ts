@@ -1,26 +1,32 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
 
-export const s3Destination = pgTable("s3_destination", {
-  id: text("id").primaryKey(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  provider: text("provider").notNull(), // e.g. "AWS", "Cloudflare", "Wasabi", etc.
-  accessKeyId: text("access_key_id").notNull(),
-  secretAccessKey: text("secret_access_key").notNull(),
-  bucket: text("bucket").notNull(),
-  region: text("region").notNull(),
-  endpoint: text("endpoint").notNull(),
-  additionalFlags: text("additional_flags").default("[]").notNull(), // JSON array of flags as string
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull(),
-});
+export const s3Destination = pgTable(
+  "s3_destination",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    provider: text("provider").notNull(), // e.g. "AWS", "Cloudflare", "Wasabi", etc.
+    accessKeyId: text("access_key_id").notNull(),
+    secretAccessKey: text("secret_access_key").notNull(),
+    bucket: text("bucket").notNull(),
+    region: text("region").notNull(),
+    endpoint: text("endpoint").notNull(),
+    additionalFlags: text("additional_flags").default("[]").notNull(), // JSON array of flags as string
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("s3_destination_organization_idx").on(table.organizationId),
+  ],
+);
 
 export const s3DestinationRelations = relations(s3Destination, ({ one }) => ({
   organization: one(organization, {

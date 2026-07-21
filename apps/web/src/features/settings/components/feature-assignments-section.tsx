@@ -94,18 +94,16 @@ export function FeatureAssignmentsSection({
     removeAssignment.isPending;
 
   return (
-    <Card className="border-border bg-card/50">
+    <Card>
       <CardHeader>
-        <CardTitle className="font-semibold text-sm">
-          AI Feature Routing
-        </CardTitle>
-        <CardDescription>
+        <CardTitle className="text-sm">AI Feature Routing</CardTitle>
+        <CardDescription className="text-xs">
           Link your added AI provider configurations to specific UpGal
           operations. If no provider is selected, we fall back to the first
           available provider.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+      <CardContent className="flex flex-col gap-4">
         {providers.length === 0 ? (
           <p className="py-2 text-muted-foreground text-xs italic">
             Add at least one AI provider above to route features.
@@ -134,7 +132,7 @@ export function FeatureAssignmentsSection({
             return (
               <div
                 key={feat.key}
-                className="flex flex-col gap-3 border-border/40 border-b pb-5 last:border-b-0 last:pb-0 md:flex-row md:items-center md:justify-between"
+                className="flex flex-col gap-3 border-border border-b pb-4 last:border-b-0 last:pb-0 md:flex-row md:items-center md:justify-between"
               >
                 <div className="flex max-w-lg flex-col gap-0.5">
                   <span className="font-medium text-foreground text-sm">

@@ -79,8 +79,10 @@ export class DuplicateProjectUseCase {
           for (const tag of tags) {
             await tx.tagRepository.attachToResource(copiedResource.id, tag.id);
           }
+        }
+        if (resources.length > 0) {
           await tx.environmentRepository.updateById(copiedEnvironment.id, {
-            resourceCount: resources.indexOf(resource) + 1,
+            resourceCount: resources.length,
           });
         }
       }

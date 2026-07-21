@@ -1,18 +1,29 @@
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
-import { Input } from "@upstand/ui/components/input";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@upstand/ui/components/popover";
-import { Separator } from "@upstand/ui/components/separator";
-import { Switch } from "@upstand/ui/components/switch";
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@upstand/ui/components/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@upstand/ui/components/select";
 import { cn } from "@upstand/ui/lib/utils";
-import { type ComponentProps, useEffect, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import {
-  Check,
+  ArrowDown,
+  Bot,
   Clock,
   Copy,
   Download,
@@ -20,9 +31,12 @@ import {
   Hash,
   Pause,
   Play,
+  Search,
+  XCircle,
 } from "@/components/huge-icons";
 import { CodeSurface } from "@/components/shared/code-editor";
 import { copyText, downloadText } from "@/lib/browser";
+import { askUpGalWithLogs } from "@/lib/upgal-events";
 
 // Log parser and style rules
 export type LogType = "error" | "warning" | "success" | "info" | "debug";
@@ -151,17 +165,87 @@ export const getLogType = (message: string): LogStyle => {
 };
 
 const parseLogLine = (line: string): LogLine => {
-  const match = line.match(/^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(.*)$/);
-  if (!match) {
+  const trimmed = line.trim();
+  if (!trimmed) {
     return { rawTimestamp: null, timestamp: null, message: line };
   }
 
-  const timestamp = new Date(match[1]);
-  return {
-    rawTimestamp: match[1],
-    timestamp: Number.isNaN(timestamp.getTime()) ? null : timestamp,
-    message: match[2],
-  };
+  // 1. JSON logs (e.g. Caddy logs or structured application logs)
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const rawTs =
+        parsed.ts ?? parsed.time ?? parsed.timestamp ?? parsed["@timestamp"];
+      if (rawTs !== undefined && rawTs !== null) {
+        let date: Date | null = null;
+        if (typeof rawTs === "number") {
+          const ms = rawTs < 1e11 ? rawTs * 1000 : rawTs;
+          date = new Date(ms);
+        } else if (typeof rawTs === "string") {
+          date = new Date(rawTs);
+        }
+        if (date && !Number.isNaN(date.getTime())) {
+          return {
+            rawTimestamp: String(rawTs),
+            timestamp: date,
+            message: line,
+          };
+        }
+      }
+    } catch {
+      // Fall back to pattern matching if JSON parse fails
+    }
+  }
+
+  // 2. ISO 8601 or Date at start: "2026-07-21T05:30:00...", "2026-07-21 05:30:00...", "[2026-07-21T05:30:00Z]..."
+  const dateMatch = trimmed.match(
+    /^(?:\[)?(\d{4}[-/]\d{2}[-/]\d{2}(?:[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?)(?:\])?\s*(.*)$/i,
+  );
+  if (dateMatch?.[1]) {
+    const rawTs = dateMatch[1];
+    const date = new Date(rawTs);
+    if (!Number.isNaN(date.getTime())) {
+      return {
+        rawTimestamp: rawTs,
+        timestamp: date,
+        message: dateMatch[2] || line,
+      };
+    }
+  }
+
+  // 3. Syslog date pattern at start: "Jul 21 05:30:00 message..."
+  const syslogMatch = trimmed.match(
+    /^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(.*)$/,
+  );
+  if (syslogMatch?.[1]) {
+    const rawTs = syslogMatch[1];
+    const date = new Date(rawTs);
+    if (!Number.isNaN(date.getTime())) {
+      return {
+        rawTimestamp: rawTs,
+        timestamp: date,
+        message: syslogMatch[2] || line,
+      };
+    }
+  }
+
+  // 4. Time-only pattern at start: "05:30:00" or "[05:30:00]"
+  const timeOnlyMatch = trimmed.match(
+    /^(?:\[)?(\d{2}:\d{2}:\d{2}(?:\.\d+)?)(?:\])?\s*(.*)$/,
+  );
+  if (timeOnlyMatch?.[1]) {
+    const today = new Date().toISOString().split("T")[0];
+    const date = new Date(`${today}T${timeOnlyMatch[1]}`);
+    if (!Number.isNaN(date.getTime())) {
+      return {
+        rawTimestamp: timeOnlyMatch[1],
+        timestamp: date,
+        message: timeOnlyMatch[2] || line,
+      };
+    }
+  }
+
+  return { rawTimestamp: null, timestamp: null, message: line };
 };
 
 const getServiceColor = (name: string): string => {
@@ -188,10 +272,12 @@ export function TerminalLine({
   log,
   noTimestamp,
   searchTerm,
+  fontSize = "sm",
 }: {
   log: LogLine;
   noTimestamp?: boolean;
   searchTerm?: string;
+  fontSize?: "sm" | "md" | "lg";
 }) {
   const { timestamp, message } = log;
   const { type, variant } = getLogType(message);
@@ -219,7 +305,7 @@ export function TerminalLine({
     return text.split(expression).map((part, index) =>
       index % 2 === 1 ? (
         <mark
-          className="rounded bg-warning/20 px-0.5 font-semibold text-foreground"
+          className="rounded bg-warning/30 px-0.5 font-semibold text-foreground"
           key={`${part}-${index}`}
         >
           {part}
@@ -233,40 +319,58 @@ export function TerminalLine({
   return (
     <div
       className={cn(
-        "flex gap-3 border-l-2 px-2 py-1 font-mono text-xs",
+        "flex gap-3 border-l-2 px-2 py-0.5 font-mono leading-normal transition-colors",
         type === "error"
-          ? "border-destructive bg-destructive/10 hover:bg-destructive/15"
+          ? "border-destructive bg-destructive/5 hover:bg-destructive/10"
           : type === "warning"
-            ? "border-warning bg-warning/10 hover:bg-warning/15"
+            ? "border-warning bg-warning/5 hover:bg-warning/10"
             : type === "debug"
-              ? "border-muted-foreground/30 bg-muted/50 hover:bg-muted"
+              ? "border-muted-foreground/30 bg-muted/20 hover:bg-muted/40"
               : type === "success"
-                ? "border-primary bg-primary/10 hover:bg-primary/15"
-                : "border-transparent hover:bg-muted/60",
+                ? "border-primary bg-primary/5 hover:bg-primary/10"
+                : "border-transparent hover:bg-muted/30",
       )}
     >
       {!noTimestamp && (
-        <span className="w-20 shrink-0 select-none text-muted-foreground">
+        <span
+          className={cn(
+            "shrink-0 select-none self-center font-mono text-muted-foreground tabular-nums",
+            fontSize === "sm"
+              ? "w-14 text-[9px]"
+              : fontSize === "md"
+                ? "w-16 text-[10px]"
+                : "w-20 text-xs",
+          )}
+        >
           {formattedTime}
         </span>
       )}
       <Badge
         variant={variant}
-        className="h-4 w-14 shrink-0 justify-center px-1 py-0 font-bold text-[9px] capitalize"
+        className="h-4.5 w-14 shrink-0 select-none justify-center self-center px-1 py-0 font-bold text-[8.5px] capitalize tracking-wide"
       >
         {type}
       </Badge>
       {servicePrefix && (
         <span
           className={cn(
-            "inline-flex h-4 shrink-0 select-none items-center justify-center rounded border px-1.5 font-bold font-mono text-[9px] uppercase tracking-wider",
+            "inline-flex h-4.5 shrink-0 select-none items-center justify-center self-center rounded border px-1.5 font-bold font-mono text-[8px] uppercase tracking-wider",
             getServiceColor(servicePrefix),
           )}
         >
           {servicePrefix}
         </span>
       )}
-      <span className="flex-1 whitespace-pre-wrap break-all font-mono text-foreground">
+      <span
+        className={cn(
+          "flex-1 whitespace-pre-wrap break-all font-mono text-foreground leading-relaxed",
+          fontSize === "sm"
+            ? "text-[10px]"
+            : fontSize === "md"
+              ? "text-xs"
+              : "text-sm",
+        )}
+      >
         {highlightMessage(displayMessage, searchTerm || "")}
       </span>
     </div>
@@ -286,22 +390,48 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
   const [showTimestamp, setShowTimestamp] = useState<boolean>(true);
   const [typeFilters, setTypeFilters] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("sm");
 
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [messageBuffer, setMessageBuffer] = useState<LogLine[]>([]);
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] =
+    useState<boolean>(false);
+  const [unseenCount, setUnseenCount] = useState<number>(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // The API returns the authoritative tail on every poll. Replacing this view
-  // avoids duplicate entries when Docker repeats the same log line.
+  // Parse logs list and count differences when paused / scrolled up
   useEffect(() => {
+    const parsed = logs.filter(Boolean).map(parseLogLine);
     if (!isPaused) {
-      setLogsList(logs.filter(Boolean).map(parseLogLine));
+      if (!autoScroll && logsList.length > 0) {
+        const diff = parsed.length - logsList.length;
+        if (diff > 0) {
+          setUnseenCount((prev) => prev + diff);
+        }
+      }
+      setLogsList(parsed);
       setMessageBuffer([]);
     } else {
-      setMessageBuffer(logs.filter(Boolean).map(parseLogLine));
+      setMessageBuffer(parsed);
+      const diff = parsed.length - logsList.length;
+      if (diff > 0) {
+        setUnseenCount((prev) => prev + diff);
+      }
     }
-  }, [isPaused, logs]);
+  }, [isPaused, logs, autoScroll, logsList.length]);
+
+  // Compute log level matches counts for current list
+  const levelCounts = useMemo(() => {
+    const counts = { info: 0, success: 0, warning: 0, debug: 0, error: 0 };
+    for (const log of logsList) {
+      const { type } = getLogType(log.message);
+      if (type in counts) {
+        counts[type]++;
+      }
+    }
+    return counts;
+  }, [logsList]);
 
   // Filter implementation
   useEffect(() => {
@@ -338,18 +468,23 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
     setFilteredLogs(result);
   }, [logsList, searchQuery, timeRange, typeFilters, linesLimit]);
 
-  // Scroll to bottom
+  // Scroll to bottom trigger
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      setUnseenCount(0);
     }
   }, [autoScroll]);
 
   const handleScroll = () => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 15;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 20;
     setAutoScroll(isAtBottom);
+    setShowScrollBottomBtn(!isAtBottom);
+    if (isAtBottom) {
+      setUnseenCount(0);
+    }
   };
 
   const handlePauseResume = () => {
@@ -358,6 +493,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
         setLogsList((prev) => [...prev, ...messageBuffer].slice(-500));
         setMessageBuffer([]);
       }
+      setUnseenCount(0);
     }
     setIsPaused(!isPaused);
   };
@@ -366,7 +502,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
     const text = filteredLogs
       .map((log) =>
         showTimestamp
-          ? `${log.timestamp?.toLocaleTimeString()} [${getLogType(log.message).type}] ${log.message}`
+          ? `${log.timestamp?.toLocaleTimeString() || "---"} [${getLogType(log.message).type}] ${log.message}`
           : log.message,
       )
       .join("\n");
@@ -383,178 +519,283 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
     const text = filteredLogs
       .map((log) =>
         showTimestamp
-          ? `${log.timestamp?.toLocaleTimeString()} [${getLogType(log.message).type}] ${log.message}`
+          ? `${log.timestamp?.toLocaleTimeString() || "---"} [${getLogType(log.message).type}] ${log.message}`
           : log.message,
       )
       .join("\n");
     downloadText(text, `container-${containerId}-logs.txt`);
   };
 
+  const snapToBottom = () => {
+    setAutoScroll(true);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+    setUnseenCount(0);
+  };
+
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {/* Filters & Control bar */}
-      <div className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-          {/* Limit Filter */}
-          <Popover>
-            <PopoverTrigger className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border/40 bg-transparent px-3 py-1 font-medium text-foreground text-xs transition-colors hover:bg-muted/10">
-              <Hash className="size-3.5 text-muted-foreground" />
-              <span>Limit: {linesLimit}</span>
-            </PopoverTrigger>
-            <PopoverContent className="w-40 p-1" align="start">
-              {[100, 300, 500, 1000].map((num) => (
-                <button
-                  key={num}
-                  onClick={() => setLinesLimit(num)}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/10",
-                    linesLimit === num && "bg-muted/5 font-bold text-primary",
-                  )}
-                >
-                  <span>{num} lines</span>
-                  {linesLimit === num && <Check className="size-3.5" />}
-                </button>
-              ))}
-            </PopoverContent>
-          </Popover>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/40 bg-card/60 p-2 text-xs">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {/* Ask UpGal AI Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const linesToAttach = filteredLogs.slice(-100);
+              const logsText = linesToAttach
+                .map((log) =>
+                  showTimestamp
+                    ? `${log.timestamp?.toLocaleTimeString() || "---"} [${getLogType(log.message).type}] ${log.message}`
+                    : log.message,
+                )
+                .join("\n");
+              if (!logsText.trim()) {
+                toast.error("No logs available to attach");
+                return;
+              }
+              askUpGalWithLogs(
+                logsText,
+                `Please analyze these container logs (container: ${containerId}) and explain any errors, warnings, or anomalies:`,
+              );
+              toast.success("Logs attached to UpGal assistant");
+            }}
+            className="h-8 gap-1.5 border-primary/40 bg-primary/5 font-medium text-primary text-xs hover:bg-primary/10 active:scale-[0.98]"
+            title="Attach recent logs (up to 100 lines) to UpGal assistant"
+          >
+            <Bot className="size-3.5" />
+            <span>Ask UpGal</span>
+          </Button>
 
-          {/* Time range Popover */}
-          <Popover>
-            <PopoverTrigger className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border/40 bg-transparent px-3 py-1 font-medium text-foreground text-xs transition-colors hover:bg-muted/10">
+          {/* Limit Filter Select */}
+          <Select
+            value={String(linesLimit)}
+            onValueChange={(val) => val && setLinesLimit(Number(val))}
+          >
+            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
+              <Hash className="size-3.5 text-muted-foreground" />
+              <span>
+                <span className="hidden sm:inline">Limit: </span>
+                {linesLimit}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="100" className="text-xs">
+                100 lines
+              </SelectItem>
+              <SelectItem value="300" className="text-xs">
+                300 lines
+              </SelectItem>
+              <SelectItem value="500" className="text-xs">
+                500 lines
+              </SelectItem>
+              <SelectItem value="1000" className="text-xs">
+                1000 lines
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Time range Select */}
+          <Select
+            value={timeRange}
+            onValueChange={(val) => val && setTimeRange(val)}
+          >
+            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
               <Clock className="size-3.5 text-muted-foreground" />
               <span>
-                Range:{" "}
+                <span className="hidden md:inline">Range: </span>
                 {timeRange === "all"
                   ? "All time"
                   : timeRange === "1h"
-                    ? "Last hour"
+                    ? "Last 1h"
                     : `Last ${timeRange}`}
               </span>
-            </PopoverTrigger>
-            <PopoverContent className="w-48 space-y-2 p-1.5" align="start">
-              <div className="space-y-0.5">
-                {[
-                  { label: "All time", value: "all" },
-                  { label: "Last hour", value: "1h" },
-                  { label: "Last 6 hours", value: "6h" },
-                  { label: "Last 24 hours", value: "24h" },
-                ].map((item) => (
-                  <button
-                    key={item.value}
-                    onClick={() => setTimeRange(item.value)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/10",
-                      timeRange === item.value &&
-                        "bg-muted/5 font-bold text-primary",
-                    )}
-                  >
-                    <span>{item.label}</span>
-                    {timeRange === item.value && <Check className="size-3.5" />}
-                  </button>
-                ))}
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-[11px] text-muted-foreground">
-                  Show Timestamps
-                </span>
-                <Switch
-                  checked={showTimestamp}
-                  onCheckedChange={setShowTimestamp}
-                  className="scale-75"
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">
+                All time
+              </SelectItem>
+              <SelectItem value="1h" className="text-xs">
+                Last hour
+              </SelectItem>
+              <SelectItem value="6h" className="text-xs">
+                Last 6 hours
+              </SelectItem>
+              <SelectItem value="24h" className="text-xs">
+                Last 24 hours
+              </SelectItem>
+            </SelectContent>
+          </Select>
 
-          {/* Log Level Popover */}
-          <Popover>
-            <PopoverTrigger className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border/40 bg-transparent px-3 py-1 font-medium text-foreground text-xs transition-colors hover:bg-muted/10">
+          {/* Log Level Select */}
+          <Select
+            value={
+              typeFilters.length === 1
+                ? typeFilters[0]
+                : typeFilters.length === 0
+                  ? "all"
+                  : "multiple"
+            }
+            onValueChange={(val) => {
+              if (!val) return;
+              if (val === "all") setTypeFilters([]);
+              else setTypeFilters([val]);
+            }}
+          >
+            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
               <Filter className="size-3.5 text-muted-foreground" />
-              <span>Level ({typeFilters.length || "All"})</span>
-            </PopoverTrigger>
-            <PopoverContent className="w-40 p-1" align="start">
-              <button
-                onClick={() => setTypeFilters([])}
-                className={cn(
-                  "flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/10",
-                  typeFilters.length === 0 && "font-bold text-primary",
-                )}
-              >
-                <span>All Levels</span>
-                {typeFilters.length === 0 && <Check className="size-3.5" />}
-              </button>
-              <Separator className="my-1" />
-              {priorities.map((item) => {
-                const isSelected = typeFilters.includes(item.value);
-                return (
-                  <button
-                    key={item.value}
-                    onClick={() => {
-                      if (isSelected) {
-                        setTypeFilters((prev) =>
-                          prev.filter((v) => v !== item.value),
-                        );
-                      } else {
-                        setTypeFilters((prev) => [...prev, item.value]);
-                      }
-                    }}
-                    className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/10"
-                  >
-                    <span className="capitalize">{item.label}</span>
-                    {isSelected && <Check className="size-3.5 text-primary" />}
-                  </button>
-                );
-              })}
-            </PopoverContent>
-          </Popover>
+              <span>
+                <span className="hidden md:inline">Level: </span>
+                {typeFilters.length === 0
+                  ? "All"
+                  : typeFilters.length === 1
+                    ? typeFilters[0].toUpperCase()
+                    : `(${typeFilters.length})`}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">
+                All Levels
+              </SelectItem>
+              <SelectItem value="error" className="text-xs">
+                Error ({levelCounts.error})
+              </SelectItem>
+              <SelectItem value="warning" className="text-xs">
+                Warning ({levelCounts.warning})
+              </SelectItem>
+              <SelectItem value="success" className="text-xs">
+                Success ({levelCounts.success})
+              </SelectItem>
+              <SelectItem value="info" className="text-xs">
+                Info ({levelCounts.info})
+              </SelectItem>
+              <SelectItem value="debug" className="text-xs">
+                Debug ({levelCounts.debug})
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Text Size Control Select */}
+          <Select
+            value={fontSize}
+            onValueChange={(val) =>
+              val && setFontSize(val as "sm" | "md" | "lg")
+            }
+          >
+            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
+              <span className="font-mono font-semibold text-muted-foreground">
+                aA
+              </span>
+              <span className="hidden capitalize lg:inline">
+                {fontSize === "sm"
+                  ? "Small"
+                  : fontSize === "md"
+                    ? "Medium"
+                    : "Large"}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm" className="text-xs">
+                Small
+              </SelectItem>
+              <SelectItem value="md" className="text-xs">
+                Medium
+              </SelectItem>
+              <SelectItem value="lg" className="text-xs">
+                Large
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Toggle Timestamps Button */}
+          <Button
+            variant={showTimestamp ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setShowTimestamp(!showTimestamp)}
+            className="h-8 gap-1 border-border/30 px-2 text-xs"
+            title="Toggle Timestamps"
+          >
+            <Clock className="size-3 text-muted-foreground" />
+            <span className="hidden xl:inline">Time</span>
+          </Button>
 
           {/* Search bar */}
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search logs…"
-            aria-label="Search logs"
-            className="h-8 min-w-40 flex-1 bg-background text-xs sm:max-w-56"
-          />
+          <InputGroup className="h-8 min-w-[130px] max-w-full flex-1 border border-border/40 bg-background md:max-w-48">
+            <InputGroupAddon align="inline-start">
+              <Search className="pointer-events-none size-3.5 text-muted-foreground" />
+            </InputGroupAddon>
+            <InputGroupInput
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search logs…"
+              aria-label="Search logs"
+              className="font-mono text-xs"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            {searchQuery && (
+              <InputGroupAddon align="inline-end">
+                <span className="select-none rounded bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+                  {filteredLogs.length}
+                </span>
+                <InputGroupButton
+                  size="icon-xs"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search query"
+                >
+                  <XCircle className="size-3.5" />
+                </InputGroupButton>
+              </InputGroupAddon>
+            )}
+          </InputGroup>
         </div>
 
-        {/* Actions panel */}
-        <div className="flex w-full gap-2 sm:w-auto">
+        {/* Action Buttons: Responsive icon-only when constrained */}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:ml-0">
           <Button
             variant="outline"
             size="sm"
             onClick={handlePauseResume}
-            className="h-8 gap-1.5 border-border/40 text-xs"
+            className="h-8 gap-1.5 border-border/40 px-2.5 text-xs"
+            aria-label={isPaused ? "Resume log stream" : "Pause log stream"}
+            title={isPaused ? "Resume stream" : "Pause stream"}
           >
             {isPaused ? (
               <Play className="size-3.5 text-primary" />
             ) : (
               <Pause className="size-3.5 text-warning" />
             )}
-            <span className="hidden sm:inline">
+            <span className="hidden lg:inline">
               {isPaused ? "Resume" : "Pause"}
             </span>
           </Button>
+
           <Button
             variant="outline"
             size="sm"
             onClick={handleCopy}
             disabled={filteredLogs.length === 0}
-            className="h-8 gap-1.5 border-border/40 text-xs"
+            className="h-8 gap-1.5 border-border/40 px-2.5 text-xs"
+            aria-label="Copy logs to clipboard"
+            title="Copy logs"
           >
             <Copy className="size-3.5 text-muted-foreground" />
-            <span className="hidden sm:inline">Copy</span>
+            <span className="hidden lg:inline">Copy</span>
           </Button>
+
           <Button
             variant="outline"
             size="sm"
             onClick={handleDownload}
             disabled={filteredLogs.length === 0}
-            className="h-8 gap-1.5 border-border/40 text-xs"
+            className="h-8 gap-1.5 border-border/40 px-2.5 text-xs"
+            aria-label="Download logs as text file"
+            title="Download logs"
           >
             <Download className="size-3.5 text-muted-foreground" />
-            <span className="hidden sm:inline">Download</span>
+            <span className="hidden lg:inline">Download</span>
           </Button>
         </div>
       </div>
@@ -573,28 +814,59 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
       )}
 
       {/* Terminal log panel */}
-      <CodeSurface>
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="custom-logs-scrollbar h-[min(24rem,55svh)] space-y-0.5 overflow-y-auto bg-muted/30 p-2 font-mono text-[11px] sm:p-3"
-        >
-          {filteredLogs.length > 0 ? (
-            filteredLogs.map((logItem, index) => (
-              <TerminalLine
-                key={`${logItem.rawTimestamp ?? "untimed"}-${index}`}
-                log={logItem}
-                noTimestamp={!showTimestamp}
-                searchTerm={searchQuery}
-              />
-            ))
-          ) : (
-            <div className="flex h-full items-center justify-center font-sans text-muted-foreground text-xs">
-              No matching logs found.
-            </div>
-          )}
-        </div>
-      </CodeSurface>
+      <div className="relative">
+        <CodeSurface>
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className={cn(
+              "custom-logs-scrollbar h-[min(28rem,60svh)] space-y-0.5 overflow-y-auto bg-muted/30 p-2 font-mono transition-all sm:p-3",
+              fontSize === "sm"
+                ? "text-[10px]"
+                : fontSize === "md"
+                  ? "text-xs"
+                  : "text-sm",
+            )}
+          >
+            {filteredLogs.length > 0 ? (
+              filteredLogs.map((logItem, index) => (
+                <TerminalLine
+                  key={`${logItem.rawTimestamp ?? "untimed"}-${index}`}
+                  log={logItem}
+                  noTimestamp={!showTimestamp}
+                  searchTerm={searchQuery}
+                  fontSize={fontSize}
+                />
+              ))
+            ) : (
+              <div className="flex h-full items-center justify-center font-sans text-muted-foreground text-xs">
+                No matching logs found.
+              </div>
+            )}
+          </div>
+        </CodeSurface>
+
+        {/* Floating Snap to Bottom button */}
+        {showScrollBottomBtn && (
+          <Button
+            size="sm"
+            onClick={snapToBottom}
+            className="fade-in slide-in-from-bottom-2 absolute right-4 bottom-4 h-8 animate-in gap-1 rounded-full bg-primary/95 text-primary-foreground text-xs shadow-lg duration-200 hover:bg-primary/90"
+            aria-label="Snap view to bottom"
+          >
+            <ArrowDown className="size-3.5 animate-bounce" />
+            <span>Scroll to Bottom</span>
+            {unseenCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="h-4.5 rounded-full bg-secondary-foreground px-1 font-bold text-[9px] text-secondary tabular-nums"
+              >
+                +{unseenCount}
+              </Badge>
+            )}
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

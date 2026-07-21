@@ -17,6 +17,7 @@ import { DrizzleResourceRepository } from "./resource/drizzle-resource.repositor
 import { DrizzleResourceRuntimeRepository } from "./resource/drizzle-resource-runtime.repository";
 import { DrizzleS3DestinationRepository } from "./s3-destination/drizzle-s3-destination.repository";
 import { DrizzleScheduleRepository } from "./schedule/drizzle-schedule.repository";
+import { DrizzleScheduleLogRepository } from "./schedule/drizzle-schedule-log.repository";
 import { DrizzleServerRepository } from "./server/drizzle-server.repository";
 import { DrizzleServerBuildSettingsRepository } from "./server-build-settings/drizzle-server-build-settings.repository";
 import type { Executor } from "./shared/types";
@@ -51,6 +52,7 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly monitoringSettingsRepository: DrizzleMonitoringSettingsRepository;
   public readonly previewDeploymentRepository: DrizzlePreviewDeploymentRepository;
   public readonly scheduleRepository: DrizzleScheduleRepository;
+  public readonly scheduleLogRepository: DrizzleScheduleLogRepository;
   public readonly outboxRepository: DrizzleOutboxRepository;
 
   constructor(private readonly executor: Executor) {
@@ -101,6 +103,9 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
       this.executor,
     );
     this.scheduleRepository = new DrizzleScheduleRepository(this.executor);
+    this.scheduleLogRepository = new DrizzleScheduleLogRepository(
+      this.executor,
+    );
     this.outboxRepository = new DrizzleOutboxRepository(this.executor);
   }
 

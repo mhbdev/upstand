@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { getDocsUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./auth/user/user-avatar";
 import { ModeToggle } from "./mode-toggle";
@@ -82,7 +83,7 @@ export default function Header() {
               return external ? (
                 <a
                   key={href}
-                  href={href}
+                  href={href === "/docs" ? getDocsUrl() : href}
                   className={cn(
                     "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
                     isActive
@@ -151,7 +152,7 @@ export default function Header() {
                   return external ? (
                     <a
                       key={href}
-                      href={href}
+                      href={href === "/docs" ? getDocsUrl() : href}
                       className={className}
                       onClick={() => setMobileMenuOpen(false)}
                     >

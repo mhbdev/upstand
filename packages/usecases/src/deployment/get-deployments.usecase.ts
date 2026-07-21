@@ -1,4 +1,4 @@
-import type { IUnitOfWork } from "@upstand/domain";
+import type { Environment, IUnitOfWork, Project } from "@upstand/domain";
 
 export interface DeploymentHistoryResult {
   id: string;
@@ -24,18 +24,19 @@ export class GetDeploymentsUseCase {
     const projects =
       await this.uow.projectRepository.findByOrganizationId(organizationId);
     const projectIds = new Set(projects.map((project) => project.id));
-    const environments = await this.uow.environmentRepository.findMany();
-    const environmentIds = new Set(
-      environments
-        .filter((environment) => projectIds.has(environment.projectId))
-        .map((environment) => environment.id),
-    );
-    const resources = await this.uow.resourceRepository.findMany();
-    return this.execute(
-      resources
-        .filter((resource) => environmentIds.has(resource.environmentId))
-        .map((resource) => resource.id),
-    );
+    const environments = [];
+    for (const projectId of projectIds) {
+      const envs =
+        await this.uow.environmentRepository.findByProjectId(projectId);
+      environments.push(...envs);
+    }
+    const environmentIds = new Set(environments.map((env) => env.id));
+    const resources = [];
+    for (const envId of environmentIds) {
+      const res = await this.uow.resourceRepository.findByEnvironmentId(envId);
+      resources.push(...res);
+    }
+    return this.execute(resources.map((resource) => resource.id));
   }
 
   async execute(
@@ -49,7 +50,12 @@ export class GetDeploymentsUseCase {
           resourceIds.map((resourceId) =>
             this.uow.resourceRepository.findById(resourceId),
           ),
-        ).then((items) => items.filter((resource) => resource !== null))
+        ).then((items) =>
+          items.filter(
+            (resource): resource is NonNullable<typeof resource> =>
+              resource !== null,
+          ),
+        )
       : await this.uow.resourceRepository.findMany();
     const deployments = resourceIds
       ? await this.uow.deploymentRepository.findRecentByResourceIds(
@@ -59,8 +65,28 @@ export class GetDeploymentsUseCase {
       : await this.uow.deploymentRepository.findRecent(500);
 
     // Fetch environments and projects to enrich data
-    const environments = await this.uow.environmentRepository.findMany();
-    const projects = await this.uow.projectRepository.findMany();
+    let environments: Environment[];
+    let projects: Project[];
+    if (resourceIds) {
+      const envIds = [...new Set(resources.map((r) => r.environmentId))];
+      environments = await Promise.all(
+        envIds.map((envId) => this.uow.environmentRepository.findById(envId)),
+      ).then((items) =>
+        items.filter((env): env is NonNullable<typeof env> => env !== null),
+      );
+
+      const projectIds = [...new Set(environments.map((env) => env.projectId))];
+      projects = await Promise.all(
+        projectIds.map((projectId) =>
+          this.uow.projectRepository.findById(projectId),
+        ),
+      ).then((items) =>
+        items.filter((p): p is NonNullable<typeof p> => p !== null),
+      );
+    } else {
+      environments = await this.uow.environmentRepository.findMany();
+      projects = await this.uow.projectRepository.findMany();
+    }
 
     const resourceMap = new Map(
       resources.map((resource) => [resource.id, resource]),

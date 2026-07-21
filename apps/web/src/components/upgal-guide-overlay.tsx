@@ -74,8 +74,10 @@ export function UpGalGuideOverlay() {
   const targetDefinition =
     step && step.type !== "navigate" ? getUpGalUiTarget(step.target) : null;
   const targetRoute =
-    targetDefinition?.kind !== "navigation"
-      ? targetDefinition?.path
+    targetDefinition &&
+    "path" in targetDefinition &&
+    targetDefinition.kind !== "navigation"
+      ? targetDefinition.path
       : undefined;
   const targetRouteMismatch = Boolean(
     targetRoute && normalizedPath(pathname) !== normalizedPath(targetRoute),

@@ -64,6 +64,7 @@ import { uploadArchive, validateArchiveFile } from "@/lib/archive-upload";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
+import { ConfigureRollbackDialog } from "./configure-rollback-dialog";
 import {
   createBuildConfig,
   type DatabaseCredentials,
@@ -243,6 +244,8 @@ export function GeneralTab({
   const [buildRegistryId, setBuildRegistryId] = useState("");
   const [rollbackActive, setRollbackActive] = useState(false);
   const [rollbackRegistryId, setRollbackRegistryId] = useState("");
+  const [configureRollbackDialogOpen, setConfigureRollbackDialogOpen] =
+    useState(false);
   const [dockerBuildSecretsJson, setDockerBuildSecretsJson] = useState("");
   const [databaseType, setDatabaseType] = useState<DatabaseType>("postgres");
   const [databaseExternalPort, setDatabaseExternalPort] = useState("");
@@ -830,14 +833,21 @@ export function GeneralTab({
                 <span className="text-muted-foreground text-xs">
                   Use this endpoint for CI systems that cannot install a
                   provider webhook. Tokens are stored only as hashes.
+                  {!webhookToken && resource.webhookTokenPrefix && (
+                    <span className="mt-1 block font-medium text-amber-600 dark:text-amber-400">
+                      ⚠️ Only the prefix is shown below. Rotate the token to copy
+                      the full URL.
+                    </span>
+                  )}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <code className="min-w-0 flex-1 truncate rounded-lg bg-muted px-3 py-2 text-xs">
                   {webhookBaseUrl}/api/deploy/
                   {webhookToken ??
-                    resource.webhookTokenPrefix ??
-                    "not-configured"}
+                    (resource.webhookTokenPrefix
+                      ? `${resource.webhookTokenPrefix}••••••••••••`
+                      : "not-configured")}
                 </code>
                 {webhookToken && (
                   <Button
@@ -1462,10 +1472,7 @@ export function GeneralTab({
                       setBuildConfig(createBuildConfig(nextType));
                     }}
                   >
-                    <SelectTrigger
-                      id="build-type"
-                      className="w-full bg-background sm:w-72"
-                    >
+                    <SelectTrigger id="build-type" className="w-full sm:w-72">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1550,6 +1557,7 @@ export function GeneralTab({
                       <CodeEditor
                         id="docker-build-args"
                         language="json"
+                        allowLanguageChange={false}
                         height="130px"
                         value={JSON.stringify(
                           buildConfig.dockerBuildArgs ?? {},
@@ -1595,6 +1603,7 @@ export function GeneralTab({
                       <CodeEditor
                         id="docker-build-secrets"
                         language="json"
+                        allowLanguageChange={false}
                         height="130px"
                         value={dockerBuildSecretsJson}
                         onChange={(value) =>
@@ -2038,7 +2047,7 @@ export function GeneralTab({
               {providerType === "drop" && (
                 <div className="flex flex-col gap-3 pt-2">
                   <Label>Source Archive (ZIP or Tarball)</Label>
-                  <label
+                  <Label
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2070,7 +2079,7 @@ export function GeneralTab({
                     <p className="mt-1 text-muted-foreground text-xs">
                       Supports .zip, .tar.gz, .tgz (Max 50MB)
                     </p>
-                  </label>
+                  </Label>
                 </div>
               )}
 
@@ -2120,66 +2129,113 @@ export function GeneralTab({
                     Upstand sends the selected registry credentials to Docker
                     for image pulls and Swarm task authentication.
                   </p>
-                  <div className="mt-3 flex items-center justify-between rounded-md border border-border/40 bg-muted/10 p-3">
-                    <div className="space-y-1 pr-4">
-                      <Label htmlFor="application-rollback-active">
-                        Enable registry-backed rollback
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        Pass private-registry credentials when Swarm restores
-                        the previous service specification.
-                      </p>
+                  <div className="mt-4 space-y-3 rounded-lg border border-border/40 bg-muted/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1 pr-4">
+                        <Label
+                          htmlFor="application-rollback-active"
+                          className="font-medium text-sm"
+                        >
+                          Enable registry-backed rollback
+                        </Label>
+                        <p className="text-muted-foreground text-xs">
+                          Pass private-registry credentials when Swarm restores
+                          the previous service specification.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfigureRollbackDialogOpen(true)}
+                        >
+                          Configure Rollback
+                        </Button>
+                        <Switch
+                          id="application-rollback-active"
+                          checked={rollbackActive}
+                          onCheckedChange={(checked) => {
+                            if (
+                              checked &&
+                              !(dockerRegistriesQuery.data || []).length
+                            ) {
+                              toast.error(
+                                "No registries available. Please configure a registry first to enable rollbacks.",
+                              );
+                              return;
+                            }
+                            setRollbackActive(checked);
+                          }}
+                        />
+                      </div>
                     </div>
-                    <Switch
-                      id="application-rollback-active"
-                      checked={rollbackActive}
-                      onCheckedChange={setRollbackActive}
-                    />
+
+                    {!(dockerRegistriesQuery.data || []).length && (
+                      <div className="space-y-1 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-amber-600 text-xs dark:text-amber-400">
+                        <p className="font-medium">
+                          No registries available. Please configure a registry
+                          first to enable rollbacks.
+                        </p>
+                        <Link
+                          href="/docker-registry"
+                          className="mt-1 inline-block font-semibold underline hover:text-amber-700 dark:hover:text-amber-300"
+                        >
+                          Go to Docker Registry page &rarr;
+                        </Link>
+                      </div>
+                    )}
+
+                    {rollbackActive &&
+                      (dockerRegistriesQuery.data || []).length > 0 && (
+                        <>
+                          <Label
+                            htmlFor="application-rollback-registry"
+                            className="text-xs"
+                          >
+                            Rollback registry
+                          </Label>
+                          <Select
+                            items={[
+                              ...(dockerRegistriesQuery.data || []).map(
+                                (registry) => ({
+                                  value: registry.id,
+                                  label: registry.name,
+                                }),
+                              ),
+                            ]}
+                            value={
+                              rollbackRegistryId ||
+                              (dockerRegistriesQuery.data || [])[0]?.id ||
+                              ""
+                            }
+                            onValueChange={(value) =>
+                              setRollbackRegistryId(value || "")
+                            }
+                          >
+                            <SelectTrigger id="application-rollback-registry">
+                              <SelectValue placeholder="Select a rollback registry" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(dockerRegistriesQuery.data || []).map(
+                                (registry) => (
+                                  <SelectItem
+                                    key={registry.id}
+                                    value={registry.id}
+                                  >
+                                    {registry.name}
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-muted-foreground text-xs">
+                            Credentials are organization-scoped and encrypted at
+                            rest. Used during service rollback.
+                          </p>
+                        </>
+                      )}
                   </div>
-                  {rollbackActive && (
-                    <>
-                      <Label htmlFor="application-rollback-registry">
-                        Rollback registry (optional)
-                      </Label>
-                      <Select
-                        items={[
-                          { value: "none", label: "Use service credentials" },
-                          ...(dockerRegistriesQuery.data || []).map(
-                            (registry) => ({
-                              value: registry.id,
-                              label: registry.name,
-                            }),
-                          ),
-                        ]}
-                        value={rollbackRegistryId || "none"}
-                        onValueChange={(value) =>
-                          setRollbackRegistryId(
-                            value === "none" ? "" : (value ?? ""),
-                          )
-                        }
-                      >
-                        <SelectTrigger id="application-rollback-registry">
-                          <SelectValue placeholder="Use credentials stored in the service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">
-                            Use service credentials
-                          </SelectItem>
-                          {(dockerRegistriesQuery.data || []).map(
-                            (registry) => (
-                              <SelectItem key={registry.id} value={registry.id}>
-                                {registry.name}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-muted-foreground text-xs">
-                        Credentials are organization-scoped and encrypted at
-                        rest. The registry is used only during rollback.
-                      </p>
-                    </>
-                  )}
                 </div>
               )}
 
@@ -2235,7 +2291,7 @@ export function GeneralTab({
                           .length === 0
                       }
                     >
-                      <SelectTrigger className="border-border/40">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select Account" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2280,7 +2336,7 @@ export function GeneralTab({
                           .length === 0
                       }
                     >
-                      <SelectTrigger className="border-border/40">
+                      <SelectTrigger>
                         <SelectValue
                           placeholder={
                             loadingRepos
@@ -2320,7 +2376,7 @@ export function GeneralTab({
                           ).length === 0
                         }
                       >
-                        <SelectTrigger className="border-border/40">
+                        <SelectTrigger>
                           <SelectValue
                             placeholder={
                               loadingBranches
@@ -2365,7 +2421,7 @@ export function GeneralTab({
                         setGithubTriggerType(value ?? "On Push")
                       }
                     >
-                      <SelectTrigger className="border-border/40">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select Trigger" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2515,7 +2571,7 @@ export function GeneralTab({
                         value={gitSshKeyId}
                         onValueChange={(value) => setGitSshKeyId(value ?? "")}
                       >
-                        <SelectTrigger className="border-border/40">
+                        <SelectTrigger>
                           <SelectValue placeholder="Select SSH Key" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2564,7 +2620,7 @@ export function GeneralTab({
                         setGitTriggerType(value ?? "push")
                       }
                     >
-                      <SelectTrigger className="border-border/40">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select Trigger" />
                       </SelectTrigger>
                       <SelectContent>
@@ -3014,6 +3070,16 @@ export function GeneralTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfigureRollbackDialog
+        open={configureRollbackDialogOpen}
+        onOpenChange={setConfigureRollbackDialogOpen}
+        resource={resource}
+        organizationId={organizationState.organizationId as string}
+        onSuccess={() => {
+          void refetchSecrets();
+        }}
+      />
     </div>
   );
 }

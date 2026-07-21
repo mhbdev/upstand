@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AnalyticsUpIcon,
   ArrowRight01Icon,
   BookmarkIcon,
   Certificate01Icon,
@@ -13,7 +12,6 @@ import {
   Key01Icon,
   Layers01Icon,
   Notification01Icon,
-  Rocket01Icon,
   ServerStack01Icon,
   Shield01Icon,
   SourceCodeIcon,
@@ -45,6 +43,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
@@ -52,8 +53,8 @@ import {
 import { Spinner } from "@upstand/ui/components/spinner";
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { CreateOrganizationDialog } from "@/components/auth/organization/create-organization-dialog";
 import { OrganizationSwitcher } from "@/components/auth/organization/organization-switcher";
 import { UserButton } from "@/components/auth/user/user-button";
@@ -72,9 +73,7 @@ const NAVIGATION_GROUPS = [
     title: "Workloads",
     items: [
       { title: "Projects", href: "/projects", icon: Folder01Icon },
-      { title: "Deployments", href: "/deployments", icon: Rocket01Icon },
       { title: "Templates", href: "/templates", icon: Layers01Icon },
-      { title: "Requests", href: "/requests", icon: Rocket01Icon },
     ],
   },
   {
@@ -109,58 +108,181 @@ const NAVIGATION_GROUPS = [
   {
     title: "Management",
     items: [
-      { title: "Monitoring", href: "/monitoring", icon: AnalyticsUpIcon },
+      {
+        title: "Observation",
+        href: "/observation",
+        icon: FileSecurityIcon,
+        items: [
+          { title: "Audit Logs", href: "/observation?tab=audits" },
+          { title: "Cron Jobs", href: "/observation?tab=cron-jobs" },
+          { title: "Requests", href: "/observation?tab=requests" },
+          { title: "Monitoring", href: "/observation?tab=monitoring" },
+          {
+            title: "Notification Deliveries",
+            href: "/observation?tab=notification-deliveries",
+          },
+          { title: "Deployments", href: "/observation?tab=deployments" },
+        ],
+      },
       {
         title: "Notifications",
         href: "/notifications",
         icon: Notification01Icon,
       },
-      { title: "Audit Logs", href: "/audit-logs", icon: FileSecurityIcon },
       { title: "Tags", href: "/tags", icon: BookmarkIcon },
     ],
   },
 ];
+
+function CollapsibleMenuItem({
+  item,
+  pathname,
+  currentTab,
+}: {
+  item: any;
+  pathname: string;
+  currentTab: string | null;
+}) {
+  const isChildActive = item.items.some((subItem: any) => {
+    if (subItem.href.includes("?")) {
+      const [path, query] = subItem.href.split("?");
+      const targetTab = new URLSearchParams(query).get("tab");
+      return pathname === path && currentTab === targetTab;
+    }
+    return pathname === subItem.href || pathname.startsWith(`${subItem.href}/`);
+  });
+
+  const [isOpen, setIsOpen] = useState(isChildActive);
+
+  // Sync state if active child changes
+  useEffect(() => {
+    if (isChildActive) {
+      setIsOpen(true);
+    }
+  }, [isChildActive]);
+
+  return (
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className="group/sub-collapsible w-full"
+    >
+      <SidebarMenuItem>
+        <CollapsibleTrigger
+          render={
+            <SidebarMenuButton
+              isActive={isChildActive}
+              tooltip={item.title}
+              className="text-xs"
+            >
+              <HugeiconsIcon icon={item.icon} className="size-5!" />
+              <span>{item.title}</span>
+              <HugeiconsIcon
+                icon={ArrowRight01Icon}
+                className="ml-auto size-3.5 transition-transform duration-200 group-data-open/sub-collapsible:rotate-90"
+              />
+            </SidebarMenuButton>
+          }
+        />
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {item.items.map((subItem: any) => {
+              const isSubActive = (() => {
+                if (subItem.href.includes("?")) {
+                  const [path, query] = subItem.href.split("?");
+                  const targetTab = new URLSearchParams(query).get("tab");
+                  return pathname === path && currentTab === targetTab;
+                }
+                return (
+                  pathname === subItem.href ||
+                  pathname.startsWith(`${subItem.href}/`)
+                );
+              })();
+
+              return (
+                <SidebarMenuSubItem key={subItem.title}>
+                  <SidebarMenuSubButton
+                    isActive={isSubActive}
+                    className="text-xs!"
+                    render={(props) => {
+                      const { children, ...linkProps } = props;
+                      return (
+                        <Link {...linkProps} href={subItem.href as Route}>
+                          {children}
+                        </Link>
+                      );
+                    }}
+                  >
+                    <span>{subItem.title}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
 
 function DashboardSidebarGroup({
   group,
   pathname,
   isCollapsed,
 }: {
-  group: (typeof NAVIGATION_GROUPS)[number];
+  group: any;
   pathname: string;
   isCollapsed: boolean;
 }) {
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab");
+
   const content = (
     <SidebarGroupContent className={isCollapsed ? undefined : "mt-1"}>
       <SidebarMenu>
-        {group.items.map((item) => (
-          <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton
-              render={(props) => {
-                const { children, ...linkProps } = props;
-                return (
-                  <UpGalTarget
-                    definition={getUpGalNavigationTarget(
-                      item.href as `/${string}`,
-                    )}
-                  >
-                    <Link {...linkProps} href={item.href as Route}>
-                      {children}
-                    </Link>
-                  </UpGalTarget>
-                );
-              }}
-              isActive={
-                pathname === item.href || pathname.startsWith(`${item.href}/`)
-              }
-              tooltip={item.title}
-              className="text-xs"
-            >
-              <HugeiconsIcon icon={item.icon} className="size-5!" />
-              <span>{item.title}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
+        {group.items.map((item: any) => {
+          const hasSubItems = item.items && item.items.length > 0;
+
+          if (hasSubItems) {
+            return (
+              <CollapsibleMenuItem
+                key={item.title}
+                item={item}
+                pathname={pathname}
+                currentTab={currentTab}
+              />
+            );
+          }
+
+          return (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton
+                render={(props) => {
+                  const { children, ...linkProps } = props;
+                  return (
+                    <UpGalTarget
+                      definition={getUpGalNavigationTarget(
+                        item.href as `/${string}`,
+                      )}
+                    >
+                      <Link {...linkProps} href={item.href as Route}>
+                        {children}
+                      </Link>
+                    </UpGalTarget>
+                  );
+                }}
+                isActive={
+                  pathname === item.href || pathname.startsWith(`${item.href}/`)
+                }
+                tooltip={item.title}
+                className="text-xs"
+              >
+                <HugeiconsIcon icon={item.icon} className="size-5!" />
+                <span>{item.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          );
+        })}
       </SidebarMenu>
     </SidebarGroupContent>
   );
@@ -210,6 +332,72 @@ function DashboardSidebar({ pathname }: { pathname: string }) {
         <UserButton className="w-full" />
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function BreadcrumbTitle({
+  pathname,
+  activeOrgName,
+}: {
+  pathname: string;
+  activeOrgName: string;
+}) {
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab");
+
+  const flatNavItems = NAVIGATION_GROUPS.flatMap((group) =>
+    group.items.flatMap((item: any) => {
+      if (item.items) {
+        return [item, ...item.items];
+      }
+      return [item];
+    }),
+  );
+  const currentNav = flatNavItems.find((item) => {
+    if (item.href.includes("?")) {
+      const [path, query] = item.href.split("?");
+      const targetTab = new URLSearchParams(query).get("tab");
+      return pathname === path && currentTab === targetTab;
+    }
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  });
+
+  return (
+    <BreadcrumbPage className="max-w-[min(48vw,16rem)] truncate">
+      {currentNav?.title ?? activeOrgName}
+    </BreadcrumbPage>
+  );
+}
+
+function ChatWrapper({
+  organizationId,
+  pathname,
+}: {
+  organizationId: string | undefined;
+  pathname: string;
+}) {
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab");
+
+  const flatNavItems = NAVIGATION_GROUPS.flatMap((group) =>
+    group.items.flatMap((item: any) => {
+      if (item.items) {
+        return [item, ...item.items];
+      }
+      return [item];
+    }),
+  );
+  const currentNav = flatNavItems.find((item) => {
+    if (item.href.includes("?")) {
+      const [path, query] = item.href.split("?");
+      const targetTab = new URLSearchParams(query).get("tab");
+      return pathname === path && currentTab === targetTab;
+    }
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  });
+
+  return (
+    <UpGalChat organizationId={organizationId} pageTitle={currentNav?.title} />
   );
 }
 
@@ -293,15 +481,12 @@ export default function DashboardLayout({
   // 2FA challenge page — render without the sidebar shell
   if (pathname === "/2fa-verify") return <>{children}</>;
 
-  const flatNavItems = NAVIGATION_GROUPS.flatMap((group) => group.items);
-  const currentNav = flatNavItems.find(
-    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-  );
-
   return (
     <SidebarProvider>
       <div className="flex h-svh w-full overflow-hidden">
-        <DashboardSidebar pathname={pathname} />
+        <Suspense fallback={<div className="w-60 border-r bg-background" />}>
+          <DashboardSidebar pathname={pathname} />
+        </Suspense>
 
         <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 sm:flex-nowrap sm:px-4 sm:py-0">
@@ -323,9 +508,18 @@ export default function DashboardLayout({
                         />
                       ) : (
                         <BreadcrumbItem>
-                          <BreadcrumbPage className="max-w-[min(48vw,16rem)] truncate">
-                            {currentNav?.title ?? activeOrg.name}
-                          </BreadcrumbPage>
+                          <Suspense
+                            fallback={
+                              <BreadcrumbPage className="max-w-[min(48vw,16rem)] truncate">
+                                {activeOrg.name}
+                              </BreadcrumbPage>
+                            }
+                          >
+                            <BreadcrumbTitle
+                              pathname={pathname}
+                              activeOrgName={activeOrg.name}
+                            />
+                          </Suspense>
                         </BreadcrumbItem>
                       )}
                     </>
@@ -349,7 +543,9 @@ export default function DashboardLayout({
         onOpenChange={setCreateOrgOpen}
       />
       <SettingsDialog />
-      <UpGalChat organizationId={activeOrg?.id} pageTitle={currentNav?.title} />
+      <Suspense fallback={null}>
+        <ChatWrapper organizationId={activeOrg?.id} pathname={pathname} />
+      </Suspense>
       <UpGalGuideOverlay />
     </SidebarProvider>
   );

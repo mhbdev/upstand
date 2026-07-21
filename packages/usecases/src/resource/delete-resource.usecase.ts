@@ -61,14 +61,10 @@ export class DeleteResourceUseCase {
       try {
         await dockerService.removeResource(resource, !!input.deleteVolumes);
         return await this.uow.transaction(async (tx) => {
-          const environment = await tx.environmentRepository.findById(
+          await tx.environmentRepository.incrementResourceCount(
             resource.environmentId,
+            -1,
           );
-          if (environment) {
-            await tx.environmentRepository.updateById(resource.environmentId, {
-              resourceCount: Math.max(0, environment.resourceCount - 1),
-            });
-          }
           return tx.resourceRepository.deleteById(input.id);
         });
       } catch (error) {

@@ -694,6 +694,11 @@ export const MCP_TOOL_CAPABILITIES = {
   delete_tag: "tag:delete",
   assign_resource_tag: "tag:update",
   detach_resource_tag: "tag:update",
+  list_schedules: "resource:view",
+  create_schedule: "resource:update",
+  update_schedule: "resource:update",
+  delete_schedule: "resource:update",
+  trigger_schedule: "resource:update",
   search_web: "ai:view",
   guide_upstand: "ai:view",
 } as const satisfies Record<string, Capability>;
@@ -739,6 +744,7 @@ export const MCP_READ_ONLY_TOOL_NAMES = [
   "get_update_status",
   "list_tags",
   "get_resource_tags",
+  "list_schedules",
   "search_web",
   "guide_upstand",
 ] as const satisfies readonly (keyof typeof MCP_TOOL_CAPABILITIES)[];

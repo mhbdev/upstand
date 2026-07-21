@@ -252,3 +252,22 @@ export function toNotificationChannelView(
   const { encryptedConfiguration: _encryptedConfiguration, ...view } = channel;
   return view;
 }
+
+export const ListNotificationDeliveriesInputSchema = z.object({
+  organizationId: z.string().min(1),
+  channelId: z.string().optional(),
+  status: NotificationDeliveryStatusSchema.optional(),
+  timespan: z.enum(["24h", "7d", "30d"]).default("30d").optional(),
+  search: z.string().optional(),
+  page: z.number().int().min(1).default(1).optional(),
+  pageSize: z.number().int().min(1).max(100).default(50).optional(),
+});
+
+export type ListNotificationDeliveriesInput = z.infer<
+  typeof ListNotificationDeliveriesInputSchema
+>;
+
+export interface ListNotificationDeliveriesResult {
+  items: NotificationDelivery[];
+  total: number;
+}

@@ -13,6 +13,7 @@ export interface IEnvironmentRepository {
     id: string,
     patch: Partial<CreateEnvironmentDTO>,
   ): Promise<Environment | null>;
+  incrementResourceCount(id: string, delta: number): Promise<void>;
   deleteById(id: string): Promise<boolean>;
   count(where?: unknown): Promise<number>;
 }

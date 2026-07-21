@@ -2,6 +2,8 @@ import { TRPCError } from "@trpc/server";
 import {
   CreateScheduleInputSchema,
   DeleteScheduleInputSchema,
+  GetCronJobObservabilityInputSchema,
+  GetScheduleLogsInputSchema,
   GetSchedulesInputSchema,
   UpdateScheduleInputSchema,
 } from "@upstand/domain";
@@ -12,6 +14,7 @@ import {
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
   GetResourceUseCaseToken,
+  GetScheduleLogsUseCaseToken,
   GetSchedulesUseCaseToken,
   UnitOfWorkToken,
   UpdateScheduleUseCaseToken,
@@ -55,6 +58,45 @@ export const scheduleRouter = router({
     .query(async ({ ctx, input }) => {
       await authorizeResource(ctx, input.resourceId, "resource:view");
       return ctx.scope.resolve(GetSchedulesUseCaseToken).execute(input);
+    }),
+  listObservability: twoFactorVerifiedProcedure
+    .input(GetCronJobObservabilityInputSchema)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "resource:view",
+      );
+      return ctx.scope
+        .resolve(UnitOfWorkToken)
+        .scheduleLogRepository.getObservabilityMetrics(input);
+    }),
+  listLogs: twoFactorVerifiedProcedure
+    .input(GetScheduleLogsInputSchema)
+    .query(async ({ ctx, input }) => {
+      if (!input.resourceId && !input.scheduleId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Either resourceId or scheduleId must be provided",
+        });
+      }
+      if (input.resourceId) {
+        await authorizeResource(ctx, input.resourceId, "resource:view");
+      } else if (input.scheduleId) {
+        const schedule = await ctx.scope
+          .resolve(UnitOfWorkToken)
+          .scheduleRepository.findById(input.scheduleId);
+        if (!schedule) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Schedule not found",
+          });
+        }
+        if (schedule.resourceId) {
+          await authorizeResource(ctx, schedule.resourceId, "resource:view");
+        }
+      }
+      return ctx.scope.resolve(GetScheduleLogsUseCaseToken).execute(input);
     }),
   create: twoFactorVerifiedProcedure
     .input(CreateScheduleInputSchema)

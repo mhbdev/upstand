@@ -544,7 +544,7 @@ function CreateDbDialog({
                 value={dbType}
                 onValueChange={handleDbTypeChange}
               >
-                <SelectTrigger id="db-type" className="border-border/40">
+                <SelectTrigger id="db-type">
                   <SelectValue placeholder="Select Engine" />
                 </SelectTrigger>
                 <SelectContent>
@@ -572,7 +572,7 @@ function CreateDbDialog({
                   }
                 }}
               >
-                <SelectTrigger id="db-image" className="border-border/40">
+                <SelectTrigger id="db-image">
                   <SelectValue placeholder="Select image version" />
                 </SelectTrigger>
                 <SelectContent>
@@ -653,10 +653,7 @@ function CreateDbDialog({
               value={serverId}
               onValueChange={(value) => value && setServerId(value)}
             >
-              <SelectTrigger
-                id="db-server"
-                className="border-border/40 focus:border-primary"
-              >
+              <SelectTrigger id="db-server">
                 <SelectValue placeholder="Local Server" />
               </SelectTrigger>
               <SelectContent>
@@ -1021,10 +1018,7 @@ function CreateComposeDialog({
               value={serverId}
               onValueChange={(value) => value && setServerId(value)}
             >
-              <SelectTrigger
-                id="comp-server"
-                className="border-border/40 focus:border-primary"
-              >
+              <SelectTrigger id="comp-server">
                 <SelectValue placeholder="Local Server" />
               </SelectTrigger>
               <SelectContent>
@@ -1056,7 +1050,7 @@ function CreateComposeDialog({
               value={composeType}
               onValueChange={(val: any) => setComposeType(val)}
             >
-              <SelectTrigger id="comp-type" className="border-border/40">
+              <SelectTrigger id="comp-type">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>

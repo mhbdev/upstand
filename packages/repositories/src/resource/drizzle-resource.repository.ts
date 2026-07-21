@@ -8,7 +8,7 @@ import {
   RESOURCE_STATE_VERSION,
   serializeResourceConfiguration,
 } from "@upstand/domain";
-import { count, eq, inArray } from "drizzle-orm";
+import { count, eq, inArray, or } from "drizzle-orm";
 import type { Executor } from "../shared/types";
 
 const DEFAULT_CONFIGURATION = serializeResourceConfiguration({});
@@ -32,6 +32,15 @@ export class DrizzleResourceRepository implements IResourceRepository {
     return row ? ((await this.hydrate([row]))[0] ?? null) : null;
   }
 
+  async findByAppName(appName: string): Promise<Resource | null> {
+    const [row] = await this.executor
+      .select()
+      .from(resource)
+      .where(eq(resource.appName, appName))
+      .limit(1);
+    return row ? ((await this.hydrate([row]))[0] ?? null) : null;
+  }
+
   async findByWebhookTokenHash(hash: string): Promise<Resource | null> {
     const [row] = await this.executor
       .select()
@@ -47,6 +56,42 @@ export class DrizzleResourceRepository implements IResourceRepository {
       .from(resource)
       .where(eq(resource.environmentId, environmentId));
     return this.hydrate(rows);
+  }
+
+  async findByDockerRegistryId(registryId: string): Promise<Resource[]> {
+    const rows = await this.executor
+      .select()
+      .from(resource)
+      .where(
+        or(
+          eq(resource.buildRegistryId, registryId),
+          eq(resource.rollbackRegistryId, registryId),
+        ),
+      );
+    return this.hydrate(rows);
+  }
+
+  async checkDuplicateServiceKey(
+    appName: string,
+    excludeResourceId?: string,
+  ): Promise<Resource | null> {
+    const rows = await this.executor
+      .select({ id: resource.id, appName: resource.appName })
+      .from(resource);
+    const serviceKey = appName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]/g, "-");
+    const duplicate = rows.find(
+      (r) =>
+        r.id !== excludeResourceId &&
+        (r.appName ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9-_]/g, "-") === serviceKey,
+    );
+    if (!duplicate) return null;
+    return this.findById(duplicate.id);
   }
 
   async findMany(): Promise<Resource[]> {
@@ -99,15 +144,10 @@ export class DrizzleResourceRepository implements IResourceRepository {
       await this.executor.update(resource).set(core).where(eq(resource.id, id));
     }
     if (configuration) {
-      const current = await this.getConfiguration(id);
-      await this.upsertConfiguration(
-        id,
-        mergeConfiguration(current, configuration),
-      );
+      await this.patchConfiguration(id, configuration);
     }
     if (secrets) {
-      const current = await this.getSecrets(id);
-      await this.upsertSecrets(id, mergeSecrets(current, secrets));
+      await this.patchSecrets(id, secrets);
     }
     return this.findById(id);
   }
@@ -169,76 +209,56 @@ export class DrizzleResourceRepository implements IResourceRepository {
     configuration: ResourceConfigurationValues,
     secrets: ResourceSecretValues,
   ): Promise<void> {
-    await Promise.all([
-      this.executor.insert(resourceConfiguration).values({
-        resourceId,
-        ...configuration,
-      }),
-      this.executor.insert(resourceSecret).values({
-        resourceId,
-        ...secrets,
-      }),
-    ]);
+    await this.executor.insert(resourceConfiguration).values({
+      resourceId,
+      ...configuration,
+    });
+    await this.executor.insert(resourceSecret).values({
+      resourceId,
+      ...secrets,
+    });
   }
 
-  private async getConfiguration(
+  private async patchConfiguration(
     resourceId: string,
-  ): Promise<ResourceConfigurationValues> {
-    const [row] = await this.executor
-      .select()
-      .from(resourceConfiguration)
-      .where(eq(resourceConfiguration.resourceId, resourceId))
-      .limit(1);
-    return row
-      ? {
-          version: row.version,
-          buildConfig: row.buildConfig,
-          advancedConfig: row.advancedConfig,
-          watchPaths: row.watchPaths,
-          domains: row.domains,
-        }
-      : defaultConfiguration();
-  }
-
-  private async getSecrets(resourceId: string): Promise<ResourceSecretValues> {
-    const [row] = await this.executor
-      .select()
-      .from(resourceSecret)
-      .where(eq(resourceSecret.resourceId, resourceId))
-      .limit(1);
-    return row
-      ? {
-          version: row.version,
-          credentials: row.credentials,
-          buildSecrets: row.buildSecrets,
-          envVars: row.envVars,
-        }
-      : defaultSecrets();
-  }
-
-  private async upsertConfiguration(
-    resourceId: string,
-    values: ResourceConfigurationValues,
+    patch: Partial<ResourceConfigurationValues>,
   ): Promise<void> {
+    const defaultVals = defaultConfiguration();
+    const insertVals = {
+      resourceId,
+      version: patch.version ?? defaultVals.version,
+      buildConfig: patch.buildConfig ?? defaultVals.buildConfig,
+      advancedConfig: patch.advancedConfig ?? defaultVals.advancedConfig,
+      watchPaths: patch.watchPaths ?? defaultVals.watchPaths,
+      domains: patch.domains ?? defaultVals.domains,
+    };
     await this.executor
       .insert(resourceConfiguration)
-      .values({ resourceId, ...values })
+      .values(insertVals)
       .onConflictDoUpdate({
         target: resourceConfiguration.resourceId,
-        set: values,
+        set: patch,
       });
   }
 
-  private async upsertSecrets(
+  private async patchSecrets(
     resourceId: string,
-    values: ResourceSecretValues,
+    patch: Partial<ResourceSecretValues>,
   ): Promise<void> {
+    const defaultVals = defaultSecrets();
+    const insertVals = {
+      resourceId,
+      version: patch.version ?? defaultVals.version,
+      credentials: patch.credentials ?? defaultVals.credentials,
+      buildSecrets: patch.buildSecrets ?? defaultVals.buildSecrets,
+      envVars: patch.envVars ?? defaultVals.envVars,
+    };
     await this.executor
       .insert(resourceSecret)
-      .values({ resourceId, ...values })
+      .values(insertVals)
       .onConflictDoUpdate({
         target: resourceSecret.resourceId,
-        set: values,
+        set: patch,
       });
   }
 }

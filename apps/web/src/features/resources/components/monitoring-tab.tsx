@@ -285,7 +285,7 @@ export function MonitoringTab({
             onValueChange={(value) => value && setRangeKey(value as RangeKey)}
           >
             <SelectTrigger
-              className="h-9 w-[160px]"
+              className="h-9 w-40"
               aria-label="Resource monitoring time range"
             >
               <SelectValue />

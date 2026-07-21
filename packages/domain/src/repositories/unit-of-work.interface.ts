@@ -15,6 +15,7 @@ import type { IProjectRepository } from "./project-repository.interface";
 import type { IResourceRepository } from "./resource-repository.interface";
 import type { IResourceRuntimeRepository } from "./resource-runtime-repository.interface";
 import type { IS3DestinationRepository } from "./s3-destination-repository.interface";
+import type { IScheduleLogRepository } from "./schedule-log-repository.interface";
 import type { IScheduleRepository } from "./schedule-repository.interface";
 import type { IServerBuildSettingsRepository } from "./server-build-settings-repository.interface";
 import type { IServerRepository } from "./server-repository.interface";
@@ -49,6 +50,7 @@ export interface IUnitOfWork {
   readonly monitoringSettingsRepository: IMonitoringSettingsRepository;
   readonly previewDeploymentRepository: IPreviewDeploymentRepository;
   readonly scheduleRepository: IScheduleRepository;
+  readonly scheduleLogRepository: IScheduleLogRepository;
   readonly outboxRepository: IOutboxRepository;
   transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T>;
 }

@@ -163,20 +163,24 @@ export class BackupRuntimeService {
   }
 
   async listVolumes(resource: Resource): Promise<string[]> {
-    const containerId = await this.resolveContainerId(resource, null);
-    const { stdout } = await execFileAsync(
-      "docker",
-      ["inspect", containerId, "--format", "{{json .Mounts}}"],
-      { env: { ...process.env, ...this.dockerEnvironment } },
-    );
-    const mounts = JSON.parse(stdout) as Array<{
-      Type?: string;
-      Name?: string;
-    }>;
-    return mounts
-      .filter((mount) => mount.Type === "volume" && mount.Name)
-      .map((mount) => mount.Name as string)
-      .sort();
+    try {
+      const containerId = await this.resolveContainerId(resource, null);
+      const { stdout } = await execFileAsync(
+        "docker",
+        ["inspect", containerId, "--format", "{{json .Mounts}}"],
+        { env: { ...process.env, ...this.dockerEnvironment } },
+      );
+      const mounts = JSON.parse(stdout) as Array<{
+        Type?: string;
+        Name?: string;
+      }>;
+      return mounts
+        .filter((mount) => mount.Type === "volume" && mount.Name)
+        .map((mount) => mount.Name as string)
+        .sort();
+    } catch {
+      return [];
+    }
   }
 
   async createBackup(

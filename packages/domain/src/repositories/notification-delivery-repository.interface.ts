@@ -1,5 +1,7 @@
 import type {
   CreateNotificationDeliveryDTO,
+  ListNotificationDeliveriesInput,
+  ListNotificationDeliveriesResult,
   NotificationDelivery,
 } from "../entities/notification";
 
@@ -10,6 +12,9 @@ export interface INotificationDeliveryRepository {
     limit?: number,
   ): Promise<NotificationDelivery[]>;
   findByStatus(status: string, limit?: number): Promise<NotificationDelivery[]>;
+  list(
+    input: ListNotificationDeliveriesInput,
+  ): Promise<ListNotificationDeliveriesResult>;
   claimForDelivery(
     id: string,
     now: Date,

@@ -2,6 +2,7 @@
   "title": "Core Features",
   "pages": [
     "deployments",
+    "cron-jobs",
     "routing",
     "servers",
     "monitoring",

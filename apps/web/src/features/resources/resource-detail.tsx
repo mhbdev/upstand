@@ -7,7 +7,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { Badge } from "@upstand/ui/components/badge";
-import { Button } from "@upstand/ui/components/button";
 import {
   Card,
   CardContent,
@@ -31,12 +30,12 @@ import {
 } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
 import type { Route } from "next";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BookmarkIcon,
+  Clock,
   Code,
   Globe,
   HardDrive,
@@ -49,6 +48,7 @@ import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { BackupPanel } from "@/features/backups";
 import { ConsoleTab } from "./components/console-tab";
 import { ContainersTab } from "./components/containers-tab";
+import { CronJobsTab } from "./components/cron-jobs-tab";
 import { DeploymentsTab } from "./components/deployments-tab";
 import { DomainsTab } from "./components/domains-tab";
 import { EnvironmentTab } from "./components/environment-tab";
@@ -81,6 +81,7 @@ const RESOURCE_TABS = new Set([
   "console",
   "monitoring",
   "tags",
+  "crons",
 ]);
 
 interface ResourceDetailProps {
@@ -223,9 +224,6 @@ export default function ResourceDetail({
             </p>
           </div>
         </div>
-        <Link href={`/projects/${projectId}/${environmentId}` as Route}>
-          <Button variant="outline">Back to Environment</Button>
-        </Link>
       </div>
 
       {/* Tabs */}
@@ -270,6 +268,9 @@ export default function ResourceDetail({
           </TabsTrigger>
           <TabsTrigger value="tags" className="shrink-0 gap-2">
             <BookmarkIcon className="size-4" /> Tags
+          </TabsTrigger>
+          <TabsTrigger value="crons" className="shrink-0 gap-2">
+            <Clock className="size-4" /> Cron Jobs
           </TabsTrigger>
         </TabsList>
 
@@ -344,6 +345,7 @@ export default function ResourceDetail({
             refetchDeployments={refetchDeployments}
             deployResource={deployResource}
             isDeployingResource={isDeployingResource}
+            onNavigateToCrons={() => changeTab("crons")}
           />
         </TabsContent>
 
@@ -469,6 +471,9 @@ export default function ResourceDetail({
               organizationId={project.organizationId}
             />
           )}
+        </TabsContent>
+        <TabsContent value="crons" className="min-w-0 space-y-6 outline-none">
+          <CronJobsTab resource={resource} />
         </TabsContent>
       </Tabs>
     </div>

@@ -75,13 +75,6 @@ export const CreateResourceInputSchema = z.object({
 
 export type CreateResourceInput = z.infer<typeof CreateResourceInputSchema>;
 
-function dockerServiceKey(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]/g, "-");
-}
-
 export class CreateResourceUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
@@ -214,9 +207,8 @@ export class CreateResourceUseCase {
         await validateServer(input.buildServerId, "build");
       }
 
-      const serviceKey = dockerServiceKey(input.appName);
-      const duplicate = (await tx.resourceRepository.findMany()).find(
-        (resource) => dockerServiceKey(resource.appName ?? "") === serviceKey,
+      const duplicate = await tx.resourceRepository.checkDuplicateServiceKey(
+        input.appName,
       );
       if (duplicate) {
         throw new ValidationError(
@@ -322,9 +314,10 @@ export class CreateResourceUseCase {
       });
 
       // Increment resource count
-      await tx.environmentRepository.updateById(input.environmentId, {
-        resourceCount: environment.resourceCount + 1,
-      });
+      await tx.environmentRepository.incrementResourceCount(
+        input.environmentId,
+        1,
+      );
 
       return res;
     });

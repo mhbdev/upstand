@@ -4,11 +4,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import type {
   NotificationChannelView,
-  NotificationDelivery,
   NotificationEventType,
   NotificationProviderType,
 } from "@upstand/domain";
-import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -84,23 +82,6 @@ type NotificationChannelDto = Omit<
 > & {
   createdAt: string;
   updatedAt: string;
-};
-
-type NotificationDeliveryDto = Omit<
-  NotificationDelivery,
-  | "createdAt"
-  | "updatedAt"
-  | "deliveredAt"
-  | "processingStartedAt"
-  | "lastAttemptAt"
-  | "nextAttemptAt"
-> & {
-  createdAt: string;
-  updatedAt: string;
-  deliveredAt: string | null;
-  processingStartedAt: string | null;
-  lastAttemptAt: string | null;
-  nextAttemptAt: string | null;
 };
 
 type ConfigurationField = {
@@ -565,14 +546,6 @@ export default function NotificationsPage() {
     ...trpc.notification.list.queryOptions({ organizationId }),
     enabled: organizationState.status === "ready",
   });
-  const { data: deliveries = [] } = useQuery({
-    ...trpc.notification.deliveries.queryOptions({
-      organizationId,
-      limit: 25,
-    }),
-    enabled: organizationState.status === "ready",
-    refetchInterval: 10_000,
-  });
 
   const createChannel = useMutation({
     ...trpc.notification.create.mutationOptions(),
@@ -610,26 +583,8 @@ export default function NotificationsPage() {
     onError: (error) =>
       toast.error(error.message || "Test notification failed"),
   });
-  const retryDelivery = useMutation({
-    ...trpc.notification.retryDelivery.mutationOptions(),
-    onSuccess: () => toast.success("Notification delivery requeued"),
-    onError: (error) =>
-      toast.error(error.message || "Could not retry delivery"),
-  });
 
   const isPending = createChannel.isPending || updateChannel.isPending;
-
-  const deliveryStatusVariant = (
-    status: NotificationDeliveryDto["status"],
-  ): "default" | "secondary" | "destructive" | "outline" => {
-    if (status === "delivered") return "default";
-    if (status === "failed" || status === "dead_letter") return "destructive";
-    if (status === "processing") return "outline";
-    return "secondary";
-  };
-
-  const formatDeliveryDate = (value: string | null) =>
-    value ? new Date(value).toLocaleString() : "—";
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -837,76 +792,6 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Delivery activity</CardTitle>
-          <CardDescription>
-            The latest 25 organization deliveries, including retries and
-            dead-letter failures. Secrets and full provider responses are never
-            shown here.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {deliveries.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No notification deliveries have been recorded yet.
-            </p>
-          ) : (
-            (deliveries as NotificationDeliveryDto[]).map((delivery) => (
-              <div key={delivery.id} className="rounded-xl border p-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{delivery.title}</span>
-                  <Badge variant={deliveryStatusVariant(delivery.status)}>
-                    {delivery.status.replace("_", " ")}
-                  </Badge>
-                  <span className="text-muted-foreground text-xs">
-                    {delivery.event.replaceAll("_", " ")}
-                  </span>
-                  <span className="ml-auto text-muted-foreground text-xs">
-                    {formatDeliveryDate(delivery.createdAt)}
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
-                  <span>Attempts: {delivery.attempts}</span>
-                  <span>
-                    Last attempt: {formatDeliveryDate(delivery.lastAttemptAt)}
-                  </span>
-                  {delivery.deliveredAt && (
-                    <span>
-                      Delivered: {formatDeliveryDate(delivery.deliveredAt)}
-                    </span>
-                  )}
-                </div>
-                {delivery.error && (
-                  <p className="mt-2 break-words rounded-md bg-destructive/10 px-2 py-1 text-destructive text-xs">
-                    {delivery.error}
-                  </p>
-                )}
-                {(delivery.status === "failed" ||
-                  delivery.status === "dead_letter") && (
-                  <Button
-                    className="mt-2"
-                    size="sm"
-                    variant="outline"
-                    disabled={retryDelivery.isPending}
-                    onClick={() => retryDelivery.mutate({ id: delivery.id })}
-                  >
-                    {retryDelivery.isPending ? (
-                      <>
-                        <Spinner data-icon="inline-start" />
-                        Retrying…
-                      </>
-                    ) : (
-                      "Retry Delivery"
-                    )}
-                  </Button>
-                )}
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
 
       <Dialog
         open={dialogOpen}

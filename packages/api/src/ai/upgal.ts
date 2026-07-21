@@ -23,13 +23,16 @@ import {
   ControlResourceUseCaseToken,
   CreateEnvironmentUseCaseToken,
   CreateProjectUseCaseToken,
+  CreateScheduleUseCaseToken,
   CreateTemplateUseCaseToken,
   DeleteProjectUseCaseToken,
   DeleteResourceUseCaseToken,
+  DeleteScheduleUseCaseToken,
   DeployResourceUseCaseToken,
   DeployTemplateUseCaseToken,
   ExecContainerCommandUseCaseToken,
   ExecServerTerminalCommandUseCaseToken,
+  GeneralSchedulerToken,
   GetAccountStatusUseCaseToken,
   GetBackupRunsUseCaseToken,
   GetBackupSchedulesUseCaseToken,
@@ -45,6 +48,7 @@ import {
   GetResourceRoutingTargetsUseCaseToken,
   GetResourceStatsUseCaseToken,
   GetResourcesUseCaseToken,
+  GetSchedulesUseCaseToken,
   GetServerHistoricalMetricsUseCaseToken,
   GetServerMonitoringStatusUseCaseToken,
   GetServersUseCaseToken,
@@ -58,6 +62,7 @@ import {
   ListBackupVolumesUseCaseToken,
   PruneDockerResourcesUseCaseToken,
   UnitOfWorkToken,
+  UpdateScheduleUseCaseToken,
 } from "@upstand/usecases/tokens";
 import {
   createAgentUIStream,
@@ -368,6 +373,27 @@ export const UPGAL_TOOL_METADATA = [
     "Create a resource from a built-in or organization template and queue its first deployment after approval.",
     true,
   ],
+  [
+    "list_schedules",
+    "Read all cron jobs and schedules configured for a resource.",
+    false,
+  ],
+  [
+    "create_schedule",
+    "Create a new cron job or command schedule for a resource after approval.",
+    true,
+  ],
+  [
+    "update_schedule",
+    "Update an existing cron job or schedule for a resource after approval.",
+    true,
+  ],
+  ["delete_schedule", "Delete a cron job or schedule after approval.", true],
+  [
+    "trigger_schedule",
+    "Manually trigger execution of a cron job or schedule after approval.",
+    true,
+  ],
 ] as const;
 
 type UpGalToolRegistry = {
@@ -509,11 +535,47 @@ const createEnvironmentSchema = z.object({
     .min(1)
     .max(120)
     .describe("Human-readable environment name to create."),
-  description: z
+  description: z.string().trim().max(500).optional(),
+});
+const listSchedulesSchema = z.object({
+  resourceId: z.string().min(1).describe("Resource ID to list schedules for."),
+});
+const createScheduleSchema = z.object({
+  resourceId: z.string().min(1).describe("Resource ID."),
+  name: z.string().min(1).describe("Schedule task name."),
+  cronExpression: z
     .string()
-    .max(500)
-    .optional()
-    .describe("Optional explanation of the environment's purpose."),
+    .min(1)
+    .describe("Cron expression (e.g. '0 10 * * *')."),
+  timezone: z.string().default("UTC").optional().describe("Timezone."),
+  jobType: z
+    .enum(["command", "cron", "deployment", "backup"])
+    .default("command")
+    .optional(),
+  command: z
+    .string()
+    .min(1)
+    .describe("Command script or HTTP path (e.g. /api/cron)."),
+  serviceName: z.string().optional().describe("Service name for Compose."),
+  shellType: z.enum(["bash", "sh"]).default("bash").optional(),
+  enabled: z.boolean().default(true).optional(),
+});
+const updateScheduleSchema = z.object({
+  id: z.string().min(1).describe("Schedule ID to update."),
+  name: z.string().optional(),
+  cronExpression: z.string().optional(),
+  timezone: z.string().optional(),
+  jobType: z.enum(["command", "cron", "deployment", "backup"]).optional(),
+  command: z.string().optional(),
+  serviceName: z.string().optional(),
+  shellType: z.enum(["bash", "sh"]).optional(),
+  enabled: z.boolean().optional(),
+});
+const deleteScheduleSchema = z.object({
+  id: z.string().min(1).describe("Schedule ID to delete."),
+});
+const triggerScheduleSchema = z.object({
+  id: z.string().min(1).describe("Schedule ID to run now."),
 });
 const controlResourceSchema = z.object({
   id: z.string().min(1).describe("Stable ID of the resource to control."),
@@ -1487,6 +1549,75 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
           ...input,
         }),
       execCommandOutputSchema,
+    ),
+    list_schedules: readTool(
+      "Read all cron jobs and schedules for a resource.",
+      listSchedulesSchema,
+      async ({ resourceId }) => {
+        await assertResource(context, resourceId);
+        return run(GetSchedulesUseCaseToken).execute({ resourceId });
+      },
+      z.array(z.any()),
+    ),
+    create_schedule: mutationTool(
+      "Create a new schedule for a resource after approval.",
+      createScheduleSchema,
+      async (input) => {
+        await assertResource(context, input.resourceId);
+        const res = await run(CreateScheduleUseCaseToken).execute({
+          jobType: input.jobType ?? "command",
+          enabled: input.enabled ?? true,
+          ...input,
+        });
+        await run(GeneralSchedulerToken).refresh();
+        return res;
+      },
+      z.any(),
+    ),
+    update_schedule: mutationTool(
+      "Update an existing schedule for a resource after approval.",
+      updateScheduleSchema,
+      async (input) => {
+        const schedule = await run(UnitOfWorkToken).scheduleRepository.findById(
+          input.id,
+        );
+        if (schedule?.resourceId) {
+          await assertResource(context, schedule.resourceId);
+        }
+        const res = await run(UpdateScheduleUseCaseToken).execute(input);
+        await run(GeneralSchedulerToken).refresh();
+        return res;
+      },
+      z.any(),
+    ),
+    delete_schedule: mutationTool(
+      "Delete a schedule after approval.",
+      deleteScheduleSchema,
+      async ({ id }) => {
+        const schedule =
+          await run(UnitOfWorkToken).scheduleRepository.findById(id);
+        if (schedule?.resourceId) {
+          await assertResource(context, schedule.resourceId);
+        }
+        const res = await run(DeleteScheduleUseCaseToken).execute({ id });
+        await run(GeneralSchedulerToken).refresh();
+        return res;
+      },
+      z.any(),
+    ),
+    trigger_schedule: mutationTool(
+      "Run a schedule immediately after approval.",
+      triggerScheduleSchema,
+      async ({ id }) => {
+        const schedule =
+          await run(UnitOfWorkToken).scheduleRepository.findById(id);
+        if (schedule?.resourceId) {
+          await assertResource(context, schedule.resourceId);
+        }
+        await run(GeneralSchedulerToken).executeNow(id);
+        return { success: true };
+      },
+      z.any(),
     ),
   } as UpGalToolRegistry;
   return tools;

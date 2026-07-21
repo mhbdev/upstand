@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import {
   CreateNotificationChannelInputSchema,
+  ListNotificationDeliveriesInputSchema,
   UpdateNotificationChannelInputSchema,
 } from "@upstand/domain";
 import {
@@ -135,29 +136,16 @@ export const notificationRouter = router({
     }),
 
   deliveries: twoFactorVerifiedProcedure
-    .input(
-      OrganizationInputSchema.extend({
-        status: z
-          .enum(["queued", "processing", "delivered", "failed", "dead_letter"])
-          .optional(),
-        limit: z.number().int().min(1).max(100).default(25),
-      }),
-    )
+    .input(ListNotificationDeliveriesInputSchema)
     .query(async ({ ctx, input }) => {
       await checkPermission(
         ctx.session.user.id,
         input.organizationId,
         "notification:view",
       );
-      const deliveries = await ctx.scope
+      return ctx.scope
         .resolve(UnitOfWorkToken)
-        .notificationDeliveryRepository.findRecentByOrganizationId(
-          input.organizationId,
-          input.limit,
-        );
-      return input.status
-        ? deliveries.filter((delivery) => delivery.status === input.status)
-        : deliveries;
+        .notificationDeliveryRepository.list(input);
     }),
 
   retryDelivery: twoFactorVerifiedProcedure

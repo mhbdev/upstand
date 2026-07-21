@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Spinner } from "@upstand/ui/components/spinner";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, ShieldCheck, Trash2 } from "@/components/huge-icons";
@@ -138,23 +139,18 @@ export function ApiKeysPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="border border-border/40 bg-card/25 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="font-semibold text-sm">
-            Create an API key
-          </CardTitle>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Create an API key</CardTitle>
           <CardDescription className="text-xs">
             Secrets are shown once, hashed by Better Auth, and rate limited
             through Redis.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 border-border/10 border-t pt-5">
+        <CardContent className="flex flex-col gap-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="key-name"
-                className="font-medium text-foreground/80 text-xs"
-              >
+              <Label htmlFor="key-name" className="font-medium text-xs">
                 Name
               </Label>
               <Input
@@ -168,10 +164,7 @@ export function ApiKeysPanel() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="key-expiration"
-                className="font-medium text-foreground/80 text-xs"
-              >
+              <Label htmlFor="key-expiration" className="font-medium text-xs">
                 Expiration (days)
               </Label>
               <Input
@@ -188,10 +181,7 @@ export function ApiKeysPanel() {
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label
-              htmlFor="key-preset"
-              className="font-medium text-foreground/80 text-xs"
-            >
+            <Label htmlFor="key-preset" className="font-medium text-xs">
               Permission preset
             </Label>
             <Select
@@ -225,19 +215,19 @@ export function ApiKeysPanel() {
               {PRESETS.find((item) => item.value === preset)?.description}
             </p>
           </div>
-          <label className="flex cursor-pointer items-center gap-2 font-medium text-foreground/80 text-xs">
+          <Label className="flex cursor-pointer items-center gap-2 font-medium text-xs">
             <Checkbox
               checked={advanced}
               onCheckedChange={(checked) => setAdvanced(checked === true)}
             />
             Use advanced permissions
-          </label>
+          </Label>
           {advanced ? (
-            <div className="grid grid-cols-1 gap-2 rounded-md border border-border/40 bg-background/30 p-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
               {API_KEY_PERMISSION_ACTIONS.map((permission) => (
-                <label
+                <Label
                   key={permission}
-                  className="flex cursor-pointer items-center gap-2 font-medium text-foreground/80 text-xs"
+                  className="flex cursor-pointer items-center gap-2 font-medium text-xs"
                 >
                   <Checkbox
                     checked={selectedPermissions.includes(permission)}
@@ -246,7 +236,7 @@ export function ApiKeysPanel() {
                     }
                   />
                   {permission}
-                </label>
+                </Label>
               ))}
             </div>
           ) : null}
@@ -256,6 +246,7 @@ export function ApiKeysPanel() {
               onClick={createKey}
               disabled={!name.trim() || create.isPending}
             >
+              {create.isPending ? <Spinner data-icon="inline-start" /> : null}
               {create.isPending ? "Creating…" : "Create API key"}
             </Button>
           </div>
@@ -277,7 +268,7 @@ export function ApiKeysPanel() {
                 }}
                 className="w-fit"
               >
-                <Copy className="mr-2 size-3.5" />
+                <Copy data-icon="inline-start" />
                 Copy secret
               </Button>
             </div>
@@ -285,24 +276,22 @@ export function ApiKeysPanel() {
         </CardContent>
       </Card>
 
-      <Card className="border border-border/40 bg-card/25 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="font-semibold text-sm">
-            Organization keys
-          </CardTitle>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Organization keys</CardTitle>
           <CardDescription className="text-xs">
             Revoked and expired keys cannot be used, even if cached clients
             retry.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2 border-border/10 border-t pt-5">
+        <CardContent className="flex flex-col gap-2.5">
           {keys.data?.apiKeys.map((key) => (
             <div
               key={key.id}
-              className="flex flex-wrap items-center gap-3 rounded-md border border-border/40 bg-background/30 p-3 text-xs"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-xs"
             >
-              <div className="mr-auto">
-                <p className="font-semibold text-foreground/90">
+              <div className="mr-auto min-w-0">
+                <p className="font-semibold text-foreground">
                   {key.name || "Unnamed key"}
                 </p>
                 <p className="text-[10px] text-muted-foreground">
@@ -312,22 +301,30 @@ export function ApiKeysPanel() {
                     : "never"}
                 </p>
               </div>
-              <Badge
-                variant={key.enabled ? "secondary" : "destructive"}
-                className="px-2 py-0.5 text-[10px]"
-              >
-                {key.enabled ? "Active" : "Disabled"}
-              </Badge>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => revoke.mutate({ organizationId, keyId: key.id })}
-                disabled={revoke.isPending}
-                className="h-8 text-destructive text-xs hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 className="mr-1.5 size-3.5" />
-                Revoke
-              </Button>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={key.enabled ? "secondary" : "outline"}
+                  className="text-xs"
+                >
+                  {key.enabled ? "Active" : "Disabled"}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    revoke.mutate({ organizationId, keyId: key.id })
+                  }
+                  disabled={revoke.isPending}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {revoke.isPending ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <Trash2 data-icon="inline-start" />
+                  )}
+                  Revoke
+                </Button>
+              </div>
             </div>
           ))}
           {!keys.data?.apiKeys.length ? (
@@ -337,9 +334,10 @@ export function ApiKeysPanel() {
           ) : null}
         </CardContent>
       </Card>
-      <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-        <ShieldCheck className="size-4 text-emerald-600" />
-        Organization keys never create browser sessions.
+
+      <div className="flex items-center gap-2 px-1 text-muted-foreground text-xs">
+        <ShieldCheck className="size-4 shrink-0 text-muted-foreground" />
+        <span>Organization keys never create browser sessions.</span>
       </div>
     </div>
   );

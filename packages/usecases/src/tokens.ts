@@ -208,6 +208,10 @@ export const GeneralSchedulerToken =
   createToken<UseCases.GeneralScheduler>("GeneralScheduler");
 export const GetSchedulesUseCaseToken =
   createToken<UseCases.GetSchedulesUseCase>("GetSchedulesUseCase");
+export const GetScheduleLogsUseCaseToken =
+  createToken<UseCases.GetScheduleLogsUseCase>("GetScheduleLogsUseCase");
+export const SyncUpstandConfigUseCaseToken =
+  createToken<UseCases.SyncUpstandConfigUseCase>("SyncUpstandConfigUseCase");
 export const CreateScheduleUseCaseToken =
   createToken<UseCases.CreateScheduleUseCase>("CreateScheduleUseCase");
 export const UpdateScheduleUseCaseToken =

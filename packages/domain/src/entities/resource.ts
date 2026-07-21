@@ -323,6 +323,7 @@ export const ResourceSchema = z.object({
   domains: z.string(),
   serverId: z.string().nullable().optional(),
   buildServerId: z.string().nullable().optional(),
+  cronJobsEnabled: z.boolean().default(true).optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -365,4 +366,5 @@ export interface CreateResourceDTO {
   domains?: string;
   serverId?: string | null;
   buildServerId?: string | null;
+  cronJobsEnabled?: boolean;
 }

@@ -163,12 +163,20 @@ export const UPGAL_UI_TARGETS = [
     path: "/notifications",
   },
   {
+    id: "navigation-observation",
+    label: "Observation navigation",
+    description: "Open the Observation page.",
+    kind: "navigation",
+    action: "spotlight",
+    path: "/observation",
+  },
+  {
     id: "navigation-audit-logs",
     label: "Audit Logs navigation",
     description: "Open the Audit Logs page.",
     kind: "navigation",
     action: "spotlight",
-    path: "/audit-logs",
+    path: "/observation?tab=audits",
   },
   {
     id: "navigation-tags",
@@ -181,10 +189,9 @@ export const UPGAL_UI_TARGETS = [
   {
     id: "navigation-settings-ai",
     label: "UpGal Settings navigation",
-    description: "Open the UpGal Settings page.",
+    description: "Open the UpGal Settings dialog panel.",
     kind: "navigation",
-    action: "spotlight",
-    path: "/settings/ai",
+    action: "open_dialog",
   },
   {
     id: "create-project",
@@ -352,7 +359,6 @@ export const UPGAL_UI_TARGETS = [
     description: "Opens the form for configuring an AI provider.",
     kind: "button",
     action: "open_dialog",
-    path: "/settings/ai",
   },
 ] as const satisfies readonly UpGalUiTargetDefinition[];
 

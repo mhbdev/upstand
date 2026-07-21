@@ -23,6 +23,7 @@ import {
   FieldLabel,
 } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -213,6 +214,7 @@ export function ResourceAdvancedSettings({
                 <CodeEditor
                   id="resource-command"
                   language="shell"
+                  allowLanguageChange={false}
                   height="110px"
                   value={config.command.join("\n")}
                   onChange={(value) =>
@@ -231,6 +233,7 @@ export function ResourceAdvancedSettings({
                 <CodeEditor
                   id="resource-args"
                   language="shell"
+                  allowLanguageChange={false}
                   height="110px"
                   value={config.args.join("\n")}
                   onChange={(value) => updateConfig("args", splitLines(value))}
@@ -428,7 +431,7 @@ export function ResourceAdvancedSettings({
                     )
                   }
                 />
-                <label className="flex items-center gap-2 px-2 text-muted-foreground text-xs">
+                <Label className="flex items-center gap-2 px-2 text-muted-foreground text-xs">
                   <Switch
                     checked={volume.readOnly}
                     onCheckedChange={(readOnly) =>
@@ -441,7 +444,7 @@ export function ResourceAdvancedSettings({
                     }
                   />{" "}
                   Read-only
-                </label>
+                </Label>
                 <Button
                   type="button"
                   size="icon-sm"

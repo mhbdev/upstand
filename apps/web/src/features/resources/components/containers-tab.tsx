@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@upstand/ui/components/dropdown-menu";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -378,12 +379,12 @@ export function ContainersTab({
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <label
+              <Label
                 className="font-medium text-sm"
                 htmlFor="container-archive"
               >
                 Archive
-              </label>
+              </Label>
               <Input
                 id="container-archive"
                 type="file"
@@ -394,12 +395,12 @@ export function ContainersTab({
               />
             </div>
             <div className="grid gap-2">
-              <label
+              <Label
                 className="font-medium text-sm"
                 htmlFor="container-destination"
               >
                 Destination directory
-              </label>
+              </Label>
               <Input
                 id="container-destination"
                 value={uploadDestination}

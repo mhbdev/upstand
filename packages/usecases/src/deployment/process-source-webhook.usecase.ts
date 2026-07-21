@@ -253,7 +253,7 @@ function matchesResource(
     return false;
   }
   const config = resourceConfig(resource);
-  if (config.autoDeploy !== true) return false;
+  if (config.autoDeploy === false) return false;
   if (
     typeof config.githubAccount === "string" &&
     config.githubAccount !== providerId
@@ -359,18 +359,19 @@ export class ProcessSourceWebhookUseCase {
       return { accepted: true, queued: 0, ignored: 1, reason: "event_ignored" };
     }
 
-    const resources = await this.uow.resourceRepository.findMany();
+    const projects = await this.uow.projectRepository.findByOrganizationId(
+      provider.organizationId,
+    );
     const ownedResources: Resource[] = [];
-    for (const resource of resources) {
-      const environment = await this.uow.environmentRepository.findById(
-        resource.environmentId,
+    for (const project of projects) {
+      const environments = await this.uow.environmentRepository.findByProjectId(
+        project.id,
       );
-      if (!environment) continue;
-      const project = await this.uow.projectRepository.findById(
-        environment.projectId,
-      );
-      if (project?.organizationId === provider.organizationId) {
-        ownedResources.push(resource);
+      for (const environment of environments) {
+        const resources = await this.uow.resourceRepository.findByEnvironmentId(
+          environment.id,
+        );
+        ownedResources.push(...resources);
       }
     }
     const matches = ownedResources.filter((resource) =>

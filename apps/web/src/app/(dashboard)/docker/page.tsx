@@ -66,6 +66,7 @@ import {
   Trash2,
   Upload,
 } from "@/components/huge-icons";
+import { CodeBlock } from "@/components/shared/code-block";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import {
   uploadArchive,
@@ -733,7 +734,7 @@ export default function DockerInventoryPage() {
                                         >
                                           <Terminal className="size-3.5 text-sky-500" />
                                         </Button>
-                                        <label
+                                        <Label
                                           className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                           title="Upload Tar Archive"
                                           aria-label={`Upload tar archive to container ${c.name}`}
@@ -754,7 +755,7 @@ export default function DockerInventoryPage() {
                                               event.currentTarget.value = "";
                                             }}
                                           />
-                                        </label>
+                                        </Label>
                                         <Button
                                           size="icon"
                                           variant="ghost"
@@ -900,7 +901,7 @@ export default function DockerInventoryPage() {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-1.5">
-                                      <label
+                                      <Label
                                         className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                         title="Upload Tar Archive"
                                         aria-label={`Upload tar archive to volume ${v.name}`}
@@ -918,7 +919,7 @@ export default function DockerInventoryPage() {
                                             event.currentTarget.value = "";
                                           }}
                                         />
-                                      </label>
+                                      </Label>
                                       <Button
                                         size="icon"
                                         variant="ghost"
@@ -1097,7 +1098,7 @@ export default function DockerInventoryPage() {
                     <div className="space-y-4">
                       {/* Logs Controls */}
                       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                        <Label className="flex flex-col space-y-1 font-semibold text-xs">
                           <span className="mb-1 text-muted-foreground">
                             Target Container
                           </span>
@@ -1125,9 +1126,9 @@ export default function DockerInventoryPage() {
                               </SelectGroup>
                             </SelectContent>
                           </Select>
-                        </label>
+                        </Label>
 
-                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                        <Label className="flex flex-col space-y-1 font-semibold text-xs">
                           <span className="mb-1 text-muted-foreground">
                             Service Name (Swarm)
                           </span>
@@ -1140,9 +1141,9 @@ export default function DockerInventoryPage() {
                             placeholder="Service name"
                             className="h-9"
                           />
-                        </label>
+                        </Label>
 
-                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                        <Label className="flex flex-col space-y-1 font-semibold text-xs">
                           <span className="mb-1 text-muted-foreground">
                             Lines limit (max 1000)
                           </span>
@@ -1154,9 +1155,9 @@ export default function DockerInventoryPage() {
                             onChange={(e) => setTail(e.target.value)}
                             className="h-9"
                           />
-                        </label>
+                        </Label>
 
-                        <label className="flex flex-col space-y-1 font-semibold text-xs">
+                        <Label className="flex flex-col space-y-1 font-semibold text-xs">
                           <span className="mb-1 text-muted-foreground">
                             Logs Since
                           </span>
@@ -1166,7 +1167,7 @@ export default function DockerInventoryPage() {
                             onChange={(e) => setSince(e.target.value)}
                             className="h-9"
                           />
-                        </label>
+                        </Label>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-3 border-t pt-3">
@@ -1475,12 +1476,17 @@ export default function DockerInventoryPage() {
               />
             </button>
             {showRawJson && (
-              <div className="border-t bg-muted/5 p-4 font-mono text-[11px] leading-relaxed">
-                <pre className="max-h-[350px] select-all overflow-auto">
-                  {typeof inventoryQuery.data === "string"
-                    ? inventoryQuery.data
-                    : JSON.stringify(inventoryQuery.data ?? null, null, 2)}
-                </pre>
+              <div className="border-t p-4">
+                <CodeBlock
+                  code={
+                    typeof inventoryQuery.data === "string"
+                      ? inventoryQuery.data
+                      : JSON.stringify(inventoryQuery.data ?? null, null, 2)
+                  }
+                  language="json"
+                  filename="raw-docker-response.json"
+                  className="max-h-[350px]"
+                />
               </div>
             )}
           </div>

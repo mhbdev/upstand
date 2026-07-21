@@ -88,6 +88,11 @@ export const aiConversation = pgTable(
   },
   (table) => [
     index("ai_conversation_org_idx").on(table.organizationId, table.updatedAt),
+    index("ai_conversation_org_user_idx").on(
+      table.organizationId,
+      table.userId,
+      table.updatedAt,
+    ),
   ],
 );
 

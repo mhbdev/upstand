@@ -18,4 +18,15 @@ export class DrizzleServerBuildSettingsRepository
   constructor(executor: Executor) {
     super(executor, serverBuildSettings);
   }
+
+  async createIfNotExists(
+    data: CreateServerBuildSettingsDTO,
+  ): Promise<ServerBuildSettings | null> {
+    const [row] = await this.executor
+      .insert(serverBuildSettings)
+      .values(data)
+      .onConflictDoNothing()
+      .returning();
+    return (row as ServerBuildSettings | undefined) ?? this.findById(data.id);
+  }
 }

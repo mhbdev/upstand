@@ -447,7 +447,7 @@ export default function S3Destinations(_props: {
                 value={provider}
                 onValueChange={(val) => setProvider(val || "")}
               >
-                <SelectTrigger id="provider" className="border-border/40">
+                <SelectTrigger id="provider">
                   <SelectValue placeholder="Select a S3 Provider" />
                 </SelectTrigger>
                 <SelectContent>

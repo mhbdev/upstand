@@ -1,3 +1,5 @@
+"use client";
+
 import {
   CodeIcon,
   Folder01Icon,
@@ -17,6 +19,7 @@ import {
 } from "@upstand/ui/components/card";
 import Link from "next/link";
 import { PageBackdrop } from "@/components/marketing/page-backdrop";
+import { getDocsUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
 
 const FEATURES = [
@@ -227,7 +230,7 @@ export default function Home() {
           <Button
             size="lg"
             variant="outline"
-            render={<a href="/docs" />}
+            render={<a href={getDocsUrl()} />}
             nativeButton={false}
           >
             Read the docs
@@ -236,7 +239,7 @@ export default function Home() {
         <footer className="mt-16 flex flex-col gap-3 border-t pt-6 text-muted-foreground text-xs sm:flex-row sm:items-center sm:justify-between">
           <span>Upstand · Open-source infrastructure for teams that ship.</span>
           <div className="flex gap-4">
-            <a className="hover:text-foreground" href="/docs">
+            <a className="hover:text-foreground" href={getDocsUrl()}>
               Docs
             </a>
             <a

@@ -27,18 +27,19 @@ export class GetQueueUseCase {
     const projects =
       await this.uow.projectRepository.findByOrganizationId(organizationId);
     const projectIds = new Set(projects.map((project) => project.id));
-    const environments = await this.uow.environmentRepository.findMany();
-    const environmentIds = new Set(
-      environments
-        .filter((environment) => projectIds.has(environment.projectId))
-        .map((environment) => environment.id),
-    );
-    const resources = await this.uow.resourceRepository.findMany();
-    return this.execute(
-      resources
-        .filter((resource) => environmentIds.has(resource.environmentId))
-        .map((resource) => resource.id),
-    );
+    const environments = [];
+    for (const projectId of projectIds) {
+      const envs =
+        await this.uow.environmentRepository.findByProjectId(projectId);
+      environments.push(...envs);
+    }
+    const environmentIds = new Set(environments.map((env) => env.id));
+    const resources = [];
+    for (const envId of environmentIds) {
+      const res = await this.uow.resourceRepository.findByEnvironmentId(envId);
+      resources.push(...res);
+    }
+    return this.execute(resources.map((resource) => resource.id));
   }
 
   async execute(resourceIds?: readonly string[]): Promise<QueueJobResult[]> {

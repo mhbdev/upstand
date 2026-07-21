@@ -28,6 +28,7 @@ import {
   FieldLabel,
 } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -947,25 +948,25 @@ export function DomainsTab({
 
                 <form.Field name="stripPath">
                   {(field) => (
-                    <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                    <Label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
                       <Switch
                         checked={field.state.value}
                         onCheckedChange={(val) => field.handleChange(val)}
                       />{" "}
                       Strip Path Prefix before passing request downstream.
-                    </label>
+                    </Label>
                   )}
                 </form.Field>
 
                 <form.Field name="https">
                   {(field) => (
-                    <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                    <Label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
                       <Switch
                         checked={field.state.value}
                         onCheckedChange={(val) => field.handleChange(val)}
                       />{" "}
                       Force HTTPS Redirection.
-                    </label>
+                    </Label>
                   )}
                 </form.Field>
 
@@ -1214,35 +1215,35 @@ export function DomainsTab({
                   <div className="grid gap-2 sm:grid-cols-3">
                     <form.Field name="securityHeaders.hsts">
                       {(field) => (
-                        <label className="flex items-center gap-2 text-xs">
+                        <Label className="flex items-center gap-2 text-xs">
                           <Switch
                             checked={field.state.value}
                             onCheckedChange={field.handleChange}
                           />
                           HSTS
-                        </label>
+                        </Label>
                       )}
                     </form.Field>
                     <form.Field name="securityHeaders.nosniff">
                       {(field) => (
-                        <label className="flex items-center gap-2 text-xs">
+                        <Label className="flex items-center gap-2 text-xs">
                           <Switch
                             checked={field.state.value}
                             onCheckedChange={field.handleChange}
                           />
                           No sniff
-                        </label>
+                        </Label>
                       )}
                     </form.Field>
                     <form.Field name="securityHeaders.frameDeny">
                       {(field) => (
-                        <label className="flex items-center gap-2 text-xs">
+                        <Label className="flex items-center gap-2 text-xs">
                           <Switch
                             checked={field.state.value}
                             onCheckedChange={field.handleChange}
                           />
                           Frame deny
-                        </label>
+                        </Label>
                       )}
                     </form.Field>
                   </div>

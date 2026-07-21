@@ -4,7 +4,7 @@ import type {
   Environment,
   IEnvironmentRepository,
 } from "@upstand/domain";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { BaseRepository } from "../shared/base.repository";
 import type { Executor } from "../shared/types";
 
@@ -20,5 +20,14 @@ export class DrizzleEnvironmentRepository
     return this.findMany({
       where: eq(environment.projectId, projectId),
     });
+  }
+
+  async incrementResourceCount(id: string, delta: number): Promise<void> {
+    await this.executor
+      .update(environment)
+      .set({
+        resourceCount: sql`GREATEST(0, ${environment.resourceCount} + ${delta})`,
+      })
+      .where(eq(environment.id, id));
   }
 }

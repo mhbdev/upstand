@@ -19,6 +19,7 @@ import {
 import { Checkbox } from "@upstand/ui/components/checkbox";
 import { Field, FieldError, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -482,7 +483,7 @@ export function MembersPanel() {
                         <FieldLabel>Capabilities</FieldLabel>
                         <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
                           {MEMBER_CAPABILITIES.map(([key, label]) => (
-                            <label
+                            <Label
                               className="flex items-center gap-2 text-xs"
                               key={key}
                             >
@@ -499,7 +500,7 @@ export function MembersPanel() {
                                 }}
                               />
                               {label}
-                            </label>
+                            </Label>
                           ))}
                         </div>
                       </Field>
@@ -648,7 +649,7 @@ export function MembersPanel() {
                     </div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {MEMBER_CAPABILITIES.map(([key, label]) => (
-                        <label
+                        <Label
                           className="flex items-center gap-2 text-xs"
                           key={key}
                         >
@@ -669,7 +670,7 @@ export function MembersPanel() {
                             }
                           />
                           {label}
-                        </label>
+                        </Label>
                       ))}
                     </div>
                   </>

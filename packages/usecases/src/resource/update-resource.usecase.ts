@@ -73,16 +73,10 @@ export const UpdateResourceInputSchema = z.object({
   domains: z.string().optional(),
   serverId: z.string().nullable().optional(),
   buildServerId: z.string().nullable().optional(),
+  cronJobsEnabled: z.boolean().optional(),
 });
 
 export type UpdateResourceInput = z.infer<typeof UpdateResourceInputSchema>;
-
-function dockerServiceKey(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]/g, "-");
-}
 
 export class UpdateResourceUseCase {
   constructor(
@@ -97,6 +91,9 @@ export class UpdateResourceUseCase {
     }
 
     const patch: Partial<Resource> = {};
+    if (input.cronJobsEnabled !== undefined) {
+      patch.cronJobsEnabled = input.cronJobsEnabled;
+    }
     validateLibsqlSettings(
       input.dbType ?? resource.dbType ?? undefined,
       input.libsqlGrpcPort,
@@ -108,12 +105,11 @@ export class UpdateResourceUseCase {
     if (input.name !== undefined) patch.name = input.name;
     if (input.status !== undefined) patch.status = input.status;
     if (input.appName !== undefined) {
-      const serviceKey = dockerServiceKey(input.appName);
-      const duplicate = (await this.uow.resourceRepository.findMany()).find(
-        (candidate) =>
-          candidate.id !== resource.id &&
-          dockerServiceKey(candidate.appName ?? "") === serviceKey,
-      );
+      const duplicate =
+        await this.uow.resourceRepository.checkDuplicateServiceKey(
+          input.appName,
+          resource.id,
+        );
       if (duplicate) {
         throw new ValidationError(
           `Docker service name '${input.appName}' is already used by resource '${duplicate.name}'. Choose a unique service name across the Swarm cluster.`,
@@ -232,7 +228,17 @@ export class UpdateResourceUseCase {
         input.rollbackRegistryId !== undefined
           ? input.rollbackRegistryId
           : resource.rollbackRegistryId;
-      if (rollbackRegistryId) {
+      const willBeActive =
+        input.rollbackActive !== undefined
+          ? input.rollbackActive
+          : resource.rollbackActive;
+
+      if (willBeActive) {
+        if (!rollbackRegistryId) {
+          throw new ValidationError(
+            "A Docker registry must be selected to enable rollbacks",
+          );
+        }
         const registry =
           await this.uow.dockerRegistryRepository.findById(rollbackRegistryId);
         if (!registry || registry.organizationId !== project.organizationId) {

@@ -24,6 +24,7 @@ import {
   FieldLabel,
 } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
+import { Label } from "@upstand/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -893,14 +894,14 @@ export function BackupPanel({
                       </div>
                       <form.Field name="stopService">
                         {(field) => (
-                          <label className="flex items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-sm">
+                          <Label className="flex items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-sm">
                             <Switch
                               checked={field.state.value}
                               onCheckedChange={(val) => field.handleChange(val)}
                             />{" "}
                             Stop the service during archive and restore for a
                             consistent volume snapshot.
-                          </label>
+                          </Label>
                         )}
                       </form.Field>
                     </>

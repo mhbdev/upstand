@@ -108,14 +108,17 @@ Deploy multi-container applications from raw YAML configurations or repository-h
 
 ---
 
-## 4. Scheduled Jobs
+## 4. Scheduled Deployments & Crons
 
-Schedules are resource-scoped, permission-checked, and managed via the **Deployments → Scheduled jobs** interface:
+All scheduled operations—including automated deployment rebuilds, container CLI scripts, backup jobs, and HTTP cron endpoints—are centrally managed via the **Cron Jobs** tab on the resource page:
 
+- **Deployment Jobs**: Queue a standard build/deployment operation on a cron schedule (e.g., nightly rebuilds).
 - **Command Jobs**: Execute specific cron commands inside the running resource container.
-- **Deployment Jobs**: Queue a standard build/deployment operation on a cron schedule.
-- **Backup Jobs**: Trigger the resource's S3 backup workflow.
-- **Run Now**: Instantly enqueues the job (even if disabled) into the worker queues.
+- **Backup Jobs**: Trigger the resource's S3 backup workflow automatically on a schedule.
+- **HTTP Cron Jobs**: Send authenticated HTTP requests to server endpoints (e.g., `/api/cron`) with `CRON_SECRET`.
+- **Run Now & Logs**: Instantly enqueue any job into worker queues and view historical execution logs.
+
+For full details on configuring cron jobs, timezones, and framework code snippets, see the [Cron Jobs Documentation](/docs/features/cron-jobs).
 
 ---
 

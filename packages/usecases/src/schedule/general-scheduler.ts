@@ -11,7 +11,10 @@ export interface GeneralSchedulerDependencies {
     Array<{
       id: string;
       cronExpression: string;
+      timezone?: string | null;
       jobType?: string | null;
+      serviceName?: string | null;
+      shellType?: string | null;
       backupScheduleId?: string | null;
       command: string;
     }>
@@ -85,7 +88,8 @@ export class GeneralScheduler {
     }
 
     for (const schedule of schedules) {
-      const signature = `${schedule.cronExpression}\0${schedule.jobType ?? "command"}\0${schedule.backupScheduleId ?? ""}\0${schedule.command}`;
+      const timezone = schedule.timezone || "UTC";
+      const signature = `${schedule.cronExpression}\0${timezone}\0${schedule.jobType ?? "command"}\0${schedule.serviceName ?? ""}\0${schedule.shellType ?? "bash"}\0${schedule.backupScheduleId ?? ""}\0${schedule.command}`;
       const existing = this.jobs.get(schedule.id);
       if (existing?.signature === signature) continue;
       existing?.cron.stop();
@@ -93,7 +97,7 @@ export class GeneralScheduler {
       try {
         const cron = new Cron(
           schedule.cronExpression,
-          { protect: true },
+          { timezone, protect: true },
           () => void this.trigger(schedule.id),
         );
         this.jobs.set(schedule.id, { cron, signature });

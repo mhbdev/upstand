@@ -64,8 +64,17 @@ export class CreateScheduleUseCase {
     }
     return this.uow.scheduleRepository.create({
       id: randomUUID(),
-      ...parsed,
-      command: parsed.jobType === "command" ? parsed.command : "",
+      resourceId: parsed.resourceId,
+      name: parsed.name,
+      description: parsed.description ?? null,
+      cronExpression: parsed.cronExpression,
+      timezone: parsed.timezone ?? "UTC",
+      jobType: parsed.jobType,
+      serviceName: parsed.serviceName ?? null,
+      shellType: parsed.shellType ?? "bash",
+      source: parsed.source ?? "manual",
+      command: parsed.command ?? "",
+      enabled: parsed.enabled ?? true,
       backupScheduleId:
         parsed.jobType === "backup" ? (parsed.backupScheduleId ?? null) : null,
     });
@@ -85,10 +94,14 @@ export class UpdateScheduleUseCase {
     const resourceId = existing.resourceId;
     const command = parsed.command ?? existing.command;
     if (
-      jobType === "command" &&
+      (jobType === "command" || jobType === "cron") &&
       !ScheduleCommandSchema.safeParse(command).success
     ) {
-      throw new Error("A command is required for command schedules");
+      throw new Error(
+        jobType === "cron"
+          ? "A path is required for HTTP cron schedules"
+          : "A command is required for command schedules",
+      );
     }
     if (jobType === "backup") {
       const backupScheduleId =

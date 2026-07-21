@@ -273,14 +273,14 @@ export function SettingsDialog() {
                 </Breadcrumb>
               </header>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-0">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 {activeTab === "profile" && <ProfilePanel />}
                 {activeTab === "sessions" && <SessionsPanel />}
                 {activeTab === "members" && <MembersPanel />}
                 {activeTab === "api-keys" && <ApiKeysPanel />}
                 {activeTab === "organization" && <OrganizationPanel />}
                 {activeTab === "security" && <SecurityPanel />}
-                {activeTab === "upgal" && <UpGalSettingsPanel embedded />}
+                {activeTab === "upgal" && <UpGalSettingsPanel />}
                 {activeTab === "app" && <AppInfoPanel />}
               </div>
             </main>
@@ -314,7 +314,7 @@ export function SettingsDialog() {
                             />
                             <span>{item.label}</span>
                           </div>
-                          <div className="ml-4 space-y-1 border-l pl-3">
+                          <div className="ml-4 flex flex-col gap-1 border-l pl-3">
                             {item.subItems?.map((subItem) => (
                               <button
                                 key={subItem.name}

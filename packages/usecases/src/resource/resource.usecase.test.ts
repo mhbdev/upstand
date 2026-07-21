@@ -32,6 +32,13 @@ class MockEnvironmentRepository {
     }
     return null;
   }
+
+  async incrementResourceCount(id: string, delta: number) {
+    const item = this.store.find((e) => e.id === id);
+    if (item) {
+      item.resourceCount = Math.max(0, (item.resourceCount || 0) + delta);
+    }
+  }
 }
 
 class MockResourceRepository {
@@ -73,6 +80,32 @@ class MockResourceRepository {
     }
     return null;
   }
+
+  async checkDuplicateServiceKey(appName: string, excludeResourceId?: string) {
+    const serviceKey = appName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]/g, "-");
+    const duplicate = this.store.find(
+      (r) =>
+        r.id !== excludeResourceId &&
+        (r.appName ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9-_]/g, "-") === serviceKey,
+    );
+    return duplicate ? { ...duplicate } : null;
+  }
+
+  async findByDockerRegistryId(registryId: string) {
+    return this.store
+      .filter(
+        (r) =>
+          r.buildRegistryId === registryId ||
+          r.rollbackRegistryId === registryId,
+      )
+      .map((r) => ({ ...r }));
+  }
 }
 
 class MockDeploymentRepository {
@@ -104,6 +137,11 @@ class MockServerBuildSettingsRepository {
     const item = { ...data, createdAt: new Date(), updatedAt: new Date() };
     this.store.push(item);
     return item;
+  }
+  async createIfNotExists(data: any) {
+    const existing = await this.findById(data.id);
+    if (existing) return existing;
+    return this.create(data);
   }
 }
 

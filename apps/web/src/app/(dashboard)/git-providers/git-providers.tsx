@@ -524,7 +524,7 @@ export default function GitProviders({
                     if (val) setProviderType(val as ProviderType);
                   }}
                 >
-                  <SelectTrigger className="border-border/40">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select Provider Type" />
                   </SelectTrigger>
                   <SelectContent>

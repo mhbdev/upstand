@@ -274,6 +274,69 @@
       "when": 1784479740634,
       "tag": "0038_strong_zaladane",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1784514738051,
+      "tag": "0039_melted_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1784517698285,
+      "tag": "0040_solid_hellcat",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1784518452856,
+      "tag": "0041_cute_scalphunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1784518466965,
+      "tag": "0042_curious_cerise",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1784518470927,
+      "tag": "0043_foamy_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1784518476704,
+      "tag": "0044_sour_raider",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1784518482254,
+      "tag": "0045_bizarre_ender_wiggin",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1784518499837,
+      "tag": "0046_last_nehzno",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1784518515622,
+      "tag": "0047_steady_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }

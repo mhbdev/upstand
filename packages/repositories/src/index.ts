@@ -18,6 +18,7 @@ export * from "./resource/drizzle-resource.repository";
 export * from "./resource/drizzle-resource-runtime.repository";
 export * from "./s3-destination/drizzle-s3-destination.repository";
 export * from "./schedule/drizzle-schedule.repository";
+export * from "./schedule/drizzle-schedule-log.repository";
 export * from "./server/drizzle-server.repository";
 export * from "./server-build-settings/drizzle-server-build-settings.repository";
 export * from "./shared";

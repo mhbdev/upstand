@@ -34,6 +34,8 @@ class MockEnvironmentRepository implements IEnvironmentRepository {
     return null;
   }
 
+  async incrementResourceCount() {}
+
   async deleteById() {
     return false;
   }

@@ -430,3 +430,5 @@ export const X = createHugeIcon(iconMap.X);
 export const XCircle = createHugeIcon(iconMap.XCircle);
 export const XCircleIcon = createHugeIcon(iconMap.XCircleIcon);
 export const XIcon = createHugeIcon(iconMap.XIcon);
+export const AnalyticsUpIcon = LineChart;
+export const Rocket01Icon = Rocket;

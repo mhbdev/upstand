@@ -43,6 +43,8 @@ export const backupSchedule = pgTable(
   (table) => [
     index("backup_schedule_resource_idx").on(table.resourceId),
     index("backup_schedule_enabled_idx").on(table.enabled),
+    index("backup_schedule_organization_idx").on(table.organizationId),
+    index("backup_schedule_destination_idx").on(table.destinationId),
   ],
 );
 
@@ -82,6 +84,8 @@ export const backupRun = pgTable(
       table.createdAt,
     ),
     index("backup_run_status_idx").on(table.status),
+    index("backup_run_organization_idx").on(table.organizationId),
+    index("backup_run_destination_idx").on(table.destinationId),
   ],
 );
 

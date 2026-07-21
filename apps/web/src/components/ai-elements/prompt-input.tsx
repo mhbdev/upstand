@@ -66,6 +66,14 @@ import {
   useState,
 } from "react";
 import {
+  Attachment,
+  type AttachmentData,
+  AttachmentInfo,
+  AttachmentPreview,
+  AttachmentRemove,
+  Attachments,
+} from "@/components/ai-elements/attachments";
+import {
   CornerDownLeftIcon,
   ImageIcon,
   Monitor,
@@ -1068,6 +1076,36 @@ export const PromptInputTextarea = ({
   );
 };
 
+export const PromptInputAttachments = ({
+  className,
+}: {
+  className?: string;
+}) => {
+  const { files, remove } = usePromptInputAttachments();
+  if (files.length === 0) return null;
+  return (
+    <Attachments
+      variant="inline"
+      className={cn(
+        "w-full flex-wrap gap-1.5 border-border/30 border-b bg-muted/20 p-2",
+        className,
+      )}
+    >
+      {files.map((file) => (
+        <Attachment
+          key={file.id}
+          data={file as AttachmentData}
+          onRemove={() => remove(file.id)}
+        >
+          <AttachmentPreview />
+          <AttachmentInfo />
+          <AttachmentRemove />
+        </Attachment>
+      ))}
+    </Attachments>
+  );
+};
+
 export type PromptInputHeaderProps = Omit<
   ComponentProps<typeof InputGroupAddon>,
   "align"
@@ -1075,14 +1113,21 @@ export type PromptInputHeaderProps = Omit<
 
 export const PromptInputHeader = ({
   className,
+  children,
   ...props
-}: PromptInputHeaderProps) => (
-  <InputGroupAddon
-    align="block-end"
-    className={cn("order-first flex-wrap gap-1", className)}
-    {...props}
-  />
-);
+}: PromptInputHeaderProps) => {
+  const { files } = usePromptInputAttachments();
+  if (!children || (files && files.length === 0)) return null;
+  return (
+    <InputGroupAddon
+      align="block-end"
+      className={cn("order-first flex-wrap gap-1 border-0 p-0", className)}
+      {...props}
+    >
+      {children}
+    </InputGroupAddon>
+  );
+};
 
 export type PromptInputFooterProps = Omit<
   ComponentProps<typeof InputGroupAddon>,

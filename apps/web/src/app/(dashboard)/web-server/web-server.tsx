@@ -47,7 +47,6 @@ import {
 import { PageSkeleton } from "@/components/dashboard/page-skeleton";
 import {
   ArrowRightIcon as ArrowRight,
-  CheckCircle2,
   Copy,
   PlusIcon,
   RefreshCw,
@@ -124,11 +123,11 @@ export default function WebServerDashboard(_props: {
 
   // Log views
   const [caddyLogsTail, setCaddyLogsTail] = useState(100);
-  const [serverLogsTail, setServerLogsTail] = useState(100);
-  const [caddyLogsCopied, setCaddyLogsCopied] = useState(false);
+  const [serverLogsTail, _setServerLogsTail] = useState(100);
+  const [_caddyLogsCopied, setCaddyLogsCopied] = useState(false);
   const [, setServerLogsCopied] = useState(false);
   const [autoRefreshCaddyLogs, setAutoRefreshCaddyLogs] = useState(true);
-  const [autoRefreshServerLogs, setAutoRefreshServerLogs] = useState(true);
+  const [autoRefreshServerLogs, _setAutoRefreshServerLogs] = useState(true);
 
   // 1. Fetch Caddy/server settings and container status
   const {
@@ -514,7 +513,7 @@ export default function WebServerDashboard(_props: {
     });
   };
 
-  const handleCopyLogs = async (type: "caddy" | "server") => {
+  const _handleCopyLogs = async (type: "caddy" | "server") => {
     const text = type === "caddy" ? caddyLogs : serverLogs;
     if (!text) return;
     try {
@@ -1315,6 +1314,7 @@ export default function WebServerDashboard(_props: {
                           id="global-caddyfile-overrides"
                           height="132px"
                           language="caddy"
+                          allowLanguageChange={false}
                           value={globalCaddyfile}
                           onChange={setGlobalCaddyfile}
                           aria-label="Custom global Caddyfile options"
@@ -1335,6 +1335,7 @@ export default function WebServerDashboard(_props: {
                           id="caddy-snippets"
                           height="190px"
                           language="caddy"
+                          allowLanguageChange={false}
                           value={caddySnippets}
                           onChange={setCaddySnippets}
                           aria-label="Reusable Caddy route snippets"
@@ -1525,10 +1526,11 @@ export default function WebServerDashboard(_props: {
                     <CodeEditor
                       height="360px"
                       language="caddy"
+                      allowLanguageChange={false}
                       value={
                         info?.status?.mainCaddyfile || "# No Caddyfile found."
                       }
-                      disabled
+                      mode="view"
                       aria-label="Compiled Caddyfile preview"
                     />
                   </CodeSurface>
@@ -1591,21 +1593,6 @@ export default function WebServerDashboard(_props: {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCopyLogs("caddy")}
-                  disabled={!caddyLogs}
-                  className="gap-1 text-xs"
-                >
-                  {caddyLogsCopied ? (
-                    <CheckCircle2 className="size-3.5" />
-                  ) : (
-                    <Copy className="size-3.5" />
-                  )}
-                  {caddyLogsCopied ? "Copied" : "Copy"}
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="border-border/10 border-t pt-4">
@@ -1627,62 +1614,11 @@ export default function WebServerDashboard(_props: {
       {/* ─── SERVER LOGS DIALOG ─────────────────────────────────────────── */}
       <Dialog open={serverLogsOpen} onOpenChange={setServerLogsOpen}>
         <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,64rem)] overflow-y-auto sm:min-w-[min(42rem,calc(100vw-2rem))]">
-          <DialogHeader className="flex w-full flex-row items-center justify-between">
-            <div>
-              <DialogTitle>Upstand Server Logs</DialogTitle>
-              <DialogDescription>
-                Tailing stdout from Upstand backend process.
-              </DialogDescription>
-            </div>
-            <div className="mr-4 flex shrink-0 items-center gap-3">
-              <div className="flex items-center gap-1.5 text-xs">
-                <Checkbox
-                  id="auto-refresh-server"
-                  checked={autoRefreshServerLogs}
-                  onCheckedChange={(val) =>
-                    setAutoRefreshServerLogs(Boolean(val))
-                  }
-                />
-                <Label
-                  htmlFor="auto-refresh-server"
-                  className="cursor-pointer text-xs"
-                >
-                  Auto-refresh (5s)
-                </Label>
-              </div>
-              <Select
-                items={[
-                  { value: "50", label: "Last 50 lines" },
-                  { value: "100", label: "Last 100 lines" },
-                  { value: "200", label: "Last 200 lines" },
-                ]}
-                value={String(serverLogsTail)}
-                onValueChange={(val) => {
-                  setServerLogsTail(Number(val));
-                  setTimeout(() => refetchServerLogs(), 50);
-                }}
-              >
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="50">Last 50 lines</SelectItem>
-                    <SelectItem value="100">Last 100 lines</SelectItem>
-                    <SelectItem value="200">Last 200 lines</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleCopyLogs("server")}
-                disabled={!serverLogs}
-                className="h-7 text-xs"
-              >
-                Copy
-              </Button>
-            </div>
+          <DialogHeader>
+            <DialogTitle>Upstand Server Logs</DialogTitle>
+            <DialogDescription>
+              Tailing stdout from Upstand backend process.
+            </DialogDescription>
           </DialogHeader>
           <div className="mt-2">
             {loadingServerLogs && !serverLogs ? (

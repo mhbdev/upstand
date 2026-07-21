@@ -95,3 +95,21 @@ export function getServerApiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return new URL(normalizedPath, `${getServerUrl()}/`).toString();
 }
+
+/** Resolve the documentation URL (Fumadocs) dynamically for development and production. */
+export function getDocsUrl(path = ""): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const docsPath = normalizedPath.startsWith("/docs")
+    ? normalizedPath
+    : `/docs${normalizedPath}`;
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname, port } = window.location;
+    if (isLoopbackHost(hostname) && (port === "3001" || port === "3000")) {
+      return `http://${hostname}:4000${docsPath}`;
+    }
+    return `${protocol}//${hostname}${port ? `:${port}` : ""}${docsPath}`;
+  }
+
+  return `http://localhost:4000${docsPath}`;
+}

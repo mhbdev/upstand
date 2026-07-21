@@ -169,7 +169,7 @@ export function ProviderFormFields({
       </div>
 
       <div className="flex items-center justify-between rounded-md border p-3">
-        <div className="space-y-0.5">
+        <div className="flex flex-col gap-0.5">
           <FieldLabel htmlFor={`${idPrefix}-reasoning`}>
             Enable model reasoning
           </FieldLabel>

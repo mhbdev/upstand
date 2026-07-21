@@ -860,9 +860,9 @@ app.post("/api/monitoring/alerts", async (c) => {
 // Public, tokenized deployment hook used by GitHub Actions and external CI.
 // Only a SHA-256 digest is persisted; the URL token is never recoverable from
 // the database and must be rotated if it is lost.
-app.post("/api/deploy/:token", async (c) => {
+app.on(["POST", "GET"], "/api/deploy/:token", async (c) => {
   const token = c.req.param("token");
-  if (!token?.startsWith("upw_") || token.length <= 12) {
+  if (!token?.startsWith("upw_") || token.length < 12) {
     return c.json({ error: "Invalid deployment webhook" }, 404);
   }
   const scope = c.get("scope");
@@ -876,7 +876,7 @@ app.post("/api/deploy/:token", async (c) => {
   let autoDeploy = false;
   try {
     const credentials = parseResourceCredentials(resource.credentials);
-    autoDeploy = credentials?.autoDeploy === true;
+    autoDeploy = credentials?.autoDeploy !== false;
   } catch {
     autoDeploy = false;
   }
@@ -884,7 +884,10 @@ app.post("/api/deploy/:token", async (c) => {
     return c.json({ error: "Automatic deployment is disabled" }, 403);
   }
 
-  const payload = await c.req.json().catch(() => ({}));
+  let payload: any = {};
+  if (c.req.method === "POST" || c.req.method === "PUT") {
+    payload = await c.req.json().catch(() => ({}));
+  }
   if (resource.provider === "docker-registry") {
     const repository =
       typeof payload?.repository?.repo_name === "string"
@@ -911,12 +914,22 @@ app.post("/api/deploy/:token", async (c) => {
   const title = branch
     ? `Webhook deployment (${String(branch).slice(0, 120)})`
     : "Webhook deployment";
+  const deploymentId = `dep-${randomUUID()}`;
   try {
     const queued = await new QueueDeploymentUseCase(uow).execute({
       resourceId,
       title,
+      deploymentId,
     });
-    return c.json({ accepted: true, resourceId, status: queued.status }, 202);
+    return c.json(
+      {
+        accepted: true,
+        resourceId,
+        status: queued.status,
+        deploymentId,
+      },
+      202,
+    );
   } catch (error) {
     log.error({
       message: "Failed to queue deployment webhook",
@@ -1002,12 +1015,22 @@ app.post("/api/resources/:resourceId/upload", async (c) => {
     });
   });
 
+  const deploymentId = `dep-${randomUUID()}`;
   try {
     const queued = await new QueueDeploymentUseCase(uow).execute({
       resourceId,
       title: "ZIP upload deployment",
+      deploymentId,
     });
-    return c.json({ accepted: true, resourceId, status: queued.status }, 202);
+    return c.json(
+      {
+        accepted: true,
+        resourceId,
+        status: queued.status,
+        deploymentId,
+      },
+      202,
+    );
   } catch (error: any) {
     return c.json(
       { error: `Failed to trigger deployment queue: ${error.message}` },

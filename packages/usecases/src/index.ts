@@ -107,7 +107,9 @@ export * from "./s3-destination/test-s3-destination-connection.usecase";
 export * from "./s3-destination/update-s3-destination.usecase";
 // Web Server
 export * from "./schedule/general-scheduler";
+export * from "./schedule/get-schedule-logs.usecase";
 export * from "./schedule/schedule.usecases";
+export * from "./schedule/sync-upstand-config.usecase";
 export * from "./search/global-search.usecase";
 export * from "./server/create-server.usecase";
 export * from "./server/delete-server.usecase";

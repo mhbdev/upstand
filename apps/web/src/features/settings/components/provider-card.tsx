@@ -4,9 +4,10 @@ import { useMutation } from "@tanstack/react-query";
 import type { AIProvider } from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
-import { Card, CardContent } from "@upstand/ui/components/card";
+import { Card } from "@upstand/ui/components/card";
+import { Spinner } from "@upstand/ui/components/spinner";
 import { toast } from "sonner";
-import { Edit2, Loader2, Play, Trash2 } from "@/components/huge-icons";
+import { Edit2, Play, Trash2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 export type ProviderView = {
@@ -60,63 +61,51 @@ export function ProviderCard({
   });
 
   return (
-    <Card className="border border-border/40 bg-card/25 shadow-sm">
-      <CardContent className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-        <div className="min-w-0 space-y-3">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <p className="font-semibold text-foreground text-sm">
+    <Card className="p-3.5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-semibold text-foreground text-sm">
               {provider.name}
-            </p>
-            <Badge variant="secondary">
+            </span>
+            <Badge variant="secondary" className="text-xs">
               {PROVIDER_NAMES[provider.provider]}
             </Badge>
+            <Badge variant="outline" className="font-mono text-xs">
+              {provider.model}
+            </Badge>
             {provider.baseUrl ? (
-              <Badge variant="outline">Custom URL</Badge>
+              <Badge variant="outline" className="text-xs">
+                Custom Endpoint
+              </Badge>
             ) : null}
           </div>
 
-          <dl className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
-            <div className="min-w-0">
-              <dt className="text-muted-foreground">Model</dt>
-              <dd className="mt-0.5 truncate font-medium text-foreground/90">
-                <code>{provider.model}</code>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Temperature</dt>
-              <dd className="mt-0.5 font-medium text-foreground/90">
-                {provider.temperature ?? "default"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Reasoning</dt>
-              <dd className="mt-0.5 font-medium text-foreground/90">
-                {provider.reasoningEnabled ? "On" : "Off"}
-              </dd>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-xs">
+            <span>Temp: {provider.temperature ?? "default"}</span>
+            <span>·</span>
+            <span>Reasoning: {provider.reasoningEnabled ? "On" : "Off"}</span>
             {provider.maxOutputTokens ? (
-              <div>
-                <dt className="text-muted-foreground">Max output</dt>
-                <dd className="mt-0.5 font-medium text-foreground/90">
-                  {provider.maxOutputTokens}
-                </dd>
-              </div>
+              <>
+                <span>·</span>
+                <span>Max tokens: {provider.maxOutputTokens}</span>
+              </>
             ) : null}
             {provider.baseUrl ? (
-              <div className="min-w-0 sm:col-span-2">
-                <dt className="text-muted-foreground">Endpoint</dt>
-                <dd
-                  className="mt-0.5 truncate font-medium text-foreground/90"
+              <>
+                <span>·</span>
+                <span
+                  className="max-w-[200px] truncate"
                   title={provider.baseUrl}
                 >
                   {provider.baseUrl}
-                </dd>
-              </div>
+                </span>
+              </>
             ) : null}
-          </dl>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 md:justify-end">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Button
             size="sm"
             variant="outline"
@@ -124,9 +113,9 @@ export function ProviderCard({
             disabled={test.isPending || remove.isPending}
           >
             {test.isPending ? (
-              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              <Spinner data-icon="inline-start" />
             ) : (
-              <Play className="mr-1.5 size-3.5" />
+              <Play data-icon="inline-start" />
             )}
             Test
           </Button>
@@ -136,13 +125,13 @@ export function ProviderCard({
             onClick={onEdit}
             disabled={test.isPending || remove.isPending}
           >
-            <Edit2 className="mr-1.5 size-3.5" />
+            <Edit2 data-icon="inline-start" />
             Edit
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="text-destructive hover:text-destructive"
             aria-label={`Delete ${provider.name}`}
             onClick={() => {
               if (
@@ -156,13 +145,13 @@ export function ProviderCard({
             disabled={test.isPending || remove.isPending}
           >
             {remove.isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Spinner data-icon="inline-start" />
             ) : (
-              <Trash2 className="size-3.5" />
+              <Trash2 data-icon="inline-start" />
             )}
           </Button>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

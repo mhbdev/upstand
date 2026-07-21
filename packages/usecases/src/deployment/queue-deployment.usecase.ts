@@ -14,6 +14,7 @@ export interface QueueDeploymentInput {
   title?: string;
   previewDeploymentId?: string;
   sourceRevision?: string;
+  deploymentId?: string;
 }
 
 export interface LocalDeploymentTarget {
@@ -92,7 +93,7 @@ export class QueueDeploymentUseCase {
       const settings =
         await tx.serverBuildSettingsRepository.findById(serverId);
       if (!settings) {
-        await tx.serverBuildSettingsRepository.create({
+        await tx.serverBuildSettingsRepository.createIfNotExists({
           id: serverId,
           hostname: serverName,
           ip: serverIp,
@@ -100,7 +101,7 @@ export class QueueDeploymentUseCase {
         });
       }
 
-      const deploymentId = `dep-${randomUUID()}`;
+      const deploymentId = input.deploymentId || `dep-${randomUUID()}`;
       const title = input.title || "Manual deployment";
 
       // 2. Create the deployment record in the database

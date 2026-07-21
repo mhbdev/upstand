@@ -2,9 +2,11 @@ import { notificationDelivery } from "@upstand/db";
 import type {
   CreateNotificationDeliveryDTO,
   INotificationDeliveryRepository,
+  ListNotificationDeliveriesInput,
+  ListNotificationDeliveriesResult,
   NotificationDelivery,
 } from "@upstand/domain";
-import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like, lt, or, sql } from "drizzle-orm";
 import type { Executor } from "../shared/types";
 
 export class DrizzleNotificationDeliveryRepository
@@ -43,6 +45,67 @@ export class DrizzleNotificationDeliveryRepository
       .where(eq(notificationDelivery.status, status))
       .orderBy(desc(notificationDelivery.createdAt))
       .limit(Math.max(1, Math.min(limit, 1_000)))) as NotificationDelivery[];
+  }
+
+  async list(
+    input: ListNotificationDeliveriesInput,
+  ): Promise<ListNotificationDeliveriesResult> {
+    const timespan = input.timespan || "30d";
+    const millisInTimespan =
+      timespan === "24h"
+        ? 24 * 60 * 60 * 1000
+        : timespan === "7d"
+          ? 7 * 24 * 60 * 60 * 1000
+          : 30 * 24 * 60 * 60 * 1000;
+    const cutoffDate = new Date(Date.now() - millisInTimespan);
+
+    const conditions = [
+      eq(notificationDelivery.organizationId, input.organizationId),
+      gte(notificationDelivery.createdAt, cutoffDate),
+    ];
+
+    if (input.channelId) {
+      conditions.push(eq(notificationDelivery.channelId, input.channelId));
+    }
+    if (input.status) {
+      conditions.push(eq(notificationDelivery.status, input.status));
+    }
+    if (input.search) {
+      const pattern = `%${input.search}%`;
+      const searchCondition = or(
+        like(notificationDelivery.title, pattern),
+        like(notificationDelivery.message, pattern),
+      );
+      if (searchCondition) {
+        conditions.push(searchCondition);
+      }
+    }
+
+    const whereClause = and(...conditions);
+    const page = Math.max(1, input.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 50));
+    const offset = (page - 1) * pageSize;
+
+    const [items, countResult] = await Promise.all([
+      this.executor
+        .select()
+        .from(notificationDelivery)
+        .where(whereClause)
+        .orderBy(desc(notificationDelivery.createdAt))
+        .limit(pageSize)
+        .offset(offset),
+      this.executor
+        .select({ total: sql<number>`count(*)` })
+        .from(notificationDelivery)
+        .where(whereClause),
+    ]);
+
+    const total = countResult[0]?.total ?? 0;
+
+    return {
+      items: items as NotificationDelivery[],
+      total: Number(total || 0),
+    };
   }
 
   async create(
