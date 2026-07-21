@@ -397,6 +397,16 @@ export class UpdateResourceUseCase {
         );
       }
     }
+    if (process.env.IS_CLOUD === "true") {
+      if (
+        input.serverId === null ||
+        (input.serverId && ["local", "manager"].includes(input.serverId))
+      ) {
+        throw new ValidationError(
+          "Please select a target server for deployment.",
+        );
+      }
+    }
     if (input.serverId !== undefined || input.buildServerId !== undefined) {
       if (input.buildServerId) {
         assertResourceCanUseBuildServer(resource.type);

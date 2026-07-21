@@ -126,9 +126,14 @@ For database schema changes, update the TypeScript schema and run `bun run db:ge
 
 ---
 
-## Production Installation
+## Production Installation & Deployments
 
-To install Upstand on a fresh Linux Swarm manager node:
+Upstand can be installed as a **Self-Hosted** instance or run as a multi-tenant **Cloud Service** (SaaS) depending on the configuration flags.
+
+### 1. Self-Hosted Mode (Default)
+In self-hosted mode, you can deploy applications, databases, and Docker Compose configurations directly onto the local Docker Swarm manager node running the Upstand dashboard.
+
+To install Self-Hosted Upstand on a fresh Linux Swarm manager node:
 
 ```bash
 export BETTER_AUTH_URL=https://api.example.com
@@ -142,6 +147,19 @@ export UPSTAND_WEB_IMAGE=ghcr.io/mhbdev/upstand-web@sha256:<digest>
 export UPSTAND_DOCS_IMAGE=ghcr.io/mhbdev/upstand-fumadocs@sha256:<digest>
 
 curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash
+```
+
+### 2. Cloud Mode (Multi-Tenant SaaS)
+In cloud mode, local server target deployments are blocked for security and resource isolation. Users are forced to add and select their own remote servers (connected via SSH) to run applications, databases, and registry configurations.
+
+To deploy Upstand in cloud mode, enable the following flags in your environment configuration before starting the control-plane containers:
+
+```env
+# Client-side validation flag
+NEXT_PUBLIC_IS_CLOUD=true
+
+# Server-side validation flag
+IS_CLOUD=true
 ```
 
 For detailed guides, refer to the local documentation site (`apps/fumadocs`) or navigate to `/docs/getting-started` once deployed.

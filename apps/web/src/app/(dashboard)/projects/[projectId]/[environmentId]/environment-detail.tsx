@@ -12,6 +12,7 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DATABASE_IMAGE_OPTIONS, type DatabaseType } from "@upstand/domain";
+import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -190,7 +191,8 @@ function CreateAppDialog({
   const [name, setName] = useState("");
   const [appName, setAppName] = useState("");
   const [description, setDescription] = useState("");
-  const [serverId, setServerId] = useState("local");
+  const isCloud = env.NEXT_PUBLIC_IS_CLOUD;
+  const [serverId, setServerId] = useState(() => (isCloud ? "" : "local"));
 
   const { data: servers = [] } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
@@ -213,7 +215,7 @@ function CreateAppDialog({
       setName("");
       setAppName("");
       setDescription("");
-      setServerId("local");
+      setServerId(isCloud ? "" : "local");
       onOpenChange(false);
       onCreated();
     },
@@ -236,6 +238,10 @@ function CreateAppDialog({
           onSubmit={(e) => {
             e.preventDefault();
             if (name.trim() && appName.trim()) {
+              if (isCloud && (!serverId || serverId === "local")) {
+                toast.error("Please select a target server for deployment.");
+                return;
+              }
               mutation.mutate({
                 environmentId,
                 name: name.trim(),
@@ -275,7 +281,9 @@ function CreateAppDialog({
             <Label htmlFor="app-server">Target Server</Label>
             <Select
               items={[
-                { value: "local", label: "Local Server (Leader)" },
+                ...(!isCloud
+                  ? [{ value: "local", label: "Local Server (Leader)" }]
+                  : []),
                 ...(servers ?? [])
                   .filter((srv: any) => srv.status === "ready")
                   .map((srv: any) => ({
@@ -290,11 +298,15 @@ function CreateAppDialog({
                 id="app-server"
                 className="border-border/40 focus:border-primary"
               >
-                <SelectValue placeholder="Local Server" />
+                <SelectValue
+                  placeholder={isCloud ? "Select Server" : "Local Server"}
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="local">Local Server (Leader)</SelectItem>
+                  {!isCloud && (
+                    <SelectItem value="local">Local Server (Leader)</SelectItem>
+                  )}
                   {servers
                     ?.filter((srv: any) => srv.status === "ready")
                     ?.map((srv: any) => (
@@ -376,7 +388,8 @@ function CreateDbDialog({
   );
   const [customImage, setCustomImage] = useState("");
   const [description, setDescription] = useState("");
-  const [serverId, setServerId] = useState("local");
+  const isCloud = env.NEXT_PUBLIC_IS_CLOUD;
+  const [serverId, setServerId] = useState(() => (isCloud ? "" : "local"));
 
   const { data: servers = [] } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
@@ -500,6 +513,10 @@ function CreateDbDialog({
           onSubmit={(e) => {
             e.preventDefault();
             if (validateForm()) {
+              if (isCloud && (!serverId || serverId === "local")) {
+                toast.error("Please select a target server for deployment.");
+                return;
+              }
               const credsPayload = JSON.stringify({
                 dbUser: dbUser.trim(),
                 dbPassword: dbPassword.trim(),
@@ -647,7 +664,9 @@ function CreateDbDialog({
             <Label htmlFor="db-server">Target Server</Label>
             <Select
               items={[
-                { value: "local", label: "Local Server (Leader)" },
+                ...(!isCloud
+                  ? [{ value: "local", label: "Local Server (Leader)" }]
+                  : []),
                 ...(servers ?? [])
                   .filter((srv: any) => srv.status === "ready")
                   .map((srv: any) => ({
@@ -659,11 +678,15 @@ function CreateDbDialog({
               onValueChange={(value) => value && setServerId(value)}
             >
               <SelectTrigger id="db-server">
-                <SelectValue placeholder="Local Server" />
+                <SelectValue
+                  placeholder={isCloud ? "Select Server" : "Local Server"}
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="local">Local Server (Leader)</SelectItem>
+                  {!isCloud && (
+                    <SelectItem value="local">Local Server (Leader)</SelectItem>
+                  )}
                   {servers
                     ?.filter((srv: any) => srv.status === "ready")
                     ?.map((srv: any) => (
@@ -926,7 +949,8 @@ function CreateComposeDialog({
     "compose",
   );
   const [description, setDescription] = useState("");
-  const [serverId, setServerId] = useState("local");
+  const isCloud = env.NEXT_PUBLIC_IS_CLOUD;
+  const [serverId, setServerId] = useState(() => (isCloud ? "" : "local"));
 
   const { data: servers = [] } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
@@ -949,6 +973,7 @@ function CreateComposeDialog({
       setName("");
       setAppName("");
       setDescription("");
+      setServerId(isCloud ? "" : "local");
       onOpenChange(false);
       onCreated();
     },
@@ -971,6 +996,10 @@ function CreateComposeDialog({
           onSubmit={(e) => {
             e.preventDefault();
             if (name.trim() && appName.trim()) {
+              if (isCloud && (!serverId || serverId === "local")) {
+                toast.error("Please select a target server for deployment.");
+                return;
+              }
               mutation.mutate({
                 environmentId,
                 name: name.trim(),
@@ -1012,7 +1041,9 @@ function CreateComposeDialog({
             <Label htmlFor="comp-server">Target Server</Label>
             <Select
               items={[
-                { value: "local", label: "Local Server (Leader)" },
+                ...(!isCloud
+                  ? [{ value: "local", label: "Local Server (Leader)" }]
+                  : []),
                 ...(servers ?? [])
                   .filter((srv: any) => srv.status === "ready")
                   .map((srv: any) => ({
@@ -1024,11 +1055,15 @@ function CreateComposeDialog({
               onValueChange={(value) => value && setServerId(value)}
             >
               <SelectTrigger id="comp-server">
-                <SelectValue placeholder="Local Server" />
+                <SelectValue
+                  placeholder={isCloud ? "Select Server" : "Local Server"}
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="local">Local Server (Leader)</SelectItem>
+                  {!isCloud && (
+                    <SelectItem value="local">Local Server (Leader)</SelectItem>
+                  )}
                   {servers
                     ?.filter((srv: any) => srv.status === "ready")
                     ?.map((srv: any) => (

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
+import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -155,6 +156,10 @@ export default function DockerRegistryPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (env.NEXT_PUBLIC_IS_CLOUD && !serverId.trim()) {
+      toast.error("Please enter a Target Server ID.");
+      return;
+    }
     const payload = {
       organizationId,
       name,
@@ -335,10 +340,17 @@ export default function DockerRegistryPage() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="serverId">Server (Optional)</FieldLabel>
+                <FieldLabel htmlFor="serverId">
+                  {env.NEXT_PUBLIC_IS_CLOUD
+                    ? "Target Server ID"
+                    : "Server (Optional)"}
+                </FieldLabel>
                 <Input
                   id="serverId"
-                  placeholder="Server ID"
+                  required={env.NEXT_PUBLIC_IS_CLOUD}
+                  placeholder={
+                    env.NEXT_PUBLIC_IS_CLOUD ? "Enter server ID" : "Server ID"
+                  }
                   value={serverId}
                   onChange={(e) => setServerId(e.target.value)}
                 />

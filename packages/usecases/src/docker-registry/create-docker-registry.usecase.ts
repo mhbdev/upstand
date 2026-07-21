@@ -25,6 +25,13 @@ export class CreateDockerRegistryUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: CreateDockerRegistryInput): Promise<DockerRegistry> {
+    if (process.env.IS_CLOUD === "true") {
+      if (!input.serverId || ["local", "manager"].includes(input.serverId)) {
+        throw new ValidationError(
+          "Please select a target server for docker registry.",
+        );
+      }
+    }
     let password: string | null = null;
     if (input.password) {
       try {

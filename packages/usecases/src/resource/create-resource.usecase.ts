@@ -79,6 +79,13 @@ export class CreateResourceUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: CreateResourceInput): Promise<Resource> {
+    if (process.env.IS_CLOUD === "true") {
+      if (!input.serverId || ["local", "manager"].includes(input.serverId)) {
+        throw new ValidationError(
+          "Please select a target server for deployment.",
+        );
+      }
+    }
     validateLibsqlSettings(
       input.dbType,
       input.libsqlGrpcPort,

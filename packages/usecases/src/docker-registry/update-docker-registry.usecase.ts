@@ -26,6 +26,16 @@ export class UpdateDockerRegistryUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: UpdateDockerRegistryInput): Promise<DockerRegistry> {
+    if (process.env.IS_CLOUD === "true") {
+      if (
+        input.serverId === null ||
+        (input.serverId && ["local", "manager"].includes(input.serverId))
+      ) {
+        throw new ValidationError(
+          "Please select a target server for docker registry.",
+        );
+      }
+    }
     const existing = await this.uow.dockerRegistryRepository.findById(input.id);
     if (!existing || existing.organizationId !== input.organizationId) {
       throw new Error("Docker registry not found");

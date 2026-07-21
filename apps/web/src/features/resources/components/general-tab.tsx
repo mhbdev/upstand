@@ -8,6 +8,7 @@ import {
   type DatabaseType,
   type ResourceComposeType,
 } from "@upstand/domain";
+import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -941,7 +942,9 @@ export function GeneralTab({
               <Label htmlFor="deployment-server">Deployment server</Label>
               <Select
                 items={[
-                  { value: "default", label: "Local Swarm manager" },
+                  ...(!env.NEXT_PUBLIC_IS_CLOUD
+                    ? [{ value: "default", label: "Local Swarm manager" }]
+                    : []),
                   ...servers.map((server) => ({
                     value: server.id,
                     label: `${server.name} (${server.ipAddress})`,
@@ -953,10 +956,18 @@ export function GeneralTab({
                 }}
               >
                 <SelectTrigger id="deployment-server">
-                  <SelectValue placeholder="Use local Swarm manager" />
+                  <SelectValue
+                    placeholder={
+                      env.NEXT_PUBLIC_IS_CLOUD
+                        ? "Select Server"
+                        : "Use local Swarm manager"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Local Swarm manager</SelectItem>
+                  {!env.NEXT_PUBLIC_IS_CLOUD && (
+                    <SelectItem value="default">Local Swarm manager</SelectItem>
+                  )}
                   {servers.map((server) => (
                     <SelectItem key={server.id} value={server.id}>
                       {server.name} ({server.ipAddress})
@@ -1047,7 +1058,16 @@ export function GeneralTab({
             <div className="flex justify-end border-border/20 border-t pt-4 sm:col-span-2">
               <Button
                 disabled={isUpdatingResource}
-                onClick={() =>
+                onClick={() => {
+                  if (
+                    env.NEXT_PUBLIC_IS_CLOUD &&
+                    (deploymentServerId === "default" || !deploymentServerId)
+                  ) {
+                    toast.error(
+                      "Please select a target server for deployment.",
+                    );
+                    return;
+                  }
                   updateResource(
                     {
                       id: resource.id,
@@ -1069,8 +1089,8 @@ export function GeneralTab({
                       onSuccess: () =>
                         toast.success("Execution infrastructure saved"),
                     },
-                  )
-                }
+                  );
+                }}
               >
                 Save Infrastructure
               </Button>

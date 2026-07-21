@@ -11,6 +11,12 @@ export const env = createEnv({
     TRUSTED_PROXY_CIDRS: z.string().default(""),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    IS_CLOUD: z
+      .preprocess(
+        (val) => val === "true" || val === "1" || val === true,
+        z.boolean(),
+      )
+      .default(false),
     NODE_ENV: z
       .enum(["development", "production", "test"])
       .default("development"),

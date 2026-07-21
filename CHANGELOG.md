@@ -4,6 +4,25 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.98 - 2026-07-21
+
+### Added
+- Cloud mode capability via `IS_CLOUD` and `NEXT_PUBLIC_IS_CLOUD` environment variables.
+- Excluded Local Server deployment target options from resource creation dialogs and General infrastructure tab dropdowns when cloud mode is active.
+- Added client-side and server-side target server validation checks on resource creation, update, and registry creation/updates, preventing cloud tenants from bypassing control plane isolation.
+- Enforced target server selection requirement for Docker Registry credential validation under cloud mode.
+
+## 0.1.97 - 2026-07-21
+
+### Changed
+- Resource general and advanced tab optimizations (1:1 with Dokploy service general tab).
+- Hid the "Advanced Settings" and "Cron Jobs" tab trigger and panels for Database resources, avoiding configuration noise.
+- Restricted Compose resource advanced settings tabs to only "General" and "Raw JSON" tabs.
+- Relocated Database Lifecycle controls (Start / Stop) to the database configuration card footer on the General Tab.
+- Wrapped deployment operations under `{resource.type !== "database" && ...}`.
+- Hid build server and build registry execution infrastructure dropdowns for Databases and Compose resources, keeping layout clean.
+- Excluded raw Compose file editor option from git providers when the resource type is `"application"`.
+
 ## 0.1.96 - 2026-07-21
 
 ### Added
