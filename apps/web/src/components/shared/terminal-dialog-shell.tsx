@@ -179,7 +179,7 @@ export function TerminalDialogShell({
   if (appearance === "standard") {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex h-[min(92svh,820px)] w-[calc(100%-1rem)] max-w-[min(96vw,70rem)] flex-col gap-0 overflow-hidden border-border/60 bg-background p-0 sm:w-[calc(100%-2rem)]">
+        <DialogContent className="flex h-[min(92svh,820px)] w-[calc(100%-1rem)] max-w-[min(96vw,84rem)] flex-col gap-0 overflow-hidden border-border/60 bg-background p-0 sm:w-[calc(100%-2rem)]">
           <DialogHeader className="shrink-0 border-border/60 border-b bg-muted/20 px-4 py-4 sm:px-6 sm:py-5">
             <DialogTitle className="flex min-w-0 items-center gap-2">
               <HugeiconsIcon
@@ -234,7 +234,7 @@ export function TerminalDialogShell({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(92svh,800px)] w-[calc(100%-1rem)] max-w-[min(96vw,64rem)] flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100%-2rem)]">
+      <DialogContent className="flex h-[min(92svh,800px)] w-[calc(100%-1rem)] max-w-[min(96vw,80rem)] flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100%-2rem)]">
         <DialogHeader className="shrink-0 px-5 py-5 pr-16 sm:px-7 sm:py-6 sm:pr-16">
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10">

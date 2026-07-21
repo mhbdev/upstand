@@ -271,15 +271,10 @@ app.post("/api/terminal/session", async (c) => {
     sshKeyId?: string;
     username?: string;
     port?: number;
+    serverId?: string;
   } | null;
-  if (!body?.organizationId || !body.sshKeyId) {
-    return c.json({ error: "Organization and SSH key are required" }, 400);
-  }
-  if (
-    body.port !== undefined &&
-    (!Number.isInteger(body.port) || body.port < 1 || body.port > 65535)
-  ) {
-    return c.json({ error: "SSH port must be between 1 and 65535" }, 400);
+  if (!body?.organizationId) {
+    return c.json({ error: "Organization is required" }, 400);
   }
 
   const scope = c.get("scope");
@@ -294,45 +289,85 @@ app.post("/api/terminal/session", async (c) => {
     return c.json({ error: "Server terminal permission is required" }, 403);
   }
 
-  const [key, settings] = await Promise.all([
-    uow.sshKeyRepository.findById(body.sshKeyId),
-    uow.webServerSettingsRepository.findGlobal(),
-  ]);
-  if (!key || key.organizationId !== body.organizationId) {
-    return c.json({ error: "SSH key was not found in this organization" }, 404);
-  }
-  if (!settings?.serverIp) {
-    return c.json(
-      { error: "Set the control-plane server IP before opening a terminal" },
-      409,
-    );
-  }
-  const controlPlaneFingerprint =
-    env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT;
-  if (!controlPlaneFingerprint) {
-    return c.json(
-      {
-        error: "Configure the trusted control-plane SSH host fingerprint first",
-      },
-      409,
-    );
+  let host: string;
+  let port: number;
+  let username: string;
+  let privateKey: string;
+  let hostKeyFingerprint: string;
+
+  if (body.serverId) {
+    const server = await uow.serverRepository.findById(body.serverId);
+    if (!server || server.organizationId !== body.organizationId) {
+      return c.json({ error: "Server not found in this organization" }, 404);
+    }
+    if (!server.sshKeyId) {
+      return c.json({ error: "Server does not have an SSH key configured" }, 409);
+    }
+    if (!server.sshHostKeyFingerprint) {
+      return c.json({ error: "Trust the server SSH host key first" }, 409);
+    }
+    const key = await uow.sshKeyRepository.findById(server.sshKeyId);
+    if (!key) {
+      return c.json({ error: "Configured SSH key not found" }, 404);
+    }
+    host = server.ipAddress;
+    port = server.port;
+    username = server.username;
+    privateKey = decryptSecret({
+      ciphertext: key.privateKeyCiphertext,
+      iv: key.privateKeyIv,
+      authTag: key.privateKeyAuthTag,
+      keyVersion: key.privateKeyVersion,
+    });
+    hostKeyFingerprint = server.sshHostKeyFingerprint;
+  } else {
+    if (!body.sshKeyId) {
+      return c.json({ error: "SSH key is required for control-plane terminal" }, 400);
+    }
+    const [key, settings] = await Promise.all([
+      uow.sshKeyRepository.findById(body.sshKeyId),
+      uow.webServerSettingsRepository.findGlobal(),
+    ]);
+    if (!key || key.organizationId !== body.organizationId) {
+      return c.json({ error: "SSH key was not found in this organization" }, 404);
+    }
+    if (!settings?.serverIp) {
+      return c.json(
+        { error: "Set the control-plane server IP before opening a terminal" },
+        409,
+      );
+    }
+    const controlPlaneFingerprint =
+      env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT;
+    if (!controlPlaneFingerprint) {
+      return c.json(
+        {
+          error: "Configure the trusted control-plane SSH host fingerprint first",
+        },
+        409,
+      );
+    }
+    host = settings.serverIp;
+    port = body.port && Number.isInteger(body.port) ? body.port : 22;
+    username = body.username?.trim() || "root";
+    privateKey = decryptSecret({
+      ciphertext: key.privateKeyCiphertext,
+      iv: key.privateKeyIv,
+      authTag: key.privateKeyAuthTag,
+      keyVersion: key.privateKeyVersion,
+    });
+    hostKeyFingerprint = controlPlaneFingerprint;
   }
 
-  const privateKey = decryptSecret({
-    ciphertext: key.privateKeyCiphertext,
-    iv: key.privateKeyIv,
-    authTag: key.privateKeyAuthTag,
-    keyVersion: key.privateKeyVersion,
-  });
   const token = terminalBroker.create({
     userId: session.user.id,
     sessionId: session.session.id,
     twoFactorEnabled: session.user.twoFactorEnabled === true,
-    host: settings.serverIp,
-    port: body.port && Number.isInteger(body.port) ? body.port : 22,
-    username: body.username?.trim() || "root",
+    host,
+    port,
+    username,
     privateKey,
-    hostKeyFingerprint: controlPlaneFingerprint,
+    hostKeyFingerprint,
   });
   return c.json({ token, expiresIn: 60 });
 });

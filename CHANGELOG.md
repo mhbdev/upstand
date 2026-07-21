@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.104 - 2026-07-21
+
+### Added
+- **Direct Remote Server Terminals**: Added a dedicated "Open Terminal" button on each Remote Server card, allowing users to connect to that server's terminal directly from the server manager. The terminal pre-selects the server's attached SSH Key, username, and port.
+- **Enhanced Terminal Dialog Width**: Made the terminal emulator dialog wider on tablets and desktops (`max-w-[80rem]` for control-plane terminal and `max-w-[84rem]` for standard terminals) to accommodate longer terminal commands and larger font sizes.
+
 ## 0.1.103 - 2026-07-21
 
 ### Added

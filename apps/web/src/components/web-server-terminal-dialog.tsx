@@ -33,9 +33,11 @@ import { trpc } from "@/utils/trpc";
 export function WebServerTerminalDialog({
   open,
   onOpenChange,
+  serverId,
 }: {
   open: boolean;
   onOpenChange(open: boolean): void;
+  serverId?: string;
 }) {
   const { data: organization } = authClient.useActiveOrganization();
   const { data: keys = [] } = useQuery({
@@ -44,6 +46,15 @@ export function WebServerTerminalDialog({
     }),
     enabled: Boolean(organization?.id && open),
   });
+
+  const { data: server } = useQuery({
+    ...trpc.server.one.queryOptions({
+      organizationId: organization?.id as string,
+      id: serverId as string,
+    }),
+    enabled: Boolean(organization?.id && serverId && open),
+  });
+
   const [keyId, setKeyId] = useState("");
   const [username, setUsername] = useState("root");
   const [port, setPort] = useState("22");
@@ -63,10 +74,16 @@ export function WebServerTerminalDialog({
   }, [open]);
 
   useEffect(() => {
-    if (open && !keyId && keys.length === 1) {
-      setKeyId(keys[0]?.id ?? "");
+    if (server) {
+      setKeyId(server.sshKeyId ?? "");
+      setUsername(server.username);
+      setPort(String(server.port));
+    } else {
+      if (open && !keyId && keys.length === 1) {
+        setKeyId(keys[0]?.id ?? "");
+      }
     }
-  }, [keyId, keys, open]);
+  }, [server, keyId, keys, open]);
 
   const disconnect = () => {
     setToken(null);
@@ -75,7 +92,8 @@ export function WebServerTerminalDialog({
   };
 
   const connect = async () => {
-    if (!organization?.id || !keyId) {
+    if (!organization?.id) return;
+    if (!serverId && !keyId) {
       toast.error("Choose an SSH key first");
       return;
     }
@@ -104,9 +122,10 @@ export function WebServerTerminalDialog({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           organizationId: organization.id,
-          sshKeyId: keyId,
+          sshKeyId: keyId || undefined,
           username: normalizedUsername,
           port: normalizedPort,
+          serverId: serverId || undefined,
         }),
       });
       const data = (await response.json()) as {
@@ -133,12 +152,20 @@ export function WebServerTerminalDialog({
         if (!nextOpen) disconnect();
         onOpenChange(nextOpen);
       }}
-      title="Control-plane terminal"
-      description="Secure SSH access to the configured control-plane server. Your private key stays encrypted on the server."
+      title={server ? `Terminal for ${server.name}` : "Control-plane terminal"}
+      description={
+        server
+          ? `Secure SSH access to ${server.name} (${server.ipAddress}). Your private key stays encrypted on the server.`
+          : "Secure SSH access to the configured control-plane server. Your private key stays encrypted on the server."
+      }
       token={token}
       connecting={connecting}
       appearance="control-plane"
-      terminalLabel={`${username.trim() || "root"}@control-plane`}
+      terminalLabel={
+        server
+          ? `${username.trim() || "root"}@${server.name}`
+          : `${username.trim() || "root"}@control-plane`
+      }
       emptyMessage="Choose a key and confirm the SSH details to open a session."
       onTerminalReady={() => setSessionReady(true)}
       onTerminalClose={(reason) => {
