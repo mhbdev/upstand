@@ -4,6 +4,19 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.96 - 2026-07-21
+
+### Added
+- Refactored the Resource Advanced Settings page into a modular, tabbed UI with seven focused sections: **General & Runtime**, **Resources & Limits**, **Ports & Storage**, **Health & Deployment**, **Security & Capabilities**, **Environment & Labels**, and **Raw JSON**.
+- Each section is extracted into its own self-contained card component (`GeneralCard`, `ResourcesCard`, `PortsVolumesCard`, `HealthcheckDeploymentCard`, `SecurityCard`, `EnvLabelsCard`, `RawJsonCard`) with a shared `AdvancedCardProps` type and `splitLines` utility to eliminate duplication.
+- CPU and memory inputs now display unit adornments (`CPU`, `MB`) via `InputGroup` / `InputGroupAddon` instead of bare placeholder text.
+- Port and volume editors are now structured per-row forms with labelled columns, protocol selectors, and read-only toggles — replacing the previous monolithic form that required manual text parsing.
+- DNS and extra-hosts fields are now separate, clearly-labelled text areas instead of being merged into a single combined editor.
+- Security toggles (init process, read-only root FS, TTY, privileged mode) are rendered from a typed `SECURITY_TOGGLES` constant array to avoid repetition.
+- Rolling update and rollback strategies share a `StrategyForm` sub-component to avoid duplicating the identical five-field form.
+- The main `ResourceAdvancedSettings` orchestrator now keeps `config` and `rawJson` in sync bidirectionally so editing via cards updates the JSON tab preview in real time.
+- A sticky save footer (badge + button) appears on all non-JSON tabs; the JSON tab has its own inline validate-and-save button with a schema-error message.
+
 ## 0.1.95 - 2026-07-21
 
 ### Security & Bug Fixes
