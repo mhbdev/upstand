@@ -21,9 +21,13 @@ import {
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
-import { AlertTriangleIcon, ExternalLinkIcon, Layers } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  AlertTriangleIcon,
+  ExternalLinkIcon,
+  Layers,
+} from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 interface ConfigureRollbackDialogProps {

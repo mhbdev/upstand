@@ -39,6 +39,8 @@ import {
 } from "@upstand/ui/components/table";
 import { Tabs, TabsList, TabsTrigger } from "@upstand/ui/components/tabs";
 import { Textarea } from "@upstand/ui/components/textarea";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
   Clock,
   Edit3,
@@ -47,9 +49,7 @@ import {
   Plus,
   Terminal,
   Trash2,
-} from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+} from "@/components/huge-icons";
 import { CodeBlock } from "@/components/shared/code-block";
 import { getDocsUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
