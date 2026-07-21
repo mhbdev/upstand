@@ -4,6 +4,17 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.94 - 2026-07-21
+
+### Added
+- Added Cron Job Observability dashboard, schedule execution logs tracking, and `upstand.json` declarative schedule synchronization.
+- Added live system status diagnostics endpoint (`getSystemStatus`) checking database and Redis health and server time zones.
+
+### Security & Bug Fixes
+- Fixed multi-tenant authorization check in `scheduleRouter.listLogs` to prevent schedule log query leakage across resources.
+- Optimized resource configuration and secret upserts (`patchConfiguration`, `patchSecrets`) for atomic database patches.
+- Cleaned up unused imports and refactored regex search loops in `code-editor.tsx` to achieve 0 biome check lint errors and warnings.
+
 ## 0.1.93 - 2026-07-20
 
 ### Fixed
