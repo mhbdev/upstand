@@ -4,7 +4,11 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.99 - 2026-07-21
+## 0.1.100 - 2026-07-21
+
+### Changed
+- Release milestone 0.1.100 release hardening and complete synchronization between `master` and `canary` release channels.
+- Verified 100% build type safety across all 15 workspace packages (`check-types`).
 
 ### Added
 - **Declarative Repository Configuration (`upstand.json`)**: Added auto-discovery parser, schema validation (`upstand.schema.json`), domain entity Zod schemas, and automatic Git deployment synchronization for build engines, runtime resource limits, monorepo watch paths, and HTTP/Script cron schedules.
