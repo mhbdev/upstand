@@ -1,7 +1,6 @@
+import { env } from "@upstand/env/server";
 import { log } from "evlog";
 
-const DEFAULT_BRAVE_SEARCH_URL =
-  "https://api.search.brave.com/res/v1/web/search";
 const SEARCH_TIMEOUT_MS = 15_000;
 const MAX_RESULT_TEXT_LENGTH = 600;
 
@@ -19,8 +18,7 @@ export type WebSearchResponse = {
 };
 
 function searchEndpoint(): URL {
-  const configured =
-    process.env.UPGAL_WEB_SEARCH_BASE_URL?.trim() || DEFAULT_BRAVE_SEARCH_URL;
+  const configured = env.UPGAL_WEB_SEARCH_BASE_URL;
   const endpoint = new URL(configured);
   if (endpoint.protocol !== "https:") {
     throw new Error("UPGAL_WEB_SEARCH_BASE_URL must use HTTPS.");
@@ -70,7 +68,7 @@ export async function searchWeb(input: {
   query: string;
   limit: number;
 }): Promise<WebSearchResponse> {
-  const apiKey = process.env.UPGAL_WEB_SEARCH_API_KEY?.trim();
+  const apiKey = env.UPGAL_WEB_SEARCH_API_KEY?.trim();
   if (!apiKey) {
     throw new Error(
       "Web search is not configured. Set UPGAL_WEB_SEARCH_API_KEY in the server environment.",

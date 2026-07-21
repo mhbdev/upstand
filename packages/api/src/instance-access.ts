@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { db } from "@upstand/db";
 import { user } from "@upstand/db/schema/auth";
+import { env } from "@upstand/env/server";
 import { asc } from "drizzle-orm";
 
 /**
@@ -19,7 +20,7 @@ export async function requireInstanceOwner(
     });
   }
 
-  const configuredOwner = process.env.UPSTAND_INSTANCE_OWNER_USER_ID?.trim();
+  const configuredOwner = env.UPSTAND_INSTANCE_OWNER_USER_ID?.trim();
   if (configuredOwner) {
     if (configuredOwner !== userId) {
       throw new TRPCError({

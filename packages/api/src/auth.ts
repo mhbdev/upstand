@@ -51,6 +51,9 @@ const callbacks: AuthCallbacks = {
   },
 
   async canCreateInitialAccount() {
+    if (env.IS_CLOUD) {
+      return true;
+    }
     const result = await db.select({ value: count() }).from(authSchema.user);
     return (result[0]?.value ?? 0) === 0;
   },
@@ -157,9 +160,11 @@ export const auth = createAuth({
   stepUp,
   callbacks,
   configuration: {
-    corsOrigin: env.CORS_ORIGIN,
-    betterAuthUrl: env.BETTER_AUTH_URL,
-    secret: env.BETTER_AUTH_SECRET,
+    corsOrigin: env.CORS_ORIGIN || "http://localhost:3001",
+    betterAuthUrl: env.BETTER_AUTH_URL || "http://localhost:3000",
+    secret:
+      env.BETTER_AUTH_SECRET ||
+      "upstand-local-development-secret-that-is-at-least-32-characters",
     nodeEnv: env.NODE_ENV,
     googleClientId: env.GOOGLE_CLIENT_ID,
     googleClientSecret: env.GOOGLE_CLIENT_SECRET,

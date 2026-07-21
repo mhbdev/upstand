@@ -32,7 +32,22 @@ describe("SyncUpstandConfigUseCase", () => {
     const updated: any[] = [];
     const deletedIds: string[] = [];
 
+    const mockResource = {
+      id: "res-1",
+      buildConfig: JSON.stringify({ type: "dockerfile", buildPath: "." }),
+      advancedConfig: JSON.stringify({ command: [], ports: [] }),
+      watchPaths: "[]",
+    };
+    const updatedResources: any[] = [];
+
     const mockUow: any = {
+      resourceRepository: {
+        findById: mock(async () => mockResource),
+        updateById: mock(async (id: string, patch: any) => {
+          updatedResources.push({ id, ...patch });
+          return { ...mockResource, ...patch };
+        }),
+      },
       scheduleRepository: {
         findByResourceId: mock(async () => mockExistingSchedules),
         create: mock(async (data: any) => {
@@ -53,6 +68,16 @@ describe("SyncUpstandConfigUseCase", () => {
 
     const useCase = new SyncUpstandConfigUseCase(mockUow);
     const newConfigJson = JSON.stringify({
+      build: {
+        type: "nixpacks",
+        buildPath: "./src",
+        watchPaths: ["apps/web/**"],
+      },
+      runtime: {
+        command: ["npm", "run", "start"],
+        cpuLimit: 2,
+        memoryLimitMb: 512,
+      },
       crons: [
         {
           path: "/api/new",
@@ -72,5 +97,9 @@ describe("SyncUpstandConfigUseCase", () => {
     expect(deletedIds).not.toContain("sch-manual");
     expect(created[0].command).toBe("/api/new");
     expect(created[0].source).toBe("upstand.json");
+    expect(updatedResources).toHaveLength(1);
+    expect(updatedResources[0].watchPaths).toBe('["apps/web/**"]');
+    expect(updatedResources[0].buildConfig).toContain('"type":"nixpacks"');
+    expect(updatedResources[0].advancedConfig).toContain('"cpuLimit":2');
   });
 });

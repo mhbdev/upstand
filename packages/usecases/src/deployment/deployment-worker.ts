@@ -779,6 +779,8 @@ export class DeploymentWorker {
           appendLog(
             "Triggering Docker container build pipeline for repository...\n",
           );
+          const syncUseCase = new SyncUpstandConfigUseCase(uow);
+          const currentResourceId = resource.id;
           await buildDockerService.deployAppGit(
             resource,
             envVars,
@@ -789,35 +791,40 @@ export class DeploymentWorker {
             registryInfo,
             targetDestinationDocker,
             sourceRevision,
+            async (clonePath: string) => {
+              try {
+                const upstandJsonPath = path.join(clonePath, "upstand.json");
+                const vercelJsonPath = path.join(clonePath, "vercel.json");
+                let configContent: string | null = null;
+                if (fs.existsSync(upstandJsonPath)) {
+                  configContent = fs.readFileSync(upstandJsonPath, "utf-8");
+                } else if (fs.existsSync(vercelJsonPath)) {
+                  configContent = fs.readFileSync(vercelJsonPath, "utf-8");
+                }
+
+                if (configContent) {
+                  await syncUseCase.execute({
+                    resourceId: currentResourceId,
+                    configContentOrObject: configContent,
+                    onLog: appendLog,
+                  });
+                  const reloaded = await uow.transaction(async (tx) => {
+                    return await tx.resourceRepository.findById(
+                      currentResourceId,
+                    );
+                  });
+                  if (reloaded) return reloaded;
+                }
+              } catch (syncErr: any) {
+                appendLog(
+                  `Warning: Failed to sync upstand.json configuration: ${syncErr.message}\n`,
+                );
+              }
+            },
           );
           appendLog(
             "Build compiled successfully and Swarm Service registered.\n",
           );
-
-          try {
-            const clonePath = path.join(process.cwd(), ".builds", resource.id);
-            if (fs.existsSync(clonePath)) {
-              const upstandJsonPath = path.join(clonePath, "upstand.json");
-              const vercelJsonPath = path.join(clonePath, "vercel.json");
-              let configContent: string | null = null;
-              if (fs.existsSync(upstandJsonPath)) {
-                configContent = fs.readFileSync(upstandJsonPath, "utf-8");
-              } else if (fs.existsSync(vercelJsonPath)) {
-                configContent = fs.readFileSync(vercelJsonPath, "utf-8");
-              }
-
-              const syncUseCase = new SyncUpstandConfigUseCase(uow);
-              await syncUseCase.execute({
-                resourceId: resource.id,
-                configContentOrObject: configContent ?? { crons: [] },
-                onLog: appendLog,
-              });
-            }
-          } catch (syncErr: any) {
-            appendLog(
-              `Warning: Failed to sync upstand.json schedule configuration: ${syncErr.message}\n`,
-            );
-          }
         }
       }
 

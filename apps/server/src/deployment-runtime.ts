@@ -1,4 +1,5 @@
 import { getServiceProvider } from "@upstand/api/di";
+import { env } from "@upstand/env/server";
 import { getDockerInstance } from "@upstand/infrastructure";
 import { DeploymentWorker } from "@upstand/usecases";
 import {
@@ -108,7 +109,7 @@ export class DeploymentRuntime {
   }
 
   private async discoverServerIds(): Promise<string[]> {
-    if (process.env.SERVER_ID) return [process.env.SERVER_ID];
+    if (env.SERVER_ID) return [env.SERVER_ID];
 
     const serverIds = new Set<string>();
     const scope = getServiceProvider().createScope();

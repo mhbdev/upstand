@@ -4,7 +4,18 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.98 - 2026-07-21
+## 0.1.99 - 2026-07-21
+
+### Added
+- **Declarative Repository Configuration (`upstand.json`)**: Added auto-discovery parser, schema validation (`upstand.schema.json`), domain entity Zod schemas, and automatic Git deployment synchronization for build engines, runtime resource limits, monorepo watch paths, and HTTP/Script cron schedules.
+- **Interactive Remote Server Onboarding Wizard**: Added a multi-step onboarding wizard (`RemoteServerWizard`) for VPS hosts featuring provider options, OS installation guides, SSH key pairing, host role selection, automated provisioning, and live Docker/clock/runtime validation dialogs.
+- **Trusted Proxy CIDR IP Resolution**: Added `TRUSTED_PROXY_CIDRS` parsing and robust IP address normalization supporting IPv4 and IPv6 CIDR subnet matching for client IP resolution.
+- **Comprehensive Feature Documentation**: Added dedicated documentation guide (`upstand-json.mdx`) and JSON Schema editor autocompletion file (`public/upstand.schema.json`).
+
+### Security & Bug Fixes
+- Resolved TypeScript null-narrowing build error (`TS18047`) in deployment worker callback (`deployment-worker.ts`).
+- Refactored Docker deployment service parameter reassignment (`noParameterAssign`) and normalized callback return signature types.
+- Fixed fallback master key encoding in `secret-box.ts` to guarantee a 32-byte base64-encoded key during development and test environments.
 
 ### Added
 - Cloud mode capability via `IS_CLOUD` and `NEXT_PUBLIC_IS_CLOUD` environment variables.

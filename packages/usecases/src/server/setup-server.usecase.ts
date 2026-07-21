@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { IUnitOfWork, Server } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
@@ -234,8 +235,7 @@ export class SetupServerUseCase {
 
     const token = settings.token;
 
-    const configuredMonitoringImage =
-      process.env.UPSTAND_MONITORING_IMAGE?.trim();
+    const configuredMonitoringImage = env.UPSTAND_MONITORING_IMAGE?.trim();
     const monitoringImage =
       configuredMonitoringImage || "upstand-monitoring-agent";
     let remoteTarPath: string | undefined;
@@ -247,7 +247,7 @@ export class SetupServerUseCase {
       });
       await privileged(`docker pull ${shellQuote(configuredMonitoringImage)}`);
     } else {
-      if (process.env.NODE_ENV === "production") {
+      if (env.NODE_ENV === "production") {
         throw new Error(
           "UPSTAND_MONITORING_IMAGE is required in production for remote monitoring setup",
         );
@@ -314,7 +314,7 @@ export class SetupServerUseCase {
         port: 3001,
         serverType: "Remote",
         token: token,
-        urlCallback: `http://${controlPlaneIp}:${process.env.PORT || 3000}/api/monitoring/alerts`,
+        urlCallback: `http://${controlPlaneIp}:${env.PORT}/api/monitoring/alerts`,
         retentionDays: 7,
         cronJob: "0 0 * * *",
         thresholds: {
@@ -369,7 +369,7 @@ const DOCKER_GPG_KEY_FINGERPRINT = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88";
  */
 export function buildDockerInstallCommand(
   sudo: string,
-  requestedVersion = process.env.UPSTAND_DOCKER_VERSION?.trim(),
+  requestedVersion = env.UPSTAND_DOCKER_VERSION?.trim(),
 ): string {
   const privileged = (command: string) => `${sudo ? `${sudo} ` : ""}${command}`;
   const packages = requestedVersion

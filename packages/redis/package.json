@@ -21,6 +21,7 @@
     "redis:down": "docker compose down"
   },
   "dependencies": {
+    "@upstand/env": "workspace:*",
     "evlog": "catalog:",
     "ioredis": "^5.6.1"
   },

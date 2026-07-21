@@ -56,6 +56,46 @@ describe("parseUpstandConfig", () => {
     }
   });
 
+  it("should parse build and runtime configuration sections", () => {
+    const json = JSON.stringify({
+      $schema: "https://upstand.dev/upstand.schema.json",
+      build: {
+        type: "dockerfile",
+        buildPath: "./app",
+        dockerfilePath: "Dockerfile.prod",
+        dockerBuildStage: "runner",
+        dockerBuildArgs: { NODE_ENV: "production" },
+        dockerNoCache: true,
+        watchPaths: ["apps/web/**", "packages/**"],
+      },
+      runtime: {
+        command: ["npm", "run", "start"],
+        cpuLimit: 2,
+        memoryLimitMb: 1024,
+        replicas: 3,
+        restartPolicy: {
+          condition: "on-failure",
+          maxAttempts: 5,
+        },
+      },
+    });
+
+    const result = parseUpstandConfig(json);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.build?.type).toBe("dockerfile");
+      expect(result.data.build?.dockerfilePath).toBe("Dockerfile.prod");
+      expect(result.data.build?.watchPaths).toEqual([
+        "apps/web/**",
+        "packages/**",
+      ]);
+      expect(result.data.runtime?.cpuLimit).toBe(2);
+      expect(result.data.runtime?.memoryLimitMb).toBe(1024);
+      expect(result.data.runtime?.replicas).toBe(3);
+      expect(result.data.runtime?.restartPolicy?.condition).toBe("on-failure");
+    }
+  });
+
   it("should return empty crons array for empty json object", () => {
     const result = parseUpstandConfig("{}");
     expect(result.success).toBe(true);

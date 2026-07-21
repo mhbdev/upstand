@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@upstand/domain": "workspace:*",
+    "@upstand/env": "workspace:*",
     "@upstand/platform": "workspace:*",
     "@upstand/redis": "workspace:*",
     "@upstand/usecases": "workspace:*",

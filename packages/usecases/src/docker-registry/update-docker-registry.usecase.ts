@@ -3,6 +3,7 @@ import {
   type IUnitOfWork,
   ValidationError,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 
@@ -26,7 +27,7 @@ export class UpdateDockerRegistryUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: UpdateDockerRegistryInput): Promise<DockerRegistry> {
-    if (process.env.IS_CLOUD === "true") {
+    if (env.IS_CLOUD) {
       if (
         input.serverId === null ||
         (input.serverId && ["local", "manager"].includes(input.serverId))

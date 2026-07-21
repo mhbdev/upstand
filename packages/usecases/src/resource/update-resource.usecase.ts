@@ -11,6 +11,7 @@ import {
   serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import {
   decryptSecret,
   encryptSecret,
@@ -397,7 +398,7 @@ export class UpdateResourceUseCase {
         );
       }
     }
-    if (process.env.IS_CLOUD === "true") {
+    if (env.IS_CLOUD) {
       if (
         input.serverId === null ||
         (input.serverId && ["local", "manager"].includes(input.serverId))

@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { env } from "@upstand/env/server";
 
 const MAX_FORWARDED_FOR_LENGTH = 4096;
 const MAX_PROXY_HOPS = 20;
@@ -162,8 +163,10 @@ function ipToGroups(ip: string): { family: IpFamily; groups: number[] } | null {
   return { family: 6, groups };
 }
 
-export function parseTrustedProxyCidrs(value: string): TrustedProxyNetwork[] {
-  return value
+export function parseTrustedProxyCidrs(
+  value?: string | null,
+): TrustedProxyNetwork[] {
+  return (value || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
@@ -221,7 +224,7 @@ function isTrustedProxy(
 }
 
 const configuredTrustedProxyNetworks = parseTrustedProxyCidrs(
-  process.env.TRUSTED_PROXY_CIDRS ?? "",
+  env.TRUSTED_PROXY_CIDRS,
 );
 
 export function resolveClientIp({

@@ -1,3 +1,4 @@
+import { env } from "@upstand/env/server";
 import { log } from "evlog";
 import Redis, { type RedisOptions } from "ioredis";
 
@@ -46,7 +47,7 @@ export type CreateRedisOptions = {
  * Each caller gets its own connection — use for workers, subscribers, etc.
  */
 export function createRedis(options?: CreateRedisOptions) {
-  const url = options?.url ?? process.env.REDIS_URL ?? "redis://localhost:6379";
+  const url = options?.url ?? env.REDIS_URL ?? "redis://localhost:6379";
   const loggerName = options?.loggerName ?? "redis";
 
   const isTls = url.startsWith("rediss://");

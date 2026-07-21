@@ -14,6 +14,7 @@ import {
   serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { log } from "evlog";
 import { z } from "zod";
@@ -79,7 +80,7 @@ export class CreateResourceUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: CreateResourceInput): Promise<Resource> {
-    if (process.env.IS_CLOUD === "true") {
+    if (env.IS_CLOUD) {
       if (!input.serverId || ["local", "manager"].includes(input.serverId)) {
         throw new ValidationError(
           "Please select a target server for deployment.",

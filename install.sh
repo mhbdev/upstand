@@ -14,10 +14,11 @@ readonly NETWORK_NAME="${DOCKER_NETWORK:-upstand-network}"
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE:-$0}")" && pwd)"
 STACK_FILE="$INSTALL_DIR/docker-compose.prod.yml"
 INTERACTIVE=false
+IS_CLOUD="${IS_CLOUD:-false}"
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--interactive]
+Usage: install.sh [--interactive] [--cloud|--self-hosted]
 
 The installer is non-interactive by default. Set deployment variables in the
 environment before running it. Use --interactive to prompt for missing public
@@ -25,6 +26,8 @@ origins when installing from a terminal.
 
 Options:
   --interactive         prompt for missing public origins
+  --cloud               install in multi-tenant Cloud mode (open sign-ups enabled)
+  --self-hosted         install in single-tenant Self-Hosted mode (default, single owner account)
   --help                show this help
 EOF
 }
@@ -33,6 +36,8 @@ parse_args() {
   while (($# > 0)); do
     case "$1" in
       --interactive) INTERACTIVE=true ;;
+      --cloud) IS_CLOUD=true ;;
+      --self-hosted) IS_CLOUD=false ;;
       --help|-h) usage; exit 0 ;;
       *) fail "unknown option '$1' (use --help for usage)" ;;
     esac
@@ -85,8 +90,9 @@ build_source_images() {
   UPSTAND_DOCS_IMAGE="upstand-docs:source-${revision}"
   UPSTAND_MONITORING_IMAGE="upstand-monitoring:source-${revision}"
 
+  NEXT_PUBLIC_IS_CLOUD="${NEXT_PUBLIC_IS_CLOUD:-$IS_CLOUD}"
   docker build --file "$SOURCE_DIR/apps/server/Dockerfile" --tag "$UPSTAND_SERVER_IMAGE" "$SOURCE_DIR"
-  docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
+  docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --build-arg "NEXT_PUBLIC_IS_CLOUD=$NEXT_PUBLIC_IS_CLOUD" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/fumadocs/Dockerfile" --tag "$UPSTAND_DOCS_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/monitoring/Dockerfile" --tag "$UPSTAND_MONITORING_IMAGE" "$SOURCE_DIR/apps/monitoring"
   SOURCE_BUILD=true
@@ -285,6 +291,8 @@ UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE
 UPSTAND_MONITORING_IMAGE=$UPSTAND_MONITORING_IMAGE
 UPSTAND_AUTO_UPDATE=$UPSTAND_AUTO_UPDATE
 UPSTAND_VERSION=$requested_version
+IS_CLOUD=${IS_CLOUD:-false}
+NEXT_PUBLIC_IS_CLOUD=${NEXT_PUBLIC_IS_CLOUD:-$IS_CLOUD}
 POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16.4-alpine}
 REDIS_IMAGE=${REDIS_IMAGE:-redis:7.4-alpine}
 UPSTAND_SERVER_PORT=${UPSTAND_SERVER_PORT:-3000}

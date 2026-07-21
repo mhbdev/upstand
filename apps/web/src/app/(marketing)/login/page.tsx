@@ -44,6 +44,8 @@ export default function LoginPage() {
   const [needsOwnerSetup, setNeedsOwnerSetup] = useState<boolean | null>(null);
   const [setupError, setSetupError] = useState(false);
   const [setupAttempt, setSetupAttempt] = useState(0);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [isCloud, setIsCloud] = useState<boolean>(false);
   const [sessionTimedOut, setSessionTimedOut] = useState(false);
   const {
     data: session,
@@ -72,11 +74,17 @@ export default function LoginPage() {
     })
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to check instance setup");
-        return (await response.json()) as { needsOwnerSetup: boolean };
+        return (await response.json()) as {
+          needsOwnerSetup: boolean;
+          isCloud?: boolean;
+        };
       })
       .then((status) => {
         if (!active) return;
         setNeedsOwnerSetup(status.needsOwnerSetup);
+        if (typeof status.isCloud === "boolean") {
+          setIsCloud(status.isCloud);
+        }
       })
       .catch(() => {
         if (active) {
@@ -129,6 +137,8 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const isSignUp = needsOwnerSetup || (isCloud && authMode === "signup");
 
   return (
     <div className="relative flex min-h-[calc(100svh-64px)] flex-col items-center justify-center overflow-hidden bg-background px-4">
@@ -224,17 +234,37 @@ export default function LoginPage() {
               <div className="space-y-2 text-center">
                 {/* Fixed: added bg-clip-text */}
                 <h1 className="bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text font-extrabold text-3xl text-transparent tracking-tight">
-                  {needsOwnerSetup ? "Set up Upstand" : "Welcome back"}
+                  {needsOwnerSetup
+                    ? "Set up Upstand"
+                    : isSignUp
+                      ? "Create an account"
+                      : "Welcome back"}
                 </h1>
                 <p className="text-muted-foreground text-sm">
                   {needsOwnerSetup
                     ? "Create the owner account for this self-hosted instance"
-                    : "Sign in to manage your workspace"}
+                    : isSignUp
+                      ? "Sign up to start building with Upstand"
+                      : "Sign in to manage your workspace"}
                 </p>
               </div>
 
               <div className="space-y-5">
-                {needsOwnerSetup ? <SignUpForm /> : <SignInForm />}
+                {isSignUp ? (
+                  <SignUpForm
+                    onSwitchToSignIn={
+                      isCloud && !needsOwnerSetup
+                        ? () => setAuthMode("signin")
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <SignInForm
+                    onSwitchToSignUp={
+                      isCloud ? () => setAuthMode("signup") : undefined
+                    }
+                  />
+                )}
 
                 <Button
                   variant="outline"
@@ -251,7 +281,7 @@ export default function LoginPage() {
                     </>
                   )}
                 </Button>
-                {!needsOwnerSetup && <SsoSignInForm />}
+                {!isSignUp && <SsoSignInForm />}
               </div>
             </>
           )}

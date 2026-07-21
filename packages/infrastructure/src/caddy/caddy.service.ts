@@ -5,6 +5,7 @@ import {
   parseDomainMappings,
   parseResourceAdvancedConfig,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import type {
   CaddyCertificate,
   CaddyResource,
@@ -496,8 +497,7 @@ export class CaddyService {
   // mutation process-wide to retain the last complete, validated configuration.
   private static configurationTail: Promise<void> = Promise.resolve();
   private readonly docker: Docker;
-  private readonly networkName =
-    process.env.DOCKER_NETWORK || "upstand-network";
+  private readonly networkName = env.DOCKER_NETWORK;
 
   constructor(docker: Docker = getDockerInstance()) {
     this.docker = docker;

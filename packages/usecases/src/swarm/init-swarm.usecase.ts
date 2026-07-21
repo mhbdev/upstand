@@ -1,4 +1,5 @@
 import { ConflictError, ValidationError } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import type Docker from "dockerode";
 import { z } from "zod";
 import { getDockerInstance } from "../resource/docker-client";
@@ -88,7 +89,7 @@ export class InitSwarmUseCase {
 
       return {
         swarmId: swarm.ID,
-        networkName: process.env.DOCKER_NETWORK || "upstand-network",
+        networkName: env.DOCKER_NETWORK,
         networkCreated: network.created,
       };
     } catch (error) {

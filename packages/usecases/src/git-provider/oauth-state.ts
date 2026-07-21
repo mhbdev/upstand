@@ -1,4 +1,5 @@
 import { hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
+import { env } from "@upstand/env/server";
 
 const STATE_TTL_SECONDS = 10 * 60;
 const STATE_VERSION = "v1";
@@ -8,8 +9,7 @@ export type GitProviderOAuthStatePurpose =
   | "github-install";
 
 function stateSecret(): string {
-  const secret =
-    process.env.BETTER_AUTH_SECRET || process.env.SSH_KEY_ENCRYPTION_KEY_V1;
+  const secret = env.BETTER_AUTH_SECRET || env.SSH_KEY_ENCRYPTION_KEY_V1;
   if (!secret || secret.length < 32) {
     throw new Error("OAuth state signing secret is not configured");
   }

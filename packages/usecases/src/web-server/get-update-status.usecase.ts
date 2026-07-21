@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { env } from "@upstand/env/server";
 import { log } from "evlog";
 
 export interface UpdateStatusResult {
@@ -110,7 +111,7 @@ export class GetUpdateStatusUseCase {
   async execute(options?: {
     forceRefresh?: boolean;
   }): Promise<UpdateStatusResult> {
-    let currentVersion = process.env.UPSTAND_VERSION;
+    let currentVersion = env.UPSTAND_VERSION;
     if (!currentVersion) {
       try {
         const rootPkgPath = path.join(process.cwd(), "package.json");
@@ -122,7 +123,7 @@ export class GetUpdateStatusUseCase {
     }
     if (!currentVersion) currentVersion = "source-local";
 
-    const currentImage = process.env.UPSTAND_SERVER_IMAGE || "";
+    const currentImage = env.UPSTAND_SERVER_IMAGE || "";
     const channel: UpdateStatusResult["channel"] = currentImage.includes(
       ":canary",
     )
@@ -131,7 +132,7 @@ export class GetUpdateStatusUseCase {
         ? "source"
         : "stable";
     const checkedAt = new Date().toISOString();
-    const repo = process.env.GITHUB_REPOSITORY || "mhbdev/upstand";
+    const repo = env.GITHUB_REPOSITORY;
 
     const now = Date.now();
     const cacheKey = `${channel}:${currentVersion}:${repo}`;
@@ -154,8 +155,7 @@ export class GetUpdateStatusUseCase {
         Accept: "application/vnd.github+json",
         "User-Agent": "Upstand",
       };
-      const token =
-        process.env.UPSTAND_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+      const token = env.UPSTAND_GITHUB_TOKEN || env.GITHUB_TOKEN;
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }

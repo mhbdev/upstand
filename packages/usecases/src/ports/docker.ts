@@ -69,6 +69,7 @@ export interface DockerServicePort {
     },
     destination?: any,
     sourceRevision?: string,
+    onGitCloned?: (clonePath: string) => Promise<Resource | undefined>,
   ): Promise<void>;
   readComposeFileFromGit(
     resource: Resource,

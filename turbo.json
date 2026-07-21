@@ -6,11 +6,21 @@
       "domain": { "dependencies": { "allow": ["tooling"] } },
       "application": {
         "dependencies": {
-          "allow": ["domain", "platform", "runtime-infrastructure", "tooling"]
+          "allow": [
+            "configuration",
+            "domain",
+            "platform",
+            "runtime-infrastructure",
+            "tooling"
+          ]
         }
       },
-      "platform": { "dependencies": { "allow": ["tooling"] } },
-      "runtime-infrastructure": { "dependencies": { "allow": ["tooling"] } },
+      "platform": {
+        "dependencies": { "allow": ["configuration", "tooling"] }
+      },
+      "runtime-infrastructure": {
+        "dependencies": { "allow": ["configuration", "tooling"] }
+      },
       "infrastructure": {
         "dependencies": {
           "allow": [
