@@ -232,6 +232,7 @@ export function TerminalEmulator({
     }
   }, [downloadTrigger]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only re-run when token changes
   useEffect(() => {
     let isMounted = true;
     let closingIntentionally = false;
@@ -341,7 +342,7 @@ export function TerminalEmulator({
         resizeObserver.disconnect();
       }
     };
-  }, [token, fontSize, activeThemeKey]);
+  }, [token]);
 
   return (
     <div

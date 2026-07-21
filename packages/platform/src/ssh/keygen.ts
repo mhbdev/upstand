@@ -36,31 +36,30 @@ export function generateSshKeyPair(
       publicKey: openSshPub,
       fingerprint,
     };
-  } else {
-    const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
-      publicKeyEncoding: {
-        type: "spki",
-        format: "pem",
-      },
-      privateKeyEncoding: {
-        type: "pkcs8",
-        format: "pem",
-      },
-    });
-
-    const parsedPublic = sshpk.parseKey(publicKey, "pem");
-    const openSshPub = parsedPublic.toString("ssh") + ` ${comment}`;
-    const fingerprint = parsedPublic.fingerprint("sha256").toString();
-
-    const parsedPrivate = sshpk.parsePrivateKey(privateKey, "pem");
-    const formattedPrivateKey = parsedPrivate.toString("openssh");
-
-    return {
-      privateKey: formattedPrivateKey,
-      publicKey: openSshPub,
-      fingerprint,
-    };
   }
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
+    publicKeyEncoding: {
+      type: "spki",
+      format: "pem",
+    },
+    privateKeyEncoding: {
+      type: "pkcs8",
+      format: "pem",
+    },
+  });
+
+  const parsedPublic = sshpk.parseKey(publicKey, "pem");
+  const openSshPub = parsedPublic.toString("ssh") + ` ${comment}`;
+  const fingerprint = parsedPublic.fingerprint("sha256").toString();
+
+  const parsedPrivate = sshpk.parsePrivateKey(privateKey, "pem");
+  const formattedPrivateKey = parsedPrivate.toString("openssh");
+
+  return {
+    privateKey: formattedPrivateKey,
+    publicKey: openSshPub,
+    fingerprint,
+  };
 }
 
 export function generateEd25519KeyPair(comment: string): GeneratedSshKeyPair {

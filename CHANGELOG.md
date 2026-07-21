@@ -4,6 +4,16 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.107 - 2026-07-21
+
+### Added
+- **Modern Terminal UI and Split Sidebar Layout**: Redesigned the interactive SSH and Docker terminal Dialog, introducing a spacious dual-column layout on desktop screens with settings placed in a dedicated left sidebar, and auto-collapsing to vertical stack on mobile/tablet.
+- **Upgraded Terminal Toolbar**: Replaced the custom Popover theme menu with the `@upstand/ui` `Select` component. Designed modern font-size adjustment controls with `PlusIcon`/`MinusIcon` buttons, clear action with `Trash2`, download buffer with `Download`, and added `Tooltip` micro-interactions to all actions.
+- **Configuration State Persistence**: Enabled `localStorage` memory caching for the user's font-size and active theme selections to preserve preferences across dialogue instances and page reloads.
+
+### Fixed
+- **Terminal Reconnect Session Expiry**: Prevented active WebSocket/SSH sessions from tearing down and reconnecting when font-size or theme options change, fixing the `"Terminal session expired. Open a new terminal and try again."` toast disconnection bug.
+
 ## 0.1.106 - 2026-07-21
 
 ### Fixed

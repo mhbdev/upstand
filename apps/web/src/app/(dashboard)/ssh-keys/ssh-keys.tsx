@@ -21,8 +21,6 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
-import { Spinner } from "@upstand/ui/components/spinner";
-import { Textarea } from "@upstand/ui/components/textarea";
 import {
   Select,
   SelectContent,
@@ -31,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Spinner } from "@upstand/ui/components/spinner";
+import { Textarea } from "@upstand/ui/components/textarea";
 import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -567,7 +567,9 @@ export default function SSHKeys(_props: {
                       { value: "rsa", label: "RSA 2048-bit" },
                     ]}
                     value={algorithm}
-                    onValueChange={(val) => val && setAlgorithm(val as "ed25519" | "rsa")}
+                    onValueChange={(val) =>
+                      val && setAlgorithm(val as "ed25519" | "rsa")
+                    }
                   >
                     <SelectTrigger id="key-algorithm">
                       <SelectValue placeholder="Select key type" />
@@ -577,9 +579,7 @@ export default function SSHKeys(_props: {
                         <SelectItem value="ed25519">
                           ED25519 (Recommended)
                         </SelectItem>
-                        <SelectItem value="rsa">
-                          RSA 2048-bit
-                        </SelectItem>
+                        <SelectItem value="rsa">RSA 2048-bit</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>

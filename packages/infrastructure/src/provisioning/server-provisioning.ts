@@ -28,7 +28,9 @@ export function createServerProvisioningPort(): ServerProvisioningPort {
       });
 
       // Run docker info via SSH to avoid the Unix socket proxy (not supported on Windows).
-      const dockerInfoViaSsh = async (): Promise<{ Swarm?: { LocalNodeState?: string } }> => {
+      const dockerInfoViaSsh = async (): Promise<{
+        Swarm?: { LocalNodeState?: string };
+      }> => {
         const result = await execute(client, "docker info --format json");
         if (result.code !== 0) {
           throw new Error(
@@ -92,7 +94,9 @@ async function initializeCaddyViaSsh(
       `docker volume inspect ${vol} >/dev/null 2>&1 || docker volume create ${vol}`,
     );
     if (r.code !== 0) {
-      throw new Error(`Failed to create Docker volume '${vol}': ${r.stderr.trim()}`);
+      throw new Error(
+        `Failed to create Docker volume '${vol}': ${r.stderr.trim()}`,
+      );
     }
   }
 
@@ -110,7 +114,10 @@ async function initializeCaddyViaSsh(
 
   if (inspect.code === 0) {
     // Container already exists – make sure it is running and on the overlay network.
-    await execute(client, `docker start ${CADDY_CONTAINER_NAME} 2>/dev/null || true`);
+    await execute(
+      client,
+      `docker start ${CADDY_CONTAINER_NAME} 2>/dev/null || true`,
+    );
     await execute(
       client,
       `docker network connect ${CADDY_NETWORK} ${CADDY_CONTAINER_NAME} 2>/dev/null || true`,
@@ -123,26 +130,28 @@ async function initializeCaddyViaSsh(
   //    overlay network is attached before starting – matching what the Docker
   //    API path does (create → network connect → start).
   const runCmd = [
-    `docker create`,
+    "docker create",
     `--name ${CADDY_CONTAINER_NAME}`,
-    `--restart always`,
-    `-p 80:80`,
-    `-p 443:443`,
-    `-p 443:443/udp`,
-    `-v upstand-caddy-runtime:/etc/caddy`,
-    `-v upstand-caddy-data:/data`,
-    `-v upstand-caddy-config:/config`,
-    `-v upstand-caddy-logs:/var/log/caddy`,
+    "--restart always",
+    "-p 80:80",
+    "-p 443:443",
+    "-p 443:443/udp",
+    "-v upstand-caddy-runtime:/etc/caddy",
+    "-v upstand-caddy-data:/data",
+    "-v upstand-caddy-config:/config",
+    "-v upstand-caddy-logs:/var/log/caddy",
     `-e UPSTAND_CADDYFILE_B64=${bootstrapConfig}`,
-    `--entrypoint /bin/sh`,
+    "--entrypoint /bin/sh",
     CADDY_IMAGE,
-    `-ec`,
+    "-ec",
     `'if [ ! -s /etc/caddy/Caddyfile ]; then printf "%s" "$UPSTAND_CADDYFILE_B64" | base64 -d > /etc/caddy/Caddyfile; fi; exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'`,
   ].join(" ");
 
   const create = await execute(client, runCmd);
   if (create.code !== 0) {
-    throw new Error(`Failed to create Caddy container: ${create.stderr.trim()}`);
+    throw new Error(
+      `Failed to create Caddy container: ${create.stderr.trim()}`,
+    );
   }
 
   // 5. Attach to the overlay network.

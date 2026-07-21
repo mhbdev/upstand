@@ -280,7 +280,9 @@ export function RemoteServerWizard({
       return;
     }
 
-    toast.loading("Scanning remote server SSH host key...", { id: "host-key-scan" });
+    toast.loading("Scanning remote server SSH host key...", {
+      id: "host-key-scan",
+    });
 
     scanHostKeyMutation.mutate(
       {
@@ -378,7 +380,10 @@ export function RemoteServerWizard({
                 const isActive = step === s.num;
                 const isPassed = step > s.num;
                 return (
-                  <div key={s.num} className="flex flex-1 items-center last:flex-initial">
+                  <div
+                    key={s.num}
+                    className="flex flex-1 items-center last:flex-initial"
+                  >
                     <li
                       onClick={() => {
                         if (s.num < step || (s.num <= 3 && !createdServerId)) {
@@ -410,7 +415,7 @@ export function RemoteServerWizard({
                         <span className="font-semibold text-[11px] text-foreground leading-none">
                           {s.title}
                         </span>
-                        <span className="mt-0.5 text-[9px] text-muted-foreground font-medium leading-none">
+                        <span className="mt-0.5 font-medium text-[9px] text-muted-foreground leading-none">
                           {s.sub}
                         </span>
                       </div>

@@ -301,7 +301,10 @@ app.post("/api/terminal/session", async (c) => {
       return c.json({ error: "Server not found in this organization" }, 404);
     }
     if (!server.sshKeyId) {
-      return c.json({ error: "Server does not have an SSH key configured" }, 409);
+      return c.json(
+        { error: "Server does not have an SSH key configured" },
+        409,
+      );
     }
     if (!server.sshHostKeyFingerprint) {
       return c.json({ error: "Trust the server SSH host key first" }, 409);
@@ -322,14 +325,20 @@ app.post("/api/terminal/session", async (c) => {
     hostKeyFingerprint = server.sshHostKeyFingerprint;
   } else {
     if (!body.sshKeyId) {
-      return c.json({ error: "SSH key is required for control-plane terminal" }, 400);
+      return c.json(
+        { error: "SSH key is required for control-plane terminal" },
+        400,
+      );
     }
     const [key, settings] = await Promise.all([
       uow.sshKeyRepository.findById(body.sshKeyId),
       uow.webServerSettingsRepository.findGlobal(),
     ]);
     if (!key || key.organizationId !== body.organizationId) {
-      return c.json({ error: "SSH key was not found in this organization" }, 404);
+      return c.json(
+        { error: "SSH key was not found in this organization" },
+        404,
+      );
     }
     if (!settings?.serverIp) {
       return c.json(
@@ -342,7 +351,8 @@ app.post("/api/terminal/session", async (c) => {
     if (!controlPlaneFingerprint) {
       return c.json(
         {
-          error: "Configure the trusted control-plane SSH host fingerprint first",
+          error:
+            "Configure the trusted control-plane SSH host fingerprint first",
         },
         409,
       );

@@ -45,7 +45,8 @@ export function normalizePrivateKey(privateKeyPem: string): string {
     const priv = sshpk.parsePrivateKey(privateKeyPem, "auto");
     if (priv.type === "ed25519") {
       return priv.toString("openssh");
-    } else if (priv.type === "rsa") {
+    }
+    if (priv.type === "rsa") {
       return priv.toString("pkcs1");
     }
     return privateKeyPem;

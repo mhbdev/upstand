@@ -380,4 +380,3 @@ export const RetryNotificationDeliveryUseCaseToken =
   );
 export const ScanServerHostKeyUseCaseToken =
   createToken<UseCases.ScanServerHostKeyUseCase>("ScanServerHostKeyUseCase");
-

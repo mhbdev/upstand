@@ -52,8 +52,8 @@ export function hostVerifierForFingerprint(expected: string) {
     verifyHostKeyFingerprint(normalized, received);
 }
 
-import { Client } from "ssh2";
 import crypto from "node:crypto";
+import { Client } from "ssh2";
 
 export function scanHostKey(
   host: string,
@@ -88,7 +88,9 @@ export function scanHostKey(
       if (!resolved) {
         clearTimeout(timer);
         cleanup();
-        reject(new Error("Connection established but no host key was verified"));
+        reject(
+          new Error("Connection established but no host key was verified"),
+        );
       }
     });
 
@@ -102,8 +104,10 @@ export function scanHostKey(
           const algLen = keyBuf.readUInt32BE(0);
           const algorithm = keyBuf.subarray(4, 4 + algLen).toString("utf8");
           const key = keyBuf.toString("base64");
-          const fingerprint = "SHA256:" + crypto.createHash("sha256").update(keyBuf).digest("base64");
-          
+          const fingerprint =
+            "SHA256:" +
+            crypto.createHash("sha256").update(keyBuf).digest("base64");
+
           clearTimeout(timer);
           cleanup();
           resolve({ fingerprint, algorithm, key });
@@ -117,4 +121,3 @@ export function scanHostKey(
     });
   });
 }
-

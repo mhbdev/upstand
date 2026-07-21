@@ -57,8 +57,8 @@ import {
   KeyRound,
   PlusIcon,
   ServerIcon,
-  Trash2Icon,
   TerminalIcon,
+  Trash2Icon,
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
@@ -86,7 +86,9 @@ export default function RemoteServersPage() {
   const [setupServerId, setSetupServerId] = useState<string | null>(null);
   const [inspectServerId, setInspectServerId] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
-  const [terminalServerId, setTerminalServerId] = useState<string | undefined>(undefined);
+  const [terminalServerId, setTerminalServerId] = useState<string | undefined>(
+    undefined,
+  );
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
@@ -191,7 +193,9 @@ export default function RemoteServersPage() {
     if (editingServerId) {
       updateMutation.mutate({ ...input, id: editingServerId });
     } else {
-      toast.loading("Scanning remote server SSH host key...", { id: "host-key-scan" });
+      toast.loading("Scanning remote server SSH host key...", {
+        id: "host-key-scan",
+      });
       scanHostKeyMutation.mutate(
         {
           ipAddress: ipAddress.trim(),
@@ -380,7 +384,7 @@ export default function RemoteServersPage() {
                         size="icon-sm"
                         aria-label={`Open terminal for ${srv.name}`}
                         onClick={() => handleTerminal(srv.id)}
-                        className="text-primary hover:text-primary hover:bg-primary/10"
+                        className="text-primary hover:bg-primary/10 hover:text-primary"
                       >
                         <TerminalIcon className="size-4" />
                       </Button>

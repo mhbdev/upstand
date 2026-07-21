@@ -235,7 +235,11 @@ function getTrustedKnownHostsEntry(connection: RemoteDockerConnection): string {
     }
   }
 
-  const fallback = scanHostKeyWithSsh2Sync(connection.host, connection.port, trustedFingerprint);
+  const fallback = scanHostKeyWithSsh2Sync(
+    connection.host,
+    connection.port,
+    trustedFingerprint,
+  );
   if (fallback) {
     return fallback;
   }
