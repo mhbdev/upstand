@@ -18,6 +18,8 @@ export const env = createEnv({
     NEXT_PUBLIC_IS_CLOUD: process.env.NEXT_PUBLIC_IS_CLOUD,
   },
   skipValidation:
-    !!process.env.SKIP_ENV_VALIDATION || process.env.NODE_ENV === "test",
+    !!process.env.SKIP_ENV_VALIDATION ||
+    process.env.NODE_ENV === "test" ||
+    process.env.NEXT_PHASE === "phase-production-build",
   emptyStringAsUndefined: true,
 });

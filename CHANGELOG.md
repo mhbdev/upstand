@@ -4,6 +4,11 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.106 - 2026-07-21
+
+### Fixed
+- **Bypass env validation during Next.js production builds**: Added `process.env.NEXT_PHASE === "phase-production-build"` validation bypass to both `@upstand/env` server and web modules. This allows Next.js static page collection and dynamic routing build traces to compile successfully in CI/CD (GitHub Actions) environments without requiring active database connections or runtime secret environment variables.
+
 ## 0.1.105 - 2026-07-21
 
 ### Fixed
