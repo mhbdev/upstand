@@ -1306,10 +1306,12 @@ function DeployDialog({
                 onValueChange={(value) =>
                   onServerChange(value === "_automatic" ? "" : value)
                 }
-                items={servers.map((server) => ({
-                  value: server.id,
-                  label: `${server.name} (${server.serverType})`,
-                }))}
+                items={servers
+                  .filter((server) => server.serverType === "deploy")
+                  .map((server) => ({
+                    value: server.id,
+                    label: `${server.name} (${server.serverType})`,
+                  }))}
                 placeholder="Automatic"
                 allowEmptyLabel="Automatic (recommended)"
                 emptyValue="_automatic"

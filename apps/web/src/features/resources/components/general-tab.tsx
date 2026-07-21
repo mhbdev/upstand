@@ -945,10 +945,17 @@ export function GeneralTab({
                   ...(!env.NEXT_PUBLIC_IS_CLOUD
                     ? [{ value: "default", label: "Local Swarm manager" }]
                     : []),
-                  ...servers.map((server) => ({
-                    value: server.id,
-                    label: `${server.name} (${server.ipAddress})`,
-                  })),
+                  ...servers
+                    .filter((server) =>
+                      resource.type === "database"
+                        ? server.serverType === "deploy" ||
+                          server.serverType === "database"
+                        : server.serverType === "deploy",
+                    )
+                    .map((server) => ({
+                      value: server.id,
+                      label: `${server.name} (${server.ipAddress})`,
+                    })),
                 ]}
                 value={deploymentServerId}
                 onValueChange={(value) => {
@@ -968,11 +975,18 @@ export function GeneralTab({
                   {!env.NEXT_PUBLIC_IS_CLOUD && (
                     <SelectItem value="default">Local Swarm manager</SelectItem>
                   )}
-                  {servers.map((server) => (
-                    <SelectItem key={server.id} value={server.id}>
-                      {server.name} ({server.ipAddress})
-                    </SelectItem>
-                  ))}
+                  {servers
+                    .filter((server) =>
+                      resource.type === "database"
+                        ? server.serverType === "deploy" ||
+                          server.serverType === "database"
+                        : server.serverType === "deploy",
+                    )
+                    .map((server) => (
+                      <SelectItem key={server.id} value={server.id}>
+                        {server.name} ({server.ipAddress})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <p className="text-muted-foreground text-xs">
@@ -986,10 +1000,16 @@ export function GeneralTab({
                 <Select
                   items={[
                     { value: "default", label: "Same as deployment server" },
-                    ...servers.map((server) => ({
-                      value: server.id,
-                      label: `${server.name} (${server.ipAddress})`,
-                    })),
+                    ...servers
+                      .filter(
+                        (server) =>
+                          server.serverType === "build" ||
+                          server.serverType === "deploy",
+                      )
+                      .map((server) => ({
+                        value: server.id,
+                        label: `${server.name} (${server.ipAddress})`,
+                      })),
                   ]}
                   value={buildServerId}
                   onValueChange={(value) => {
@@ -1003,11 +1023,17 @@ export function GeneralTab({
                     <SelectItem value="default">
                       Same as deployment server
                     </SelectItem>
-                    {servers.map((server) => (
-                      <SelectItem key={server.id} value={server.id}>
-                        {server.name} ({server.ipAddress})
-                      </SelectItem>
-                    ))}
+                    {servers
+                      .filter(
+                        (server) =>
+                          server.serverType === "build" ||
+                          server.serverType === "deploy",
+                      )
+                      .map((server) => (
+                        <SelectItem key={server.id} value={server.id}>
+                          {server.name} ({server.ipAddress})
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <p className="text-muted-foreground text-xs">

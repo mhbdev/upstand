@@ -285,7 +285,10 @@ function CreateAppDialog({
                   ? [{ value: "local", label: "Local Server (Leader)" }]
                   : []),
                 ...(servers ?? [])
-                  .filter((srv: any) => srv.status === "ready")
+                  .filter(
+                    (srv: any) =>
+                      srv.status === "ready" && srv.serverType === "deploy",
+                  )
                   .map((srv: any) => ({
                     value: srv.id,
                     label: `${srv.name} (${srv.ipAddress})`,
@@ -308,7 +311,10 @@ function CreateAppDialog({
                     <SelectItem value="local">Local Server (Leader)</SelectItem>
                   )}
                   {servers
-                    ?.filter((srv: any) => srv.status === "ready")
+                    ?.filter(
+                      (srv: any) =>
+                        srv.status === "ready" && srv.serverType === "deploy",
+                    )
                     ?.map((srv: any) => (
                       <SelectItem key={srv.id} value={srv.id}>
                         {srv.name} ({srv.ipAddress})
@@ -668,7 +674,12 @@ function CreateDbDialog({
                   ? [{ value: "local", label: "Local Server (Leader)" }]
                   : []),
                 ...(servers ?? [])
-                  .filter((srv: any) => srv.status === "ready")
+                  .filter(
+                    (srv: any) =>
+                      srv.status === "ready" &&
+                      (srv.serverType === "deploy" ||
+                        srv.serverType === "database"),
+                  )
                   .map((srv: any) => ({
                     value: srv.id,
                     label: `${srv.name} (${srv.ipAddress})`,
@@ -688,7 +699,12 @@ function CreateDbDialog({
                     <SelectItem value="local">Local Server (Leader)</SelectItem>
                   )}
                   {servers
-                    ?.filter((srv: any) => srv.status === "ready")
+                    ?.filter(
+                      (srv: any) =>
+                        srv.status === "ready" &&
+                        (srv.serverType === "deploy" ||
+                          srv.serverType === "database"),
+                    )
                     ?.map((srv: any) => (
                       <SelectItem key={srv.id} value={srv.id}>
                         {srv.name} ({srv.ipAddress})
@@ -1045,7 +1061,10 @@ function CreateComposeDialog({
                   ? [{ value: "local", label: "Local Server (Leader)" }]
                   : []),
                 ...(servers ?? [])
-                  .filter((srv: any) => srv.status === "ready")
+                  .filter(
+                    (srv: any) =>
+                      srv.status === "ready" && srv.serverType === "deploy",
+                  )
                   .map((srv: any) => ({
                     value: srv.id,
                     label: `${srv.name} (${srv.ipAddress})`,
@@ -1065,7 +1084,10 @@ function CreateComposeDialog({
                     <SelectItem value="local">Local Server (Leader)</SelectItem>
                   )}
                   {servers
-                    ?.filter((srv: any) => srv.status === "ready")
+                    ?.filter(
+                      (srv: any) =>
+                        srv.status === "ready" && srv.serverType === "deploy",
+                    )
                     ?.map((srv: any) => (
                       <SelectItem key={srv.id} value={srv.id}>
                         {srv.name} ({srv.ipAddress})

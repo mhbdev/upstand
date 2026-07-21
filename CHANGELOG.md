@@ -4,6 +4,10 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.108 - 2026-07-21
+
+### Fixed
+- **Role-Based Remote Server Selection**: Updated resource creation dialogs (Application, Database, Compose), resource general settings tab, and templates setup page to filter target server and build server dropdown lists based on server types (`deploy`, `build`, `database`). This prevents selecting incompatible server roles in the UI and aligns with backend role assertions.
 ## 0.1.107 - 2026-07-21
 
 ### Added
