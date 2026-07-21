@@ -85,14 +85,14 @@ class MockResourceRepository {
     const serviceKey = appName
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9-_]/g, "-");
+      .replace(/[^a-z0-9_-]/g, "-");
     const duplicate = this.store.find(
       (r) =>
         r.id !== excludeResourceId &&
         (r.appName ?? "")
           .trim()
           .toLowerCase()
-          .replace(/[^a-z0-9-_]/g, "-") === serviceKey,
+          .replace(/[^a-z0-9_-]/g, "-") === serviceKey,
     );
     return duplicate ? { ...duplicate } : null;
   }

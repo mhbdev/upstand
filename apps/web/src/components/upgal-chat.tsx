@@ -164,10 +164,7 @@ function displayChatError(error: Error): {
   detail?: string;
   retryable: boolean;
 } {
-  if (
-    error.message === "An error occurred." ||
-    error.message.toLowerCase().includes("stream")
-  ) {
+  if (error.message === "An error occurred.") {
     return {
       message: "The response ended before UpGal finished.",
       detail:

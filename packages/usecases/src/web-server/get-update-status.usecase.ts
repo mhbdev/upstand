@@ -110,8 +110,11 @@ function isCompleteRelease(
 export class GetUpdateStatusUseCase {
   async execute(options?: {
     forceRefresh?: boolean;
+    fetcher?: typeof fetch;
+    repository?: string;
   }): Promise<UpdateStatusResult> {
-    let currentVersion = env.UPSTAND_VERSION;
+    const requestFetch = options?.fetcher ?? fetch;
+    let currentVersion = process.env.UPSTAND_VERSION || env.UPSTAND_VERSION;
     if (!currentVersion) {
       try {
         const rootPkgPath = path.join(process.cwd(), "package.json");
@@ -123,7 +126,8 @@ export class GetUpdateStatusUseCase {
     }
     if (!currentVersion) currentVersion = "source-local";
 
-    const currentImage = env.UPSTAND_SERVER_IMAGE || "";
+    const currentImage =
+      process.env.UPSTAND_SERVER_IMAGE || env.UPSTAND_SERVER_IMAGE || "";
     const channel: UpdateStatusResult["channel"] = currentImage.includes(
       ":canary",
     )
@@ -132,7 +136,10 @@ export class GetUpdateStatusUseCase {
         ? "source"
         : "stable";
     const checkedAt = new Date().toISOString();
-    const repo = env.GITHUB_REPOSITORY;
+    const repo =
+      options?.repository ||
+      process.env.GITHUB_REPOSITORY ||
+      env.GITHUB_REPOSITORY;
 
     const now = Date.now();
     const cacheKey = `${channel}:${currentVersion}:${repo}`;
@@ -164,7 +171,7 @@ export class GetUpdateStatusUseCase {
       let manifest: ReleaseManifest | null = null;
 
       try {
-        const response = await fetch(endpoint, {
+        const response = await requestFetch(endpoint, {
           cache: "no-store",
           headers,
         });
@@ -186,7 +193,7 @@ export class GetUpdateStatusUseCase {
               (asset) => asset.name === RELEASE_MANIFEST_ASSET,
             );
             if (manifestAsset?.browser_download_url) {
-              const manifestResponse = await fetch(
+              const manifestResponse = await requestFetch(
                 manifestAsset.browser_download_url,
                 {
                   cache: "no-store",
@@ -221,7 +228,7 @@ export class GetUpdateStatusUseCase {
             "Attempting GitHub HTTP redirect fallback to check for updates...",
         });
         try {
-          const redirectRes = await fetch(
+          const redirectRes = await requestFetch(
             `https://github.com/${repo}/releases/latest`,
             {
               redirect: "manual",
@@ -237,7 +244,7 @@ export class GetUpdateStatusUseCase {
             if (tagPart) {
               const tag = tagPart.trim();
               const manifestUrl = `https://github.com/${repo}/releases/download/${tag}/${RELEASE_MANIFEST_ASSET}`;
-              const manifestResponse = await fetch(manifestUrl, {
+              const manifestResponse = await requestFetch(manifestUrl, {
                 cache: "no-store",
                 headers: {
                   Accept: "application/json",

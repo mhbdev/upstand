@@ -1,10 +1,10 @@
-import { getServiceProvider } from "@upstand/api/di";
 import { env } from "@upstand/env/server";
 import {
   GetUpdateStatusUseCaseToken,
   TriggerUpdateUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { log } from "evlog";
+import { getServiceProvider } from "./di";
 
 export class AutoUpdateRuntime {
   private timer: ReturnType<typeof setInterval> | null = null;

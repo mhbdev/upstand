@@ -32,7 +32,7 @@ const principal: ApiKeyPrincipal = {
 describe("API-key endpoint authorization", () => {
   it("maps only explicitly approved routes", () => {
     expect(requiredApiKeyPermission("project.list")).toBe("project:view");
-    expect(requiredApiKeyPermission("resource.get")).toBeNull();
+    expect(requiredApiKeyPermission("resource.get")).toBe("resource:view");
     expect(requiredApiKeyPermission("swarm.removeNode")).toBeNull();
   });
 

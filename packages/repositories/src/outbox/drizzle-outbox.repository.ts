@@ -142,7 +142,13 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
     return ((result as { rows?: unknown[] }).rows ?? []).map(normalizeRow);
   }
 
-  async markPublished(id: string, publishedAt: Date): Promise<boolean> {
+  async markPublished(
+    id: string,
+    publishedAt: Date,
+    claimedAt?: Date | null,
+  ): Promise<boolean> {
+    const conditions = [eq(outbox.id, id), eq(outbox.status, "publishing")];
+    if (claimedAt) conditions.push(eq(outbox.claimedAt, claimedAt));
     const result = await this.executor
       .update(outbox)
       .set({
@@ -151,7 +157,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
         publishedAt,
         updatedAt: publishedAt,
       })
-      .where(and(eq(outbox.id, id), eq(outbox.status, "publishing")))
+      .where(and(...conditions))
       .returning({ id: outbox.id });
     return result.length > 0;
   }
@@ -161,7 +167,10 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
     failedAt: Date,
     error: string,
     retryDelayMs: number,
+    claimedAt?: Date | null,
   ): Promise<OutboxMessage | null> {
+    const conditions = [eq(outbox.id, id), eq(outbox.status, "publishing")];
+    if (claimedAt) conditions.push(eq(outbox.claimedAt, claimedAt));
     const [message] = await this.executor
       .update(outbox)
       .set({
@@ -172,7 +181,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
         lastError: error.slice(0, 4_000),
         updatedAt: failedAt,
       })
-      .where(and(eq(outbox.id, id), eq(outbox.status, "publishing")))
+      .where(and(...conditions))
       .returning();
     return message ? normalizeRow(message) : null;
   }

@@ -3,11 +3,11 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getServiceProvider } from "@upstand/api/di";
 import { env } from "@upstand/env/server";
 import { getDockerInstance } from "@upstand/infrastructure";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
+import { getServiceProvider } from "./di";
 
 const MONITORING_IMAGE_ENV = "UPSTAND_MONITORING_IMAGE";
 
@@ -47,8 +47,12 @@ export async function initializeMonitoring(): Promise<void> {
       const info = await me.inspect();
       const networks = Object.keys(info.NetworkSettings.Networks || {});
       networkMode = networks.find((n) => n !== "bridge") || networks[0];
-    } catch (error: any) {
-      if (error.statusCode === 404) {
+    } catch (error: unknown) {
+      const statusCode =
+        typeof error === "object" && error !== null && "statusCode" in error
+          ? error.statusCode
+          : undefined;
+      if (statusCode === 404) {
         log.info({
           message:
             "Monitoring agent running in host mode (not inside a Docker container)",

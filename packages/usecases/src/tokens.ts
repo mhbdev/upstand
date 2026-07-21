@@ -12,6 +12,7 @@ import type {
   DockerResourceControllerPort,
   DockerServicePort,
 } from "./ports/docker";
+import type { ManagedUserProvisioner } from "./ports/managed-user-provisioner";
 
 // Application composition token. The domain exposes the IUnitOfWork contract,
 // while the DI token belongs to the outer composition layer.
@@ -19,6 +20,9 @@ export const UnitOfWorkToken = createToken<IUnitOfWork>("IUnitOfWork");
 
 export const NotificationTransportToken = createToken<NotificationTransport>(
   "NotificationTransport",
+);
+export const ManagedUserProvisionerToken = createToken<ManagedUserProvisioner>(
+  "ManagedUserProvisioner",
 );
 export const CaddyServiceToken = createToken<CaddyServicePort>("CaddyService");
 export const DockerServiceToken =
@@ -140,6 +144,12 @@ export const GetServerCountUseCaseToken =
   createToken<UseCases.GetServerCountUseCase>("GetServerCountUseCase");
 export const GetAccountStatusUseCaseToken =
   createToken<UseCases.GetAccountStatusUseCase>("GetAccountStatusUseCase");
+export const GetSetupStatusUseCaseToken =
+  createToken<UseCases.GetSetupStatusUseCase>("GetSetupStatusUseCase");
+export const ResetTwoFactorUseCaseToken =
+  createToken<UseCases.ResetTwoFactorUseCase>("ResetTwoFactorUseCase");
+export const ScimUseCaseToken =
+  createToken<UseCases.ScimUseCase>("ScimUseCase");
 export const GetDockerInventoryUseCaseToken =
   createToken<UseCases.GetDockerInventoryUseCase>("GetDockerInventoryUseCase");
 export const PruneDockerResourcesUseCaseToken =

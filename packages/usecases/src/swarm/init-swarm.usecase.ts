@@ -89,7 +89,7 @@ export class InitSwarmUseCase {
 
       return {
         swarmId: swarm.ID,
-        networkName: env.DOCKER_NETWORK,
+        networkName: env.DOCKER_NETWORK || "upstand-network",
         networkCreated: network.created,
       };
     } catch (error) {

@@ -16,18 +16,20 @@ export class RetryNotificationDeliveryUseCase {
     }
 
     return this.uow.transaction(async (tx) => {
-      const queued = await tx.notificationDeliveryRepository.updateById(
-        delivery.id,
-        {
-          status: "queued",
-          attempts: 0,
-          error: null,
-          deliveredAt: null,
-          processingStartedAt: null,
-          lastAttemptAt: null,
-          nextAttemptAt: null,
-        },
-      );
+      const queued = tx.notificationDeliveryRepository.requeueIfRetryable
+        ? await tx.notificationDeliveryRepository.requeueIfRetryable(
+            delivery.id,
+            delivery.updatedAt,
+          )
+        : await tx.notificationDeliveryRepository.updateById(delivery.id, {
+            status: "queued",
+            attempts: 0,
+            error: null,
+            deliveredAt: null,
+            processingStartedAt: null,
+            lastAttemptAt: null,
+            nextAttemptAt: null,
+          });
       if (!queued) throw new Error("Notification delivery could not be queued");
 
       const payload: NotificationDeliveryOutboxPayload = {

@@ -1,4 +1,3 @@
-import { getServiceProvider } from "@upstand/api/di";
 import { env } from "@upstand/env/server";
 import { getDockerInstance } from "@upstand/infrastructure";
 import { DeploymentWorker } from "@upstand/usecases";
@@ -9,6 +8,7 @@ import {
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
 import { log } from "evlog";
+import { getServiceProvider } from "./di";
 
 export class DeploymentRuntime {
   private readonly workers = new Map<string, DeploymentWorker>();

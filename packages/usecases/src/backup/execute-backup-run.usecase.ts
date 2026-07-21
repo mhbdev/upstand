@@ -19,43 +19,59 @@ export class ExecuteBackupRunUseCase {
     private readonly runtime = new BackupRuntimeService(),
   ) {}
 
-  async execute(runId: string): Promise<BackupRun> {
-    const run = await this.uow.backupRunRepository.findById(runId);
-    if (!run) throw new ValidationError("Backup run not found");
-    if (run.status === "succeeded") return run;
+  async execute(runId: string, claimedRun?: BackupRun): Promise<BackupRun> {
+    const existing =
+      claimedRun ?? (await this.uow.backupRunRepository.findById(runId));
+    if (!existing) throw new ValidationError("Backup run not found");
+    if (existing.status === "succeeded") return existing;
+    if (!claimedRun && existing.status !== "queued") {
+      throw new ValidationError("Backup run is already being processed");
+    }
+
+    const run =
+      claimedRun ??
+      (await this.uow.backupRunRepository.claimForExecution(runId, new Date()));
+    if (!run) {
+      const current = await this.uow.backupRunRepository.findById(runId);
+      if (current?.status === "succeeded") return current;
+      throw new ValidationError("Backup run is already being processed");
+    }
+
+    const failBeforeExecution = async (message: string): Promise<never> => {
+      await this.uow.backupRunRepository.updateById(run.id, {
+        status: "failed",
+        error: message,
+        completedAt: new Date(),
+      });
+      throw new ValidationError(message);
+    };
 
     const schedule = await this.uow.backupScheduleRepository.findById(
       run.scheduleId,
     );
-    if (!schedule) throw new ValidationError("Backup schedule not found");
+    if (!schedule) return failBeforeExecution("Backup schedule not found");
     const resource = run.resourceId
       ? await this.uow.resourceRepository.findById(run.resourceId)
       : null;
     if (schedule.kind !== "web-server" && !resource) {
-      throw new ValidationError("Resource not found");
+      return failBeforeExecution("Resource not found");
     }
     const destination = await this.uow.s3DestinationRepository.findById(
       run.destinationId,
     );
-    if (!destination) throw new ValidationError("Backup destination not found");
+    if (!destination)
+      return failBeforeExecution("Backup destination not found");
 
     const organizationId =
       schedule.organizationId ??
       (resource ? await resolveBackupOrganizationId(this.uow, resource) : null);
     if (!organizationId)
-      throw new ValidationError("Backup organization not found");
+      return failBeforeExecution("Backup organization not found");
     if (destination.organizationId !== organizationId) {
-      throw new ValidationError(
+      return failBeforeExecution(
         "Backup destination belongs to another organization",
       );
     }
-
-    await this.uow.backupRunRepository.updateById(run.id, {
-      status: "running",
-      error: null,
-      startedAt: new Date(),
-      completedAt: null,
-    });
 
     try {
       const fileKey =

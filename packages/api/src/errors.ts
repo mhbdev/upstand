@@ -1,6 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { DomainError } from "@upstand/domain";
+import { DomainError, OperationalError } from "@upstand/domain";
 import { log } from "evlog";
+
+export function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
 
 export function handleUseCaseError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -38,34 +42,20 @@ export function handleUseCaseError(error: unknown): never {
     });
   }
 
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const isExpectedOperationalError =
-    errorMessage.includes("ECONNREFUSED") ||
-    errorMessage.includes("connection refused") ||
-    errorMessage.includes("Failed to contact monitoring agent") ||
-    errorMessage.includes("SSH") ||
-    errorMessage.includes("ssh") ||
-    errorMessage.includes("Docker") ||
-    errorMessage.includes("docker") ||
-    errorMessage.includes("handshake") ||
-    errorMessage.includes("dial tcp") ||
-    errorMessage.includes("Permission denied") ||
-    errorMessage.includes("host unreachable") ||
-    errorMessage.includes("fetch failed") ||
-    errorMessage.includes("rejected the notification") ||
-    errorMessage.includes("Unable to connect") ||
-    errorMessage.includes("Was there a typo in the url or port?") ||
-    errorMessage.includes("Failed to fetch Git") ||
-    errorMessage.includes("GitHub App is not fully configured") ||
-    errorMessage.includes("ENOTFOUND") ||
-    errorMessage.includes("EAI_AGAIN") ||
-    errorMessage.includes("ETIMEDOUT") ||
-    errorMessage.includes("All configured authentication methods failed");
-
-  if (isExpectedOperationalError) {
+  if (error instanceof OperationalError) {
+    const trpcCode =
+      error.code === "AUTHENTICATION"
+        ? "UNAUTHORIZED"
+        : error.code === "PERMISSION"
+          ? "FORBIDDEN"
+          : error.code === "RATE_LIMIT"
+            ? "TOO_MANY_REQUESTS"
+            : error.code === "TIMEOUT"
+              ? "TIMEOUT"
+              : "BAD_REQUEST";
     throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: errorMessage,
+      code: trpcCode,
+      message: error.message,
       cause: error,
     });
   }
@@ -74,7 +64,7 @@ export function handleUseCaseError(error: unknown): never {
   // but mask details to avoid leaking database/system internals to client
   log.error({
     message: "Unexpected system error in router",
-    err: errorMessage,
+    err: error instanceof Error ? error : String(error),
   });
 
   throw new TRPCError({

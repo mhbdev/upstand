@@ -25,7 +25,6 @@ import {
   DeployResourceUseCaseToken,
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
-  GetResourceUseCaseToken,
   InspectComposeUseCaseToken,
   RandomizeComposeUseCaseToken,
   UpdateResourceUseCaseToken,
@@ -34,6 +33,8 @@ import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
+import { createResourceAuthorizer } from "./shared/resource-authorization";
+import { parseWatchPaths } from "./shared/watch-paths";
 
 const CreateComposeInputSchema = z.object({
   environmentId: z.string().min(1),
@@ -73,22 +74,11 @@ const RandomizeComposeInputSchema = z.object({
   id: z.string().min(1),
 });
 
-function parseWatchPaths(value: string[] | string | undefined): string[] {
-  if (Array.isArray(value))
-    return value.filter((item) => item.trim().length > 0);
-  if (typeof value !== "string") return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.filter(
-          (item): item is string =>
-            typeof item === "string" && item.trim().length > 0,
-        )
-      : [];
-  } catch {
-    return [];
-  }
-}
+const authorizeCompose = createResourceAuthorizer({
+  expectedType: "compose",
+  resourceLabel: "Compose resource",
+  missingProjectMessage: "Environment not found",
+});
 
 function composePayload(resource: Resource) {
   let composeFile = "";
@@ -129,41 +119,6 @@ function composePayload(resource: Resource) {
     createdAt: resource.createdAt,
     updatedAt: resource.updatedAt,
   };
-}
-
-async function authorizedCompose(
-  ctx: any,
-  id: string,
-  action: "view" | "update" | "delete",
-) {
-  const resource = await ctx.scope
-    .resolve(GetResourceUseCaseToken)
-    .execute({ id });
-  if (resource?.type !== "compose") {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Compose resource not found",
-    });
-  }
-  const environment = await ctx.scope
-    .resolve(GetEnvironmentUseCaseToken)
-    .execute({ id: resource.environmentId });
-  const project = environment
-    ? await ctx.scope
-        .resolve(GetProjectUseCaseToken)
-        .execute({ id: environment.projectId })
-    : null;
-  if (!project)
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Environment not found",
-    });
-  await checkPermission(
-    ctx.session.user.id,
-    project.organizationId,
-    `resource:${action}`,
-  );
-  return resource;
 }
 
 export const composeRouter = router({
@@ -249,13 +204,13 @@ export const composeRouter = router({
   get: twoFactorVerifiedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .query(async ({ ctx, input }) =>
-      composePayload(await authorizedCompose(ctx, input.id, "view")),
+      composePayload(await authorizeCompose(ctx, input.id, "resource:view")),
     ),
 
   update: twoFactorVerifiedProcedure
     .input(UpdateComposeInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const resource = await authorizedCompose(ctx, input.id, "update");
+      const resource = await authorizeCompose(ctx, input.id, "resource:update");
       const { composeFile, advancedConfig, envVars, domains, ...patch } = input;
       let credentials = input.credentials;
       let newEnvVars: Record<string, string> | undefined;
@@ -320,7 +275,7 @@ export const composeRouter = router({
   deploy: twoFactorVerifiedProcedure
     .input(DeployResourceInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await authorizedCompose(ctx, input.id, "update");
+      await authorizeCompose(ctx, input.id, "resource:update");
       try {
         return composePayload(
           await ctx.scope.resolve(DeployResourceUseCaseToken).execute(input),
@@ -333,7 +288,7 @@ export const composeRouter = router({
   control: twoFactorVerifiedProcedure
     .input(ControlResourceInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await authorizedCompose(ctx, input.id, "update");
+      await authorizeCompose(ctx, input.id, "resource:update");
       try {
         return composePayload(
           await ctx.scope.resolve(ControlResourceUseCaseToken).execute(input),
@@ -346,7 +301,7 @@ export const composeRouter = router({
   delete: twoFactorVerifiedProcedure
     .input(DeleteResourceInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await authorizedCompose(ctx, input.id, "delete");
+      await authorizeCompose(ctx, input.id, "resource:delete");
       try {
         return await ctx.scope
           .resolve(DeleteResourceUseCaseToken)
@@ -359,7 +314,7 @@ export const composeRouter = router({
   randomize: twoFactorVerifiedProcedure
     .input(RandomizeComposeInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await authorizedCompose(ctx, input.id, "update");
+      await authorizeCompose(ctx, input.id, "resource:update");
       try {
         return composePayload(
           await ctx.scope.resolve(RandomizeComposeUseCaseToken).execute(input),

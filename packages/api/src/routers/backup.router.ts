@@ -1,4 +1,3 @@
-import type { ServiceScope } from "@circulo-ai/di";
 import { TRPCError } from "@trpc/server";
 import {
   CreateBackupScheduleInputSchema,
@@ -28,53 +27,35 @@ import {
   UpdateWebServerBackupScheduleUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { z } from "zod";
+import type { AuthenticatedContext } from "../context";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { requireInstanceOwnerContext } from "../instance-access";
-import { checkPermission, type PermissionAction } from "../permissions";
+import {
+  authorizeContextCapability,
+  type PermissionAction,
+} from "../permissions";
+import { authorizeResource } from "./shared/resource-authorization";
 
 async function assertResourcePermission(
-  ctx: { session: { user: { id: string } }; scope: ServiceScope },
+  ctx: AuthenticatedContext,
   resourceId: string,
   permission: PermissionAction,
 ) {
-  const uow = ctx.scope.resolve(UnitOfWorkToken);
-  const resource = await uow.resourceRepository.findById(resourceId);
-  if (!resource) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Resource not found" });
-  }
-  const environment = await uow.environmentRepository.findById(
-    resource.environmentId,
-  );
-  if (!environment) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Environment not found",
-    });
-  }
-  const project = await uow.projectRepository.findById(environment.projectId);
-  if (!project) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-  }
-  await checkPermission(
-    ctx.session.user.id,
-    project.organizationId,
-    permission,
-  );
-  return resource;
+  return authorizeResource(ctx, resourceId, { action: permission });
 }
 
 async function assertOrganizationPermission(
-  ctx: { session: { user: { id: string } }; actor?: { kind: string } | null },
+  ctx: AuthenticatedContext,
   _organizationId: string,
   permission: PermissionAction,
 ): Promise<void> {
   await requireInstanceOwnerContext(ctx);
-  await checkPermission(ctx.session.user.id, _organizationId, permission);
+  await authorizeContextCapability(ctx, _organizationId, permission);
 }
 
 async function assertWebServerSchedulePermission(
-  ctx: { session: { user: { id: string } }; scope: ServiceScope },
+  ctx: AuthenticatedContext,
   scheduleId: string,
   permission: PermissionAction,
 ) {

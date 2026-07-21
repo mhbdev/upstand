@@ -15,6 +15,8 @@ import { redis } from "@upstand/redis";
 import { assertSafeGitUrl } from "@upstand/usecases";
 import type {
   ContainerRuntimeStats,
+  ConvergenceOptions,
+  ConvergenceResult,
   DockerRegistryAuth,
   ServerRuntimeStats,
 } from "@upstand/usecases/ports/docker";
@@ -269,7 +271,7 @@ export class DockerService {
     return name
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9-_]/g, "-");
+      .replace(/[^a-z0-9_-]/g, "-");
   }
 
   async initializeSwarm(targetDocker?: Docker): Promise<void> {
@@ -784,6 +786,8 @@ export class DockerService {
           ["push", registryInfo.imageTag],
           onLog,
         );
+      } else if (destinationDocker && destinationDocker !== this.docker) {
+        await this.transferImage(buildImageName, destinationDocker, onLog);
       }
 
       onLog("Deploying Swarm Service...\n");
@@ -2608,5 +2612,172 @@ export class DockerService {
         reject(err);
       });
     });
+  }
+
+  async transferImage(
+    imageName: string,
+    targetDocker: any,
+    onLog?: (log: string) => void,
+  ): Promise<void> {
+    onLog?.(
+      `Transferring image '${imageName}' to target production server...\n`,
+    );
+    try {
+      const image = this.docker.getImage(imageName);
+      const stream = await image.get();
+      await targetDocker.loadImage(stream);
+      onLog?.(`Image '${imageName}' transferred successfully! ✅\n`);
+    } catch (err: any) {
+      log.error({
+        message: "Failed to transfer image between Docker daemons",
+        imageName,
+        err: err.message || err,
+      });
+      throw new Error(
+        `Failed to transfer image '${imageName}': ${err.message || err}`,
+      );
+    }
+  }
+
+  async waitForServiceConvergence(
+    resource: Resource,
+    options: ConvergenceOptions = {},
+  ): Promise<ConvergenceResult> {
+    const serviceName = this.sanitizeName(resource.appName || resource.name);
+    const docker = options.destinationDocker || this.docker;
+    const timeoutSeconds = options.timeoutSeconds ?? 60;
+    const stabilityWindowSeconds = options.stabilityWindowSeconds ?? 5;
+    const onLog = options.onLog;
+
+    onLog?.(
+      `Verifying service convergence for '${serviceName}' (timeout: ${timeoutSeconds}s)...\n`,
+    );
+
+    const startTime = Date.now();
+    const timeoutMs = timeoutSeconds * 1000;
+    const stabilityMs = stabilityWindowSeconds * 1000;
+    let healthyStartTime: number | null = null;
+
+    while (Date.now() - startTime < timeoutMs) {
+      try {
+        const tasks = await (docker as any).listTasks({
+          filters: JSON.stringify({
+            service: [serviceName],
+            "desired-state": ["running"],
+          }),
+        });
+
+        if (!Array.isArray(tasks) || tasks.length === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+
+        const activeTasks = tasks.filter(
+          (t: any) =>
+            t.Status?.State === "running" || t.Status?.State === "starting",
+        );
+
+        const failedTasks = tasks.filter(
+          (t: any) =>
+            t.Status?.State === "failed" ||
+            t.Status?.State === "rejected" ||
+            (t.Status?.State === "shutdown" && t.DesiredState !== "shutdown"),
+        );
+
+        if (failedTasks.length > 0 && activeTasks.length === 0) {
+          const failureReason =
+            failedTasks[0]?.Status?.Err ||
+            failedTasks[0]?.Status?.State ||
+            "Task failed to start";
+          onLog?.(
+            `Convergence check failed: Task crash loop detected (${failureReason}). ❌\n`,
+          );
+          return {
+            healthy: false,
+            state: "failed",
+            message: `Task crash loop detected: ${failureReason}`,
+          };
+        }
+
+        if (activeTasks.length > 0) {
+          let allTasksHealthy = true;
+          let explicitHealthCheckFound = false;
+
+          for (const task of activeTasks) {
+            const containerId = task.Status?.ContainerStatus?.ContainerID;
+            if (containerId) {
+              try {
+                const container = docker.getContainer(containerId);
+                const inspectData = await container.inspect();
+                const health = inspectData.State?.Health;
+
+                if (health && typeof health.Status === "string") {
+                  explicitHealthCheckFound = true;
+                  if (health.Status === "unhealthy") {
+                    onLog?.(
+                      `Convergence check: Container ${containerId.slice(0, 12)} reported unhealthy status. ❌\n`,
+                    );
+                    return {
+                      healthy: false,
+                      state: "unhealthy",
+                      message: `Container health check failed: ${health.Status}`,
+                    };
+                  }
+                  if (health.Status !== "healthy") {
+                    allTasksHealthy = false;
+                  }
+                }
+              } catch {
+                // Container inspect might briefly fail while starting up
+              }
+            }
+
+            if (task.Status?.State !== "running") {
+              allTasksHealthy = false;
+            }
+          }
+
+          if (allTasksHealthy) {
+            if (explicitHealthCheckFound) {
+              onLog?.("Container health check passed healthy! ✅\n");
+              return {
+                healthy: true,
+                state: "healthy",
+                message: "Health check passed",
+              };
+            }
+
+            if (healthyStartTime === null) {
+              healthyStartTime = Date.now();
+            }
+
+            const elapsedHealthy = Date.now() - healthyStartTime;
+            if (elapsedHealthy >= stabilityMs) {
+              onLog?.(
+                `Container convergence verified (running stably for ${Math.round(elapsedHealthy / 1000)}s). ✅\n`,
+              );
+              return {
+                healthy: true,
+                state: "running",
+                message: `Container running stably for ${Math.round(elapsedHealthy / 1000)}s`,
+              };
+            }
+          } else {
+            healthyStartTime = null;
+          }
+        }
+      } catch (_err: any) {
+        // Swarm task API call error, retry until timeout
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
+    onLog?.(`Convergence check timed out after ${timeoutSeconds}s. ❌\n`);
+    return {
+      healthy: false,
+      state: "timeout",
+      message: `Container failed to converge within ${timeoutSeconds} seconds`,
+    };
   }
 }

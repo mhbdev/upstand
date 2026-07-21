@@ -59,11 +59,17 @@ export class GetServerMonitoringStatusUseCase {
         collectionError: health.collectionError,
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const collectionError = message.startsWith(
+        "Failed to contact monitoring agent",
+      )
+        ? message
+        : `Failed to contact monitoring agent for ${parsed.serverId}: ${message}`;
       return {
         serverId: parsed.serverId,
         reachable: false,
         status: "unhealthy",
-        collectionError: error instanceof Error ? error.message : String(error),
+        collectionError,
       };
     }
   }

@@ -11,45 +11,26 @@ import {
   CreateScheduleUseCaseToken,
   DeleteScheduleUseCaseToken,
   GeneralSchedulerToken,
-  GetEnvironmentUseCaseToken,
-  GetProjectUseCaseToken,
-  GetResourceUseCaseToken,
   GetScheduleLogsUseCaseToken,
   GetSchedulesUseCaseToken,
   UnitOfWorkToken,
   UpdateScheduleUseCaseToken,
 } from "@upstand/usecases/tokens";
+import type { AuthenticatedContext } from "../context";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission, type PermissionAction } from "../permissions";
+import { authorizeResource as authorizeResourceScope } from "./shared/resource-authorization";
 
 async function authorizeResource(
-  ctx: any,
+  ctx: AuthenticatedContext,
   resourceId: string,
   action: PermissionAction,
 ) {
-  const resource = await ctx.scope
-    .resolve(GetResourceUseCaseToken)
-    .execute({ id: resourceId });
-  if (!resource) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Resource not found" });
-  }
-  const environment = await ctx.scope
-    .resolve(GetEnvironmentUseCaseToken)
-    .execute({ id: resource.environmentId });
-  const project = environment
-    ? await ctx.scope.resolve(GetProjectUseCaseToken).execute({
-        id: environment.projectId,
-      })
-    : null;
-  if (!project) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Project not found",
-    });
-  }
-  await checkPermission(ctx.session.user.id, project.organizationId, action);
-  return resource;
+  return authorizeResourceScope(ctx, resourceId, {
+    action,
+    missingProjectMessage: "Project not found",
+  });
 }
 
 export const scheduleRouter = router({

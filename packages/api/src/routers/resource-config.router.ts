@@ -5,15 +5,11 @@ import {
   ResourcePortSchema,
   ResourceVolumeSchema,
 } from "@upstand/domain";
-import {
-  GetEnvironmentUseCaseToken,
-  GetProjectUseCaseToken,
-  GetResourceUseCaseToken,
-  UpdateResourceUseCaseToken,
-} from "@upstand/usecases/tokens";
+import { UpdateResourceUseCaseToken } from "@upstand/usecases/tokens";
 import { z } from "zod";
+import type { AuthenticatedContext } from "../context";
 import { router, twoFactorVerifiedProcedure } from "../index";
-import { checkPermission } from "../permissions";
+import { authorizeResource } from "./shared/resource-authorization";
 
 const ResourceIndexInputSchema = z.object({
   id: z.string().min(1),
@@ -36,35 +32,19 @@ const VolumeUpdateInputSchema = ResourceIndexInputSchema.extend({
 });
 const ResourceIdInputSchema = z.object({ id: z.string().min(1) });
 
-async function authorize(ctx: any, id: string, action: "view" | "update") {
-  const resource = await ctx.scope
-    .resolve(GetResourceUseCaseToken)
-    .execute({ id });
-  if (!resource)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Resource not found" });
-  const environment = await ctx.scope
-    .resolve(GetEnvironmentUseCaseToken)
-    .execute({ id: resource.environmentId });
-  const project = environment
-    ? await ctx.scope
-        .resolve(GetProjectUseCaseToken)
-        .execute({ id: environment.projectId })
-    : null;
-  if (!project)
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Environment not found",
-    });
-  await checkPermission(
-    ctx.session.user.id,
-    project.organizationId,
-    `resource:${action}`,
-  );
-  return resource as Resource;
+function authorize(
+  ctx: AuthenticatedContext,
+  id: string,
+  action: "view" | "update",
+) {
+  return authorizeResource(ctx, id, {
+    action: `resource:${action}`,
+    missingProjectMessage: "Environment not found",
+  });
 }
 
 async function updateConfig(
-  ctx: any,
+  ctx: AuthenticatedContext,
   resource: Resource,
   config: ReturnType<typeof parseResourceAdvancedConfig>,
 ) {

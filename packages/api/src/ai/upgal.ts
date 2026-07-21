@@ -1983,7 +1983,7 @@ export async function createUpGalResponse(
     finishedAt?: Date;
   }) => {
     try {
-      await ai.updateRun(runId, patch);
+      await ai.updateRun(runId, context.organizationId, context.userId, patch);
     } catch (error) {
       log.error({
         message: "Failed to update UpGal run state",
@@ -2055,7 +2055,13 @@ export async function createUpGalResponse(
     },
     onStepEnd: async ({ messages }) => {
       try {
-        await saveIncomingMessages(context.conversationId, messages, ai);
+        await saveIncomingMessages(
+          context.conversationId,
+          messages,
+          ai,
+          context.organizationId,
+          context.userId,
+        );
       } catch (error) {
         log.error({
           message: "Failed to persist UpGal intermediate messages",
@@ -2071,7 +2077,13 @@ export async function createUpGalResponse(
     // stored, so a reloaded conversation loses the useful part of the run.
     onEnd: async ({ messages, isAborted, finishReason }) => {
       try {
-        await saveIncomingMessages(context.conversationId, messages, ai);
+        await saveIncomingMessages(
+          context.conversationId,
+          messages,
+          ai,
+          context.organizationId,
+          context.userId,
+        );
         if (isAborted) {
           await updateRunSafely({ status: "failed", finishedAt: new Date() });
         }
@@ -2119,12 +2131,22 @@ export async function persistUpGalMessages(
   conversationId: string,
   messages: ReadonlyArray<UpGalUIMessage>,
   ai: IAIRepository,
+  organizationId?: string,
+  userId?: string,
 ): Promise<void> {
   const previous =
     messagePersistenceChains.get(conversationId) ?? Promise.resolve();
   const current = previous
     .catch(() => undefined)
-    .then(() => saveIncomingMessagesNow(conversationId, messages, ai));
+    .then(() =>
+      saveIncomingMessagesNow(
+        conversationId,
+        messages,
+        ai,
+        organizationId,
+        userId,
+      ),
+    );
   messagePersistenceChains.set(conversationId, current);
 
   try {
@@ -2140,14 +2162,24 @@ export async function saveIncomingMessages(
   conversationId: string,
   messages: ReadonlyArray<UpGalUIMessage>,
   ai: IAIRepository,
+  organizationId?: string,
+  userId?: string,
 ) {
-  return persistUpGalMessages(conversationId, messages, ai);
+  return persistUpGalMessages(
+    conversationId,
+    messages,
+    ai,
+    organizationId,
+    userId,
+  );
 }
 
 async function saveIncomingMessagesNow(
   conversationId: string,
   messages: ReadonlyArray<UpGalUIMessage>,
   ai: IAIRepository,
+  organizationId?: string,
+  userId?: string,
 ) {
   const existingMessages = await ai.listMessages(conversationId);
   const existingCreatedAt = new Map(
@@ -2172,13 +2204,17 @@ async function saveIncomingMessagesNow(
       createdAt:
         existingCreatedAt.get(message.id) ?? new Date(nextCreatedAt + index),
     })),
+    organizationId,
+    userId,
   );
   const firstUserText = messages
     .find((message) => message.role === "user")
     ?.parts.find((part) => part.type === "text")?.text;
-  if (firstUserText?.trim()) {
+  if (firstUserText?.trim() && organizationId && userId) {
     await ai.updateConversationTitle(
       conversationId,
+      organizationId,
+      userId,
       firstUserText.trim().replace(/\s+/g, " "),
     );
   }

@@ -1,4 +1,7 @@
-import type { NotificationConfiguration } from "@upstand/domain";
+import {
+  type NotificationConfiguration,
+  OperationalError,
+} from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import type {
   NotificationAction,
@@ -27,8 +30,9 @@ async function ensureSuccess(
     response,
     MAX_PROVIDER_ERROR_BODY_LENGTH,
   );
-  throw new Error(
+  throw new OperationalError(
     `${provider} rejected the notification (${response.status} ${response.statusText})${body ? `: ${body}` : ""}`,
+    "NOTIFICATION",
   );
 }
 
@@ -78,6 +82,15 @@ async function fetchWithTimeout(
   );
   try {
     return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new OperationalError("Notification request timed out.", "TIMEOUT", {
+        cause: error,
+      });
+    }
+    throw new OperationalError("Notification request failed.", "NETWORK", {
+      cause: error,
+    });
   } finally {
     clearTimeout(timeout);
   }
@@ -289,8 +302,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const meta = message.metadata ?? {};
-    const isFailed =
-      message.title.toLowerCase().includes("fail") || !!meta.error;
+    const isFailed = meta.status === "failed" || !!meta.error;
 
     const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
     if (meta.resourceName)

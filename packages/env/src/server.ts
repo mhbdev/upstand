@@ -82,8 +82,9 @@ const validatedEnv = createEnv({
   },
   runtimeEnv: process.env,
   skipValidation:
-    !!process.env.SKIP_ENV_VALIDATION ||
-    process.env.NEXT_PHASE === "phase-production-build",
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    (process.env.NODE_ENV !== "production" &&
+      !!process.env.SKIP_ENV_VALIDATION),
   emptyStringAsUndefined: true,
 });
 

@@ -91,7 +91,7 @@ export const dockerRegistryRouter = router({
       await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        "docker_registry:create",
+        "docker_registry:update",
       );
 
       const useCase = ctx.scope.resolve(UpdateDockerRegistryUseCaseToken);

@@ -344,6 +344,20 @@
       "when": 1784618581249,
       "tag": "0048_rare_star_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1784666189122,
+      "tag": "0049_integrity_and_hot_path_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1784666216253,
+      "tag": "0050_furry_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

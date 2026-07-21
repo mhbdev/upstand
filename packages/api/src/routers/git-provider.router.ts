@@ -150,7 +150,7 @@ export const gitProviderRouter = router({
       await checkPermission(
         ctx.session.user.id,
         provider.organizationId,
-        "git_provider:create",
+        "git_provider:update",
       );
       const useCase = ctx.scope.resolve(UpdateGitProviderUseCaseToken);
       try {

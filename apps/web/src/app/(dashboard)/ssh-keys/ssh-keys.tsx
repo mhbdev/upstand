@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -307,27 +308,21 @@ export default function SSHKeys(_props: {
         </div>
       ) : keys && keys.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {keys.map((key, index) => (
-            <Card key={key.id} className="border border-border/40 bg-card/30">
-              <CardHeader className="flex flex-row items-start justify-between pb-3">
+          {keys.map((key) => (
+            <Card key={key.id}>
+              <CardHeader className="flex flex-row items-start justify-between">
                 <div className="space-y-1">
+                  <Badge variant="outline" className="uppercase">
+                    {key.algorithm}
+                  </Badge>
                   <CardTitle className="flex items-center gap-2 font-bold text-base">
-                    <span className="font-mono text-muted-foreground text-xs">
-                      {index + 1}.
-                    </span>
                     {key.name}
-                    <span className="rounded-full border border-border/50 px-2 py-0.5 font-mono text-[9px] text-muted-foreground uppercase tracking-wider">
-                      {key.algorithm}
-                    </span>
                   </CardTitle>
                   {key.description && (
                     <CardDescription className="line-clamp-2 text-muted-foreground text-xs">
                       {key.description}
                     </CardDescription>
                   )}
-                  <p className="pt-1 font-semibold text-[10px] text-muted-foreground/70 uppercase tracking-wider">
-                    Created: {new Date(key.createdAt).toLocaleString()}
-                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Button
@@ -362,7 +357,7 @@ export default function SSHKeys(_props: {
                   <Label className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest">
                     Fingerprint
                   </Label>
-                  <p className="select-all break-all pt-1 font-mono text-[10px] text-zinc-300">
+                  <p className="select-all break-all pt-1 font-mono text-[10px] text-muted-foreground">
                     {key.fingerprint ?? `${key.publicKey.substring(0, 60)}...`}
                   </p>
                 </div>

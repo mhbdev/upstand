@@ -1,5 +1,3 @@
-process.env.SKIP_ENV_VALIDATION = "1";
-
 import { createInterface } from "node:readline";
 
 async function askQuestion(query: string): Promise<string> {
@@ -24,24 +22,29 @@ async function main() {
     process.exit(1);
   }
 
-  // Dynamically import db dependencies to bypass schema validation checks during boot
-  const { db, user, twoFactor, closeDb } = await import("@upstand/db");
-  const { eq } = await import("drizzle-orm");
+  const { getServiceProvider } = await import("./di");
+  const { closeDb } = await import("@upstand/db");
+  const { ResetTwoFactorUseCaseToken } = await import(
+    "@upstand/usecases/tokens"
+  );
+  const scope = getServiceProvider().createScope();
 
-  if (command === "reset-2fa") {
-    let email = args.find((a) => a.startsWith("--email="))?.split("=")[1];
+  try {
+    if (command !== "reset-2fa") {
+      printUsage();
+      process.exitCode = 1;
+      return;
+    }
+
+    const resetTwoFactor = scope.resolve(ResetTwoFactorUseCaseToken);
+    let email = args.find((a) => a.startsWith("--email="))?.slice(8);
 
     if (!email) {
-      // Find all users with 2FA enabled
-      const mfaUsers = await db
-        .select()
-        .from(user)
-        .where(eq(user.twoFactorEnabled, true));
+      const mfaUsers = await resetTwoFactor.listEnabledUsers();
 
       if (mfaUsers.length === 0) {
         console.log("No users found with Two-Factor Authentication enabled.");
-        await closeDb();
-        process.exit(0);
+        return;
       }
 
       console.log("\nUsers with Two-Factor Authentication enabled:");
@@ -56,8 +59,8 @@ async function main() {
 
       if (!input) {
         console.error("Error: Input cannot be empty.");
-        await closeDb();
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
 
       const index = Number.parseInt(input, 10) - 1;
@@ -69,14 +72,12 @@ async function main() {
       }
     }
 
-    const targetUser = await db.query.user.findFirst({
-      where: eq(user.email, email),
-    });
+    const targetUser = await resetTwoFactor.findUserByEmail(email);
 
     if (!targetUser) {
       console.error(`\nError: User with email '${email}' not found.`);
-      await closeDb();
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     console.log(
@@ -84,29 +85,18 @@ async function main() {
     );
 
     try {
-      await db.transaction(async (tx) => {
-        // 1. Disable 2FA in user table
-        await tx
-          .update(user)
-          .set({ twoFactorEnabled: false })
-          .where(eq(user.id, targetUser.id));
-
-        // 2. Remove two_factor records
-        await tx.delete(twoFactor).where(eq(twoFactor.userId, targetUser.id));
-      });
+      await resetTwoFactor.reset(targetUser.id);
 
       console.log(
         "Success: Two-Factor Authentication has been successfully reset. The user can now log in using only their password.\n",
       );
     } catch (err) {
       console.error("Error: Failed to reset Two-Factor Authentication:", err);
-    } finally {
-      await closeDb();
+      process.exitCode = 1;
     }
-  } else {
-    printUsage();
+  } finally {
+    await scope.dispose();
     await closeDb();
-    process.exit(1);
   }
 }
 

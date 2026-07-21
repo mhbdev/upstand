@@ -18,16 +18,19 @@ import {
 } from "@upstand/usecases/tokens";
 import { log } from "evlog";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
+import { authorizeContextCapability } from "../permissions";
 
 const SwarmOrganizationInputSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
 });
 
-async function requireClusterOwner(userId: string, organizationId: string) {
-  await ensureOrganizationAccess(userId, organizationId, ["owner"]);
+async function requireClusterOwner(
+  ctx: Parameters<typeof authorizeContextCapability>[0],
+  organizationId: string,
+) {
+  await authorizeContextCapability(ctx, organizationId, "swarm:manage");
 }
 
 function auditClusterOperation({
@@ -84,7 +87,7 @@ export const swarmRouter = router({
   getInfo: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema)
     .query(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(GetSwarmInfoUseCaseToken);
       try {
         return await useCase.execute();
@@ -96,7 +99,7 @@ export const swarmRouter = router({
   getNodes: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema)
     .query(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(GetSwarmNodesUseCaseToken);
       try {
         return await useCase.execute();
@@ -108,7 +111,7 @@ export const swarmRouter = router({
   updateNode: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema.merge(UpdateSwarmNodeInputSchema))
     .mutation(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(UpdateSwarmNodeUseCaseToken);
       try {
         const result = await useCase.execute(input);
@@ -138,7 +141,7 @@ export const swarmRouter = router({
   initSwarm: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema.merge(InitSwarmInputSchema))
     .mutation(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(InitSwarmUseCaseToken);
       try {
         const result = await useCase.execute(input);
@@ -168,7 +171,7 @@ export const swarmRouter = router({
   removeNode: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema.merge(RemoveSwarmNodeInputSchema))
     .mutation(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(RemoveSwarmNodeUseCaseToken);
       try {
         const result = await useCase.execute(input);
@@ -194,7 +197,7 @@ export const swarmRouter = router({
   getJoinCommands: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema)
     .query(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(GetSwarmJoinCommandsUseCaseToken);
       try {
         const result = await useCase.execute();
@@ -216,7 +219,7 @@ export const swarmRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const result = await ctx.scope
         .resolve(GetSwarmJoinCommandsUseCaseToken)
         .execute();
@@ -238,7 +241,7 @@ export const swarmRouter = router({
   rotateJoinToken: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema.merge(RotateSwarmJoinTokenInputSchema))
     .mutation(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(RotateSwarmJoinTokenUseCaseToken);
       try {
         const result = await useCase.execute(input);
@@ -263,7 +266,7 @@ export const swarmRouter = router({
   getTasks: twoFactorVerifiedProcedure
     .input(SwarmOrganizationInputSchema)
     .query(async ({ ctx, input }) => {
-      await requireClusterOwner(ctx.session.user.id, input.organizationId);
+      await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(GetSwarmContainersUseCaseToken);
       try {
         return await useCase.execute();

@@ -28,4 +28,13 @@ export interface INotificationDeliveryRepository {
     id: string,
     patch: Partial<CreateNotificationDeliveryDTO>,
   ): Promise<NotificationDelivery | null>;
+  updateClaimed(
+    id: string,
+    processingStartedAt: Date,
+    patch: Partial<CreateNotificationDeliveryDTO>,
+  ): Promise<NotificationDelivery | null>;
+  requeueIfRetryable?(
+    id: string,
+    expectedUpdatedAt: Date,
+  ): Promise<NotificationDelivery | null>;
 }

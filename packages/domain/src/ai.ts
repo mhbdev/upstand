@@ -153,6 +153,7 @@ export interface IAIRepository {
   ): Promise<AIProviderConfigRecord>;
   updateProviderConfig(
     id: string,
+    organizationId: string,
     patch: UpdateAIProviderConfig,
   ): Promise<void>;
   deleteProviderConfig(id: string, organizationId: string): Promise<void>;
@@ -188,7 +189,12 @@ export interface IAIRepository {
     organizationId: string,
     userId: string,
   ): Promise<AIConversationRecord[]>;
-  updateConversationTitle(conversationId: string, title: string): Promise<void>;
+  updateConversationTitle(
+    conversationId: string,
+    organizationId: string,
+    userId: string,
+    title: string,
+  ): Promise<void>;
   deleteConversation(
     conversationId: string,
     organizationId: string,
@@ -200,12 +206,16 @@ export interface IAIRepository {
   saveMessages(
     conversationId: string,
     messages: readonly AIMessageRecord[],
+    organizationId?: string,
+    userId?: string,
   ): Promise<void>;
 
   // ── Runs ──────────────────────────────────────────────────────────────────
   createRun(input: CreateAIRun): Promise<void>;
   updateRun(
     runId: string,
+    organizationId: string,
+    userId: string,
     patch: { stepCount?: number; status?: string; finishedAt?: Date },
   ): Promise<void>;
 }

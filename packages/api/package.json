@@ -5,6 +5,12 @@
     ".": {
       "default": "./src/index.ts"
     },
+    "./trpc": {
+      "default": "./src/trpc/index.ts"
+    },
+    "./router": {
+      "default": "./src/router.ts"
+    },
     "./*": {
       "default": "./src/*.ts"
     }

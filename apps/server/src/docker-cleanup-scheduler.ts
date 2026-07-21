@@ -1,4 +1,3 @@
-import { getServiceProvider } from "@upstand/api/di";
 import { DockerCleanupService } from "@upstand/infrastructure";
 import { resolveDockerCliEnvironmentForServer } from "@upstand/usecases";
 import {
@@ -6,6 +5,7 @@ import {
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
 import { log } from "evlog";
+import { getServiceProvider } from "./di";
 
 export class ScheduledDockerCleanup {
   private timer: ReturnType<typeof setInterval> | null = null;

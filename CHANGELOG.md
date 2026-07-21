@@ -4,6 +4,22 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.109 - 2026-07-22
+
+### Added
+- **SCIM 2.0 Identity Management & Admin 2FA Reset**: Added SCIM repository layer and API router endpoints for enterprise user provisioning/deprovisioning. Implemented admin 2FA reset workflow and repositories.
+- **Docker Deployment Convergence & Automated Rollback**: Introduced Docker service deployment convergence validation with automatic rollback triggers upon step failure or container convergence timeouts.
+- **Database Hot-Path & Integrity Indexing**: Added migrations `0049_integrity_and_hot_path_indexes.sql` and `0050_furry_quentin_quire.sql` to optimize query performance across deployments, resources, and notification outbox tables.
+
+### Improved
+- **Modular Server & API Architecture**: De-monolithized server startup (`apps/server`) and `@upstand/api` routers (`web-server.router`, `permissions`, `rate-limit`, `openapi`, `errors`) into clean modular domains (`/scim`, `/trpc`, `/authorization`, `/rate-limiting`, `/routers/web-server`). Added full procedure authorization policy test coverage.
+- **Resilient Redis Rate-Limiting**: Enhanced rate limiter with a circuit breaker and bounded local token-bucket LRU fallback, gracefully maintaining rate limits when Redis experiences timeouts or disconnections.
+- **UpGal AI Stability & Recovery**: Upgraded UpGal error classification, instruction guidelines, and message history persistence to automatically recover from stale tool call states.
+- **Docker Dashboard & Log Viewer**: Expanded Docker logs component with log level filtering (`INFO`, `WARN`, `ERROR`), pause/resume controls, auto-scroll toggle, and enhanced log search.
+
+### Fixed
+- **Codebase Lint & Format Compliance**: Resolved Biome linting and formatting issues across apps and packages, ensuring clean workspace build state for releases.
+
 ## 0.1.108 - 2026-07-21
 
 ### Fixed

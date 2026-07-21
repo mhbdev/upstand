@@ -67,6 +67,7 @@ import {
   Upload,
 } from "@/components/huge-icons";
 import { CodeBlock } from "@/components/shared/code-block";
+import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import {
   uploadArchive,
@@ -1096,7 +1097,7 @@ export default function DockerInventoryPage() {
                   {/* Kind: LOGS */}
                   {kind === "logs" && (
                     <div className="space-y-4">
-                      {/* Logs Controls */}
+                      {/* Target Selection & Query Parameters */}
                       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
                         <Label className="flex flex-col space-y-1 font-semibold text-xs">
                           <span className="mb-1 text-muted-foreground">
@@ -1170,99 +1171,27 @@ export default function DockerInventoryPage() {
                         </Label>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3 border-t pt-3">
-                        <Input
-                          className="h-9 max-w-xs"
-                          value={logSearch}
-                          onChange={(e) => setLogSearch(e.target.value)}
-                          placeholder="Regex search logs..."
-                        />
-
-                        <div className="flex flex-wrap items-center gap-1.5 rounded-md border p-1 text-[11px]">
-                          {(
-                            [
-                              "error",
-                              "warning",
-                              "success",
-                              "info",
-                              "debug",
-                            ] as const
-                          ).map((level) => {
-                            const isSelected = logLevels.includes(level);
-                            return (
-                              <button
-                                key={level}
-                                type="button"
-                                onClick={() => {
-                                  setLogLevels((prev) =>
-                                    prev.includes(level)
-                                      ? prev.filter((l) => l !== level)
-                                      : [...prev, level],
-                                  );
-                                }}
-                                className={`rounded px-2 py-0.5 font-medium capitalize transition-colors ${
-                                  isSelected
-                                    ? "bg-primary text-primary-foreground"
-                                    : "text-muted-foreground hover:bg-muted"
-                                }`}
-                              >
-                                {level}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        <div className="flex-1" />
-
-                        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                          <Label className="flex cursor-pointer items-center gap-1.5">
-                            <Checkbox
-                              checked={autoScroll}
-                              onCheckedChange={(value) => setAutoScroll(value)}
-                              className="rounded border bg-background"
-                            />
-                            <span>Auto-scroll</span>
-                          </Label>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const logsText =
-                                typeof inventoryQuery.data === "string"
-                                  ? inventoryQuery.data
-                                  : "";
-                              if (logsText) {
-                                void copyText(logsText)
-                                  .then(() =>
-                                    toast.success("Logs copied to clipboard"),
-                                  )
-                                  .catch(() =>
-                                    toast.error("Failed to copy logs"),
-                                  );
-                              } else {
-                                toast.error("No logs to copy");
-                              }
-                            }}
-                          >
-                            Copy
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Terminal Console Logs Container */}
-                      <div className="relative">
-                        <pre
-                          ref={logContainerRef}
-                          className="h-[400px] select-text overflow-auto rounded-lg border border-border/60 bg-[#080c0a] p-4 font-mono text-[11px] text-slate-300 leading-relaxed shadow-inner"
-                        >
-                          {typeof inventoryQuery.data === "string" &&
-                          inventoryQuery.data
-                            ? stripAnsi(inventoryQuery.data)
-                            : containerId || serviceName
-                              ? "Querying logs or no logs match current filters..."
-                              : "Choose a container or input a service name above to inspect logs."}
-                        </pre>
-                      </div>
+                      {/* Advanced Reusable Log Viewer */}
+                      <ShowDockerLogs
+                        containerId={
+                          containerId
+                            ? (availableContainers.find(
+                                (c) => c.id === containerId,
+                              )?.name ?? containerId)
+                            : serviceName || "docker"
+                        }
+                        logs={
+                          typeof inventoryQuery.data === "string"
+                            ? inventoryQuery.data
+                            : undefined
+                        }
+                        isFetching={inventoryQuery.isFetching}
+                        emptyMessage={
+                          containerId || serviceName
+                            ? "Querying logs or no logs match current target filters..."
+                            : "Choose a container or input a service name above to inspect logs."
+                        }
+                      />
                     </div>
                   )}
 

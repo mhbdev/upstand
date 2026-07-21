@@ -1,15 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import {
   API_KEY_CONFIG_ID,
-  API_KEY_ROUTE_CAPABILITIES,
   type ApiKeyPermissions,
-  type ApiKeyRoute,
   type Capability,
-  hasApiKeyPermission,
-  isCapability,
   statementsToApiKeyPermissions,
 } from "@upstand/domain";
 import { auth } from "./auth";
+import {
+  API_KEY_ROUTE_CAPABILITIES,
+  type ApiKeyRoute,
+} from "./authorization/procedure-policy";
+import { authorizeApiKeyCapability } from "./permissions";
 
 export type ApiKeyPrincipal = {
   kind: "api-key";
@@ -133,13 +134,5 @@ export async function enforceApiKeyRoute(
       message: "The API key cannot access another organization.",
     });
   }
-  if (
-    !isCapability(required) ||
-    !hasApiKeyPermission(actor.permissions, required)
-  ) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `API key permission required: ${required}`,
-    });
-  }
+  await authorizeApiKeyCapability(actor, actor.organizationId, required);
 }

@@ -103,7 +103,7 @@ export const sshKeyRouter = router({
       await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        "ssh_key:create",
+        "ssh_key:update",
       );
       const useCase = ctx.scope.resolve(UpdateSshKeyUseCaseToken);
       try {

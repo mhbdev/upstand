@@ -3,7 +3,7 @@ import { ConflictError, ValidationError } from "@upstand/domain";
 import { env } from "@upstand/env/server";
 import type Docker from "dockerode";
 
-export const UPSTAND_SWARM_NETWORK = env.DOCKER_NETWORK;
+export const UPSTAND_SWARM_NETWORK = env.DOCKER_NETWORK || "upstand-network";
 
 const RESOURCE_NETWORK_PREFIX = "upstand-resource-";
 

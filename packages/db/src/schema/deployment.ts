@@ -15,6 +15,7 @@ export const deployment = pgTable(
     serverId: text("server_id"),
     serverName: text("server_name"),
     sourceRevision: text("source_revision"),
+    executionToken: text("execution_token"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -29,6 +30,7 @@ export const deployment = pgTable(
     ),
     index("deployment_status_idx").on(table.status),
     index("deployment_server_status_idx").on(table.serverId, table.status),
+    index("deployment_execution_lease_idx").on(table.status, table.updatedAt),
   ],
 );
 

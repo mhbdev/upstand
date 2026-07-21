@@ -1,8 +1,8 @@
-import { getServiceProvider } from "@upstand/api/di";
 import { BullMqOutboxJobPublisher } from "@upstand/infrastructure";
 import { OutboxPublisher } from "@upstand/usecases";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
+import { getServiceProvider } from "./di";
 
 const PUBLISH_INTERVAL_MS = 1_000;
 const RETENTION_INTERVAL_MS = 60 * 60_000;

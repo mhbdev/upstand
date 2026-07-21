@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { classifyUpGalError } from "./upgal-errors";
+import { classifyUpGalError, UpGalError } from "./upgal-errors";
 
 describe("classifyUpGalError", () => {
   it("returns actionable configuration guidance without exposing provider details", () => {
     expect(
-      classifyUpGalError(new Error("Please configure an AI provider")),
+      classifyUpGalError(
+        new UpGalError("configuration", "provider is not configured"),
+      ),
     ).toEqual({
       code: "configuration",
       status: 503,
@@ -15,7 +17,7 @@ describe("classifyUpGalError", () => {
 
   it("marks transient provider failures as retryable", () => {
     expect(
-      classifyUpGalError(new Error("429 rate limit exceeded")),
+      classifyUpGalError(new UpGalError("rate_limit", "provider throttled")),
     ).toMatchObject({
       code: "rate_limit",
       status: 429,
@@ -25,11 +27,17 @@ describe("classifyUpGalError", () => {
 
   it("maps malformed requests to a non-retryable validation error", () => {
     expect(
-      classifyUpGalError(new Error("Invalid tool arguments")),
+      classifyUpGalError(new UpGalError("validation", "invalid arguments")),
     ).toMatchObject({
       code: "validation",
       status: 400,
       retryable: false,
     });
+  });
+
+  it("does not classify arbitrary provider text by message", () => {
+    expect(classifyUpGalError(new Error("429 rate limit exceeded")).code).toBe(
+      "provider",
+    );
   });
 });
