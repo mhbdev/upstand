@@ -1,4 +1,5 @@
 import type { NotificationConfiguration } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import type {
   NotificationAction,
   NotificationMessage,
@@ -113,7 +114,7 @@ function resolveNotificationActions(
       ? meta.dashboardUrl
       : typeof meta.url === "string"
         ? meta.url
-        : process.env.UPSTAND_BASE_URL || process.env.APP_URL || "";
+        : env.UPSTAND_BASE_URL || env.APP_URL || "";
 
   if (
     typeof meta.actionUrl === "string" &&

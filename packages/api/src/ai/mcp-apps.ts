@@ -4,6 +4,7 @@ import {
   mcpAppClientCapabilities,
   splitMCPAppTools,
 } from "@ai-sdk/mcp";
+import { env } from "@upstand/env/server";
 import type { Tool } from "ai";
 import { log } from "evlog";
 import { z } from "zod";
@@ -23,7 +24,7 @@ export type UpGalMCPAppConnection = {
 };
 
 function configuredServers() {
-  const raw = process.env.UPGAL_MCP_SERVERS?.trim();
+  const raw = env.UPGAL_MCP_SERVERS?.trim();
   if (!raw) return [];
 
   try {

@@ -8,6 +8,7 @@ import {
   type DatabaseType,
   type ResourceComposeType,
 } from "@upstand/domain";
+import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -610,7 +611,9 @@ export function GeneralTab({
         githubAccount,
         repository: githubRepo,
         branch: githubBranch,
-        composePath: githubComposePath,
+        ...(resource.type === "compose"
+          ? { composePath: githubComposePath }
+          : {}),
         triggerType: githubTriggerType,
         watchPaths: githubWatchPaths,
         enableSubmodules: githubSubmodules,
@@ -621,7 +624,7 @@ export function GeneralTab({
         repositoryUrl: gitUrl,
         sshKeyId: gitSshKeyId,
         branch: gitBranch,
-        composePath: gitComposePath,
+        ...(resource.type === "compose" ? { composePath: gitComposePath } : {}),
         triggerType: gitTriggerType,
         watchPaths: gitWatchPaths,
         enableSubmodules: gitSubmodules,
@@ -774,141 +777,149 @@ export function GeneralTab({
     <div className="grid min-w-0 gap-6 md:grid-cols-3">
       <div className="min-w-0 space-y-6 md:col-span-2">
         {/* Deploy settings */}
-        <Card className="border border-border/40 bg-card/20">
-          <CardHeader>
-            <CardTitle className="font-semibold text-lg">
-              Deployment Operations
-            </CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">
-              Control pipeline states and webhook configs.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 border-border/20 border-t pt-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <span className="block font-semibold text-foreground text-sm">
-                  Auto Deploy webhook triggers
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  Deploy the container automatically when source code updates.
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-muted-foreground text-xs">
-                  {autoDeploy ? "Active" : "Disabled"}
-                </span>
-                <Checkbox
-                  checked={autoDeploy}
-                  onCheckedChange={(val) => {
-                    const checked = Boolean(val);
-                    setAutoDeploy(checked);
-                    const config = {
-                      ...parseResourceCredentials(secrets.credentials),
-                      autoDeploy: checked,
-                    };
-                    updateResource(
-                      {
-                        id: resource.id,
-                        credentials: JSON.stringify(config),
-                      },
-                      {
-                        onSuccess: () => {
-                          toast.success(
-                            `Auto Deploy ${val ? "enabled" : "disabled"}`,
-                          );
+        {resource.type !== "database" && (
+          <Card className="border border-border/40 bg-card/20">
+            <CardHeader>
+              <CardTitle className="font-semibold text-lg">
+                Deployment Operations
+              </CardTitle>
+              <CardDescription className="text-muted-foreground text-sm">
+                Control pipeline states and webhook configs.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 border-border/20 border-t pt-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <span className="block font-semibold text-foreground text-sm">
+                    Auto Deploy webhook triggers
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    Deploy the container automatically when source code updates.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-muted-foreground text-xs">
+                    {autoDeploy ? "Active" : "Disabled"}
+                  </span>
+                  <Checkbox
+                    checked={autoDeploy}
+                    onCheckedChange={(val) => {
+                      const checked = Boolean(val);
+                      setAutoDeploy(checked);
+                      const config = {
+                        ...parseResourceCredentials(secrets.credentials),
+                        autoDeploy: checked,
+                      };
+                      updateResource(
+                        {
+                          id: resource.id,
+                          credentials: JSON.stringify(config),
                         },
-                      },
-                    );
-                  }}
-                  className="size-4 cursor-pointer rounded accent-primary"
-                />
+                        {
+                          onSuccess: () => {
+                            toast.success(
+                              `Auto Deploy ${val ? "enabled" : "disabled"}`,
+                            );
+                          },
+                        },
+                      );
+                    }}
+                    className="size-4 cursor-pointer rounded accent-primary"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-3 border-border/20 border-t pt-4">
-              <div>
-                <span className="block font-semibold text-foreground text-sm">
-                  External webhook URL
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  Use this endpoint for CI systems that cannot install a
-                  provider webhook. Tokens are stored only as hashes.
-                  {!webhookToken && resource.webhookTokenPrefix && (
-                    <span className="mt-1 block font-medium text-amber-600 dark:text-amber-400">
-                      ⚠️ Only the prefix is shown below. Rotate the token to copy
-                      the full URL.
-                    </span>
+              <div className="flex flex-col gap-3 border-border/20 border-t pt-4">
+                <div>
+                  <span className="block font-semibold text-foreground text-sm">
+                    External webhook URL
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    Use this endpoint for CI systems that cannot install a
+                    provider webhook. Tokens are stored only as hashes.
+                    {!webhookToken && resource.webhookTokenPrefix && (
+                      <span className="mt-1 block font-medium text-amber-600 dark:text-amber-400">
+                        ⚠️ Only the prefix is shown below. Rotate the token to
+                        copy the full URL.
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-lg bg-muted px-3 py-2 text-xs">
+                    {webhookBaseUrl}/api/deploy/
+                    {webhookToken ??
+                      (resource.webhookTokenPrefix
+                        ? `${resource.webhookTokenPrefix}••••••••••••`
+                        : "not-configured")}
+                  </code>
+                  {webhookToken && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label="Copy webhook URL"
+                      onClick={() => {
+                        void copyText(
+                          `${webhookBaseUrl}/api/deploy/${webhookToken}`,
+                        )
+                          .then(() => toast.success("Webhook URL copied"))
+                          .catch(() =>
+                            toast.error("Failed to copy webhook URL"),
+                          );
+                      }}
+                    >
+                      <Copy className="size-4" />
+                    </Button>
                   )}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg bg-muted px-3 py-2 text-xs">
-                  {webhookBaseUrl}/api/deploy/
-                  {webhookToken ??
-                    (resource.webhookTokenPrefix
-                      ? `${resource.webhookTokenPrefix}••••••••••••`
-                      : "not-configured")}
-                </code>
-                {webhookToken && (
                   <Button
                     type="button"
                     variant="outline"
-                    size="icon"
-                    aria-label="Copy webhook URL"
-                    onClick={() => {
-                      void copyText(
-                        `${webhookBaseUrl}/api/deploy/${webhookToken}`,
-                      )
-                        .then(() => toast.success("Webhook URL copied"))
-                        .catch(() => toast.error("Failed to copy webhook URL"));
-                    }}
+                    onClick={() =>
+                      rotateWebhookToken.mutate({ id: resource.id })
+                    }
+                    disabled={rotateWebhookToken.isPending}
                   >
-                    <Copy className="size-4" />
+                    {rotateWebhookToken.isPending
+                      ? "Rotating…"
+                      : "Rotate token"}
                   </Button>
-                )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 border-border/20 border-t pt-4">
                 <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => rotateWebhookToken.mutate({ id: resource.id })}
-                  disabled={rotateWebhookToken.isPending}
+                  onClick={() => deployResource({ id: resource.id })}
+                  disabled={isBuilding || isDeployingResource}
+                  className="gap-2 font-medium"
                 >
-                  {rotateWebhookToken.isPending ? "Rotating…" : "Rotate token"}
+                  <RefreshCw
+                    className={cn(
+                      "size-4",
+                      (isBuilding || isDeployingResource) && "animate-spin",
+                    )}
+                  />
+                  Deploy Now
+                </Button>
+                <Button
+                  onClick={() =>
+                    triggerStatusChange(isRunning ? "stopped" : "running")
+                  }
+                  variant="outline"
+                  disabled={isControllingResource}
+                  className="gap-2 border-border/40"
+                >
+                  {isRunning ? (
+                    <Square className="size-4 text-destructive" />
+                  ) : (
+                    <Play className="size-4" />
+                  )}
+                  {isRunning ? "Stop Service" : "Start Service"}
                 </Button>
               </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 border-border/20 border-t pt-4">
-              <Button
-                onClick={() => deployResource({ id: resource.id })}
-                disabled={isBuilding || isDeployingResource}
-                className="gap-2 font-medium"
-              >
-                <RefreshCw
-                  className={cn(
-                    "size-4",
-                    (isBuilding || isDeployingResource) && "animate-spin",
-                  )}
-                />
-                Deploy Now
-              </Button>
-              <Button
-                onClick={() =>
-                  triggerStatusChange(isRunning ? "stopped" : "running")
-                }
-                variant="outline"
-                disabled={isControllingResource}
-                className="gap-2 border-border/40"
-              >
-                {isRunning ? (
-                  <Square className="size-4 text-destructive" />
-                ) : (
-                  <Play className="size-4" />
-                )}
-                {isRunning ? "Stop Service" : "Start Service"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border border-border/40 bg-card/20">
           <CardHeader>
@@ -916,16 +927,24 @@ export function GeneralTab({
               Execution Infrastructure
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
-              Separate the Docker deployment target from the machine that
-              performs application builds.
+              {resource.type === "application"
+                ? "Separate the Docker deployment target from the machine that performs application builds."
+                : "Select the Docker deployment target server for this resource."}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5 border-border/20 border-t pt-4 sm:grid-cols-2">
-            <div className="space-y-2">
+            <div
+              className={cn(
+                "space-y-2",
+                resource.type !== "application" && "sm:col-span-2",
+              )}
+            >
               <Label htmlFor="deployment-server">Deployment server</Label>
               <Select
                 items={[
-                  { value: "default", label: "Local Swarm manager" },
+                  ...(!env.NEXT_PUBLIC_IS_CLOUD
+                    ? [{ value: "default", label: "Local Swarm manager" }]
+                    : []),
                   ...servers.map((server) => ({
                     value: server.id,
                     label: `${server.name} (${server.ipAddress})`,
@@ -937,10 +956,18 @@ export function GeneralTab({
                 }}
               >
                 <SelectTrigger id="deployment-server">
-                  <SelectValue placeholder="Use local Swarm manager" />
+                  <SelectValue
+                    placeholder={
+                      env.NEXT_PUBLIC_IS_CLOUD
+                        ? "Select Server"
+                        : "Use local Swarm manager"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Local Swarm manager</SelectItem>
+                  {!env.NEXT_PUBLIC_IS_CLOUD && (
+                    <SelectItem value="default">Local Swarm manager</SelectItem>
+                  )}
                   {servers.map((server) => (
                     <SelectItem key={server.id} value={server.id}>
                       {server.name} ({server.ipAddress})
@@ -953,40 +980,42 @@ export function GeneralTab({
                 configured.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="build-server">Build server</Label>
-              <Select
-                items={[
-                  { value: "default", label: "Same as deployment server" },
-                  ...servers.map((server) => ({
-                    value: server.id,
-                    label: `${server.name} (${server.ipAddress})`,
-                  })),
-                ]}
-                value={buildServerId}
-                onValueChange={(value) => {
-                  if (value) setBuildServerId(value);
-                }}
-              >
-                <SelectTrigger id="build-server">
-                  <SelectValue placeholder="Build on deployment server" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">
-                    Same as deployment server
-                  </SelectItem>
-                  {servers.map((server) => (
-                    <SelectItem key={server.id} value={server.id}>
-                      {server.name} ({server.ipAddress})
+            {resource.type === "application" && (
+              <div className="space-y-2">
+                <Label htmlFor="build-server">Build server</Label>
+                <Select
+                  items={[
+                    { value: "default", label: "Same as deployment server" },
+                    ...servers.map((server) => ({
+                      value: server.id,
+                      label: `${server.name} (${server.ipAddress})`,
+                    })),
+                  ]}
+                  value={buildServerId}
+                  onValueChange={(value) => {
+                    if (value) setBuildServerId(value);
+                  }}
+                >
+                  <SelectTrigger id="build-server">
+                    <SelectValue placeholder="Build on deployment server" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">
+                      Same as deployment server
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-xs">
-                Separate build servers use the selected registry to transfer the
-                resulting image to the deployment target.
-              </p>
-            </div>
+                    {servers.map((server) => (
+                      <SelectItem key={server.id} value={server.id}>
+                        {server.name} ({server.ipAddress})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  Separate build servers use the selected registry to transfer
+                  the resulting image to the deployment target.
+                </p>
+              </div>
+            )}
             {resource.type === "application" && (
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="build-registry">Build registry</Label>
@@ -1029,7 +1058,16 @@ export function GeneralTab({
             <div className="flex justify-end border-border/20 border-t pt-4 sm:col-span-2">
               <Button
                 disabled={isUpdatingResource}
-                onClick={() =>
+                onClick={() => {
+                  if (
+                    env.NEXT_PUBLIC_IS_CLOUD &&
+                    (deploymentServerId === "default" || !deploymentServerId)
+                  ) {
+                    toast.error(
+                      "Please select a target server for deployment.",
+                    );
+                    return;
+                  }
                   updateResource(
                     {
                       id: resource.id,
@@ -1037,18 +1075,22 @@ export function GeneralTab({
                         deploymentServerId === "default"
                           ? null
                           : deploymentServerId,
-                      buildServerId:
-                        buildServerId === "default" ? null : buildServerId,
                       ...(resource.type === "application"
-                        ? { buildRegistryId: buildRegistryId || null }
+                        ? {
+                            buildServerId:
+                              buildServerId === "default"
+                                ? null
+                                : buildServerId,
+                            buildRegistryId: buildRegistryId || null,
+                          }
                         : {}),
                     },
                     {
                       onSuccess: () =>
                         toast.success("Execution infrastructure saved"),
                     },
-                  )
-                }
+                  );
+                }}
               >
                 Save Infrastructure
               </Button>
@@ -1298,13 +1340,33 @@ export function GeneralTab({
               </div>
               <div className="flex flex-col gap-3 border-border/20 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-medium text-sm">Lifecycle operations</p>
+                  <p className="font-medium text-sm">
+                    Database Controls &amp; Lifecycle
+                  </p>
                   <p className="text-muted-foreground text-xs">
-                    Reload restarts the service. Rebuild removes the managed
-                    database volume and creates a clean instance.
+                    Control the database service status, check its
+                    health/version, or rebuild the database instance.
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={isRunning ? "destructive" : "default"}
+                    disabled={isControllingResource || isRebuildingDatabase}
+                    onClick={() =>
+                      triggerStatusChange(isRunning ? "stopped" : "running")
+                    }
+                    className="gap-2"
+                  >
+                    {isRunning ? (
+                      <>
+                        <Square className="size-4" /> Stop
+                      </>
+                    ) : (
+                      <>
+                        <Play className="size-4" /> Start
+                      </>
+                    )}
+                  </Button>
                   <Button
                     variant="outline"
                     disabled={databaseCommand.isPending}
@@ -2017,7 +2079,9 @@ export function GeneralTab({
                   { id: "bitbucket", label: "Bitbucket", icon: Globe },
                   { id: "gitea", label: "Gitea", icon: Code },
                   { id: "git", label: "Git", icon: Globe },
-                  { id: "raw", label: "Raw", icon: Code },
+                  ...(resource.type === "compose"
+                    ? [{ id: "raw", label: "Raw", icon: Code }]
+                    : []),
                 ].map((prov) => {
                   const Icon = prov.icon;
                   const active = providerType === prov.id;
@@ -2359,7 +2423,60 @@ export function GeneralTab({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  {resource.type === "compose" ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Branch</Label>
+                        <Select
+                          items={(gitBranches || []).map((branch: string) => ({
+                            value: branch,
+                            label: branch,
+                          }))}
+                          value={githubBranch}
+                          onValueChange={(value) =>
+                            setGithubBranch(value ?? "")
+                          }
+                          disabled={
+                            !githubRepo ||
+                            gitProviders?.filter(
+                              (p) => p.provider === providerType,
+                            ).length === 0
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                loadingBranches
+                                  ? "Loading Branches..."
+                                  : "Select Branch"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {gitBranches?.map((branch: string) => (
+                              <SelectItem key={branch} value={branch}>
+                                {branch}
+                              </SelectItem>
+                            ))}
+                            {(!gitBranches || gitBranches.length === 0) && (
+                              <SelectItem value="none" disabled>
+                                No Branches Found
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Compose Path</Label>
+                        <Input
+                          value={githubComposePath}
+                          onChange={(e) => setGithubComposePath(e.target.value)}
+                          placeholder="./docker-compose.yml"
+                          className="border-border/40 bg-card/30"
+                        />
+                      </div>
+                    </div>
+                  ) : (
                     <div className="space-y-2">
                       <Label>Branch</Label>
                       <Select
@@ -2399,16 +2516,7 @@ export function GeneralTab({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Compose Path</Label>
-                      <Input
-                        value={githubComposePath}
-                        onChange={(e) => setGithubComposePath(e.target.value)}
-                        placeholder="./docker-compose.yml"
-                        className="border-border/40 bg-card/30"
-                      />
-                    </div>
-                  </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Trigger Type</Label>
                     <Select
@@ -2587,7 +2695,28 @@ export function GeneralTab({
                       </Select>
                     </div>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  {resource.type === "compose" ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Branch</Label>
+                        <Input
+                          value={gitBranch}
+                          onChange={(e) => setGitBranch(e.target.value)}
+                          placeholder="master"
+                          className="border-border/40 bg-card/30"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Compose Path</Label>
+                        <Input
+                          value={gitComposePath}
+                          onChange={(e) => setGitComposePath(e.target.value)}
+                          placeholder="./docker-compose.yml"
+                          className="border-border/40 bg-card/30"
+                        />
+                      </div>
+                    </div>
+                  ) : (
                     <div className="space-y-2">
                       <Label>Branch</Label>
                       <Input
@@ -2597,16 +2726,7 @@ export function GeneralTab({
                         className="border-border/40 bg-card/30"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Compose Path</Label>
-                      <Input
-                        value={gitComposePath}
-                        onChange={(e) => setGitComposePath(e.target.value)}
-                        placeholder="./docker-compose.yml"
-                        className="border-border/40 bg-card/30"
-                      />
-                    </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Trigger Type</Label>

@@ -234,7 +234,9 @@ app.use(
         }
 
         // Also trust if it matches the hostname of the configured CORS_ORIGIN
-        const configuredCorsUrl = new URL(env.CORS_ORIGIN);
+        const configuredCorsUrl = new URL(
+          env.CORS_ORIGIN || "http://localhost:3001",
+        );
         if (originUrl.hostname === configuredCorsUrl.hostname) {
           return origin;
         }
@@ -242,7 +244,7 @@ app.use(
         // Fallback
       }
 
-      return env.CORS_ORIGIN;
+      return env.CORS_ORIGIN || "http://localhost:3001";
     },
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
@@ -306,7 +308,7 @@ app.post("/api/terminal/session", async (c) => {
     );
   }
   const controlPlaneFingerprint =
-    process.env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT;
+    env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT;
   if (!controlPlaneFingerprint) {
     return c.json(
       {
@@ -480,7 +482,7 @@ app.post("/api/container-terminal/session", async (c) => {
       keyVersion: key.privateKeyVersion,
     });
     hostKeyFingerprint =
-      process.env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT || "";
+      env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT || "";
     if (!hostKeyFingerprint) {
       return c.json(
         {
@@ -605,7 +607,7 @@ app.post("/api/docker/terminal/session", async (c) => {
       keyVersion: key.privateKeyVersion,
     });
     hostKeyFingerprint =
-      process.env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT || "";
+      env.UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT || "";
     if (!hostKeyFingerprint) {
       return c.json(
         {
@@ -825,6 +827,19 @@ app.post("/api/monitoring/alerts", async (c) => {
     value,
     threshold,
   });
+
+  // Cooldown protection: suppress duplicate notification dispatches for 15 minutes per (serverId, type)
+  const cooldownKey = `monitoring-alert-cooldown:${serverId}:${type}`;
+  const acquireCooldown = await redis.set(cooldownKey, "1", "EX", 900, "NX");
+  if (acquireCooldown !== "OK") {
+    log.info({
+      message:
+        "Server threshold alert notification suppressed due to 15-minute cooldown",
+      serverId: settings.serverId,
+      type,
+    });
+    return c.json({ status: "acknowledged", throttled: true });
+  }
 
   const publisher = scope.resolve(PublishNotificationUseCaseToken);
 
@@ -1573,7 +1588,7 @@ app.post("/api/webhooks/dockerhub/:providerId", (c) =>
 app.get("/api/setup/status", async (c) => {
   const result = await db.select({ value: count() }).from(authSchema.user);
   const userCount = result[0]?.value ?? 0;
-  return c.json({ needsOwnerSetup: userCount === 0 });
+  return c.json({ needsOwnerSetup: userCount === 0, isCloud: env.IS_CLOUD });
 });
 
 const SCIM_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0";
@@ -2828,7 +2843,7 @@ process.once("SIGINT", () => void shutdown("SIGINT"));
 // listener. Calling Bun.serve here as well would make the compiled bundle
 // attempt to bind port 3000 twice.
 export default {
-  port: Number(process.env.PORT || 3000),
+  port: env.PORT,
   fetch: (request: Request, bunServer: Bun.Server<unknown>) =>
     app.fetch(request, { server: bunServer }),
   websocket,

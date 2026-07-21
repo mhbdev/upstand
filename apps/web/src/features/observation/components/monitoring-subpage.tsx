@@ -23,6 +23,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
+  Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -211,6 +214,135 @@ function StatCard({
           {value}
         </p>
         <p className="mt-1 text-muted-foreground text-xs">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DockerDiskUsagePieChart({
+  buildCacheBytes = 0,
+  containerBytes = 0,
+  imageBytes = 0,
+  volumeBytes = 0,
+}: {
+  buildCacheBytes?: number;
+  containerBytes?: number;
+  imageBytes?: number;
+  volumeBytes?: number;
+}) {
+  const totalBytes =
+    buildCacheBytes + containerBytes + imageBytes + volumeBytes;
+
+  const categories = [
+    { name: "Build Cache", value: buildCacheBytes, color: "#a855f7" },
+    { name: "Containers", value: containerBytes, color: "#ec4899" },
+    { name: "Images", value: imageBytes, color: "#3b82f6" },
+    { name: "Volumes", value: volumeBytes, color: "#f59e0b" },
+  ];
+
+  const activeCategories = categories.filter((item) => item.value > 0);
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Database className="size-4 text-primary" aria-hidden="true" />
+          Docker disk usage
+        </CardTitle>
+        <CardDescription>
+          Storage breakdown including Build Cache, Containers, Images, and
+          Volumes ({formatBytes(totalBytes)} total)
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {totalBytes === 0 ? (
+          <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+            No Docker storage metrics reported for this server.
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 md:items-center">
+            <div className="relative h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={
+                      activeCategories.length > 0
+                        ? activeCategories
+                        : categories
+                    }
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={95}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {(activeCategories.length > 0
+                      ? activeCategories
+                      : categories
+                    ).map((entry) => (
+                      <Cell
+                        key={entry.name}
+                        fill={entry.color}
+                        stroke="transparent"
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(val) => {
+                      const num =
+                        typeof val === "number" ? val : Number(val ?? 0);
+                      const pct =
+                        totalBytes > 0
+                          ? ((num / totalBytes) * 100).toFixed(1)
+                          : "0.0";
+                      return [`${formatBytes(num)} (${pct}%)`, "Storage"];
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="font-semibold text-lg tabular-nums tracking-tight">
+                  {formatBytes(totalBytes)}
+                </span>
+                <span className="font-medium text-muted-foreground text-xs">
+                  Docker Usage
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {categories.map((item) => {
+                const percentage =
+                  totalBytes > 0
+                    ? ((item.value / totalBytes) * 100).toFixed(1)
+                    : "0.0";
+                return (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between rounded-md border p-2.5 text-sm"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="size-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="font-medium">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-right tabular-nums">
+                      <span className="font-semibold">
+                        {formatBytes(item.value)}
+                      </span>
+                      <span className="w-12 text-muted-foreground text-xs">
+                        {percentage}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -459,9 +591,10 @@ export function MonitoringSubpage() {
           value={formatBytes(
             (stats?.dockerImageBytes ?? 0) +
               (stats?.dockerContainerBytes ?? 0) +
-              (stats?.dockerVolumeBytes ?? 0),
+              (stats?.dockerVolumeBytes ?? 0) +
+              (stats?.dockerBuildCacheBytes ?? 0),
           )}
-          description="Images, containers, and volumes"
+          description="Build cache, containers, images, and volumes"
         />
         <StatCard
           label="Host uptime"
@@ -581,6 +714,13 @@ export function MonitoringSubpage() {
           yAxisUnit=" MB"
         />
       </section>
+
+      <DockerDiskUsagePieChart
+        buildCacheBytes={stats?.dockerBuildCacheBytes}
+        containerBytes={stats?.dockerContainerBytes}
+        imageBytes={stats?.dockerImageBytes}
+        volumeBytes={stats?.dockerVolumeBytes}
+      />
 
       <Card className="border-border/60">
         <CardHeader>

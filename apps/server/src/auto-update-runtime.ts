@@ -1,4 +1,5 @@
 import { getServiceProvider } from "@upstand/api/di";
+import { env } from "@upstand/env/server";
 import {
   GetUpdateStatusUseCaseToken,
   TriggerUpdateUseCaseToken,
@@ -10,7 +11,7 @@ export class AutoUpdateRuntime {
   private inFlight = false;
 
   start(): void {
-    if (process.env.UPSTAND_AUTO_UPDATE !== "true") return;
+    if (!env.UPSTAND_AUTO_UPDATE) return;
     this.timer = setInterval(
       () => void this.checkAndApplyUpdate(),
       30 * 60_000,
@@ -27,8 +28,7 @@ export class AutoUpdateRuntime {
   }
 
   private async checkAndApplyUpdate(): Promise<void> {
-    if (this.inFlight || process.env.UPSTAND_SERVER_IMAGE?.includes(":source-"))
-      return;
+    if (this.inFlight || env.UPSTAND_SERVER_IMAGE?.includes(":source-")) return;
     this.inFlight = true;
     const scope = getServiceProvider().createScope();
     try {

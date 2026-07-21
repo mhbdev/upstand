@@ -4,6 +4,7 @@ import {
   type IUnitOfWork,
   ValidationError,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 
@@ -25,6 +26,13 @@ export class CreateDockerRegistryUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: CreateDockerRegistryInput): Promise<DockerRegistry> {
+    if (env.IS_CLOUD) {
+      if (!input.serverId || ["local", "manager"].includes(input.serverId)) {
+        throw new ValidationError(
+          "Please select a target server for docker registry.",
+        );
+      }
+    }
     let password: string | null = null;
     if (input.password) {
       try {

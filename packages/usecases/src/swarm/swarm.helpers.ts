@@ -1,9 +1,9 @@
 import { isIP } from "node:net";
 import { ConflictError, ValidationError } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import type Docker from "dockerode";
 
-export const UPSTAND_SWARM_NETWORK =
-  process.env.DOCKER_NETWORK || "upstand-network";
+export const UPSTAND_SWARM_NETWORK = env.DOCKER_NETWORK;
 
 const RESOURCE_NETWORK_PREFIX = "upstand-resource-";
 
@@ -150,7 +150,7 @@ export async function requireActiveManager(
   let info = (await docker.info()) as DockerSwarmInfo;
 
   if (!isSwarmActive(info)) {
-    if (process.env.NODE_ENV === "development") {
+    if (env.NODE_ENV === "development") {
       try {
         await docker.swarmInit({
           AdvertiseAddr: "127.0.0.1",

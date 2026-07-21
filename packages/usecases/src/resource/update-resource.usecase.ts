@@ -11,6 +11,7 @@ import {
   serializeResourceAdvancedConfig,
   ValidationError,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import {
   decryptSecret,
   encryptSecret,
@@ -394,6 +395,16 @@ export class UpdateResourceUseCase {
       } catch (error) {
         throw new ValidationError(
           `Invalid domain configuration: ${error instanceof Error ? error.message : "unknown validation error"}`,
+        );
+      }
+    }
+    if (env.IS_CLOUD) {
+      if (
+        input.serverId === null ||
+        (input.serverId && ["local", "manager"].includes(input.serverId))
+      ) {
+        throw new ValidationError(
+          "Please select a target server for deployment.",
         );
       }
     }

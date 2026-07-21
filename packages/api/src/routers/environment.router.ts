@@ -1,9 +1,12 @@
 import { TRPCError } from "@trpc/server";
+import type { Environment } from "@upstand/domain";
 import {
   CreateEnvironmentInputSchema,
   DeleteEnvironmentInputSchema,
   GetEnvironmentInputSchema,
   GetEnvironmentsInputSchema,
+  parseResourceEnvironmentVariables,
+  UpdateEnvironmentInputSchema,
 } from "@upstand/usecases";
 import {
   CreateEnvironmentUseCaseToken,
@@ -11,10 +14,19 @@ import {
   GetEnvironmentsUseCaseToken,
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
+  UpdateEnvironmentUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
+
+function publicEnvironment(env: Environment) {
+  const { envVars, ...rest } = env;
+  return {
+    ...rest,
+    envVars: parseResourceEnvironmentVariables(envVars),
+  };
+}
 
 export const environmentRouter = router({
   create: twoFactorVerifiedProcedure
@@ -37,7 +49,8 @@ export const environmentRouter = router({
 
       const useCase = ctx.scope.resolve(CreateEnvironmentUseCaseToken);
       try {
-        return await useCase.execute(input);
+        const result = await useCase.execute(input);
+        return publicEnvironment(result);
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -63,7 +76,8 @@ export const environmentRouter = router({
 
       const useCase = ctx.scope.resolve(GetEnvironmentsUseCaseToken);
       try {
-        return await useCase.execute(input);
+        const result = await useCase.execute(input);
+        return result.map(publicEnvironment);
       } catch (error) {
         handleUseCaseError(error);
       }
@@ -98,7 +112,45 @@ export const environmentRouter = router({
         "environment:view",
       );
 
-      return environment;
+      return publicEnvironment(environment);
+    }),
+
+  update: twoFactorVerifiedProcedure
+    .input(UpdateEnvironmentInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const useCase = ctx.scope.resolve(GetEnvironmentUseCaseToken);
+      const environment = await useCase.execute({ id: input.id });
+      if (!environment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Environment not found",
+        });
+      }
+
+      const projectUseCase = ctx.scope.resolve(GetProjectUseCaseToken);
+      const project = await projectUseCase.execute({
+        id: environment.projectId,
+      });
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "environment:update",
+      );
+
+      const updateUseCase = ctx.scope.resolve(UpdateEnvironmentUseCaseToken);
+      try {
+        const result = await updateUseCase.execute(input);
+        return publicEnvironment(result);
+      } catch (error) {
+        handleUseCaseError(error);
+      }
     }),
 
   delete: twoFactorVerifiedProcedure

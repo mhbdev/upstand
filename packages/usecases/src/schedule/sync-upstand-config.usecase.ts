@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { IUnitOfWork } from "@upstand/domain";
-import { parseUpstandConfig, type UpstandCronConfig } from "@upstand/domain";
+import {
+  parseApplicationBuildConfig,
+  parseResourceAdvancedConfig,
+  parseUpstandConfig,
+  serializeApplicationBuildConfig,
+  serializeResourceAdvancedConfig,
+  type UpstandCronConfig,
+} from "@upstand/domain";
 
 export interface SyncUpstandConfigInput {
   resourceId: string;
@@ -40,11 +47,122 @@ export class SyncUpstandConfigUseCase {
     const crons: UpstandCronConfig[] = parseResult.data.crons ?? [];
     if (onLog) {
       onLog(
-        `[upstand.json] Processing ${crons.length} schedule/cron item(s) from upstand.json...\n`,
+        `[upstand.json] Processing configuration from upstand.json (${crons.length} cron item(s))...\n`,
       );
     }
 
     return this.uow.transaction(async (tx) => {
+      const resource = await tx.resourceRepository.findById(resourceId);
+      if (resource) {
+        let resourceUpdated = false;
+        const resourcePatch: Partial<typeof resource> = {};
+
+        if (parseResult.data.build) {
+          const b = parseResult.data.build;
+          const currentBuildConfig = parseApplicationBuildConfig(
+            resource.buildConfig,
+          );
+
+          const updatedBuildConfig: any = { ...currentBuildConfig };
+          if (b.type) updatedBuildConfig.type = b.type;
+          if (b.buildPath) updatedBuildConfig.buildPath = b.buildPath;
+          if (b.dockerfilePath)
+            updatedBuildConfig.dockerfilePath = b.dockerfilePath;
+          if (b.dockerContextPath)
+            updatedBuildConfig.dockerContextPath = b.dockerContextPath;
+          if (b.publishDirectory)
+            updatedBuildConfig.publishDirectory = b.publishDirectory;
+          if (b.dockerBuildStage)
+            updatedBuildConfig.dockerBuildStage = b.dockerBuildStage;
+          if (b.dockerBuildArgs)
+            updatedBuildConfig.dockerBuildArgs = b.dockerBuildArgs;
+          if (typeof b.dockerNoCache === "boolean")
+            updatedBuildConfig.dockerNoCache = b.dockerNoCache;
+
+          resourcePatch.buildConfig =
+            serializeApplicationBuildConfig(updatedBuildConfig);
+
+          if (b.watchPaths) {
+            const pathsArray = Array.isArray(b.watchPaths)
+              ? b.watchPaths
+              : [b.watchPaths];
+            resourcePatch.watchPaths = JSON.stringify(pathsArray);
+          }
+          resourceUpdated = true;
+          if (onLog) {
+            onLog("[upstand.json] Synced build configuration\n");
+          }
+        }
+
+        const runtime = parseResult.data.runtime || parseResult.data.resources;
+        if (runtime) {
+          const currentAdvancedConfig = parseResourceAdvancedConfig(
+            resource.advancedConfig,
+          );
+
+          const updatedAdvancedConfig = { ...currentAdvancedConfig };
+
+          if (runtime.command) {
+            updatedAdvancedConfig.command = Array.isArray(runtime.command)
+              ? runtime.command
+              : [runtime.command];
+          }
+          if (runtime.args) updatedAdvancedConfig.args = runtime.args;
+          if (runtime.workingDir)
+            updatedAdvancedConfig.workingDir = runtime.workingDir;
+          if (runtime.replicas !== undefined)
+            updatedAdvancedConfig.replicas = runtime.replicas;
+
+          if (
+            runtime.cpuLimit !== undefined ||
+            runtime.cpuReservation !== undefined ||
+            runtime.memoryLimitMb !== undefined ||
+            runtime.memoryReservationMb !== undefined
+          ) {
+            updatedAdvancedConfig.resources = {
+              ...updatedAdvancedConfig.resources,
+              ...(runtime.cpuLimit !== undefined
+                ? { cpuLimit: runtime.cpuLimit }
+                : {}),
+              ...(runtime.cpuReservation !== undefined
+                ? { cpuReservation: runtime.cpuReservation }
+                : {}),
+              ...(runtime.memoryLimitMb !== undefined
+                ? { memoryLimitMb: runtime.memoryLimitMb }
+                : {}),
+              ...(runtime.memoryReservationMb !== undefined
+                ? { memoryReservationMb: runtime.memoryReservationMb }
+                : {}),
+            };
+          }
+
+          if (runtime.restartPolicy) {
+            updatedAdvancedConfig.restartPolicy = {
+              ...updatedAdvancedConfig.restartPolicy,
+              ...runtime.restartPolicy,
+            };
+          }
+
+          if (runtime.updateConfig) {
+            updatedAdvancedConfig.updateConfig = {
+              ...updatedAdvancedConfig.updateConfig,
+              ...runtime.updateConfig,
+            };
+          }
+
+          resourcePatch.advancedConfig = serializeResourceAdvancedConfig(
+            updatedAdvancedConfig,
+          );
+          resourceUpdated = true;
+          if (onLog) {
+            onLog("[upstand.json] Synced runtime/resource configuration\n");
+          }
+        }
+
+        if (resourceUpdated) {
+          await tx.resourceRepository.updateById(resourceId, resourcePatch);
+        }
+      }
       const existingSchedules =
         await tx.scheduleRepository.findByResourceId(resourceId);
 

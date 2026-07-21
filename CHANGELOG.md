@@ -4,6 +4,49 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.99 - 2026-07-21
+
+### Added
+- **Declarative Repository Configuration (`upstand.json`)**: Added auto-discovery parser, schema validation (`upstand.schema.json`), domain entity Zod schemas, and automatic Git deployment synchronization for build engines, runtime resource limits, monorepo watch paths, and HTTP/Script cron schedules.
+- **Interactive Remote Server Onboarding Wizard**: Added a multi-step onboarding wizard (`RemoteServerWizard`) for VPS hosts featuring provider options, OS installation guides, SSH key pairing, host role selection, automated provisioning, and live Docker/clock/runtime validation dialogs.
+- **Trusted Proxy CIDR IP Resolution**: Added `TRUSTED_PROXY_CIDRS` parsing and robust IP address normalization supporting IPv4 and IPv6 CIDR subnet matching for client IP resolution.
+- **Comprehensive Feature Documentation**: Added dedicated documentation guide (`upstand-json.mdx`) and JSON Schema editor autocompletion file (`public/upstand.schema.json`).
+
+### Security & Bug Fixes
+- Resolved TypeScript null-narrowing build error (`TS18047`) in deployment worker callback (`deployment-worker.ts`).
+- Refactored Docker deployment service parameter reassignment (`noParameterAssign`) and normalized callback return signature types.
+- Fixed fallback master key encoding in `secret-box.ts` to guarantee a 32-byte base64-encoded key during development and test environments.
+
+### Added
+- Cloud mode capability via `IS_CLOUD` and `NEXT_PUBLIC_IS_CLOUD` environment variables.
+- Excluded Local Server deployment target options from resource creation dialogs and General infrastructure tab dropdowns when cloud mode is active.
+- Added client-side and server-side target server validation checks on resource creation, update, and registry creation/updates, preventing cloud tenants from bypassing control plane isolation.
+- Enforced target server selection requirement for Docker Registry credential validation under cloud mode.
+
+## 0.1.97 - 2026-07-21
+
+### Changed
+- Resource general and advanced tab optimizations (1:1 with Dokploy service general tab).
+- Hid the "Advanced Settings" and "Cron Jobs" tab trigger and panels for Database resources, avoiding configuration noise.
+- Restricted Compose resource advanced settings tabs to only "General" and "Raw JSON" tabs.
+- Relocated Database Lifecycle controls (Start / Stop) to the database configuration card footer on the General Tab.
+- Wrapped deployment operations under `{resource.type !== "database" && ...}`.
+- Hid build server and build registry execution infrastructure dropdowns for Databases and Compose resources, keeping layout clean.
+- Excluded raw Compose file editor option from git providers when the resource type is `"application"`.
+
+## 0.1.96 - 2026-07-21
+
+### Added
+- Refactored the Resource Advanced Settings page into a modular, tabbed UI with seven focused sections: **General & Runtime**, **Resources & Limits**, **Ports & Storage**, **Health & Deployment**, **Security & Capabilities**, **Environment & Labels**, and **Raw JSON**.
+- Each section is extracted into its own self-contained card component (`GeneralCard`, `ResourcesCard`, `PortsVolumesCard`, `HealthcheckDeploymentCard`, `SecurityCard`, `EnvLabelsCard`, `RawJsonCard`) with a shared `AdvancedCardProps` type and `splitLines` utility to eliminate duplication.
+- CPU and memory inputs now display unit adornments (`CPU`, `MB`) via `InputGroup` / `InputGroupAddon` instead of bare placeholder text.
+- Port and volume editors are now structured per-row forms with labelled columns, protocol selectors, and read-only toggles — replacing the previous monolithic form that required manual text parsing.
+- DNS and extra-hosts fields are now separate, clearly-labelled text areas instead of being merged into a single combined editor.
+- Security toggles (init process, read-only root FS, TTY, privileged mode) are rendered from a typed `SECURITY_TOGGLES` constant array to avoid repetition.
+- Rolling update and rollback strategies share a `StrategyForm` sub-component to avoid duplicating the identical five-field form.
+- The main `ResourceAdvancedSettings` orchestrator now keeps `config` and `rawJson` in sync bidirectionally so editing via cards updates the JSON tab preview in real time.
+- A sticky save footer (badge + button) appears on all non-JSON tabs; the JSON tab has its own inline validate-and-save button with a schema-error message.
+
 ## 0.1.95 - 2026-07-21
 
 ### Security & Bug Fixes

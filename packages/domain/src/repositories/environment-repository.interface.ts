@@ -1,6 +1,7 @@
 import type {
   CreateEnvironmentDTO,
   Environment,
+  UpdateEnvironmentDTO,
 } from "../entities/environment";
 
 export interface IEnvironmentRepository {
@@ -12,6 +13,11 @@ export interface IEnvironmentRepository {
   updateById(
     id: string,
     patch: Partial<CreateEnvironmentDTO>,
+  ): Promise<Environment | null>;
+  /** Update mutable fields including project-level environment variables. */
+  updateEnvironment(
+    id: string,
+    patch: UpdateEnvironmentDTO,
   ): Promise<Environment | null>;
   incrementResourceCount(id: string, delta: number): Promise<void>;
   deleteById(id: string): Promise<boolean>;

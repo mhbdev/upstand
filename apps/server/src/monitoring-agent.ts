@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { getServiceProvider } from "@upstand/api/di";
+import { env } from "@upstand/env/server";
 import { getDockerInstance } from "@upstand/infrastructure";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
 import { log } from "evlog";
@@ -68,7 +69,7 @@ export async function initializeMonitoring(): Promise<void> {
         port: 3001,
         serverType: "Dokploy",
         token,
-        urlCallback: `http://${callbackHost}:${process.env.PORT || 3000}/api/monitoring/alerts`,
+        urlCallback: `http://${callbackHost}:${env.PORT}/api/monitoring/alerts`,
         retentionDays: 7,
         cronJob: "0 0 * * *",
         thresholds: {
@@ -138,10 +139,10 @@ export async function initializeMonitoring(): Promise<void> {
 async function resolveMonitoringImage(
   docker: ReturnType<typeof getDockerInstance>,
 ) {
-  const configured = process.env[MONITORING_IMAGE_ENV]?.trim();
+  const configured = env.UPSTAND_MONITORING_IMAGE?.trim();
   if (configured) return configured;
 
-  if (process.env.NODE_ENV === "production") {
+  if (env.NODE_ENV === "production") {
     throw new Error(`${MONITORING_IMAGE_ENV} is required in production`);
   }
 

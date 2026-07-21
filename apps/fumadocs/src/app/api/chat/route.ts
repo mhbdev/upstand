@@ -1,4 +1,5 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { env } from "@upstand/env/server";
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
@@ -61,7 +62,7 @@ async function chunkedAll<O>(promises: Promise<O>[]): Promise<O[]> {
 }
 
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: env.OPENROUTER_API_KEY,
 });
 
 /** System prompt, you can update it to provide more specific information */
@@ -77,7 +78,7 @@ export async function POST(req: Request, _ctx: RouteContext<"/api/chat">) {
 
   const result = streamText({
     model: openrouter.chat(
-      process.env.OPENROUTER_MODEL ?? "anthropic/claude-3.5-sonnet",
+      env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
     ),
     stopWhen: stepCountIs(5),
     tools: {

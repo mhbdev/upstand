@@ -29,6 +29,7 @@ export interface ServerRuntimeStats {
   dockerImageBytes: number;
   dockerContainerBytes: number;
   dockerVolumeBytes: number;
+  dockerBuildCacheBytes: number;
 }
 
 export interface DockerRegistryAuth {
@@ -68,6 +69,7 @@ export interface DockerServicePort {
     },
     destination?: any,
     sourceRevision?: string,
+    onGitCloned?: (clonePath: string) => Promise<Resource | undefined>,
   ): Promise<void>;
   readComposeFileFromGit(
     resource: Resource,

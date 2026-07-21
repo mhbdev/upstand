@@ -3,6 +3,7 @@
   "pages": [
     "deployments",
     "cron-jobs",
+    "upstand-json",
     "routing",
     "servers",
     "monitoring",

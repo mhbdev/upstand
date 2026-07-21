@@ -1,3 +1,4 @@
+import { env } from "@upstand/env/server";
 import { log } from "evlog";
 import { z } from "zod";
 import type { NotificationPublisher } from "../notification/publish-notification.usecase";
@@ -88,7 +89,7 @@ export class TriggerUpdateUseCase {
               : "server";
 
           if (!baseImage.includes("/") || baseImage.startsWith("upstand-")) {
-            const repo = process.env.GITHUB_REPOSITORY || "mhbdev/upstand";
+            const repo = env.GITHUB_REPOSITORY;
             baseImage = `ghcr.io/${repo}-${imageName}`;
           }
 

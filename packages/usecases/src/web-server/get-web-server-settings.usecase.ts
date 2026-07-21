@@ -1,4 +1,5 @@
 import type { IUnitOfWork, WebServerSettings } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import type { CaddyService } from "./caddy.service";
 
 function addUpstreamRetry(snippets: string, upstream: string): string {
@@ -15,8 +16,12 @@ function addUpstreamRetry(snippets: string, upstream: string): string {
 }
 
 function controlPlaneUpstream(service: "server" | "web" | "fumadocs"): string {
-  const configured =
-    process.env[`UPSTAND_${service.toUpperCase()}_UPSTREAM`]?.trim();
+  const upstreamMap: Record<string, string | undefined> = {
+    server: env.UPSTAND_SERVER_UPSTREAM,
+    web: env.UPSTAND_WEB_UPSTREAM,
+    fumadocs: env.UPSTAND_FUMADOCS_UPSTREAM,
+  };
+  const configured = upstreamMap[service]?.trim();
   const port = service === "server" ? 3000 : service === "web" ? 3001 : 4000;
   return configured || `${service}:${port}`;
 }
@@ -47,7 +52,7 @@ export class GetWebServerSettingsUseCase {
         caddySnippets: this.getControlPlaneRoutes(),
       });
     } else {
-      const docsHost = process.env.UPSTAND_DOCS_HOST?.trim();
+      const docsHost = env.UPSTAND_DOCS_HOST?.trim();
       if (
         docsHost &&
         /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(docsHost) &&
@@ -123,9 +128,9 @@ export class GetWebServerSettingsUseCase {
   }
 
   private getControlPlaneRoutes(): string {
-    const dashboardHost = process.env.UPSTAND_DASHBOARD_HOST?.trim();
-    const apiHost = process.env.UPSTAND_API_HOST?.trim();
-    const docsHost = process.env.UPSTAND_DOCS_HOST?.trim();
+    const dashboardHost = env.UPSTAND_DASHBOARD_HOST?.trim();
+    const apiHost = env.UPSTAND_API_HOST?.trim();
+    const docsHost = env.UPSTAND_DOCS_HOST?.trim();
     const validHost = (host: string | undefined) =>
       host && /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(host);
 

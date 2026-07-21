@@ -10,6 +10,7 @@ import {
   parseResourceAdvancedConfig,
   type Resource,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import { redis } from "@upstand/redis";
 import { assertSafeGitUrl } from "@upstand/usecases";
 import type {
@@ -76,8 +77,7 @@ function getUrlRedactions(value: string): string[] {
 export class DockerService {
   private readonly docker: Docker;
   private readonly commandEnvironment: Record<string, string | undefined>;
-  private readonly networkName =
-    process.env.DOCKER_NETWORK || "upstand-network";
+  private readonly networkName = env.DOCKER_NETWORK;
   private cancellationKey: string | null = null;
 
   constructor(
@@ -276,7 +276,7 @@ export class DockerService {
     const docker = targetDocker || this.docker;
     let info = await docker.info();
     if (!isSwarmActive(info)) {
-      if (process.env.NODE_ENV === "development") {
+      if (env.NODE_ENV === "development") {
         try {
           await docker.swarmInit({
             AdvertiseAddr: "127.0.0.1",
@@ -440,7 +440,7 @@ export class DockerService {
     const envArray = Object.entries(mergedEnv).map(([k, v]) => `${k}=${v}`);
     const volumeName = `upstand-db-data-${resource.id}`;
 
-    const isDev = process.env.NODE_ENV === "development";
+    const isDev = env.NODE_ENV === "development";
     const getPublishedPort = (p: number) => {
       if (!isDev) return p;
       if (p === 5432) return 5433;
@@ -626,23 +626,27 @@ export class DockerService {
     },
     destinationDocker?: Docker,
     sourceRevision?: string,
+    onGitCloned?: (clonePath: string) => Promise<Resource | undefined>,
   ): Promise<void> {
-    const serviceName = this.sanitizeName(resource.appName || resource.name);
-    const imageName = `upstand-app-${resource.id}:latest`;
+    let currentResource = resource;
+    const serviceName = this.sanitizeName(
+      currentResource.appName || currentResource.name,
+    );
+    const imageName = `upstand-app-${currentResource.id}:latest`;
     const buildImageName = registryInfo ? registryInfo.imageTag : imageName;
     const networkId = (
-      await this.ensureDeploymentNetwork(resource, destinationDocker)
+      await this.ensureDeploymentNetwork(currentResource, destinationDocker)
     ).id;
 
     const buildDir = path.join(process.cwd(), ".builds");
-    const clonePath = path.join(buildDir, resource.id);
+    const clonePath = path.join(buildDir, currentResource.id);
 
-    if (resource.provider === "drop") {
+    if (currentResource.provider === "drop") {
       const dropsDir = path.join(
         process.cwd(),
         ".builds",
         "drops",
-        resource.id,
+        currentResource.id,
       );
       if (!fs.existsSync(dropsDir)) {
         throw new Error(
@@ -666,9 +670,9 @@ export class DockerService {
       let branch = "main";
       let submodules = false;
       try {
-        if (resource.credentials) {
+        if (currentResource.credentials) {
           const config: unknown = parseResourceCredentials(
-            resource.credentials,
+            currentResource.credentials,
           );
           if (isUnknownRecord(config)) {
             const configuredBranch = config.branch;
@@ -729,8 +733,17 @@ export class DockerService {
       }
     }
 
+    if (onGitCloned) {
+      const refreshedResource = await onGitCloned(clonePath);
+      if (refreshedResource) {
+        currentResource = refreshedResource;
+      }
+    }
+
     try {
-      const buildConfig = parseApplicationBuildConfig(resource.buildConfig);
+      const buildConfig = parseApplicationBuildConfig(
+        currentResource.buildConfig,
+      );
       const buildPath = this.resolveBuildPath(
         clonePath,
         buildConfig.buildPath,
@@ -742,7 +755,7 @@ export class DockerService {
         buildConfig,
         envVars,
         onLog,
-        getApplicationBuildSecrets(resource),
+        getApplicationBuildSecrets(currentResource),
       );
 
       if (registryInfo) {
@@ -798,7 +811,7 @@ export class DockerService {
       const endpointSpec = spec.EndpointSpec || {};
       spec.EndpointSpec = endpointSpec;
       this.applyAdvancedConfig(
-        resource,
+        currentResource,
         (spec.TaskTemplate as { ContainerSpec?: Record<string, unknown> })
           .ContainerSpec as Record<string, unknown>,
         spec.TaskTemplate as Record<string, unknown>,
@@ -2374,6 +2387,7 @@ export class DockerService {
       dockerImageBytes: sumDockerUsage(diskUsage.Images),
       dockerContainerBytes: sumDockerUsage(diskUsage.Containers),
       dockerVolumeBytes: sumDockerUsage(diskUsage.Volumes),
+      dockerBuildCacheBytes: sumDockerUsage(diskUsage.BuildCache),
     };
   }
 

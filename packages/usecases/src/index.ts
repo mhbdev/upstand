@@ -39,6 +39,7 @@ export * from "./environment/create-environment.usecase";
 export * from "./environment/delete-environment.usecase";
 export * from "./environment/get-environment.usecase";
 export * from "./environment/get-environments.usecase";
+export * from "./environment/update-environment.usecase";
 export * from "./git-provider/create-git-provider.usecase";
 export * from "./git-provider/delete-git-provider.usecase";
 export * from "./git-provider/get-git-providers.usecase";

@@ -138,6 +138,13 @@ export const CAPABILITY_CATALOG = {
     assurance: "standard",
     roles: ownerAdminMember,
   },
+  "environment:update": {
+    scope: "organization",
+    apiKey: true,
+    customRole: true,
+    assurance: "standard",
+    roles: ownerAdmin,
+  },
   "environment:delete": {
     scope: "organization",
     apiKey: true,
@@ -550,6 +557,7 @@ export const API_KEY_ROUTE_CAPABILITIES = {
   "environment.list": "environment:view",
   "environment.get": "environment:view",
   "environment.create": "environment:create",
+  "environment.update": "environment:update",
   "environment.delete": "environment:delete",
   "resource.list": "resource:view",
   "resource.getContainers": "resource:view",

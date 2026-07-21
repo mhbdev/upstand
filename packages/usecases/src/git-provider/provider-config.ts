@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import type { GitProvider } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 
 const REDACTED = "[configured]";
 
@@ -10,6 +11,7 @@ const TRUSTED_PUBLIC_HOSTS = new Set([
   "github.com",
   "api.bitbucket.org",
   "gitlab.com",
+  "gitea.com",
   "gitea.com",
 ]);
 
@@ -35,7 +37,7 @@ export function assertSafeProviderUrl(value: string): string {
   if (isIP(host)) {
     throw new Error("Git provider URLs must use a verified hostname");
   }
-  const allowlisted = (process.env.UPSTAND_GIT_PROVIDER_ALLOWED_HOSTS || "")
+  const allowlisted = (env.UPSTAND_GIT_PROVIDER_ALLOWED_HOSTS || "")
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);

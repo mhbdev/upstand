@@ -9,6 +9,7 @@ import {
   type Resource,
   ValidationError,
 } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { resolveDockerCliEnvironmentForServer } from "../resource/docker-client";
 import { parseResourceCredentials as parseCredentialDocument } from "../resource/resource-credentials";
@@ -449,11 +450,8 @@ export class BackupRuntimeService {
   }
 
   private async resolvePostgresContainer(): Promise<string> {
-    const candidates = process.env.UPSTAND_POSTGRES_CONTAINER
-      ? [
-          process.env.UPSTAND_POSTGRES_CONTAINER,
-          ...CONTROL_PLANE_POSTGRES_CONTAINERS,
-        ]
+    const candidates = env.UPSTAND_POSTGRES_CONTAINER
+      ? [env.UPSTAND_POSTGRES_CONTAINER, ...CONTROL_PLANE_POSTGRES_CONTAINERS]
       : [...CONTROL_PLANE_POSTGRES_CONTAINERS];
     for (const candidate of [...new Set(candidates)]) {
       const result = await execFileAsync("docker", [

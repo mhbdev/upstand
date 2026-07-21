@@ -24,6 +24,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@upstand/env": "workspace:*",
     "micro-key-producer": "^0.9.0",
     "sshpk": "^1.18.0"
   },

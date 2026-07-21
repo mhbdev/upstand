@@ -1,4 +1,5 @@
 import type { IUnitOfWork } from "@upstand/domain";
+import { env } from "@upstand/env/server";
 import {
   AccessLogCleanupCronSchema,
   AccessLogQuerySchema,
@@ -331,9 +332,7 @@ async function getSecurityAudit(uow: IUnitOfWork) {
   }
 
   try {
-    const network = await docker
-      .getNetwork(process.env.DOCKER_NETWORK || "upstand-network")
-      .inspect();
+    const network = await docker.getNetwork(env.DOCKER_NETWORK).inspect();
     const valid = network.Driver === "overlay" && network.Attachable === true;
     checks.push({
       id: "managed-network",

@@ -50,9 +50,63 @@ export const UpstandCronConfigSchema = z
 
 export type UpstandCronConfig = z.infer<typeof UpstandCronConfigSchema>;
 
+export const UpstandBuildConfigSchema = z.object({
+  type: z
+    .enum([
+      "dockerfile",
+      "railpack",
+      "nixpacks",
+      "heroku-buildpacks",
+      "paketo-buildpacks",
+      "static",
+    ])
+    .optional(),
+  buildPath: z.string().trim().min(1).optional(),
+  dockerfilePath: z.string().trim().min(1).optional(),
+  dockerContextPath: z.string().trim().min(1).optional(),
+  publishDirectory: z.string().trim().min(1).optional(),
+  dockerBuildStage: z.string().trim().min(1).optional(),
+  dockerBuildArgs: z.record(z.string(), z.string()).optional(),
+  dockerNoCache: z.boolean().optional(),
+  watchPaths: z
+    .union([z.string().trim(), z.array(z.string().trim())])
+    .optional(),
+});
+
+export type UpstandBuildConfig = z.infer<typeof UpstandBuildConfigSchema>;
+
+export const UpstandRuntimeConfigSchema = z.object({
+  command: z.union([z.string().trim(), z.array(z.string().trim())]).optional(),
+  args: z.array(z.string()).optional(),
+  workingDir: z.string().trim().optional(),
+  cpuLimit: z.number().positive().max(1024).optional(),
+  cpuReservation: z.number().positive().max(1024).optional(),
+  memoryLimitMb: z.number().int().positive().max(1_048_576).optional(),
+  memoryReservationMb: z.number().int().positive().max(1_048_576).optional(),
+  replicas: z.number().int().min(0).max(1000).optional(),
+  restartPolicy: z
+    .object({
+      condition: z.enum(["none", "on-failure", "any"]).optional(),
+      maxAttempts: z.number().int().min(0).max(1000).optional(),
+      delaySeconds: z.number().int().min(0).max(86400).optional(),
+    })
+    .optional(),
+  updateConfig: z
+    .object({
+      parallelism: z.number().int().min(0).max(1000).optional(),
+      order: z.enum(["stop-first", "start-first"]).optional(),
+    })
+    .optional(),
+});
+
+export type UpstandRuntimeConfig = z.infer<typeof UpstandRuntimeConfigSchema>;
+
 export const UpstandConfigSchema = z
   .object({
     $schema: z.string().optional(),
+    build: UpstandBuildConfigSchema.optional(),
+    runtime: UpstandRuntimeConfigSchema.optional(),
+    resources: UpstandRuntimeConfigSchema.optional(),
     crons: z.array(UpstandCronConfigSchema).optional(),
   })
   .passthrough();

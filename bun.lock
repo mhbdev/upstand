@@ -19,6 +19,7 @@
       "dependencies": {
         "@ai-sdk/react": "^4.0.34",
         "@openrouter/ai-sdk-provider": "^3.0.0",
+        "@upstand/env": "workspace:*",
         "ai": "^7.0.14",
         "class-variance-authority": "^0.7.1",
         "cnfast": "^0.0.8",
@@ -264,6 +265,7 @@
       "name": "@upstand/infrastructure",
       "dependencies": {
         "@upstand/domain": "workspace:*",
+        "@upstand/env": "workspace:*",
         "@upstand/platform": "workspace:*",
         "@upstand/redis": "workspace:*",
         "@upstand/usecases": "workspace:*",
@@ -286,6 +288,7 @@
     "packages/platform": {
       "name": "@upstand/platform",
       "dependencies": {
+        "@upstand/env": "workspace:*",
         "micro-key-producer": "^0.9.0",
         "sshpk": "^1.18.0",
       },
@@ -298,6 +301,7 @@
     "packages/redis": {
       "name": "@upstand/redis",
       "dependencies": {
+        "@upstand/env": "workspace:*",
         "evlog": "catalog:",
         "ioredis": "^5.6.1",
       },
@@ -358,6 +362,7 @@
       "dependencies": {
         "@circulo-ai/di": "^3.1.0",
         "@upstand/domain": "workspace:*",
+        "@upstand/env": "workspace:*",
         "@upstand/platform": "workspace:*",
         "@upstand/redis": "workspace:*",
         "bullmq": "catalog:",

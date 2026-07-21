@@ -3,6 +3,11 @@ import { ValidationError } from "@upstand/domain";
 import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { CreateEnvironmentUseCase } from "./create-environment.usecase";
 import { DeleteEnvironmentUseCase } from "./delete-environment.usecase";
+import { UpdateEnvironmentUseCase } from "./update-environment.usecase";
+
+process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
+  "base64",
+);
 
 class MockEnvironmentRepository {
   public store: any[] = [];
@@ -23,6 +28,17 @@ class MockEnvironmentRepository {
     };
     this.store.push(item);
     return item;
+  }
+
+  async updateEnvironment(id: string, patch: any) {
+    const index = this.store.findIndex((e) => e.id === id);
+    if (index === -1) return null;
+    this.store[index] = {
+      ...this.store[index],
+      ...patch,
+      updatedAt: new Date(),
+    };
+    return this.store[index];
   }
 
   async deleteById(id: string) {
@@ -52,6 +68,41 @@ describe("Environment Usecases", () => {
     expect(env.slug).toBe("staging-env");
     expect(env.isDefault).toBe(false);
     expect(env.isProtected).toBe(false);
+  });
+
+  test("updates an existing environment including project env vars", async () => {
+    const uow = mockUnitOfWork({
+      environmentRepository: new MockEnvironmentRepository(),
+    });
+    const createUseCase = new CreateEnvironmentUseCase(uow);
+    const updateUseCase = new UpdateEnvironmentUseCase(uow);
+
+    const env = await createUseCase.execute({
+      projectId: "project-1",
+      name: "Development",
+      description: "Old description",
+    });
+
+    const updated = await updateUseCase.execute({
+      id: env.id,
+      name: "Dev Env",
+      description: "New description",
+      envVars: {
+        DATABASE_URL: "postgres://db:5432/dev",
+        PORT: "8080",
+      },
+    });
+
+    expect(updated.name).toBe("Dev Env");
+    expect(updated.description).toBe("New description");
+    expect(updated.envVars).toBeDefined();
+
+    // Check if env vars are serialised/encrypted JSON
+    const parsed = JSON.parse(updated.envVars!);
+    // Since it's encrypted via serializeResourceEnvironmentVariables, it will be in the encrypted payload format
+    expect(parsed.ciphertext).toBeDefined();
+    expect(parsed.iv).toBeDefined();
+    expect(parsed.authTag).toBeDefined();
   });
 
   test("prevents deletion of default production environment", async () => {

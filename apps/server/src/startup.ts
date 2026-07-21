@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "@upstand/db";
+import { env } from "@upstand/env/server";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { log } from "evlog";
@@ -16,8 +17,7 @@ export async function runDatabaseMigrations(options?: {
   const attempts = options?.attempts ?? 30;
   const delayMs = options?.delayMs ?? 2_000;
 
-  let migrationsFolder =
-    options?.migrationsFolder ?? process.env.DB_MIGRATIONS_PATH;
+  let migrationsFolder = options?.migrationsFolder ?? env.DB_MIGRATIONS_PATH;
 
   if (!migrationsFolder) {
     const rootPath = path.resolve(process.cwd(), "packages/db/src/migrations");

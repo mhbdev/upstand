@@ -152,6 +152,13 @@ export function registerApplicationFeatures(services: ServiceCollection) {
         c.resolve(dependencies.UnitOfWorkToken),
       ),
   );
+  services.addTransient(
+    dependencies.UpdateEnvironmentUseCaseToken,
+    (c) =>
+      new dependencies.UpdateEnvironmentUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
 
   services.addTransient(
     dependencies.CreateResourceUseCaseToken,

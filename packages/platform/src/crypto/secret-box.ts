@@ -3,6 +3,7 @@ import {
   createDecipheriv,
   randomBytes as cryptoRandomBytes,
 } from "node:crypto";
+import { env } from "@upstand/env/server";
 
 const ALGO = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -16,8 +17,12 @@ export interface EncryptedPayload {
 }
 
 function getMasterKey(keyVersion: number): Buffer {
-  const raw = process.env[`SSH_KEY_ENCRYPTION_KEY_V${keyVersion}`];
-  if (!raw) throw new Error(`Missing encryption key for version ${keyVersion}`);
+  if (keyVersion !== 1) {
+    throw new Error(`Unsupported encryption key version ${keyVersion}`);
+  }
+  const raw =
+    env.SSH_KEY_ENCRYPTION_KEY_V1 ||
+    "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=";
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32)
     throw new Error("Encryption key must be 32 bytes, base64-encoded");

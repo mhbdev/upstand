@@ -8,6 +8,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@upstand/ui/components/alert";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -36,6 +37,7 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
+import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
@@ -58,6 +60,7 @@ import {
   Trash2Icon,
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
+import { RemoteServerWizard } from "@/features/remote-servers/components/remote-server-wizard";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 
@@ -67,6 +70,7 @@ export default function RemoteServersPage() {
   const organizationState = useRequiredActiveOrganization();
   const organizationId = organizationState.organizationId as string;
 
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -280,18 +284,33 @@ export default function RemoteServersPage() {
         }
         icon={<ServerIcon className="size-6 text-primary" />}
         actions={
-          <UpGalTarget definition={createServerTarget}>
-            <Button
-              onClick={() => {
-                resetForm();
-                setDialogOpen(true);
-              }}
-              className="gap-2 self-start sm:self-auto"
-            >
-              <PlusIcon data-icon="inline-start" />
-              Create Server
-            </Button>
-          </UpGalTarget>
+          <div className="flex items-center gap-2">
+            {servers && servers.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setWizardOpen(true)}
+                className="gap-2 self-start sm:self-auto"
+              >
+                Onboarding Wizard
+              </Button>
+            )}
+            <UpGalTarget definition={createServerTarget}>
+              <Button
+                onClick={() => {
+                  if (!servers || servers.length === 0) {
+                    setWizardOpen(true);
+                  } else {
+                    resetForm();
+                    setDialogOpen(true);
+                  }
+                }}
+                className="gap-2 self-start sm:self-auto"
+              >
+                <PlusIcon data-icon="inline-start" />
+                Create Server
+              </Button>
+            </UpGalTarget>
+          </div>
         }
       />
 
@@ -339,13 +358,22 @@ export default function RemoteServersPage() {
                     </div>
                   </div>
                   {srv.setupError && (
-                    <Alert variant="destructive" className="mt-1 p-3">
-                      <AlertTriangleIcon />
-                      <AlertTitle>Setup failed</AlertTitle>
-                      <AlertDescription className="break-words">
-                        {srv.setupError}
-                      </AlertDescription>
-                    </Alert>
+                    <div className="mt-2.5 flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-destructive text-xs">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <AlertTriangleIcon className="size-3.5 shrink-0" />
+                        <span className="truncate font-medium">
+                          {srv.setupError}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => handleSetup(srv.id)}
+                        className="h-6 shrink-0 text-[11px] text-destructive hover:bg-destructive/20 hover:text-destructive"
+                      >
+                        Retry
+                      </Button>
+                    </div>
                   )}
                 </CardHeader>
 
@@ -422,19 +450,29 @@ export default function RemoteServersPage() {
         <PageEmpty
           icon={ServerIcon}
           title="No remote servers yet"
-          description="Add a remote server to deploy resources, run builds, and inspect infrastructure from Upstand."
+          description="Follow our step-by-step onboarding wizard to connect, provision, and verify your virtual private server."
           action={
-            <UpGalTarget definition={createServerTarget}>
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <UpGalTarget definition={createServerTarget}>
+                <Button
+                  onClick={() => setWizardOpen(true)}
+                  size="lg"
+                  className="gap-2 font-semibold shadow-lg shadow-primary/20"
+                >
+                  <PlusIcon data-icon="inline-start" />
+                  Start Onboarding Wizard
+                </Button>
+              </UpGalTarget>
               <Button
+                variant="outline"
                 onClick={() => {
                   resetForm();
                   setDialogOpen(true);
                 }}
               >
-                <PlusIcon data-icon="inline-start" />
-                Create Server
+                Quick Add (Skip Wizard)
               </Button>
-            </UpGalTarget>
+            </div>
           }
         />
       )}
@@ -443,53 +481,109 @@ export default function RemoteServersPage() {
         open={!!inspectServerId}
         onOpenChange={(open) => !open && setInspectServerId(null)}
       >
-        <DialogContent className="overflow-hidden rounded-2xl border-border/40 bg-card/95 backdrop-blur-md sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <ServerIcon className="size-5 animate-pulse text-primary" />
-              Server Validation:{" "}
-              {servers?.find((s) => s.id === inspectServerId)?.name}
+        <DialogContent className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg flex-col overflow-hidden rounded-2xl border bg-background p-0 shadow-xl">
+          <DialogHeader className="shrink-0 border-b bg-muted/30 p-4 sm:p-5">
+            <DialogTitle className="flex items-center gap-2 font-bold text-base sm:text-lg">
+              <ServerIcon className="size-5 text-primary" />
+              Server Validation
             </DialogTitle>
-            <DialogDescription>
-              Real-time Docker daemon validation, clock synchronization, and
-              system resource metrics.
+            <DialogDescription className="text-xs">
+              Real-time Docker daemon status, clock synchronization, and
+              resource metrics for{" "}
+              <strong className="text-foreground">
+                {servers?.find((s) => s.id === inspectServerId)?.name}
+              </strong>
+              .
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4 text-sm">
-            <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
-              <p className="flex items-center gap-2 font-semibold text-foreground">
-                <span className="relative flex h-2 w-2">
-                  {validationQuery.isPending ? (
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75" />
-                  ) : null}
-                  <span
-                    className={`relative inline-flex h-2 w-2 rounded-full ${validationQuery.isPending ? "bg-primary" : validationQuery.isError ? "bg-rose-500" : "bg-emerald-500"}`}
-                  />
+
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 text-xs sm:p-5">
+            {/* Docker Daemon */}
+            <div className="flex flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-card-foreground transition-colors hover:border-border">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 font-semibold text-foreground text-xs">
+                  <span className="relative flex size-2">
+                    {validationQuery.isPending ? (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                    ) : null}
+                    <span
+                      className={cn(
+                        "relative inline-flex size-2 rounded-full",
+                        validationQuery.isPending
+                          ? "bg-primary"
+                          : validationQuery.isError
+                            ? "bg-destructive"
+                            : "bg-primary",
+                      )}
+                    />
+                  </span>
+                  Docker Daemon Validation
                 </span>
-                Docker Daemon Validation
-              </p>
-              <p className="mt-2 whitespace-pre-wrap break-all font-mono text-muted-foreground text-xs leading-relaxed">
+                <Badge
+                  variant={
+                    validationQuery.isPending
+                      ? "outline"
+                      : validationQuery.isError
+                        ? "destructive"
+                        : "default"
+                  }
+                  className="text-[10px]"
+                >
+                  {validationQuery.isPending
+                    ? "Checking"
+                    : validationQuery.isError
+                      ? "Failed"
+                      : "Operational"}
+                </Badge>
+              </div>
+              <p className="whitespace-pre-wrap break-all font-mono text-[11px] text-muted-foreground leading-relaxed">
                 {validationQuery.isPending
-                  ? "Checking Docker version and daemon state..."
+                  ? "Verifying Docker version and daemon state..."
                   : validationQuery.isError
                     ? validationQuery.error.message
                     : `Version: ${validationInfo?.serverVersion ?? "unknown"}\nSwarm State: ${validationInfo?.swarmState ?? "unknown"}`}
               </p>
             </div>
 
-            <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
-              <p className="flex items-center gap-2 font-semibold text-foreground">
-                <span className="relative flex h-2 w-2">
-                  {hostTimeQuery.isPending ? (
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75" />
-                  ) : null}
-                  <span
-                    className={`relative inline-flex h-2 w-2 rounded-full ${hostTimeQuery.isPending ? "bg-primary" : hostTimeQuery.isError ? "bg-rose-500" : "bg-emerald-500"}`}
-                  />
+            {/* Host Clock Sync */}
+            <div className="flex flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-card-foreground transition-colors hover:border-border">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 font-semibold text-foreground text-xs">
+                  <span className="relative flex size-2">
+                    {hostTimeQuery.isPending ? (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                    ) : null}
+                    <span
+                      className={cn(
+                        "relative inline-flex size-2 rounded-full",
+                        hostTimeQuery.isPending
+                          ? "bg-primary"
+                          : hostTimeQuery.isError
+                            ? "bg-destructive"
+                            : "bg-primary",
+                      )}
+                    />
+                  </span>
+                  Host Clock Sync
                 </span>
-                Host Time Sync
-              </p>
-              <p className="mt-2 break-all font-mono text-muted-foreground text-xs">
+                <Badge
+                  variant={
+                    hostTimeQuery.isPending
+                      ? "outline"
+                      : hostTimeQuery.isError
+                        ? "destructive"
+                        : "secondary"
+                  }
+                  className="text-[10px]"
+                >
+                  {hostTimeQuery.isPending
+                    ? "Syncing"
+                    : hostTimeQuery.isError
+                      ? "Error"
+                      : "Synced"}
+                </Badge>
+              </div>
+              <p className="break-all font-mono text-[11px] text-muted-foreground leading-relaxed">
                 {hostTimeQuery.isPending
                   ? "Reading host clock..."
                   : hostTimeQuery.isError
@@ -498,37 +592,66 @@ export default function RemoteServersPage() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-border/30 bg-black/15 p-4 transition-all hover:bg-black/25">
-              <p className="flex items-center gap-2 font-semibold text-foreground">
-                <span className="relative flex h-2 w-2">
-                  {runtimeStatsQuery.isPending ? (
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75" />
-                  ) : null}
-                  <span
-                    className={`relative inline-flex h-2 w-2 rounded-full ${runtimeStatsQuery.isPending ? "bg-primary" : runtimeStatsQuery.isError ? "bg-rose-500" : "bg-emerald-500"}`}
-                  />
+            {/* Runtime Metrics */}
+            <div className="flex flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-card-foreground transition-colors hover:border-border">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 font-semibold text-foreground text-xs">
+                  <span className="relative flex size-2">
+                    {runtimeStatsQuery.isPending ? (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                    ) : null}
+                    <span
+                      className={cn(
+                        "relative inline-flex size-2 rounded-full",
+                        runtimeStatsQuery.isPending
+                          ? "bg-primary"
+                          : runtimeStatsQuery.isError
+                            ? "bg-destructive"
+                            : "bg-primary",
+                      )}
+                    />
+                  </span>
+                  Runtime Metrics
                 </span>
-                Runtime Metrics
-              </p>
-              <div className="mt-2 space-y-1 font-mono text-muted-foreground text-xs">
+                <Badge
+                  variant={
+                    runtimeStatsQuery.isPending
+                      ? "outline"
+                      : runtimeStatsQuery.isError
+                        ? "destructive"
+                        : "outline"
+                  }
+                  className="text-[10px]"
+                >
+                  {runtimeStatsQuery.isPending
+                    ? "Fetching"
+                    : runtimeStatsQuery.isError
+                      ? "Offline"
+                      : "Metrics Live"}
+                </Badge>
+              </div>
+              <div className="flex flex-col gap-0.5 font-mono text-[11px] text-muted-foreground">
                 {runtimeStatsQuery.isPending ? (
                   <p>Reading Docker runtime stats...</p>
                 ) : runtimeStatsQuery.isError ? (
-                  <p className="text-rose-400">
+                  <p className="text-destructive">
                     {runtimeStatsQuery.error.message}
                   </p>
                 ) : runtimeStatsQuery.data ? (
                   <>
                     <p>
-                      Docker Version:{" "}
+                      Docker Engine:{" "}
                       {runtimeStatsQuery.data.dockerVersion || "unknown"}
                     </p>
                     <p>
-                      Containers: {runtimeStatsQuery.data.activeContainers}{" "}
-                      active
+                      Active Containers:{" "}
+                      {runtimeStatsQuery.data.activeContainers}
                     </p>
-                    <p>CPU Usage: {runtimeStatsQuery.data.cpu}%</p>
-                    <p>Memory Usage: {runtimeStatsQuery.data.memoryPercent}%</p>
+                    <p>CPU Utilization: {runtimeStatsQuery.data.cpu}%</p>
+                    <p>
+                      Memory Utilization: {runtimeStatsQuery.data.memoryPercent}
+                      %
+                    </p>
                   </>
                 ) : (
                   <p>No runtime metrics available</p>
@@ -536,8 +659,13 @@ export default function RemoteServersPage() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button className="w-full" onClick={() => setInspectServerId(null)}>
+
+          <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => setInspectServerId(null)}
+            >
               Close Validation
             </Button>
           </DialogFooter>
@@ -814,6 +942,13 @@ export default function RemoteServersPage() {
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id });
         }}
+      />
+
+      <RemoteServerWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        organizationId={organizationId}
+        onComplete={() => refetch()}
       />
     </DashboardPage>
   );

@@ -58,14 +58,17 @@ const roleRules: Record<
   domain: { allowedDependencies: ["tooling"] },
   application: {
     allowedDependencies: [
+      "configuration",
       "domain",
       "platform",
       "runtime-infrastructure",
       "tooling",
     ],
   },
-  platform: { allowedDependencies: ["tooling"] },
-  "runtime-infrastructure": { allowedDependencies: ["tooling"] },
+  platform: { allowedDependencies: ["configuration", "tooling"] },
+  "runtime-infrastructure": {
+    allowedDependencies: ["configuration", "tooling"],
+  },
   infrastructure: {
     allowedDependencies: [
       "application",
@@ -370,7 +373,6 @@ describe("clean architecture boundaries", () => {
       "api",
       "auth",
       "db",
-      "env",
       "infrastructure",
       "repositories",
       "ui",

@@ -9,6 +9,11 @@ export const EnvironmentSchema = z.object({
   isDefault: z.boolean(),
   isProtected: z.boolean(),
   resourceCount: z.number().int().nonnegative(),
+  /**
+   * Encrypted JSON string of project-level environment variables. Absent when
+   * the environment has no shared variables configured yet (lazy creation).
+   */
+  envVars: z.string().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -24,4 +29,11 @@ export interface CreateEnvironmentDTO {
   isDefault?: boolean;
   isProtected?: boolean;
   resourceCount?: number;
+}
+
+export interface UpdateEnvironmentDTO {
+  name?: string;
+  description?: string | null;
+  /** Serialised (encrypted) env vars JSON string, as returned by serializeResourceEnvironmentVariables. */
+  envVars?: string;
 }
