@@ -3,7 +3,10 @@ import { ValidationError } from "@upstand/domain";
 import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { CreateEnvironmentUseCase } from "./create-environment.usecase";
 import { DeleteEnvironmentUseCase } from "./delete-environment.usecase";
-import { UpdateEnvironmentUseCase } from "./update-environment.usecase";
+import {
+  resolveEnvironmentVariables,
+  UpdateEnvironmentUseCase,
+} from "./update-environment.usecase";
 
 process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
   "base64",
@@ -104,6 +107,39 @@ describe("Environment Usecases", () => {
     expect(parsed.ciphertext).toBeDefined();
     expect(parsed.iv).toBeDefined();
     expect(parsed.authTag).toBeDefined();
+  });
+
+  test("resolves inherited variables from the current environment toward its parent", async () => {
+    const parent = {
+      id: "parent",
+      parentEnvironmentId: null,
+      inheritsVariables: false,
+      envVars: JSON.stringify({ PARENT: "parent-value" }),
+    };
+    const child = {
+      id: "child",
+      parentEnvironmentId: "parent",
+      inheritsVariables: false,
+      envVars: JSON.stringify({ CHILD: "child-value" }),
+    };
+    const grandchild = {
+      id: "grandchild",
+      parentEnvironmentId: "child",
+      inheritsVariables: true,
+      envVars: JSON.stringify({ GRANDCHILD: "grandchild-value" }),
+    };
+    const uow = {
+      environmentRepository: {
+        findAncestors: async () => [grandchild, child, parent],
+      },
+    } as any;
+
+    await expect(
+      resolveEnvironmentVariables(uow, grandchild.id),
+    ).resolves.toEqual({
+      GRANDCHILD: "grandchild-value",
+      CHILD: "child-value",
+    });
   });
 
   test("prevents deletion of default production environment", async () => {

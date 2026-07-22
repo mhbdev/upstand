@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   type IUnitOfWork,
@@ -41,6 +42,23 @@ export interface DeploymentWorkerScope {
 export interface DeploymentWorkerDependencies {
   getBuildSettings: () => Promise<{ concurrency: number } | null>;
   createScope: () => Promise<DeploymentWorkerScope>;
+}
+
+function isLocalServerIp(ip: string): boolean {
+  if (!ip) return false;
+  if (["127.0.0.1", "localhost", "::1", "0.0.0.0"].includes(ip)) return true;
+  if (process.env.HOST_IP && process.env.HOST_IP === ip) return true;
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const net of interfaces[name] ?? []) {
+        if (net.address === ip) return true;
+      }
+    }
+  } catch {
+    // ignore interface query errors
+  }
+  return false;
 }
 
 function numericMetric(
@@ -277,8 +295,12 @@ export class DeploymentWorker {
 
     const lockKey = `upstand:resource:lock:${resourceId}`;
 
+    if (!this.workerRedis) {
+      throw new Error("Worker Redis client is not initialized");
+    }
+
     // 1. Try to acquire the Redis lock for serialization of this resource
-    const resourceLock = await ResourceLock.acquire(redis, lockKey);
+    const resourceLock = await ResourceLock.acquire(this.workerRedis, lockKey);
     if (!resourceLock) {
       log.info({
         message: `Resource ${resourceId} is currently building. Delaying job ${job.id}.`,
@@ -309,7 +331,10 @@ export class DeploymentWorker {
     let dockerService = scope.dockerService;
     let caddyService = scope.caddyService;
 
-    const publishDeploymentOutcome = async (status: "success" | "failed") => {
+    const publishDeploymentOutcome = async (
+      status: "success" | "failed",
+      err?: Error | unknown,
+    ) => {
       if (!resource) return;
 
       const environment = await uow.environmentRepository.findById(
@@ -338,6 +363,17 @@ export class DeploymentWorker {
           projectName: project.name,
           environmentName: environment.name,
           status,
+          ...(succeeded
+            ? {}
+            : {
+                error:
+                  err instanceof Error
+                    ? err.message
+                    : err
+                      ? String(err)
+                      : undefined,
+                logs: logsAccumulator.slice(-1500),
+              }),
         },
       });
     };
@@ -517,6 +553,10 @@ export class DeploymentWorker {
             `Warning: serverId '${deployedResource.serverId}' not found in server registry. ` +
               "Falling back to local Docker socket.\n",
           );
+        } else if (isLocalServerIp(server.ipAddress)) {
+          appendLog(
+            `Using local Docker engine for control plane server '${server.name}'.\n`,
+          );
         } else {
           assertDeploymentServerSupportsResource(server, deployedResource.type);
           if (server.status !== "ready") {
@@ -665,9 +705,11 @@ export class DeploymentWorker {
         }
       }
 
-      // Remote servers have their own scheduler, so placement constraints from
-      // the control-plane Swarm are intentionally not applied.
-      const constraints: string[] | undefined = undefined;
+      // When no registry is configured, pin service placement to the manager node
+      // where the image was compiled/loaded to avoid multi-node Swarm pull failures.
+      const constraints: string[] | undefined = !registryInfo
+        ? ["node.role==manager"]
+        : undefined;
 
       // Resolve resource env vars: substitute any ${{project.VAR_NAME}} placeholders
       // with the current environment's project-level variables.
@@ -772,6 +814,7 @@ export class DeploymentWorker {
           composeFile,
           appendLog,
           constraints,
+          envVars,
         );
         appendLog(
           resource.composeType === "compose"
@@ -1188,15 +1231,17 @@ export class DeploymentWorker {
         err,
       });
       await flushFinalLogs("failed");
-      await publishDeploymentOutcome("failed").catch((notificationError) => {
-        log.error({
-          message: "Unable to queue deployment failure notification",
-          err:
-            notificationError instanceof Error
-              ? notificationError.message
-              : notificationError,
-        });
-      });
+      await publishDeploymentOutcome("failed", err).catch(
+        (notificationError) => {
+          log.error({
+            message: "Unable to queue deployment failure notification",
+            err:
+              notificationError instanceof Error
+                ? notificationError.message
+                : notificationError,
+          });
+        },
+      );
     } finally {
       if (tempSshKeyPath && fs.existsSync(tempSshKeyPath)) {
         try {

@@ -104,6 +104,7 @@ export interface DockerServicePort {
     rawCompose: string,
     onLog: (log: string) => void,
     constraints?: string[],
+    envVars?: Record<string, string>,
   ): Promise<void>;
   waitForServiceConvergence(
     resource: Resource,

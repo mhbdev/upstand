@@ -96,14 +96,14 @@ export async function resolveEnvironmentVariables(
           Boolean(environment),
       );
   const resolved: Record<string, string> = {};
-  for (const environment of [...chain].reverse()) {
-    if (environment.id !== environmentId && !environment.inheritsVariables) {
-      continue;
-    }
+  let includeParent = true;
+  for (const environment of chain) {
+    if (!includeParent && environment.id !== environmentId) break;
     Object.assign(
       resolved,
       parseResourceEnvironmentVariables(environment.envVars),
     );
+    includeParent = environment.inheritsVariables;
   }
   return resolved;
 }

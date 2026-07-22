@@ -4,6 +4,16 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.116 - 2026-07-23
+
+### Added
+- **DAG Auto-Layout Engine for Infrastructure Topology**: Integrated `@dagrejs/dagre` automatic graph positioning engine (`topology-layout.ts`) offering top-to-bottom and left-to-right hierarchical node layout options, collision resolution, and smooth edge routing.
+
+### Improved
+- **Docker Client & Remote Socket Transport**: Refactored remote Docker socket connections, host socket resolution, and container convergence status tracking (`docker-client.ts`, `docker.service.ts`).
+- **Redis & Notification Transport Resiliency**: Hardened Redis transport reconnection logic and notification transport fallbacks (`redis/index.ts`, `notification-transport.ts`).
+- **Deployment Worker Stability**: Resolved lock acquisition typing and error reporting in `deployment-worker.ts`.
+
 ## 0.1.115 - 2026-07-22
 
 ### Added
