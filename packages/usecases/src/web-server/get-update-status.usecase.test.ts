@@ -55,47 +55,51 @@ function mockGitHub(releaseData: unknown, manifestData: unknown) {
 
 describe("GetUpdateStatusUseCase", () => {
   test("only reports an update when the release manifest contains every image", async () => {
-    const originalFetch = globalThis.fetch;
     const originalVersion = process.env.UPSTAND_VERSION;
     const originalImage = process.env.UPSTAND_SERVER_IMAGE;
     process.env.UPSTAND_VERSION = "v0.1.40";
     process.env.UPSTAND_SERVER_IMAGE = "ghcr.io/mhbdev/upstand-server:v0.1.40";
-    globalThis.fetch = mockGitHub(release(), manifest()) as typeof fetch;
+    const fetcher = mockGitHub(release(), manifest()) as typeof fetch;
 
     try {
       await expect(
-        new GetUpdateStatusUseCase().execute({ forceRefresh: true }),
+        new GetUpdateStatusUseCase().execute({
+          forceRefresh: true,
+          fetcher,
+          repository: "mhbdev/upstand",
+        }),
       ).resolves.toMatchObject({
         latestVersion: "v0.1.41",
         updateAvailable: true,
       });
     } finally {
-      globalThis.fetch = originalFetch;
       process.env.UPSTAND_VERSION = originalVersion;
       process.env.UPSTAND_SERVER_IMAGE = originalImage;
     }
   });
 
   test("does not use a tag when the release is missing an image", async () => {
-    const originalFetch = globalThis.fetch;
     const originalVersion = process.env.UPSTAND_VERSION;
     const originalImage = process.env.UPSTAND_SERVER_IMAGE;
     process.env.UPSTAND_VERSION = "v0.1.40";
     process.env.UPSTAND_SERVER_IMAGE = "ghcr.io/mhbdev/upstand-server:v0.1.40";
-    globalThis.fetch = mockGitHub(release(), {
+    const fetcher = mockGitHub(release(), {
       ...manifest(),
       images: manifest().images?.slice(0, 2),
     }) as typeof fetch;
 
     try {
       await expect(
-        new GetUpdateStatusUseCase().execute({ forceRefresh: true }),
+        new GetUpdateStatusUseCase().execute({
+          forceRefresh: true,
+          fetcher,
+          repository: "mhbdev/upstand",
+        }),
       ).resolves.toMatchObject({
         latestVersion: "v0.1.40",
         updateAvailable: false,
       });
     } finally {
-      globalThis.fetch = originalFetch;
       process.env.UPSTAND_VERSION = originalVersion;
       process.env.UPSTAND_SERVER_IMAGE = originalImage;
     }

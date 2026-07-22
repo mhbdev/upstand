@@ -33,7 +33,7 @@ export class BackupScheduler {
         void this.refresh().catch((error) => {
           log.error({
             message: "Failed to refresh backup schedules",
-            err: error instanceof Error ? error.message : String(error),
+            err: error,
           });
         }),
       60_000,
@@ -98,7 +98,7 @@ export class BackupScheduler {
         log.error({
           message: "Ignoring invalid persisted backup schedule",
           scheduleId: schedule.id,
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       }
     }
@@ -118,7 +118,7 @@ export class BackupScheduler {
       log.error({
         message: "Failed to queue scheduled backup",
         scheduleId,
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     }
   }

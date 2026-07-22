@@ -11,16 +11,18 @@ import {
 } from "@upstand/usecases/tokens";
 import { Queue } from "bullmq";
 import { z } from "zod";
+import type { AuthenticatedContext } from "../context";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
-import { checkPermission } from "../permissions";
+import { authorizeContextCapability, checkPermission } from "../permissions";
+import { resolveResourceTarget } from "./shared/resource-authorization";
 
 const OrganizationInputSchema = z.object({
   organizationId: z.string().min(1),
 });
 
 async function getDeploymentScope(
-  ctx: any,
+  ctx: AuthenticatedContext,
   deploymentId: string,
   permission: "resource:view" | "resource:update",
 ) {
@@ -36,11 +38,7 @@ async function getDeploymentScope(
     ? await uow.projectRepository.findById(environment.projectId)
     : null;
   if (!project) throw new ValidationError("Deployment project not found");
-  await checkPermission(
-    ctx.session.user.id,
-    project.organizationId,
-    permission,
-  );
+  await authorizeContextCapability(ctx, project.organizationId, permission);
   return { uow, deployment, resource, project };
 }
 
@@ -49,20 +47,11 @@ export const deploymentRouter = router({
     .input(z.object({ resourceId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const uow = ctx.scope.resolve(UnitOfWorkToken);
-      const resource = await uow.resourceRepository.findById(input.resourceId);
-      if (!resource) throw new ValidationError("Resource not found");
-      const environment = await uow.environmentRepository.findById(
-        resource.environmentId,
+      const { organizationId } = await resolveResourceTarget(
+        ctx,
+        input.resourceId,
       );
-      const project = environment
-        ? await uow.projectRepository.findById(environment.projectId)
-        : null;
-      if (!project) throw new ValidationError("Project not found");
-      await checkPermission(
-        ctx.session.user.id,
-        project.organizationId,
-        "resource:view",
-      );
+      await authorizeContextCapability(ctx, organizationId, "resource:view");
       return uow.deploymentRepository.findByResourceId(input.resourceId);
     }),
 
@@ -78,7 +67,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.executeForOrganization(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -94,7 +83,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.executeForOrganization(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -110,7 +99,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.execute(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -127,7 +116,7 @@ export const deploymentRouter = router({
           .resolve(GetDeploymentServerSettingsUseCaseToken)
           .execute(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -151,7 +140,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -164,7 +153,7 @@ export const deploymentRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const queueName = getDeploymentQueueName(input.serverId);
-      const queue = new Queue(queueName, { connection: redis as any });
+      const queue = new Queue(queueName, { connection: redis.options });
 
       try {
         const job = await queue.getJob(input.jobId);
@@ -220,7 +209,7 @@ export const deploymentRouter = router({
         }
         throw new ValidationError("Job not found in queue");
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       } finally {
         await queue.close();
       }
@@ -236,7 +225,7 @@ export const deploymentRouter = router({
       );
       const queue = new Queue(
         getDeploymentQueueName(deployment.serverId || "local"),
-        { connection: redis as any },
+        { connection: redis.options },
       );
       try {
         const job = await queue.getJob(input.deploymentId);

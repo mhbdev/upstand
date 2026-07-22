@@ -81,7 +81,10 @@ const validatedEnv = createEnv({
     OPENROUTER_MODEL: z.string().optional(),
   },
   runtimeEnv: process.env,
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  skipValidation:
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    (process.env.NODE_ENV !== "production" &&
+      !!process.env.SKIP_ENV_VALIDATION),
   emptyStringAsUndefined: true,
 });
 

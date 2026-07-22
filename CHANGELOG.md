@@ -4,6 +4,92 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.112 - 2026-07-22
+
+### Fixed
+- Normalized release configuration formatting after the build-warning cleanup.
+
+## 0.1.111 - 2026-07-22
+
+### Fixed
+- Removed remaining production build warnings by updating tsdown dependency options, externalizing optional OpenTelemetry instrumentation, and defining Fumadocs `metadataBase`.
+
+## 0.1.110 - 2026-07-22
+
+### Security
+- Fixed S3 connection-test command injection by using argument-safe rclone execution and removing arbitrary test flags.
+- Blocked private, link-local, loopback, and metadata destinations for S3 and registry tests and SSH host-key scans, with DNS validation, timeouts, and redirect protection.
+- Enforced organization, resource, server, and container ownership for AI container commands and Docker terminal sessions.
+- Made unknown Docker server references fail closed and hardened SSH host and username validation before generating SSH configuration.
+- Removed terminal handoff credentials from WebSocket query strings.
+
+## 0.1.109 - 2026-07-22
+
+### Added
+- **SCIM 2.0 Identity Management & Admin 2FA Reset**: Added SCIM repository layer and API router endpoints for enterprise user provisioning/deprovisioning. Implemented admin 2FA reset workflow and repositories.
+- **Docker Deployment Convergence & Automated Rollback**: Introduced Docker service deployment convergence validation with automatic rollback triggers upon step failure or container convergence timeouts.
+- **Database Hot-Path & Integrity Indexing**: Added migrations `0049_integrity_and_hot_path_indexes.sql` and `0050_furry_quentin_quire.sql` to optimize query performance across deployments, resources, and notification outbox tables.
+
+### Improved
+- **Modular Server & API Architecture**: De-monolithized server startup (`apps/server`) and `@upstand/api` routers (`web-server.router`, `permissions`, `rate-limit`, `openapi`, `errors`) into clean modular domains (`/scim`, `/trpc`, `/authorization`, `/rate-limiting`, `/routers/web-server`). Added full procedure authorization policy test coverage.
+- **Resilient Redis Rate-Limiting**: Enhanced rate limiter with a circuit breaker and bounded local token-bucket LRU fallback, gracefully maintaining rate limits when Redis experiences timeouts or disconnections.
+- **UpGal AI Stability & Recovery**: Upgraded UpGal error classification, instruction guidelines, and message history persistence to automatically recover from stale tool call states.
+- **Docker Dashboard & Log Viewer**: Expanded Docker logs component with log level filtering (`INFO`, `WARN`, `ERROR`), pause/resume controls, auto-scroll toggle, and enhanced log search.
+
+### Fixed
+- **Codebase Lint & Format Compliance**: Resolved Biome linting and formatting issues across apps and packages, ensuring clean workspace build state for releases.
+
+## 0.1.108 - 2026-07-21
+
+### Fixed
+- **Role-Based Remote Server Selection**: Updated resource creation dialogs (Application, Database, Compose), resource general settings tab, and templates setup page to filter target server and build server dropdown lists based on server types (`deploy`, `build`, `database`). This prevents selecting incompatible server roles in the UI and aligns with backend role assertions.
+## 0.1.107 - 2026-07-21
+
+### Added
+- **Modern Terminal UI and Split Sidebar Layout**: Redesigned the interactive SSH and Docker terminal Dialog, introducing a spacious dual-column layout on desktop screens with settings placed in a dedicated left sidebar, and auto-collapsing to vertical stack on mobile/tablet.
+- **Upgraded Terminal Toolbar**: Replaced the custom Popover theme menu with the `@upstand/ui` `Select` component. Designed modern font-size adjustment controls with `PlusIcon`/`MinusIcon` buttons, clear action with `Trash2`, download buffer with `Download`, and added `Tooltip` micro-interactions to all actions.
+- **Configuration State Persistence**: Enabled `localStorage` memory caching for the user's font-size and active theme selections to preserve preferences across dialogue instances and page reloads.
+
+### Fixed
+- **Terminal Reconnect Session Expiry**: Prevented active WebSocket/SSH sessions from tearing down and reconnecting when font-size or theme options change, fixing the `"Terminal session expired. Open a new terminal and try again."` toast disconnection bug.
+
+## 0.1.106 - 2026-07-21
+
+### Fixed
+- **Bypass env validation during Next.js production builds**: Added `process.env.NEXT_PHASE === "phase-production-build"` validation bypass to both `@upstand/env` server and web modules. This allows Next.js static page collection and dynamic routing build traces to compile successfully in CI/CD (GitHub Actions) environments without requiring active database connections or runtime secret environment variables.
+
+## 0.1.105 - 2026-07-21
+
+### Fixed
+- **Private key formatting compatibility**: Added auto-serialization of generated and imported private keys to standard PKCS#1 PEM (for RSA keys) and OpenSSH PEM (for ED25519 keys) using `sshpk` prior to database encryption. This prevents the `ssh2` parser from throwing `"Cannot parse privateKey: Unsupported key format"` errors which occurred when Node's native `generateKeyPairSync` outputs key pairs in raw PKCS#8 formatting.
+
+## 0.1.104 - 2026-07-21
+
+### Added
+- **Direct Remote Server Terminals**: Added a dedicated "Open Terminal" button on each Remote Server card, allowing users to connect to that server's terminal directly from the server manager. The terminal pre-selects the server's attached SSH Key, username, and port.
+- **Enhanced Terminal Dialog Width**: Made the terminal emulator dialog wider on tablets and desktops (`max-w-[80rem]` for control-plane terminal and `max-w-[84rem]` for standard terminals) to accommodate longer terminal commands and larger font sizes.
+
+## 0.1.103 - 2026-07-21
+
+### Added
+- **Multi-Algorithm SSH Key Generation**: Upgraded SSH key generation to support both modern, secure **ED25519** and legacy compatibility **RSA (2048-bit)** key pairs. Added a dropdown/selector in both the main SSH Keys manager panel and the remote server onboarding wizard.
+- **Automated SSH Host Key Scanning & Verification**: Introduced a native, secure, async `scanHostKey` endpoint that queries the remote server's SSH fingerprint before adding it. Both the server wizard and the server manager now auto-scan and trust the host key during server creation, fixing the `"Trust the server SSH host key before provisioning it"` error without requiring any manual terminal commands.
+
+## 0.1.102 - 2026-07-21
+
+### Fixed
+- **Remote server setup on Windows**: Provisioning (`SetupServerUseCase`) now runs `docker info --format json` over the existing SSH connection instead of routing through a Unix socket proxy, fixing the *"Was there a typo in the url or port?"* error on Windows ([`server-provisioning.ts`](packages/infrastructure/src/provisioning/server-provisioning.ts)).
+- **Caddy initialization on Windows**: Replaced `CaddyService` (Docker API / Unix socket) with a pure SSH-command-based `initializeCaddyViaSsh` during server provisioning, enabling the DEPLOY role to complete successfully on Windows without a local Unix socket.
+- **Runtime metrics and Docker API calls on Windows**: `ensureRemoteDockerProxy` now detects `process.platform === "win32"` and listens on a local TCP port (`127.0.0.1:23776+`) instead of a Unix `.sock` file path, fixing *"Was there a typo in the url or port?"* errors when fetching runtime metrics or performing any Docker API operation against remote servers on Windows ([`docker-client.ts`](packages/infrastructure/src/docker/docker-client.ts)).
+- **SSH host key fingerprint padding mismatch**: `verifyHostKeyFingerprint` now strips trailing `=` padding before comparing SHA-256 base64 fingerprints, fixing host key verification failures against OpenSSH servers that emit fingerprints with or without trailing padding ([`host-key.ts`](packages/platform/src/ssh/host-key.ts)).
+- **`ssh-keyscan` failure on Windows against OpenSSH 9.6**: `getTrustedKnownHostsEntry` now falls back to a pure Node.js/ssh2 host key scanner (`scanHostKeyWithSsh2Sync`) when `ssh-keyscan` exits with an error (e.g. unsupported KEX algorithm `sntrup761x25519-sha512@openssh.com` on modern Ubuntu 24.04 servers), fixing `"Could not read the SSH host key"` / `"Host denied (verification failed)"` errors on Windows.
+
+## 0.1.101 - 2026-07-21
+
+### Changed
+- Optimized GitHub Actions release workflow (`release.yml`) by removing non-reusable `cache-to` GHA cache layer exports on tag builds, saving ~1m 45s per release.
+- Added conditional `SKIP_TYPECHECK=1` support to Next.js container builds (`apps/web` and `apps/fumadocs`), eliminating duplicate type-checking inside Docker image builds (~22s saved).
+
 ## 0.1.100 - 2026-07-21
 
 ### Changed

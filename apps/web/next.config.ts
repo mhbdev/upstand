@@ -18,6 +18,11 @@ class SafeSha256 {
 }
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors:
+      process.env.SKIP_TYPECHECK === "1" ||
+      process.env.SKIP_TYPECHECK === "true",
+  },
   typedRoutes: true,
   reactCompiler: true,
   output: "standalone",

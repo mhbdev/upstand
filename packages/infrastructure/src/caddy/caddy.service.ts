@@ -48,7 +48,7 @@ function sanitizeServiceName(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9-_]/g, "-");
+    .replace(/[^a-z0-9_-]/g, "-");
 }
 
 function caddySettingsWithDefaults(settings: CaddySettings = {}) {
@@ -647,7 +647,7 @@ export class CaddyService {
         if (error.statusCode !== 404 && error.statusCode !== 409) {
           log.warn({
             message: `Unable to detach Caddy from stale resource network '${network.Name}'.`,
-            err: error.message || error,
+            err: error,
           });
         }
       }
@@ -1012,7 +1012,7 @@ export class CaddyService {
         durationMs: Date.now() - startedAt,
         domainCount: new Set(domains).size,
         resourceCount: resources.length,
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
       throw error;
     }

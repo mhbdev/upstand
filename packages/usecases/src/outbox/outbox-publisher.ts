@@ -66,6 +66,7 @@ export class OutboxPublisher {
         const marked = await this.uow.outboxRepository.markPublished(
           message.id,
           this.options.now(),
+          message.claimedAt,
         );
         if (marked) result.published += 1;
       } catch (error) {
@@ -79,6 +80,7 @@ export class OutboxPublisher {
           this.options.now(),
           error instanceof Error ? error.message : String(error),
           retryDelayMs,
+          message.claimedAt,
         );
         if (failed?.status === "dead_letter") result.deadLettered += 1;
         else if (failed) result.retried += 1;

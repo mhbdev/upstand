@@ -7,7 +7,7 @@ function resourceName(resource: Pick<Resource, "appName" | "name">): string {
   return (resource.appName || resource.name)
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9-_]/g, "-");
+    .replace(/[^a-z0-9_-]/g, "-");
 }
 
 function containerLabels(labels: string[]): Map<string, string> {

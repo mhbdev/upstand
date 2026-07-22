@@ -1,4 +1,5 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
+import { log } from "evlog";
 import { z } from "zod";
 import { requestMonitoringAgent } from "./monitoring-agent.client";
 
@@ -64,9 +65,11 @@ export class GetServerHistoricalMetricsUseCase {
         },
       );
     } catch (err) {
-      throw new Error(
-        `Failed to contact monitoring agent for ${serverId}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      log.warn({
+        message: `Failed to contact monitoring agent for ${serverId}`,
+        err: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
   }
 }

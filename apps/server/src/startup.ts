@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { db } from "@upstand/db";
+import { migrateDatabase } from "@upstand/db";
 import { env } from "@upstand/env/server";
-import { sql } from "drizzle-orm";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { log } from "evlog";
 
 const wait = (milliseconds: number) =>
@@ -37,7 +35,7 @@ export async function runDatabaseMigrations(options?: {
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      await migrate(db, { migrationsFolder });
+      await migrateDatabase(migrationsFolder);
       log.info({
         message: "Database migrations completed",
         migrationsFolder,
@@ -50,7 +48,7 @@ export async function runDatabaseMigrations(options?: {
         message: "Database migration attempt failed",
         attempt,
         attempts,
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
       if (attempt < attempts) await wait(delayMs);
     }
@@ -59,34 +57,4 @@ export async function runDatabaseMigrations(options?: {
   throw new Error(`Database migrations failed after ${attempts} attempts`, {
     cause: lastError,
   });
-}
-
-/**
- * The initial-owner guard predates managed workspace provisioning. Keep the
- * guard and make its exception explicit for users created by member/SCIM
- * provisioning. This runs after migrations so existing installations upgrade
- * without a hand-authored migration file.
- */
-export async function configureManagedUserProvisioning(): Promise<void> {
-  await db.execute(sql`
-    CREATE OR REPLACE FUNCTION upstand_allow_initial_owner_only()
-    RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-    BEGIN
-      PERFORM pg_advisory_xact_lock(84621735);
-
-      IF COALESCE(NEW.managed, false) THEN
-        RETURN NEW;
-      END IF;
-
-      IF EXISTS (SELECT 1 FROM "user" LIMIT 1) THEN
-        RAISE EXCEPTION 'Upstand has already been configured; sign in with the owner account'
-          USING ERRCODE = '42501';
-      END IF;
-
-      RETURN NEW;
-    END;
-    $$;
-  `);
 }

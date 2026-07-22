@@ -10,14 +10,17 @@ import {
 } from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import { auth } from "../auth";
 import {
   protectedProcedure,
   router,
   twoFactorVerifiedProcedure,
 } from "../index";
-import { type PermissionAction, ROLE_PERMISSIONS } from "../permissions";
+import {
+  checkPermission,
+  type PermissionAction,
+  ROLE_PERMISSIONS,
+} from "../permissions";
 
 const permissionActions = CUSTOM_ROLE_CAPABILITY_ACTIONS as [
   PermissionAction,
@@ -109,7 +112,11 @@ function validatePermissions(role: string, permissions: PermissionAction[]) {
 
 export const memberRouter = router({
   list: protectedProcedure.input(baseInput).query(async ({ ctx, input }) => {
-    await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+    await checkPermission(
+      ctx.session.user.id,
+      input.organizationId,
+      "member:view",
+    );
     const rows = await db
       .select({ member, user })
       .from(member)
@@ -138,9 +145,10 @@ export const memberRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const actor = await ensureOrganizationAccess(
+      const actor = await checkPermission(
         ctx.session.user.id,
         input.organizationId,
+        "member:manage",
       );
       assertManager(actor.role);
       if (actor.role === "admin" && input.role !== "member") {
@@ -157,6 +165,7 @@ export const memberRouter = router({
         input.customRoleId,
         actor.role,
       );
+      const email = input.email.trim().toLowerCase();
       const existing = await db
         .select({ id: member.id })
         .from(member)
@@ -164,7 +173,7 @@ export const memberRouter = router({
         .where(
           and(
             eq(member.organizationId, input.organizationId),
-            eq(user.email, input.email.toLowerCase()),
+            eq(user.email, email),
           ),
         )
         .limit(1);
@@ -176,35 +185,54 @@ export const memberRouter = router({
 
       const created = await auth.api.createUser({
         body: {
-          email: input.email,
+          email,
           name: input.name,
           password: input.password,
           role: "user",
           data: { managed: true },
         },
       });
-      await db.insert(member).values({
-        id: crypto.randomUUID(),
-        organizationId: input.organizationId,
-        userId: created.user.id,
-        role: assignment.role,
-        permissions: JSON.stringify(assignment.permissions),
-        createdAt: new Date(),
-      });
-      // Better Auth's user-create hook provisions a personal workspace for a
-      // standalone signup. This flow provisions the user into an existing
-      // workspace, so remove that empty bootstrap workspace if it was created.
-      const personalWorkspaces = await db
-        .select({ id: organization.id, metadata: organization.metadata })
-        .from(member)
-        .innerJoin(organization, eq(member.organizationId, organization.id))
-        .where(eq(member.userId, created.user.id));
-      for (const workspace of personalWorkspaces) {
-        if (workspace.metadata === JSON.stringify({ isPersonal: true })) {
-          await db
-            .delete(organization)
-            .where(eq(organization.id, workspace.id));
-        }
+      try {
+        await db.transaction(async (tx) => {
+          await tx.insert(member).values({
+            id: crypto.randomUUID(),
+            organizationId: input.organizationId,
+            userId: created.user.id,
+            role: assignment.role,
+            permissions: JSON.stringify(assignment.permissions),
+            createdAt: new Date(),
+          });
+
+          const personalWorkspaces = await tx
+            .select({ id: organization.id, metadata: organization.metadata })
+            .from(member)
+            .innerJoin(organization, eq(member.organizationId, organization.id))
+            .where(eq(member.userId, created.user.id));
+          for (const workspace of personalWorkspaces) {
+            if (workspace.metadata === JSON.stringify({ isPersonal: true })) {
+              await tx
+                .delete(organization)
+                .where(eq(organization.id, workspace.id));
+            }
+          }
+        });
+      } catch (error) {
+        await db
+          .delete(user)
+          .where(eq(user.id, created.user.id))
+          .catch((cleanupError) => {
+            ctx.log.error(
+              cleanupError instanceof Error
+                ? cleanupError
+                : String(cleanupError),
+              {
+                message:
+                  "Failed to clean up user after membership creation failed",
+                userId: created.user.id,
+              },
+            );
+          });
+        throw error;
       }
       return { user: created.user };
     }),
@@ -220,9 +248,10 @@ export const memberRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const actor = await ensureOrganizationAccess(
+      const actor = await checkPermission(
         ctx.session.user.id,
         input.organizationId,
+        "member:manage",
       );
       assertManager(actor.role);
       if (actor.role === "admin" && input.role !== "member")
@@ -280,9 +309,10 @@ export const memberRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const actor = await ensureOrganizationAccess(
+      const actor = await checkPermission(
         ctx.session.user.id,
         input.organizationId,
+        "member:manage",
       );
       const target = await db
         .select()
@@ -324,9 +354,10 @@ export const memberRouter = router({
   remove: twoFactorVerifiedProcedure
     .input(baseInput.extend({ memberId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      const actor = await ensureOrganizationAccess(
+      const actor = await checkPermission(
         ctx.session.user.id,
         input.organizationId,
+        "member:manage",
       );
       const target = await db
         .select()

@@ -11,6 +11,7 @@ import type {
 } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import type { LanguageModel } from "ai";
+import { UpGalError } from "./upgal-errors";
 
 export type UpGalProviderOverrides = {
   /** Look up a specific saved provider config by its ID. */
@@ -102,13 +103,19 @@ export async function getUpGalProvider(
       : null;
 
   if (!config?.enabled) {
-    throw new Error(
+    throw new UpGalError(
+      "configuration",
       "Configure an AI provider in Settings → AI before using UpGal.",
     );
   }
 
   const apiKey = overrides.apiKey?.trim() || decryptProviderApiKey(stored);
-  if (!apiKey) throw new Error("The configured AI provider has no API key.");
+  if (!apiKey) {
+    throw new UpGalError(
+      "authentication",
+      "The configured AI provider has no API key.",
+    );
+  }
 
   const controls = {
     temperature: config.temperature ?? 0.5,

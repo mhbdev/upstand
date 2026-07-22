@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -21,6 +22,14 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { Textarea } from "@upstand/ui/components/textarea";
 import { cn } from "@upstand/ui/lib/utils";
@@ -98,6 +107,7 @@ export default function SSHKeys(_props: {
   // Form State
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [algorithm, setAlgorithm] = useState<"ed25519" | "rsa">("ed25519");
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
   const [editName, setEditName] = useState("");
@@ -110,6 +120,7 @@ export default function SSHKeys(_props: {
   const resetForm = () => {
     setName("");
     setDescription("");
+    setAlgorithm("ed25519");
     setPrivateKey("");
     setPublicKey("");
   };
@@ -202,6 +213,7 @@ export default function SSHKeys(_props: {
       organizationId: orgId,
       name: name.trim(),
       description: description.trim() || undefined,
+      algorithm,
     });
   };
 
@@ -296,27 +308,21 @@ export default function SSHKeys(_props: {
         </div>
       ) : keys && keys.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {keys.map((key, index) => (
-            <Card key={key.id} className="border border-border/40 bg-card/30">
-              <CardHeader className="flex flex-row items-start justify-between pb-3">
+          {keys.map((key) => (
+            <Card key={key.id}>
+              <CardHeader className="flex flex-row items-start justify-between">
                 <div className="space-y-1">
+                  <Badge variant="outline" className="uppercase">
+                    {key.algorithm}
+                  </Badge>
                   <CardTitle className="flex items-center gap-2 font-bold text-base">
-                    <span className="font-mono text-muted-foreground text-xs">
-                      {index + 1}.
-                    </span>
                     {key.name}
-                    <span className="rounded-full border border-border/50 px-2 py-0.5 font-mono text-[9px] text-muted-foreground uppercase tracking-wider">
-                      {key.algorithm}
-                    </span>
                   </CardTitle>
                   {key.description && (
                     <CardDescription className="line-clamp-2 text-muted-foreground text-xs">
                       {key.description}
                     </CardDescription>
                   )}
-                  <p className="pt-1 font-semibold text-[10px] text-muted-foreground/70 uppercase tracking-wider">
-                    Created: {new Date(key.createdAt).toLocaleString()}
-                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Button
@@ -351,7 +357,7 @@ export default function SSHKeys(_props: {
                   <Label className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest">
                     Fingerprint
                   </Label>
-                  <p className="select-all break-all pt-1 font-mono text-[10px] text-zinc-300">
+                  <p className="select-all break-all pt-1 font-mono text-[10px] text-muted-foreground">
                     {key.fingerprint ?? `${key.publicKey.substring(0, 60)}...`}
                   </p>
                 </div>
@@ -546,6 +552,32 @@ export default function SSHKeys(_props: {
                       autoComplete="off"
                     />
                   </UpGalTarget>
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="key-algorithm">Key Type</FieldLabel>
+                  <Select
+                    items={[
+                      { value: "ed25519", label: "ED25519 (Recommended)" },
+                      { value: "rsa", label: "RSA 2048-bit" },
+                    ]}
+                    value={algorithm}
+                    onValueChange={(val) =>
+                      val && setAlgorithm(val as "ed25519" | "rsa")
+                    }
+                  >
+                    <SelectTrigger id="key-algorithm">
+                      <SelectValue placeholder="Select key type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="ed25519">
+                          ED25519 (Recommended)
+                        </SelectItem>
+                        <SelectItem value="rsa">RSA 2048-bit</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </Field>
               </FieldGroup>
 

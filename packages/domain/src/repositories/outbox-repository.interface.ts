@@ -18,12 +18,17 @@ export interface IOutboxRepository {
     leaseMs: number,
     limit?: number,
   ): Promise<OutboxMessage[]>;
-  markPublished(id: string, publishedAt: Date): Promise<boolean>;
+  markPublished(
+    id: string,
+    publishedAt: Date,
+    claimedAt?: Date | null,
+  ): Promise<boolean>;
   markFailed(
     id: string,
     failedAt: Date,
     error: string,
     retryDelayMs: number,
+    claimedAt?: Date | null,
   ): Promise<OutboxMessage | null>;
   retryDeadLetter(
     id: string,

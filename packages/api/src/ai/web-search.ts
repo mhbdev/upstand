@@ -1,5 +1,6 @@
 import { env } from "@upstand/env/server";
 import { log } from "evlog";
+import { UpGalError } from "./upgal-errors";
 
 const SEARCH_TIMEOUT_MS = 15_000;
 const MAX_RESULT_TEXT_LENGTH = 600;
@@ -21,7 +22,11 @@ function searchEndpoint(): URL {
   const configured = env.UPGAL_WEB_SEARCH_BASE_URL;
   const endpoint = new URL(configured);
   if (endpoint.protocol !== "https:") {
-    throw new Error("UPGAL_WEB_SEARCH_BASE_URL must use HTTPS.");
+    throw new UpGalError(
+      "configuration",
+      "UPGAL_WEB_SEARCH_BASE_URL must use HTTPS.",
+      "web_search",
+    );
   }
   return endpoint;
 }
@@ -70,8 +75,10 @@ export async function searchWeb(input: {
 }): Promise<WebSearchResponse> {
   const apiKey = env.UPGAL_WEB_SEARCH_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error(
+    throw new UpGalError(
+      "configuration",
       "Web search is not configured. Set UPGAL_WEB_SEARCH_API_KEY in the server environment.",
+      "web_search",
     );
   }
 
@@ -95,7 +102,19 @@ export async function searchWeb(input: {
         message: "UpGal web search provider returned an error",
         status: response.status,
       });
-      throw new Error(`Web search provider returned HTTP ${response.status}.`);
+      const code =
+        response.status === 401
+          ? "authentication"
+          : response.status === 403
+            ? "permission"
+            : response.status === 429
+              ? "rate_limit"
+              : "provider";
+      throw new UpGalError(
+        code,
+        `Web search provider returned HTTP ${response.status}.`,
+        "web_search",
+      );
     }
 
     const payload = (await response.json()) as {
@@ -116,7 +135,12 @@ export async function searchWeb(input: {
     };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("Web search timed out. Please try again.");
+      throw new UpGalError(
+        "timeout",
+        "Web search timed out. Please try again.",
+        "web_search",
+        { cause: error },
+      );
     }
     throw error;
   } finally {

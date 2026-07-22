@@ -10,8 +10,13 @@ import {
   listProviderModels,
   testUpGalProvider,
 } from "../ai/upgal";
+import { UpGalError } from "../ai/upgal-errors";
 import { UpGalPageContextSchema } from "../ai/upgal-page-context";
-import { protectedProcedure, router } from "../index";
+import {
+  protectedProcedure,
+  router,
+  twoFactorVerifiedProcedure,
+} from "../index";
 import { checkPermission } from "../permissions";
 
 // ── Shared input schemas ──────────────────────────────────────────────────────
@@ -40,7 +45,7 @@ const providerFormSchema = z.object({
 export const aiRouter = router({
   // ── Template generation ──────────────────────────────────────────────────
 
-  generateTemplate: protectedProcedure
+  generateTemplate: twoFactorVerifiedProcedure
     .input(
       organizationInput.extend({
         request: z.string().trim().min(8).max(2000),
@@ -56,6 +61,7 @@ export const aiRouter = router({
         input.organizationId,
         ctx.scope,
         input.request,
+        ctx.log,
       );
     }),
 
@@ -86,7 +92,7 @@ export const aiRouter = router({
       }));
     }),
 
-  addProvider: protectedProcedure
+  addProvider: twoFactorVerifiedProcedure
     .input(organizationInput.merge(providerFormSchema))
     .mutation(async ({ ctx, input }) => {
       await checkPermission(
@@ -123,7 +129,7 @@ export const aiRouter = router({
       };
     }),
 
-  updateProvider: protectedProcedure
+  updateProvider: twoFactorVerifiedProcedure
     .input(
       organizationInput
         .extend({ id: z.string().min(1) })
@@ -140,9 +146,11 @@ export const aiRouter = router({
         input.id,
         input.organizationId,
       );
-      if (!existing) throw new Error("Provider config not found.");
+      if (!existing) {
+        throw new UpGalError("configuration", "Provider config not found.");
+      }
       const encrypted = input.apiKey ? encryptSecret(input.apiKey) : undefined;
-      await repo.updateProviderConfig(input.id, {
+      await repo.updateProviderConfig(input.id, input.organizationId, {
         name: input.name,
         provider: input.provider,
         model: input.model,
@@ -155,7 +163,7 @@ export const aiRouter = router({
       return { updated: true };
     }),
 
-  removeProvider: protectedProcedure
+  removeProvider: twoFactorVerifiedProcedure
     .input(organizationInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await checkPermission(
@@ -169,7 +177,7 @@ export const aiRouter = router({
       return { removed: true };
     }),
 
-  testProvider: protectedProcedure
+  testProvider: twoFactorVerifiedProcedure
     .input(
       organizationInput.extend({
         id: z.string().min(1).optional(),
@@ -185,16 +193,21 @@ export const aiRouter = router({
         input.organizationId,
         "ai:manage",
       );
-      return testUpGalProvider(input.organizationId, ctx.scope, {
-        providerConfigId: input.id,
-        provider: input.provider,
-        model: input.model,
-        baseUrl: input.baseUrl,
-        apiKey: input.apiKey,
-      });
+      return testUpGalProvider(
+        input.organizationId,
+        ctx.scope,
+        {
+          providerConfigId: input.id,
+          provider: input.provider,
+          model: input.model,
+          baseUrl: input.baseUrl,
+          apiKey: input.apiKey,
+        },
+        ctx.log,
+      );
     }),
 
-  listModels: protectedProcedure
+  listModels: twoFactorVerifiedProcedure
     .input(
       organizationInput.extend({
         provider: z.enum(AI_PROVIDERS),
@@ -230,7 +243,7 @@ export const aiRouter = router({
         .listFeatureAssignments(input.organizationId);
     }),
 
-  saveFeatureAssignment: protectedProcedure
+  saveFeatureAssignment: twoFactorVerifiedProcedure
     .input(
       organizationInput.extend({
         feature: z.enum(AI_FEATURES),
@@ -249,7 +262,9 @@ export const aiRouter = router({
         input.providerConfigId,
         input.organizationId,
       );
-      if (!config) throw new Error("Provider config not found.");
+      if (!config) {
+        throw new UpGalError("configuration", "Provider config not found.");
+      }
       await repo.saveFeatureAssignment(
         input.organizationId,
         input.feature,
@@ -258,7 +273,7 @@ export const aiRouter = router({
       return { saved: true };
     }),
 
-  removeFeatureAssignment: protectedProcedure
+  removeFeatureAssignment: twoFactorVerifiedProcedure
     .input(
       organizationInput.extend({
         feature: z.enum(AI_FEATURES),
@@ -346,7 +361,7 @@ export const aiRouter = router({
       return { conversation, messages };
     }),
 
-  deleteConversation: protectedProcedure
+  deleteConversation: twoFactorVerifiedProcedure
     .input(
       z.object({
         organizationId: z.string().min(1),

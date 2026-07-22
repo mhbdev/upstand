@@ -7,13 +7,9 @@ import {
   apiKeyPermissionsToStatements,
 } from "@upstand/domain";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import { auth } from "../auth";
-import {
-  protectedProcedure,
-  router,
-  twoFactorVerifiedProcedure,
-} from "../index";
+import { router, twoFactorVerifiedProcedure } from "../index";
+import { checkPermission } from "../permissions";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
 const headersFrom = (ctx: { honoContext: { req: { raw: Request } } }) =>
@@ -83,11 +79,11 @@ function mapKey(key: ApiKeyRecord) {
 }
 
 async function requireKeyAdmin(userId: string, organizationId: string) {
-  return ensureOrganizationAccess(userId, organizationId, ["owner", "admin"]);
+  return checkPermission(userId, organizationId, "api_key:manage");
 }
 
 export const apiKeyRouter = router({
-  list: protectedProcedure
+  list: twoFactorVerifiedProcedure
     .input(organizationInput)
     .query(async ({ ctx, input }) => {
       await requireKeyAdmin(ctx.session.user.id, input.organizationId);

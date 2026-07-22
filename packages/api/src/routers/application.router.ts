@@ -19,13 +19,14 @@ import {
   DeleteResourceUseCaseToken,
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
-  GetResourceUseCaseToken,
   UpdateResourceUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
+import { createResourceAuthorizer } from "./shared/resource-authorization";
+import { parseWatchPaths } from "./shared/watch-paths";
 
 const CreateApplicationInputSchema = CreateResourceInputSchema.extend({
   type: z.literal("application"),
@@ -63,22 +64,11 @@ const UpdateApplicationInputSchema = UpdateResourceInputSchema.pick({
   domains: z.array(DomainMappingSchema).optional(),
 });
 
-function parseWatchPaths(value: string[] | string | undefined): string[] {
-  if (Array.isArray(value))
-    return value.filter((item) => item.trim().length > 0);
-  if (typeof value !== "string") return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.filter(
-          (item): item is string =>
-            typeof item === "string" && item.trim().length > 0,
-        )
-      : [];
-  } catch {
-    return [];
-  }
-}
+const authorizeApplication = createResourceAuthorizer({
+  expectedType: "application",
+  resourceLabel: "Application",
+  missingProjectMessage: "Application project not found",
+});
 
 function publicApplication(resource: Resource) {
   let domains: ReturnType<typeof parseDomainMappings> = [];
@@ -123,45 +113,6 @@ function publicApplication(resource: Resource) {
   };
 }
 
-async function getAuthorizedApplication(
-  ctx: any,
-  id: string,
-  action: "view" | "update" | "delete",
-) {
-  const resource = await ctx.scope
-    .resolve(GetResourceUseCaseToken)
-    .execute({ id });
-  if (resource?.type !== "application") {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Application not found",
-    });
-  }
-
-  const environment = await ctx.scope
-    .resolve(GetEnvironmentUseCaseToken)
-    .execute({
-      id: resource.environmentId,
-    });
-  const project = environment
-    ? await ctx.scope
-        .resolve(GetProjectUseCaseToken)
-        .execute({ id: environment.projectId })
-    : null;
-  if (!project) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Application project not found",
-    });
-  }
-  await checkPermission(
-    ctx.session.user.id,
-    project.organizationId,
-    `resource:${action}`,
-  );
-  return resource;
-}
-
 export const applicationRouter = router({
   create: twoFactorVerifiedProcedure
     .input(CreateApplicationInputSchema)
@@ -192,7 +143,7 @@ export const applicationRouter = router({
           .execute(input);
         return publicApplication(resource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -200,14 +151,14 @@ export const applicationRouter = router({
     .input(GetResourceInputSchema)
     .query(async ({ ctx, input }) => {
       return publicApplication(
-        await getAuthorizedApplication(ctx, input.id, "view"),
+        await authorizeApplication(ctx, input.id, "resource:view"),
       );
     }),
 
   update: twoFactorVerifiedProcedure
     .input(UpdateApplicationInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await getAuthorizedApplication(ctx, input.id, "update");
+      await authorizeApplication(ctx, input.id, "resource:update");
       try {
         const { advancedConfig, envVars, domains, ...resourcePatch } = input;
         const resource = await ctx.scope
@@ -227,20 +178,20 @@ export const applicationRouter = router({
           });
         return publicApplication(resource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
   delete: twoFactorVerifiedProcedure
     .input(DeleteResourceInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await getAuthorizedApplication(ctx, input.id, "delete");
+      await authorizeApplication(ctx, input.id, "resource:delete");
       try {
         return await ctx.scope
           .resolve(DeleteResourceUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

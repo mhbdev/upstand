@@ -52,7 +52,7 @@ export const environmentRouter = router({
         const result = await useCase.execute(input);
         return publicEnvironment(result);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -79,7 +79,7 @@ export const environmentRouter = router({
         const result = await useCase.execute(input);
         return result.map(publicEnvironment);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -149,7 +149,7 @@ export const environmentRouter = router({
         const result = await updateUseCase.execute(input);
         return publicEnvironment(result);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -186,7 +186,7 @@ export const environmentRouter = router({
       try {
         return await deleteUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

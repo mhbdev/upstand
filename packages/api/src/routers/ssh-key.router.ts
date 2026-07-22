@@ -34,7 +34,7 @@ export const sshKeyRouter = router({
           createdBy: ctx.session.user.id,
         });
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -53,7 +53,7 @@ export const sshKeyRouter = router({
           createdBy: ctx.session.user.id,
         });
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -69,7 +69,7 @@ export const sshKeyRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -93,7 +93,7 @@ export const sshKeyRouter = router({
       try {
         return await deleteUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -103,13 +103,13 @@ export const sshKeyRouter = router({
       await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        "ssh_key:create",
+        "ssh_key:update",
       );
       const useCase = ctx.scope.resolve(UpdateSshKeyUseCaseToken);
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

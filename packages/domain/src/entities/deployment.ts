@@ -9,6 +9,7 @@ export const DeploymentSchema = z.object({
   serverId: z.string().nullable().optional(),
   serverName: z.string().nullable().optional(),
   sourceRevision: z.string().nullable().optional(),
+  executionToken: z.string().nullable().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

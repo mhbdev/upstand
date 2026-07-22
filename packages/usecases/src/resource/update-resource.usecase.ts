@@ -60,7 +60,7 @@ export const UpdateResourceInputSchema = z.object({
   composeType: ResourceComposeTypeSchema.optional(),
   credentials: z.string().optional(),
   triggerType: z.enum(["push", "tag"]).optional(),
-  tagPattern: z.string().nullable().optional(),
+  tagPattern: z.string().trim().max(512).nullable().optional(),
   watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
   buildSecrets: z.string().optional(),
@@ -267,7 +267,7 @@ export class UpdateResourceUseCase {
       } catch (error: unknown) {
         log.error({
           message: "Failed to encrypt resource credentials",
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
         throw new ValidationError(
           "Resource credentials could not be encrypted",
@@ -333,7 +333,7 @@ export class UpdateResourceUseCase {
       } catch (error) {
         log.error({
           message: "Failed to encrypt application build secrets",
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
         throw new ValidationError(
           "Application build secrets could not be encrypted",
@@ -520,9 +520,27 @@ export class UpdateResourceUseCase {
     }
 
     try {
-      return await this.uow.transaction((tx) =>
-        tx.resourceRepository.updateById(input.id, patch),
-      );
+      return await this.uow.transaction(async (tx) => {
+        const updateIfUnchanged = tx.resourceRepository.updateByIdIfUpdatedAt;
+        if (updateIfUnchanged) {
+          const updated = await updateIfUnchanged.call(
+            tx.resourceRepository,
+            input.id,
+            resource.updatedAt,
+            patch,
+          );
+          if (!updated) {
+            throw new ValidationError(
+              "Resource changed while it was being updated. Retry the operation.",
+            );
+          }
+          return updated;
+        }
+
+        // Compatibility for lightweight test/in-memory repositories that do
+        // not implement the production compare-and-set operation.
+        return tx.resourceRepository.updateById(input.id, patch);
+      });
     } catch (error) {
       if (routingChanged) {
         try {

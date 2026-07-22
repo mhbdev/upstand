@@ -17,6 +17,11 @@ export interface IResourceRepository {
     id: string,
     patch: Partial<CreateResourceDTO>,
   ): Promise<Resource | null>;
+  updateByIdIfUpdatedAt?(
+    id: string,
+    expectedUpdatedAt: Date,
+    patch: Partial<CreateResourceDTO>,
+  ): Promise<Resource | null>;
   deleteById(id: string): Promise<boolean>;
   count(): Promise<number>;
 }

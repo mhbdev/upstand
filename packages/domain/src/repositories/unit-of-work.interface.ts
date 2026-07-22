@@ -17,11 +17,13 @@ import type { IResourceRuntimeRepository } from "./resource-runtime-repository.i
 import type { IS3DestinationRepository } from "./s3-destination-repository.interface";
 import type { IScheduleLogRepository } from "./schedule-log-repository.interface";
 import type { IScheduleRepository } from "./schedule-repository.interface";
+import type { IScimRepository } from "./scim-repository.interface";
 import type { IServerBuildSettingsRepository } from "./server-build-settings-repository.interface";
 import type { IServerRepository } from "./server-repository.interface";
 import type { ISshKeyRepository } from "./ssh-key-repository.interface";
 import type { ITagRepository } from "./tag-repository.interface";
 import type { ITemplateRepository } from "./template-repository.interface";
+import type { ITwoFactorAdminRepository } from "./two-factor-admin-repository.interface";
 import type { IUserRepository } from "./user-repository.interface";
 import type { IWebServerSettingsRepository } from "./web-server-settings-repository.interface";
 
@@ -52,5 +54,7 @@ export interface IUnitOfWork {
   readonly scheduleRepository: IScheduleRepository;
   readonly scheduleLogRepository: IScheduleLogRepository;
   readonly outboxRepository: IOutboxRepository;
+  readonly scimRepository: IScimRepository;
+  readonly twoFactorAdminRepository: ITwoFactorAdminRepository;
   transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T>;
 }

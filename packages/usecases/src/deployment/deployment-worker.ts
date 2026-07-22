@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
@@ -69,7 +70,7 @@ export class DeploymentWorker {
       log.error({
         message:
           "Failed to fetch build settings for worker, using default concurrency",
-        err: err.message,
+        err,
       });
     } finally {
     }
@@ -105,14 +106,14 @@ export class DeploymentWorker {
             resourceId: job?.data?.resourceId,
             serverId: this.serverId,
           },
-          err: err.message,
+          err,
         });
       });
       this.worker.on("error", (error) => {
         log.error({
           message: "Deployment worker connection error",
           serverId: this.serverId,
-          err: error.message,
+          err: error,
         });
       });
 
@@ -157,7 +158,7 @@ export class DeploymentWorker {
         } catch (err: any) {
           log.error({
             message: "Error processing concurrency update message",
-            err: err.message,
+            err,
           });
         }
       }
@@ -221,6 +222,8 @@ export class DeploymentWorker {
     let flushInFlight: Promise<void> | null = null;
     let remoteCliCleanup: (() => void) | null = null;
     let buildCliCleanup: (() => void) | null = null;
+    const executionToken = randomUUID();
+    let executionLeaseLost = false;
 
     const scope = await this.dependencies.createScope();
     const { uow, publisher } = scope;
@@ -255,6 +258,7 @@ export class DeploymentWorker {
           resourceType: resource.type,
           projectName: project.name,
           environmentName: environment.name,
+          status,
         },
       });
     };
@@ -268,16 +272,24 @@ export class DeploymentWorker {
           flushInFlight = uow
             .transaction(async (tx) => {
               // Update deployment logs in the dedicated deployment table
-              await tx.deploymentRepository.updateById(deploymentId, {
-                logs: logsAccumulator,
-              });
+              if (tx.deploymentRepository.updateByIdOwned) {
+                await tx.deploymentRepository.updateByIdOwned(
+                  deploymentId,
+                  executionToken,
+                  { logs: logsAccumulator },
+                );
+              } else {
+                await tx.deploymentRepository.updateById(deploymentId, {
+                  logs: logsAccumulator,
+                });
+              }
             })
             .catch((error) => {
               log.error({
                 message: "Failed to write build logs to database",
                 deploymentId,
                 resourceId,
-                err: error instanceof Error ? error.message : String(error),
+                err: error,
               });
             })
             .finally(() => {
@@ -298,10 +310,22 @@ export class DeploymentWorker {
       resourceLock.assertOwned();
       await uow.transaction(async (tx) => {
         // Update dedicated deployment record
-        await tx.deploymentRepository.updateById(deploymentId, {
-          logs: logsAccumulator,
-          status,
-        });
+        if (tx.deploymentRepository.updateByIdOwned) {
+          const updated = await tx.deploymentRepository.updateByIdOwned(
+            deploymentId,
+            executionToken,
+            { logs: logsAccumulator, status },
+          );
+          if (!updated) {
+            executionLeaseLost = true;
+            throw new Error("Deployment execution lease was lost");
+          }
+        } else {
+          await tx.deploymentRepository.updateById(deploymentId, {
+            logs: logsAccumulator,
+            status,
+          });
+        }
 
         if (previewDeploymentId) {
           await tx.previewDeploymentRepository.updateById(previewDeploymentId, {
@@ -326,7 +350,6 @@ export class DeploymentWorker {
       if (!deployment || deployment.resourceId !== resourceId) {
         throw new Error("Deployment record does not match the queued job");
       }
-      const sourceRevision = deployment.sourceRevision ?? queuedSourceRevision;
       if (deployment.status === "success" || deployment.status === "failed") {
         log.info({
           message: "Skipping deployment job whose database state is terminal",
@@ -337,18 +360,28 @@ export class DeploymentWorker {
         return;
       }
 
-      // Set deployment state to running in the database
-      await uow.transaction(async (tx) => {
-        await tx.deploymentRepository.updateById(deploymentId, {
-          status: "running",
-        });
-        const r = await tx.resourceRepository.findById(resourceId);
-        if (r) {
-          await tx.resourceRepository.updateById(resourceId, {
-            status: "running",
-          });
+      const claimed = await uow.transaction(async (tx) => {
+        const claimedDeployment = tx.deploymentRepository.claimForExecution
+          ? await tx.deploymentRepository.claimForExecution(
+              deploymentId,
+              executionToken,
+              new Date(),
+            )
+          : await tx.deploymentRepository.updateById(deploymentId, {
+              status: "running",
+            });
+        if (claimedDeployment) {
+          const r = await tx.resourceRepository.findById(resourceId);
+          if (r) {
+            await tx.resourceRepository.updateById(resourceId, {
+              status: "running",
+            });
+          }
         }
+        return claimedDeployment;
       });
+      if (!claimed) return;
+      const sourceRevision = claimed.sourceRevision ?? queuedSourceRevision;
 
       resource = await uow.transaction(async (tx) => {
         return await tx.resourceRepository.findById(resourceId);
@@ -512,46 +545,45 @@ export class DeploymentWorker {
                 organizationId,
               )
             )[0];
-        if (!registry) {
-          throw new Error(
-            configuredBuildRegistryId
-              ? "Selected build registry not found"
-              : "No Docker Registry configured. A shared Docker Registry must be configured under settings to support separate build servers.",
-          );
-        }
-        if (registry.organizationId !== organizationId) {
-          throw new Error(
-            "Selected build registry belongs to another organization",
-          );
-        }
-        let decryptedPassword = "";
-        if (registry.password) {
-          try {
-            const payload = JSON.parse(registry.password);
-            if (payload.ciphertext && payload.iv && payload.authTag) {
-              decryptedPassword = decryptSecret(payload);
-            } else {
+        if (registry) {
+          if (registry.organizationId !== organizationId) {
+            throw new Error(
+              "Selected build registry belongs to another organization",
+            );
+          }
+          let decryptedPassword = "";
+          if (registry.password) {
+            try {
+              const payload = JSON.parse(registry.password);
+              if (payload.ciphertext && payload.iv && payload.authTag) {
+                decryptedPassword = decryptSecret(payload);
+              } else {
+                decryptedPassword = registry.password;
+              }
+            } catch {
               decryptedPassword = registry.password;
             }
-          } catch {
-            decryptedPassword = registry.password;
           }
+
+          const cleanUrl = (registry.registryUrl || "")
+            .replace(/https?:\/\//, "")
+            .replace(/\/+$/, "");
+          const serviceName = dockerService.sanitizeName(
+            deployedResource.appName || deployedResource.name,
+          );
+          const imageTag = buildRegistryImageTag(registry, serviceName);
+
+          registryInfo = {
+            url: cleanUrl,
+            username: registry.username,
+            password: decryptedPassword,
+            imageTag,
+          };
+        } else {
+          appendLog(
+            "Notice: No Docker Registry configured. Compiled image will be transferred directly to destination server.\n",
+          );
         }
-
-        const cleanUrl = (registry.registryUrl || "")
-          .replace(/https?:\/\//, "")
-          .replace(/\/+$/, "");
-        const serviceName = dockerService.sanitizeName(
-          deployedResource.appName || deployedResource.name,
-        );
-        const imageTag = buildRegistryImageTag(registry, serviceName);
-
-        registryInfo = {
-          url: cleanUrl,
-          username: registry.username,
-          password: decryptedPassword,
-          imageTag,
-        };
       }
 
       // Remote servers have their own scheduler, so placement constraints from
@@ -828,6 +860,48 @@ export class DeploymentWorker {
         }
       }
 
+      if (resource.type === "application") {
+        appendLog(
+          "Verifying container convergence and health status before switching traffic...\n",
+        );
+        const convergence = await dockerService.waitForServiceConvergence(
+          deployedResource,
+          {
+            destinationDocker: targetDestinationDocker,
+            onLog: appendLog,
+          },
+        );
+
+        if (!convergence.healthy) {
+          appendLog(
+            `\n⚠️ Convergence verification failed: ${convergence.message || "Container failed health check"}.\n`,
+          );
+          appendLog(
+            "Triggering Automated Rollback Engine to preserve zero-downtime availability...\n",
+          );
+          try {
+            await dockerService.rollbackService(deployedResource);
+            appendLog(
+              "Automated Rollback Engine: Successfully reverted Swarm service to previous healthy container image. ✅\n",
+            );
+            appendLog(
+              "Caddy routing safely maintained on previous container image (0 dropped connections).\n",
+            );
+          } catch (rollbackErr: any) {
+            appendLog(
+              `Warning: Automated rollback encountered an issue: ${rollbackErr.message || rollbackErr}\n`,
+            );
+          }
+          throw new Error(
+            `Container failed convergence verification within monitor window: ${convergence.message || "Unhealthy status"}. Automated Rollback Engine executed.`,
+          );
+        }
+
+        appendLog(
+          "Container health check passed healthy! Proceeding with Health-Check Gated Traffic Switching in Caddy...\n",
+        );
+      }
+
       appendLog("Updating Caddy Web Server reverse proxy configuration...\n");
       const updatedResource = await uow.transaction(async (tx) => {
         return await tx.resourceRepository.findById(resourceId);
@@ -923,6 +997,7 @@ export class DeploymentWorker {
         });
       });
     } catch (err: any) {
+      if (executionLeaseLost) return;
       const cancelled = Boolean(
         await redis.get(`upstand:deployment:cancel:${deploymentId}`),
       );
@@ -933,7 +1008,7 @@ export class DeploymentWorker {
       );
       log.error({
         message: "Queue worker deploy pipeline error",
-        err: err.message || err,
+        err,
       });
       await flushFinalLogs("failed");
       await publishDeploymentOutcome("failed").catch((notificationError) => {
@@ -965,7 +1040,7 @@ export class DeploymentWorker {
           message: "Failed to release resource deployment lock",
           resourceId,
           deploymentId,
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       });
     }

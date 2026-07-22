@@ -14,5 +14,6 @@ export interface IBackupRunRepository {
     id: string,
     patch: Partial<CreateBackupRunDTO>,
   ): Promise<BackupRun | null>;
+  claimForExecution(id: string, startedAt: Date): Promise<BackupRun | null>;
   deleteById(id: string): Promise<boolean>;
 }

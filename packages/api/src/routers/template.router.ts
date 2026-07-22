@@ -69,7 +69,7 @@ export const templateRouter = router({
           .resolve(CreateTemplateUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -86,7 +86,7 @@ export const templateRouter = router({
           .resolve(UpdateTemplateUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -103,7 +103,7 @@ export const templateRouter = router({
           .resolve(DeleteTemplateUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -125,7 +125,7 @@ export const templateRouter = router({
           .resolve(DeployTemplateUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

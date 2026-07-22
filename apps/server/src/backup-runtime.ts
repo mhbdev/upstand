@@ -34,19 +34,24 @@ export function createBackupRunHandler(
       const run = await uow.backupRunRepository.findById(runId);
       if (!run) throw new Error("Backup run record not found");
       scheduleId = run.scheduleId;
-      if (run.status === "succeeded") {
-        await releaseBackupRunLock(scheduleId, runId);
-        return;
-      }
+      if (run.status === "succeeded") return;
+
+      const claimedRun = await uow.backupRunRepository.claimForExecution(
+        runId,
+        new Date(),
+      );
+      // Another worker owns the run. Do not release the original trigger
+      // lock from this duplicate worker.
+      if (!claimedRun) return;
 
       renewalTimer = setInterval(
         () =>
-          void renewBackupRunLock(run.scheduleId, runId)
+          void renewBackupRunLock(claimedRun.scheduleId, runId)
             .then((renewed) => {
               if (!renewed) {
                 log.error({
                   message: "Backup run no longer owns its schedule lock",
-                  scheduleId: run.scheduleId,
+                  scheduleId: claimedRun.scheduleId,
                   runId,
                 });
               }
@@ -54,9 +59,9 @@ export function createBackupRunHandler(
             .catch((error) => {
               log.warn({
                 message: "Unable to renew backup run lock",
-                scheduleId: run.scheduleId,
+                scheduleId: claimedRun.scheduleId,
                 runId,
-                err: error instanceof Error ? error.message : String(error),
+                err: error,
               });
             }),
         60_000,
@@ -66,8 +71,8 @@ export function createBackupRunHandler(
       const execute = scope.resolve<ExecuteBackupRunUseCase>(
         ExecuteBackupRunUseCaseToken,
       );
-      await execute.execute(runId);
-      await releaseBackupRunLock(run.scheduleId, runId);
+      await execute.execute(runId, claimedRun);
+      await releaseBackupRunLock(claimedRun.scheduleId, runId);
     } catch (error) {
       const attempts = job.opts.attempts ?? 1;
       const finalAttempt = job.attemptsMade + 1 >= attempts;

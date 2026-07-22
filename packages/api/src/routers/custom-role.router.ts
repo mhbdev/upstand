@@ -10,9 +10,12 @@ import {
 } from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import { router, twoFactorVerifiedProcedure } from "../index";
-import { type PermissionAction, ROLE_PERMISSIONS } from "../permissions";
+import {
+  checkPermission,
+  type PermissionAction,
+  ROLE_PERMISSIONS,
+} from "../permissions";
 
 const permissionActions = CUSTOM_ROLE_CAPABILITY_ACTIONS as [
   PermissionAction,
@@ -22,13 +25,11 @@ const permissionsSchema = z.array(z.enum(permissionActions)).max(100);
 const baseInput = z.object({ organizationId: z.string().min(1) });
 
 async function assertManager(userId: string, organizationId: string) {
-  const actor = await ensureOrganizationAccess(userId, organizationId);
-  if (!(["owner", "admin"] as string[]).includes(actor.role)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Only workspace owners and admins can manage custom roles",
-    });
-  }
+  const actor = await checkPermission(
+    userId,
+    organizationId,
+    "custom_role:manage",
+  );
   return actor;
 }
 
@@ -66,7 +67,11 @@ export const customRoleRouter = router({
   list: twoFactorVerifiedProcedure
     .input(baseInput)
     .query(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "custom_role:view",
+      );
       const rows = await db
         .select()
         .from(customRole)
@@ -152,49 +157,49 @@ export const customRoleRouter = router({
     .input(baseInput.extend({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertManager(ctx.session.user.id, input.organizationId);
-      // Degrade active members with this custom role to standard "member"
-      await db
-        .update(member)
-        .set({
-          role: "member",
-          permissions: JSON.stringify(ROLE_PERMISSIONS.member),
-        })
-        .where(
-          and(
-            eq(member.organizationId, input.organizationId),
-            eq(member.role, `custom:${input.id}`),
-          ),
-        );
+      await db.transaction(async (tx) => {
+        await tx
+          .update(member)
+          .set({
+            role: "member",
+            permissions: JSON.stringify(ROLE_PERMISSIONS.member),
+          })
+          .where(
+            and(
+              eq(member.organizationId, input.organizationId),
+              eq(member.role, `custom:${input.id}`),
+            ),
+          );
 
-      // Degrade pending invitations with this custom role to standard "member"
-      await db
-        .update(invitation)
-        .set({
-          role: "member",
-          permissions: JSON.stringify(ROLE_PERMISSIONS.member),
-        })
-        .where(
-          and(
-            eq(invitation.organizationId, input.organizationId),
-            eq(invitation.role, `custom:${input.id}`),
-          ),
-        );
+        await tx
+          .update(invitation)
+          .set({
+            role: "member",
+            permissions: JSON.stringify(ROLE_PERMISSIONS.member),
+          })
+          .where(
+            and(
+              eq(invitation.organizationId, input.organizationId),
+              eq(invitation.role, `custom:${input.id}`),
+            ),
+          );
 
-      const deleted = await db
-        .delete(customRole)
-        .where(
-          and(
-            eq(customRole.id, input.id),
-            eq(customRole.organizationId, input.organizationId),
-          ),
-        )
-        .returning({ id: customRole.id });
-      if (!deleted.length) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Custom role not found",
-        });
-      }
+        const deleted = await tx
+          .delete(customRole)
+          .where(
+            and(
+              eq(customRole.id, input.id),
+              eq(customRole.organizationId, input.organizationId),
+            ),
+          )
+          .returning({ id: customRole.id });
+        if (!deleted.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Custom role not found",
+          });
+        }
+      });
       return { success: true };
     }),
 });

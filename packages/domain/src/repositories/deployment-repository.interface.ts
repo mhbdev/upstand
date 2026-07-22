@@ -19,5 +19,16 @@ export interface IDeploymentRepository {
     id: string,
     patch: UpdateDeploymentDTO,
   ): Promise<Deployment | null>;
+  claimForExecution?(
+    id: string,
+    executionToken: string,
+    now: Date,
+    leaseMs?: number,
+  ): Promise<Deployment | null>;
+  updateByIdOwned?(
+    id: string,
+    executionToken: string,
+    patch: UpdateDeploymentDTO,
+  ): Promise<Deployment | null>;
   deleteById(id: string): Promise<boolean>;
 }

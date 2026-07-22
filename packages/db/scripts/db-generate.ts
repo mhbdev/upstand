@@ -25,6 +25,7 @@ const env = {
   SKIP_ENV_VALIDATION: "1",
 };
 const cwd = path.resolve(import.meta.dir, "..");
+const generatorOptions = process.argv.slice(2);
 
 function run(args: string[]) {
   const result = Bun.spawnSync({
@@ -44,4 +45,4 @@ function run(args: string[]) {
 // workspace intentionally keeps migration generation in Drizzle so schema
 // changes are generated from the checked-in TypeScript schema without
 // rewriting the auth tables through a separately versioned CLI.
-run(["drizzle-kit", "generate"]);
+run(["drizzle-kit", "generate", ...generatorOptions]);

@@ -42,3 +42,27 @@ export class ForbiddenError extends DomainError {
     this.name = "ForbiddenError";
   }
 }
+
+export type OperationalErrorCode =
+  | "EXTERNAL_SERVICE"
+  | "CONFIGURATION"
+  | "AUTHENTICATION"
+  | "RATE_LIMIT"
+  | "TIMEOUT"
+  | "PERMISSION"
+  | "NETWORK"
+  | "SSH"
+  | "DOCKER"
+  | "GIT"
+  | "NOTIFICATION";
+
+export class OperationalError extends Error {
+  constructor(
+    message: string,
+    public readonly code: OperationalErrorCode,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "OperationalError";
+  }
+}

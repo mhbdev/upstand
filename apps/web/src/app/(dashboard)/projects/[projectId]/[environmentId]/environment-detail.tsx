@@ -285,7 +285,10 @@ function CreateAppDialog({
                   ? [{ value: "local", label: "Local Server (Leader)" }]
                   : []),
                 ...(servers ?? [])
-                  .filter((srv: any) => srv.status === "ready")
+                  .filter(
+                    (srv: any) =>
+                      srv.status === "ready" && srv.serverType === "deploy",
+                  )
                   .map((srv: any) => ({
                     value: srv.id,
                     label: `${srv.name} (${srv.ipAddress})`,
@@ -308,7 +311,10 @@ function CreateAppDialog({
                     <SelectItem value="local">Local Server (Leader)</SelectItem>
                   )}
                   {servers
-                    ?.filter((srv: any) => srv.status === "ready")
+                    ?.filter(
+                      (srv: any) =>
+                        srv.status === "ready" && srv.serverType === "deploy",
+                    )
                     ?.map((srv: any) => (
                       <SelectItem key={srv.id} value={srv.id}>
                         {srv.name} ({srv.ipAddress})
@@ -668,7 +674,12 @@ function CreateDbDialog({
                   ? [{ value: "local", label: "Local Server (Leader)" }]
                   : []),
                 ...(servers ?? [])
-                  .filter((srv: any) => srv.status === "ready")
+                  .filter(
+                    (srv: any) =>
+                      srv.status === "ready" &&
+                      (srv.serverType === "deploy" ||
+                        srv.serverType === "database"),
+                  )
                   .map((srv: any) => ({
                     value: srv.id,
                     label: `${srv.name} (${srv.ipAddress})`,
@@ -688,7 +699,12 @@ function CreateDbDialog({
                     <SelectItem value="local">Local Server (Leader)</SelectItem>
                   )}
                   {servers
-                    ?.filter((srv: any) => srv.status === "ready")
+                    ?.filter(
+                      (srv: any) =>
+                        srv.status === "ready" &&
+                        (srv.serverType === "deploy" ||
+                          srv.serverType === "database"),
+                    )
                     ?.map((srv: any) => (
                       <SelectItem key={srv.id} value={srv.id}>
                         {srv.name} ({srv.ipAddress})
@@ -1045,7 +1061,10 @@ function CreateComposeDialog({
                   ? [{ value: "local", label: "Local Server (Leader)" }]
                   : []),
                 ...(servers ?? [])
-                  .filter((srv: any) => srv.status === "ready")
+                  .filter(
+                    (srv: any) =>
+                      srv.status === "ready" && srv.serverType === "deploy",
+                  )
                   .map((srv: any) => ({
                     value: srv.id,
                     label: `${srv.name} (${srv.ipAddress})`,
@@ -1065,7 +1084,10 @@ function CreateComposeDialog({
                     <SelectItem value="local">Local Server (Leader)</SelectItem>
                   )}
                   {servers
-                    ?.filter((srv: any) => srv.status === "ready")
+                    ?.filter(
+                      (srv: any) =>
+                        srv.status === "ready" && srv.serverType === "deploy",
+                    )
                     ?.map((srv: any) => (
                       <SelectItem key={srv.id} value={srv.id}>
                         {srv.name} ({srv.ipAddress})
@@ -1432,7 +1454,7 @@ export default function EnvironmentDetail({
                   To use these variables in your service environments, reference
                   them using the syntax:
                   <code className="mx-1 rounded border border-border/20 bg-background/50 px-1.5 py-0.5 font-mono text-[11px] text-foreground">
-                    {"DATABASE_URL=${{project.DATABASE_URL}}"}
+                    {"DATABASE_URL=$" + "{{project.DATABASE_URL}}"}
                   </code>
                   . They will be resolved and replaced dynamically during
                   deployment.

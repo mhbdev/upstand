@@ -3,20 +3,13 @@ import { db } from "@upstand/db";
 import { organization, ssoProvider } from "@upstand/db/schema/auth";
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
-import { ensureOrganizationAccess } from "../access-control";
 import { router, twoFactorVerifiedProcedure } from "../index";
+import { checkPermission } from "../permissions";
 
 const inputSchema = z.object({ organizationId: z.string().min(1) });
 
 async function assertManager(userId: string, organizationId: string) {
-  const membership = await ensureOrganizationAccess(userId, organizationId);
-  if (membership.role !== "owner" && membership.role !== "admin") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Only organization owners and admins can manage SSO",
-    });
-  }
-  return membership;
+  return checkPermission(userId, organizationId, "sso:manage");
 }
 
 function parseMetadata(value: string | null) {
@@ -35,7 +28,11 @@ export const ssoRouter = router({
   getSettings: twoFactorVerifiedProcedure
     .input(inputSchema)
     .query(async ({ ctx, input }) => {
-      await ensureOrganizationAccess(ctx.session.user.id, input.organizationId);
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "sso:view",
+      );
       const [workspace, providerCount] = await Promise.all([
         db
           .select({ metadata: organization.metadata })

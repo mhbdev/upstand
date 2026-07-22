@@ -69,7 +69,7 @@ export const certificateRouter = router({
           .execute(input);
         return certificates.map(publicCertificate);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -91,7 +91,7 @@ export const certificateRouter = router({
         );
         return publicCertificate(certificate);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -125,7 +125,7 @@ export const certificateRouter = router({
         );
         return publicCertificate(certificate);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -173,7 +173,7 @@ export const certificateRouter = router({
         );
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

@@ -38,7 +38,7 @@ export class GeneralScheduler {
         void this.refresh().catch((error) => {
           log.error({
             message: "Failed to refresh custom schedules",
-            err: error instanceof Error ? error.message : String(error),
+            err: error,
           });
         }),
       60_000,
@@ -105,7 +105,7 @@ export class GeneralScheduler {
         log.error({
           message: "Ignoring invalid persisted custom schedule",
           scheduleId: schedule.id,
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       }
     }
@@ -118,7 +118,7 @@ export class GeneralScheduler {
       log.error({
         message: "Failed to execute scheduled job",
         scheduleId,
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     }
   }

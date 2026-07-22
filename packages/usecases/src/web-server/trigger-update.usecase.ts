@@ -6,7 +6,7 @@ import { getDockerInstance } from "../resource/docker-client";
 import { GetUpdateStatusUseCase } from "./get-update-status.usecase";
 
 export const TriggerUpdateInputSchema = z.object({
-  version: z.string().min(1, "Version is required"),
+  version: z.string().trim().min(1, "Version is required").max(256),
   images: z.object({
     server: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
     web: z.string().regex(/^sha256:[a-f0-9]{64}$/i),
@@ -174,7 +174,7 @@ export class TriggerUpdateUseCase {
     } catch (err: any) {
       log.error({
         message: `Self-update to ${version} failed`,
-        err: err.message,
+        err,
       });
       throw new Error(`Self-update failed: ${err.message}`);
     }

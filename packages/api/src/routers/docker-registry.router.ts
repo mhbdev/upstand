@@ -38,7 +38,7 @@ export const dockerRegistryRouter = router({
       try {
         return publicRegistry(await useCase.execute(input));
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -55,7 +55,7 @@ export const dockerRegistryRouter = router({
       try {
         return (await useCase.execute(input)).map(publicRegistry);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -81,7 +81,7 @@ export const dockerRegistryRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -91,14 +91,14 @@ export const dockerRegistryRouter = router({
       await checkPermission(
         ctx.session.user.id,
         input.organizationId,
-        "docker_registry:create",
+        "docker_registry:update",
       );
 
       const useCase = ctx.scope.resolve(UpdateDockerRegistryUseCaseToken);
       try {
         return publicRegistry(await useCase.execute(input));
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -116,7 +116,7 @@ export const dockerRegistryRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

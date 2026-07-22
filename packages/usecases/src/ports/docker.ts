@@ -38,6 +38,19 @@ export interface DockerRegistryAuth {
   serveraddress?: string;
 }
 
+export interface ConvergenceOptions {
+  timeoutSeconds?: number;
+  stabilityWindowSeconds?: number;
+  destinationDocker?: any;
+  onLog?: (log: string) => void;
+}
+
+export interface ConvergenceResult {
+  healthy: boolean;
+  state?: string;
+  message?: string;
+}
+
 export interface DockerServicePort {
   sanitizeName(name: string): string;
   setCancellationKey(key: string | null): void;
@@ -84,6 +97,15 @@ export interface DockerServicePort {
     onLog: (log: string) => void,
     constraints?: string[],
   ): Promise<void>;
+  waitForServiceConvergence(
+    resource: Resource,
+    options?: ConvergenceOptions,
+  ): Promise<ConvergenceResult>;
+  transferImage(
+    imageName: string,
+    targetDocker: any,
+    onLog?: (log: string) => void,
+  ): Promise<void>;
   controlService(
     resource: Resource,
     command: "start" | "stop" | "restart",
@@ -124,6 +146,9 @@ export type DockerDeploymentPort = Pick<
   | "deployAppGit"
   | "readComposeFileFromGit"
   | "deployComposeStack"
+  | "waitForServiceConvergence"
+  | "rollbackService"
+  | "transferImage"
 >;
 export type DockerResourceReadPort = Pick<
   DockerServicePort,

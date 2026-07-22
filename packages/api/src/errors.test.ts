@@ -1,15 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
+import { OperationalError } from "@upstand/domain";
 import { handleUseCaseError } from "./errors";
 
 describe("use-case error mapping", () => {
-  test("maps external notification/network failures to a client error", () => {
-    expect(() => handleUseCaseError(new Error("fetch failed"))).toThrow(
-      TRPCError,
-    );
+  test("maps typed external failures to a client error", () => {
+    expect(() =>
+      handleUseCaseError(new OperationalError("fetch failed", "NETWORK")),
+    ).toThrow(TRPCError);
 
     try {
-      handleUseCaseError(new Error("fetch failed"));
+      handleUseCaseError(new OperationalError("fetch failed", "NETWORK"));
     } catch (error) {
       expect(error).toBeInstanceOf(TRPCError);
       expect((error as TRPCError).code).toBe("BAD_REQUEST");
@@ -17,16 +18,22 @@ describe("use-case error mapping", () => {
     }
   });
 
-  test("maps provider-rejected notifications to a client error", () => {
+  test("maps typed notification failures to a client error", () => {
     expect(() =>
       handleUseCaseError(
-        new Error("Slack rejected the notification (404 Not Found)"),
+        new OperationalError(
+          "Slack rejected the notification (404 Not Found)",
+          "NOTIFICATION",
+        ),
       ),
     ).toThrow(TRPCError);
 
     try {
       handleUseCaseError(
-        new Error("Slack rejected the notification (404 Not Found)"),
+        new OperationalError(
+          "Slack rejected the notification (404 Not Found)",
+          "NOTIFICATION",
+        ),
       );
     } catch (error) {
       expect((error as TRPCError).code).toBe("BAD_REQUEST");
@@ -36,19 +43,21 @@ describe("use-case error mapping", () => {
     }
   });
 
-  test("maps unavailable Git provider integrations to a client error", () => {
-    for (const message of [
-      "Unable to connect. Is the computer able to access the url?",
-      "Was there a typo in the url or port?",
-      "Failed to fetch GitHub repositories: upstream unavailable",
-      "GitHub App is not fully configured (missing installation)",
-    ]) {
-      try {
-        handleUseCaseError(new Error(message));
-      } catch (error) {
-        expect((error as TRPCError).code).toBe("BAD_REQUEST");
-        expect((error as TRPCError).message).toBe(message);
-      }
+  test("maps typed Git integration failures to a client error", () => {
+    const error = new OperationalError("Git provider is unavailable", "GIT");
+    try {
+      handleUseCaseError(error);
+    } catch (mapped) {
+      expect((mapped as TRPCError).code).toBe("BAD_REQUEST");
+      expect((mapped as TRPCError).message).toBe(error.message);
+    }
+  });
+
+  test("does not classify arbitrary error text as an operational failure", () => {
+    try {
+      handleUseCaseError(new Error("fetch failed"));
+    } catch (error) {
+      expect((error as TRPCError).code).toBe("INTERNAL_SERVER_ERROR");
     }
   });
 

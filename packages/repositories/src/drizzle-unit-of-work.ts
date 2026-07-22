@@ -18,12 +18,14 @@ import { DrizzleResourceRuntimeRepository } from "./resource/drizzle-resource-ru
 import { DrizzleS3DestinationRepository } from "./s3-destination/drizzle-s3-destination.repository";
 import { DrizzleScheduleRepository } from "./schedule/drizzle-schedule.repository";
 import { DrizzleScheduleLogRepository } from "./schedule/drizzle-schedule-log.repository";
+import { DrizzleScimRepository } from "./scim/drizzle-scim.repository";
 import { DrizzleServerRepository } from "./server/drizzle-server.repository";
 import { DrizzleServerBuildSettingsRepository } from "./server-build-settings/drizzle-server-build-settings.repository";
 import type { Executor } from "./shared/types";
 import { DrizzleSshKeyRepository } from "./ssh-key/drizzle-ssh-key.repository";
 import { DrizzleTagRepository } from "./tag/drizzle-tag.repository";
 import { DrizzleTemplateRepository } from "./template/drizzle-template.repository";
+import { DrizzleTwoFactorAdminRepository } from "./user/drizzle-two-factor-admin.repository";
 import { DrizzleUserRepository } from "./user/drizzle-user.repository";
 import { DrizzleWebServerSettingsRepository } from "./web-server/drizzle-web-server-settings.repository";
 
@@ -54,6 +56,8 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly scheduleRepository: DrizzleScheduleRepository;
   public readonly scheduleLogRepository: DrizzleScheduleLogRepository;
   public readonly outboxRepository: DrizzleOutboxRepository;
+  public readonly scimRepository: DrizzleScimRepository;
+  public readonly twoFactorAdminRepository: DrizzleTwoFactorAdminRepository;
 
   constructor(private readonly executor: Executor) {
     this.auditLogRepository = new DrizzleAuditLogRepository(this.executor);
@@ -107,6 +111,10 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
       this.executor,
     );
     this.outboxRepository = new DrizzleOutboxRepository(this.executor);
+    this.scimRepository = new DrizzleScimRepository(this.executor);
+    this.twoFactorAdminRepository = new DrizzleTwoFactorAdminRepository(
+      this.executor,
+    );
   }
 
   async transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T> {

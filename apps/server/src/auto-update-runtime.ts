@@ -1,10 +1,10 @@
-import { getServiceProvider } from "@upstand/api/di";
 import { env } from "@upstand/env/server";
 import {
   GetUpdateStatusUseCaseToken,
   TriggerUpdateUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { log } from "evlog";
+import { getServiceProvider } from "./di";
 
 export class AutoUpdateRuntime {
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -50,7 +50,7 @@ export class AutoUpdateRuntime {
     } catch (error) {
       log.error({
         message: "Automatic update check failed",
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     } finally {
       this.inFlight = false;

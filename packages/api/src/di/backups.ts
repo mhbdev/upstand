@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { IUnitOfWork } from "@upstand/domain";
 import { TriggerBackupRunUseCase } from "@upstand/usecases/backup/trigger-backup-run.usecase";
 import { QueueDeploymentUseCase } from "@upstand/usecases/deployment/queue-deployment.usecase";
 import { resolveDockerServiceForServer } from "@upstand/usecases/resource/docker-client";
@@ -9,11 +10,25 @@ import * as dependencies from "./dependencies";
 type ServiceCollection = InstanceType<typeof dependencies.ServiceCollection>;
 type ServiceProviderFactory = () => ReturnType<ServiceCollection["build"]>;
 
+type ResourceSecretRepository = {
+  findByResourceId?: (
+    resourceId: string,
+  ) => Promise<{ envVars?: string | null } | null>;
+};
+
+type TransactionWithResourceSecrets = IUnitOfWork & {
+  resourceSecretRepository?: ResourceSecretRepository;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function registerBackups(
   services: ServiceCollection,
   getServiceProvider: ServiceProviderFactory,
 ) {
-  const withScope = async <T>(operation: (uow: any) => Promise<T>) => {
+  const withScope = async <T>(operation: (uow: IUnitOfWork) => Promise<T>) => {
     const scope = getServiceProvider().createScope();
     try {
       return await operation(scope.resolve(UnitOfWorkToken));
@@ -81,7 +96,7 @@ export function registerBackups(
                   lastRunAt: new Date(),
                   lastRunStatus: "success",
                 });
-              } catch (err: any) {
+              } catch (err: unknown) {
                 const durationMs = Date.now() - startTime;
                 await uow.scheduleLogRepository.create({
                   id: randomUUID(),
@@ -91,7 +106,10 @@ export function registerBackups(
                   statusCode: 500,
                   durationMs,
                   responseBody: null,
-                  errorMessage: err.message || "Failed to queue deployment",
+                  errorMessage: getErrorMessage(
+                    err,
+                    "Failed to queue deployment",
+                  ),
                 });
                 await uow.scheduleRepository.updateById(schedule.id, {
                   lastRunAt: new Date(),
@@ -122,7 +140,7 @@ export function registerBackups(
                   lastRunAt: new Date(),
                   lastRunStatus: "success",
                 });
-              } catch (err: any) {
+              } catch (err: unknown) {
                 const durationMs = Date.now() - startTime;
                 await uow.scheduleLogRepository.create({
                   id: randomUUID(),
@@ -132,7 +150,10 @@ export function registerBackups(
                   statusCode: 500,
                   durationMs,
                   responseBody: null,
-                  errorMessage: err.message || "Failed to trigger backup run",
+                  errorMessage: getErrorMessage(
+                    err,
+                    "Failed to trigger backup run",
+                  ),
                 });
                 await uow.scheduleRepository.updateById(schedule.id, {
                   lastRunAt: new Date(),
@@ -154,13 +175,11 @@ export function registerBackups(
                 const baseUrl = `http://${resource.appName || resource.id}`;
 
                 let cronSecret = "";
-                const resourceSecret = await uow.transaction(
-                  async (tx: any) => {
-                    return await (
-                      tx as any
-                    ).resourceSecretRepository?.findByResourceId?.(resource.id);
-                  },
-                );
+                const resourceSecret = await uow.transaction(async (tx) => {
+                  const resourceSecrets = (tx as TransactionWithResourceSecrets)
+                    .resourceSecretRepository;
+                  return resourceSecrets?.findByResourceId?.(resource.id);
+                });
                 if (resourceSecret?.envVars) {
                   const envs = parseResourceEnvironmentVariables(
                     resourceSecret.envVars,
@@ -200,10 +219,12 @@ export function registerBackups(
                   status = "failed";
                   errorMessage = `HTTP ${response.status}: ${response.statusText}`;
                 }
-              } catch (err: any) {
+              } catch (err: unknown) {
                 status = "failed";
-                errorMessage =
-                  err.message || "Failed to send HTTP cron request";
+                errorMessage = getErrorMessage(
+                  err,
+                  "Failed to send HTTP cron request",
+                );
               }
 
               const durationMs = Date.now() - startTime;
@@ -252,9 +273,9 @@ export function registerBackups(
                 1000,
               );
               status = "success";
-            } catch (err: any) {
+            } catch (err: unknown) {
               status = "failed";
-              errorMessage = err.message || "Command execution failed";
+              errorMessage = getErrorMessage(err, "Command execution failed");
             } finally {
               cleanup();
             }

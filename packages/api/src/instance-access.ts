@@ -1,8 +1,4 @@
-import { TRPCError } from "@trpc/server";
-import { db } from "@upstand/db";
-import { user } from "@upstand/db/schema/auth";
-import { env } from "@upstand/env/server";
-import { asc } from "drizzle-orm";
+import { authorizationService } from "./permissions";
 
 /**
  * The first account is the instance owner created by migration 0015. An
@@ -13,37 +9,7 @@ export async function requireInstanceOwner(
   userId: string,
   actorKind: string | undefined,
 ): Promise<void> {
-  if (actorKind !== "session") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Instance operations require an interactive owner session",
-    });
-  }
-
-  const configuredOwner = env.UPSTAND_INSTANCE_OWNER_USER_ID?.trim();
-  if (configuredOwner) {
-    if (configuredOwner !== userId) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Instance owner permission required",
-      });
-    }
-    return;
-  }
-
-  const firstUser = await db
-    .select({ id: user.id })
-    .from(user)
-    .orderBy(asc(user.createdAt), asc(user.id))
-    .limit(1)
-    .then((rows) => rows[0]);
-
-  if (!firstUser || firstUser.id !== userId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Instance owner permission required",
-    });
-  }
+  await authorizationService.authorizeInstance({ userId, kind: actorKind });
 }
 
 export async function requireInstanceOwnerContext(ctx: {

@@ -57,9 +57,11 @@ import {
   KeyRound,
   PlusIcon,
   ServerIcon,
+  TerminalIcon,
   Trash2Icon,
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
+import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
 import { RemoteServerWizard } from "@/features/remote-servers/components/remote-server-wizard";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
@@ -83,6 +85,10 @@ export default function RemoteServersPage() {
   const [editingServerId, setEditingServerId] = useState<string | null>(null);
   const [setupServerId, setSetupServerId] = useState<string | null>(null);
   const [inspectServerId, setInspectServerId] = useState<string | null>(null);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalServerId, setTerminalServerId] = useState<string | undefined>(
+    undefined,
+  );
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
@@ -113,6 +119,10 @@ export default function RemoteServersPage() {
     onError: (err) => {
       toast.error(err.message || "Failed to add remote server");
     },
+  });
+
+  const scanHostKeyMutation = useMutation({
+    ...trpc.server.scanHostKey.mutationOptions(),
   });
 
   const deleteMutation = useMutation({
@@ -183,8 +193,40 @@ export default function RemoteServersPage() {
     if (editingServerId) {
       updateMutation.mutate({ ...input, id: editingServerId });
     } else {
-      createMutation.mutate(input);
+      toast.loading("Scanning remote server SSH host key...", {
+        id: "host-key-scan",
+      });
+      scanHostKeyMutation.mutate(
+        {
+          organizationId,
+          ipAddress: ipAddress.trim(),
+          port,
+        },
+        {
+          onSuccess: (data) => {
+            toast.success(
+              `Trusted host key fingerprint (${data.algorithm}): ${data.fingerprint}`,
+              { id: "host-key-scan" },
+            );
+            createMutation.mutate({
+              ...input,
+              sshHostKeyFingerprint: data.fingerprint,
+            });
+          },
+          onError: (err) => {
+            toast.error(
+              `Could not retrieve server SSH host key: ${err.message || "Connection refused"}. Please check if the IP and SSH port are correct and try again.`,
+              { id: "host-key-scan", duration: 6000 },
+            );
+          },
+        },
+      );
     }
+  };
+
+  const handleTerminal = (serverId: string) => {
+    setTerminalServerId(serverId);
+    setTerminalOpen(true);
   };
 
   const handleEdit = (server: {
@@ -338,6 +380,15 @@ export default function RemoteServersPage() {
                     </div>
 
                     <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Open terminal for ${srv.name}`}
+                        onClick={() => handleTerminal(srv.id)}
+                        className="text-primary hover:bg-primary/10 hover:text-primary"
+                      >
+                        <TerminalIcon className="size-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -949,6 +1000,12 @@ export default function RemoteServersPage() {
         onOpenChange={setWizardOpen}
         organizationId={organizationId}
         onComplete={() => refetch()}
+      />
+
+      <WebServerTerminalDialog
+        open={terminalOpen}
+        onOpenChange={setTerminalOpen}
+        serverId={terminalServerId}
       />
     </DashboardPage>
   );

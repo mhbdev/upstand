@@ -5,9 +5,11 @@ export default defineConfig({
   format: "esm",
   outDir: "./dist",
   clean: true,
-  noExternal: [/@upstand\/.*/],
+  deps: {
+    alwaysBundle: [/@upstand\/.*/],
+    neverBundle: ["ssh2", "@opentelemetry/api"],
+  },
   // ssh2 loads an optional native dependency at runtime. Keeping it external
   // lets Bun resolve the platform-specific binary instead of asking Rolldown to
   // bundle a .node artifact into the server output.
-  external: ["ssh2"],
 });

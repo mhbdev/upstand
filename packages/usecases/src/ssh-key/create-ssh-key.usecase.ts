@@ -10,6 +10,7 @@ import {
   assertKeyPairMatches,
   fingerprintOf,
   KeyPairMismatchError,
+  normalizePrivateKey,
 } from "@upstand/platform/ssh/validate";
 import { z } from "zod";
 
@@ -43,7 +44,8 @@ export class CreateSshKeyUseCase {
       throw new ValidationError("Invalid SSH key pair — could not be parsed");
     }
 
-    const encrypted = encryptSecret(input.privateKey);
+    const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
+    const encrypted = encryptSecret(normalizedPrivateKey);
 
     return this.uow.transaction(async (tx) => {
       const row = await tx.sshKeyRepository.create({

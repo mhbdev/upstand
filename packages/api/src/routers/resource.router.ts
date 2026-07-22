@@ -115,7 +115,7 @@ export const resourceRouter = router({
       try {
         return publicResource(await useCase.execute(input));
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -152,7 +152,7 @@ export const resourceRouter = router({
       try {
         return (await useCase.execute(input)).map(publicResource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -284,7 +284,7 @@ export const resourceRouter = router({
         const updated = await updateUseCase.execute(input);
         return updated ? publicResource(updated) : updated;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -332,7 +332,7 @@ export const resourceRouter = router({
       try {
         return await deleteUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -380,7 +380,7 @@ export const resourceRouter = router({
       try {
         return publicResource(await deployUseCase.execute(input));
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -428,7 +428,7 @@ export const resourceRouter = router({
       try {
         return publicResource(await controlUseCase.execute(input));
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -539,7 +539,7 @@ export const resourceRouter = router({
           await ctx.scope.resolve(RollbackResourceUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -579,7 +579,7 @@ export const resourceRouter = router({
           await ctx.scope.resolve(RebuildDatabaseUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -619,7 +619,7 @@ export const resourceRouter = router({
           .resolve(DatabaseCommandUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -659,7 +659,7 @@ export const resourceRouter = router({
           await ctx.scope.resolve(RandomizeComposeUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -743,7 +743,7 @@ export const resourceRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -793,7 +793,7 @@ export const resourceRouter = router({
       try {
         return await getContainersUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -841,7 +841,7 @@ export const resourceRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -889,7 +889,7 @@ export const resourceRouter = router({
       try {
         return await getLogsUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -929,7 +929,7 @@ export const resourceRouter = router({
           .resolve(GetResourcePreviewsUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -977,7 +977,7 @@ export const resourceRouter = router({
       try {
         return await getStatsUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

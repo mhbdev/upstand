@@ -404,7 +404,8 @@ export function MonitoringSubpage() {
     }),
     enabled:
       organizationState.status === "ready" &&
-      monitoringSettingsQuery.data?.isConfigured === true,
+      monitoringSettingsQuery.data?.isConfigured === true &&
+      monitoringStatusQuery.data?.reachable !== false,
     refetchInterval: 30_000,
   });
 

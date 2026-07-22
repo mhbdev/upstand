@@ -4,7 +4,7 @@ import type {
   CreateBackupRunDTO,
   IBackupRunRepository,
 } from "@upstand/domain";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Executor } from "../shared/types";
 
 export class DrizzleBackupRunRepository implements IBackupRunRepository {
@@ -75,6 +75,31 @@ export class DrizzleBackupRunRepository implements IBackupRunRepository {
       .update(backupRun)
       .set(patch)
       .where(eq(backupRun.id, id))
+      .returning();
+    return (run as BackupRun | undefined) ?? null;
+  }
+
+  async claimForExecution(
+    id: string,
+    startedAt: Date,
+  ): Promise<BackupRun | null> {
+    const [run] = await this.executor
+      .update(backupRun)
+      .set({
+        status: "running",
+        error: null,
+        startedAt,
+        completedAt: null,
+      })
+      // BullMQ retries the same run after the use case records a failed
+      // attempt. Allow that retry to reclaim the run while retaining the
+      // compare-and-set protection against concurrent workers.
+      .where(
+        and(
+          eq(backupRun.id, id),
+          inArray(backupRun.status, ["queued", "failed"]),
+        ),
+      )
       .returning();
     return (run as BackupRun | undefined) ?? null;
   }

@@ -7,8 +7,10 @@ import type {
 import {
   RESOURCE_STATE_VERSION,
   serializeResourceConfiguration,
+  ValidationError,
 } from "@upstand/domain";
-import { count, eq, inArray, or } from "drizzle-orm";
+import { and, count, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { isPostgresUniqueViolation } from "../shared/database-errors";
 import type { Executor } from "../shared/types";
 
 const DEFAULT_CONFIGURATION = serializeResourceConfiguration({});
@@ -75,23 +77,20 @@ export class DrizzleResourceRepository implements IResourceRepository {
     appName: string,
     excludeResourceId?: string,
   ): Promise<Resource | null> {
-    const rows = await this.executor
-      .select({ id: resource.id, appName: resource.appName })
-      .from(resource);
     const serviceKey = appName
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9-_]/g, "-");
-    const duplicate = rows.find(
-      (r) =>
-        r.id !== excludeResourceId &&
-        (r.appName ?? "")
-          .trim()
-          .toLowerCase()
-          .replace(/[^a-z0-9-_]/g, "-") === serviceKey,
-    );
-    if (!duplicate) return null;
-    return this.findById(duplicate.id);
+      .replace(/[^a-z0-9_-]/g, "-");
+    const conditions = [
+      sql`regexp_replace(lower(trim(${resource.appName})), '[^a-z0-9_-]', '-', 'g') = ${serviceKey}`,
+    ];
+    if (excludeResourceId) conditions.push(ne(resource.id, excludeResourceId));
+    const [duplicate] = await this.executor
+      .select({ id: resource.id })
+      .from(resource)
+      .where(and(...conditions))
+      .limit(1);
+    return duplicate ? this.findById(duplicate.id) : null;
   }
 
   async findMany(): Promise<Resource[]> {
@@ -100,10 +99,15 @@ export class DrizzleResourceRepository implements IResourceRepository {
 
   async create(data: CreateResourceDTO): Promise<Resource> {
     const { configuration, secrets, core } = splitResourceValues(data);
-    const [row] = await this.executor
-      .insert(resource)
-      .values(toResourceInsert(core))
-      .returning();
+    let row: ResourceRow | undefined;
+    try {
+      [row] = await this.executor
+        .insert(resource)
+        .values(toResourceInsert(core))
+        .returning();
+    } catch (error) {
+      throwResourceConstraintError(error);
+    }
     if (!row) throw new Error("create: resource insert returned no row");
     await this.insertOwnedState(
       row.id,
@@ -141,7 +145,14 @@ export class DrizzleResourceRepository implements IResourceRepository {
   ): Promise<Resource | null> {
     const { configuration, secrets, core } = splitResourceValues(patch);
     if (Object.keys(core).length > 0) {
-      await this.executor.update(resource).set(core).where(eq(resource.id, id));
+      try {
+        await this.executor
+          .update(resource)
+          .set(core)
+          .where(eq(resource.id, id));
+      } catch (error) {
+        throwResourceConstraintError(error);
+      }
     }
     if (configuration) {
       await this.patchConfiguration(id, configuration);
@@ -149,6 +160,25 @@ export class DrizzleResourceRepository implements IResourceRepository {
     if (secrets) {
       await this.patchSecrets(id, secrets);
     }
+    return this.findById(id);
+  }
+
+  async updateByIdIfUpdatedAt(
+    id: string,
+    expectedUpdatedAt: Date,
+    patch: Partial<CreateResourceDTO>,
+  ): Promise<Resource | null> {
+    const { configuration, secrets, core } = splitResourceValues(patch);
+    const [claimed] = await this.executor
+      .update(resource)
+      .set({ ...core, updatedAt: new Date() })
+      .where(
+        and(eq(resource.id, id), eq(resource.updatedAt, expectedUpdatedAt)),
+      )
+      .returning({ id: resource.id });
+    if (!claimed) return null;
+    if (configuration) await this.patchConfiguration(id, configuration);
+    if (secrets) await this.patchSecrets(id, secrets);
     return this.findById(id);
   }
 
@@ -347,6 +377,17 @@ function splitResourceValues(values: Partial<CreateResourceDTO>) {
         }
       : undefined;
   return { core, configuration, secrets };
+}
+
+function throwResourceConstraintError(error: unknown): never {
+  if (
+    isPostgresUniqueViolation(error, "resource_normalized_service_key_uidx")
+  ) {
+    throw new ValidationError(
+      "Docker service name is already used by another resource.",
+    );
+  }
+  throw error;
 }
 
 type ResourceConfigurationPatch = Partial<ResourceConfigurationValues>;

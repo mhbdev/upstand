@@ -4,26 +4,43 @@ import {
   type OpenApiRouter,
 } from "trpc-to-openapi";
 import { z } from "zod";
+import type { Context } from "./context";
 import { t } from "./index";
 import { appRouter } from "./routers/index";
 
 type ProcedureLike = {
   _def: {
     type: "query" | "mutation" | "subscription";
-    inputs: unknown[];
-    output?: unknown;
+    inputs: MergableZodObject[];
+    output?: z.ZodTypeAny;
   };
 };
 
-const emptyInput = z.object({});
-const fallbackOutput = z.any();
+type MergableZodObject = z.ZodTypeAny & {
+  merge(input: z.ZodTypeAny): z.ZodTypeAny;
+};
+
+interface CallerRecord {
+  [key: string]: CallerNode;
+}
+
+type CallerNode = ((input?: unknown) => unknown) | CallerRecord;
+
+type OpenApiResolverInput = {
+  ctx: Context;
+  input: unknown;
+};
+
+const emptyInput = z.object({}) as MergableZodObject;
+const fallbackOutput = z.unknown();
 
 function getInputParser(procedure: ProcedureLike) {
   if (procedure._def.inputs.length === 0) return emptyInput;
 
-  return procedure._def.inputs.reduce<any>((merged, input) => {
-    return merged.merge(input as any);
-  }, emptyInput);
+  return procedure._def.inputs.reduce<z.ZodTypeAny>(
+    (merged, input) => (merged as MergableZodObject).merge(input),
+    emptyInput,
+  );
 }
 
 function createOpenApiRouter() {
@@ -38,7 +55,7 @@ function createOpenApiRouter() {
         const method = definition._def.type === "query" ? "GET" : "POST";
         const hasInput = definition._def.inputs.length > 0;
         const input = getInputParser(definition);
-        const output = (definition._def.output ?? fallbackOutput) as any;
+        const output = definition._def.output ?? fallbackOutput;
         const path = `/${procedurePath.replaceAll(".", "/")}` as `/${string}`;
 
         const openApiProcedure = t.procedure
@@ -56,11 +73,25 @@ function createOpenApiRouter() {
             },
           });
 
-        const resolver = async ({ ctx, input: parsedInput }: any) => {
+        const resolver = async ({
+          ctx,
+          input: parsedInput,
+        }: OpenApiResolverInput) => {
           const caller = appRouter.createCaller(ctx);
-          let target: any = caller;
+          let target: CallerNode = caller as unknown as CallerNode;
           for (const segment of procedurePath.split(".")) {
-            target = target[segment];
+            if (typeof target === "function") {
+              throw new Error(
+                `Unable to resolve ${procedurePath} in appRouter`,
+              );
+            }
+            const next = target[segment];
+            if (!next) {
+              throw new Error(
+                `Unable to resolve ${procedurePath} in appRouter`,
+              );
+            }
+            target = next;
           }
 
           if (typeof target !== "function") {
@@ -79,7 +110,10 @@ function createOpenApiRouter() {
       }),
   );
 
-  return t.router(openApiProcedures as any) as OpenApiRouter;
+  type DynamicRouterDefinition = Parameters<typeof t.router>[0];
+  return t.router(
+    openApiProcedures as unknown as DynamicRouterDefinition,
+  ) as OpenApiRouter;
 }
 
 /**

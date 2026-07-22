@@ -118,6 +118,7 @@ export class DrizzleAIRepository implements IAIRepository {
 
   async updateProviderConfig(
     id: string,
+    organizationId: string,
     patch: UpdateAIProviderConfig,
   ): Promise<void> {
     const set: Record<string, unknown> = { updatedAt: new Date() };
@@ -139,7 +140,12 @@ export class DrizzleAIRepository implements IAIRepository {
     await this.executor
       .update(aiProviderConfig)
       .set(set)
-      .where(eq(aiProviderConfig.id, id));
+      .where(
+        and(
+          eq(aiProviderConfig.id, id),
+          eq(aiProviderConfig.organizationId, organizationId),
+        ),
+      );
   }
 
   async deleteProviderConfig(
@@ -190,20 +196,21 @@ export class DrizzleAIRepository implements IAIRepository {
     feature: AIFeature,
     providerConfigId: string,
   ): Promise<void> {
-    const existing = await this.findFeatureAssignment(organizationId, feature);
-    if (existing) {
-      await this.executor
-        .update(aiFeatureAssignment)
-        .set({ providerConfigId, updatedAt: new Date() })
-        .where(eq(aiFeatureAssignment.id, existing.id));
-    } else {
-      await this.executor.insert(aiFeatureAssignment).values({
+    await this.executor
+      .insert(aiFeatureAssignment)
+      .values({
         id: randomUUID(),
         organizationId,
         feature,
         providerConfigId,
+      })
+      .onConflictDoUpdate({
+        target: [
+          aiFeatureAssignment.organizationId,
+          aiFeatureAssignment.feature,
+        ],
+        set: { providerConfigId, updatedAt: new Date() },
       });
-    }
   }
 
   async removeFeatureAssignment(
@@ -272,12 +279,20 @@ export class DrizzleAIRepository implements IAIRepository {
 
   async updateConversationTitle(
     conversationId: string,
+    organizationId: string,
+    userId: string,
     title: string,
   ): Promise<void> {
     await this.executor
       .update(aiConversation)
       .set({ title: title.slice(0, 120), updatedAt: new Date() })
-      .where(eq(aiConversation.id, conversationId));
+      .where(
+        and(
+          eq(aiConversation.id, conversationId),
+          eq(aiConversation.organizationId, organizationId),
+          eq(aiConversation.userId, userId),
+        ),
+      );
   }
 
   async deleteConversation(
@@ -309,9 +324,27 @@ export class DrizzleAIRepository implements IAIRepository {
   async saveMessages(
     conversationId: string,
     messages: readonly AIMessageRecord[],
+    organizationId?: string,
+    userId?: string,
   ): Promise<void> {
+    if (organizationId && userId) {
+      const [conversation] = await this.executor
+        .select({ id: aiConversation.id })
+        .from(aiConversation)
+        .where(
+          and(
+            eq(aiConversation.id, conversationId),
+            eq(aiConversation.organizationId, organizationId),
+            eq(aiConversation.userId, userId),
+          ),
+        )
+        .limit(1);
+      if (!conversation) {
+        throw new Error("AI conversation is not owned by this user.");
+      }
+    }
     for (const message of messages) {
-      await this.executor
+      const [saved] = await this.executor
         .insert(aiMessage)
         .values({
           id: message.id,
@@ -326,12 +359,27 @@ export class DrizzleAIRepository implements IAIRepository {
             role: message.role,
             parts: message.parts as JsonValue[],
           },
-        });
+          where: eq(aiMessage.conversationId, conversationId),
+        })
+        .returning({ id: aiMessage.id });
+      if (!saved) {
+        throw new Error(
+          `AI message ${message.id} belongs to another conversation.`,
+        );
+      }
     }
     await this.executor
       .update(aiConversation)
       .set({ updatedAt: new Date() })
-      .where(eq(aiConversation.id, conversationId));
+      .where(
+        organizationId && userId
+          ? and(
+              eq(aiConversation.id, conversationId),
+              eq(aiConversation.organizationId, organizationId),
+              eq(aiConversation.userId, userId),
+            )
+          : eq(aiConversation.id, conversationId),
+      );
   }
 
   // ── Runs ──────────────────────────────────────────────────────────────────
@@ -342,8 +390,19 @@ export class DrizzleAIRepository implements IAIRepository {
 
   async updateRun(
     runId: string,
+    organizationId: string,
+    userId: string,
     patch: { stepCount?: number; status?: string; finishedAt?: Date },
   ): Promise<void> {
-    await this.executor.update(aiRun).set(patch).where(eq(aiRun.id, runId));
+    await this.executor
+      .update(aiRun)
+      .set(patch)
+      .where(
+        and(
+          eq(aiRun.id, runId),
+          eq(aiRun.organizationId, organizationId),
+          eq(aiRun.userId, userId),
+        ),
+      );
   }
 }

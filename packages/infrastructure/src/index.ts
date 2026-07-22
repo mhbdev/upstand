@@ -13,3 +13,11 @@ export {
 export { NotificationTransportRegistry } from "./notification/notification-transport";
 export { BullMqOutboxJobPublisher } from "./outbox/bullmq-outbox-job-publisher";
 export { createServerProvisioningPort } from "./provisioning/server-provisioning";
+export type {
+  RateLimitCheckOptions,
+  RateLimiterHealth,
+  RateLimiterOptions,
+  RateLimitRedis,
+  RateLimitResult,
+} from "./rate-limit";
+export { RateLimiter } from "./rate-limit";

@@ -29,7 +29,7 @@ export class AccessLogCleanupScheduler {
         void this.refresh().catch((error) => {
           log.error({
             message: "Failed to refresh Caddy access-log cleanup schedule",
-            err: error instanceof Error ? error.message : String(error),
+            err: error,
           });
         }),
       60_000,
@@ -75,7 +75,7 @@ export class AccessLogCleanupScheduler {
       log.error({
         message: "Ignoring invalid Caddy access-log cleanup schedule",
         cronExpression,
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     }
   }
@@ -89,7 +89,7 @@ export class AccessLogCleanupScheduler {
     } catch (error) {
       log.error({
         message: "Caddy access-log cleanup failed",
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     }
   }

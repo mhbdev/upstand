@@ -1,8 +1,7 @@
-// packages/usecases/src/ssh-key/generate-ssh-key.usecase.ts
 import { randomUUID } from "node:crypto";
 import type { IUnitOfWork } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
-import { generateEd25519KeyPair } from "@upstand/platform/ssh/keygen";
+import { generateSshKeyPair } from "@upstand/platform/ssh/keygen";
 import { z } from "zod";
 
 // Generated path: we create the key pair for the user.
@@ -10,6 +9,7 @@ export const GenerateSshKeyInputSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
   name: z.string().min(1, "Key name is required"),
   description: z.string().optional(),
+  algorithm: z.enum(["ed25519", "rsa"]).default("ed25519"),
 });
 
 export type GenerateSshKeyInput = z.infer<typeof GenerateSshKeyInputSchema>;
@@ -19,7 +19,7 @@ export interface GenerateSshKeyResult {
   name: string;
   publicKey: string;
   fingerprint: string;
-  algorithm: "ed25519";
+  algorithm: "ed25519" | "rsa";
   createdAt: Date;
   /** Returned once, at generation time only. Never persisted in
    *  plaintext and never returned by any other endpoint again. */
@@ -32,7 +32,8 @@ export class GenerateSshKeyUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: GenerateSshKeyCommand): Promise<GenerateSshKeyResult> {
-    const { privateKey, publicKey, fingerprint } = generateEd25519KeyPair(
+    const { privateKey, publicKey, fingerprint } = generateSshKeyPair(
+      input.algorithm,
       input.name,
     );
     const encrypted = encryptSecret(privateKey);
@@ -43,7 +44,7 @@ export class GenerateSshKeyUseCase {
         organizationId: input.organizationId,
         name: input.name,
         description: input.description || null,
-        algorithm: "ed25519",
+        algorithm: input.algorithm,
         publicKey,
         fingerprint,
         privateKeyCiphertext: encrypted.ciphertext,
@@ -59,7 +60,7 @@ export class GenerateSshKeyUseCase {
       name: row.name,
       publicKey,
       fingerprint,
-      algorithm: "ed25519",
+      algorithm: input.algorithm,
       createdAt: row.createdAt,
       privateKey,
     };

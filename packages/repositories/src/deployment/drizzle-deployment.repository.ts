@@ -3,8 +3,9 @@ import type {
   CreateDeploymentDTO,
   Deployment,
   IDeploymentRepository,
+  UpdateDeploymentDTO,
 } from "@upstand/domain";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { BaseRepository } from "../shared/base.repository";
 import type { Executor } from "../shared/types";
 
@@ -49,5 +50,50 @@ export class DrizzleDeploymentRepository
       orderBy: desc(deployment.createdAt),
       limit: 500,
     });
+  }
+
+  async claimForExecution(
+    id: string,
+    executionToken: string,
+    now: Date,
+    leaseMs = 30 * 60_000,
+  ): Promise<Deployment | null> {
+    const staleBefore = new Date(now.getTime() - leaseMs);
+    const [claimed] = await this.executor
+      .update(deployment)
+      .set({ status: "running", executionToken, updatedAt: now })
+      .where(
+        and(
+          eq(deployment.id, id),
+          or(
+            eq(deployment.status, "queued"),
+            and(
+              eq(deployment.status, "running"),
+              lt(deployment.updatedAt, staleBefore),
+            ),
+          ),
+        ),
+      )
+      .returning();
+    return claimed ? (claimed as Deployment) : null;
+  }
+
+  async updateByIdOwned(
+    id: string,
+    executionToken: string,
+    patch: UpdateDeploymentDTO,
+  ): Promise<Deployment | null> {
+    const [updated] = await this.executor
+      .update(deployment)
+      .set(patch)
+      .where(
+        and(
+          eq(deployment.id, id),
+          eq(deployment.status, "running"),
+          eq(deployment.executionToken, executionToken),
+        ),
+      )
+      .returning();
+    return updated ? (updated as Deployment) : null;
   }
 }

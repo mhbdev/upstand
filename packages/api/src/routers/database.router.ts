@@ -16,7 +16,6 @@ import {
   DeleteResourceUseCaseToken,
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
-  GetResourceUseCaseToken,
   RebuildDatabaseUseCaseToken,
   UpdateResourceUseCaseToken,
 } from "@upstand/usecases/tokens";
@@ -24,6 +23,7 @@ import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
+import { createResourceAuthorizer } from "./shared/resource-authorization";
 
 const DatabaseTypeSchema = z.enum([
   "postgres",
@@ -53,6 +53,12 @@ const UpdateDatabaseInputSchema = UpdateResourceInputSchema.pick({
   serverId: true,
 });
 
+const authorizeDatabase = createResourceAuthorizer({
+  expectedType: "database",
+  resourceLabel: "Database",
+  missingProjectMessage: "Database project not found",
+});
+
 function publicDatabase(resource: Resource) {
   return {
     id: resource.id,
@@ -70,40 +76,6 @@ function publicDatabase(resource: Resource) {
     createdAt: resource.createdAt,
     updatedAt: resource.updatedAt,
   };
-}
-
-async function getAuthorizedDatabase(
-  ctx: any,
-  id: string,
-  action: "view" | "update" | "delete",
-) {
-  const resource = await ctx.scope
-    .resolve(GetResourceUseCaseToken)
-    .execute({ id });
-  if (resource?.type !== "database") {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Database not found" });
-  }
-  const environment = await ctx.scope
-    .resolve(GetEnvironmentUseCaseToken)
-    .execute({
-      id: resource.environmentId,
-    });
-  const project = environment
-    ? await ctx.scope
-        .resolve(GetProjectUseCaseToken)
-        .execute({ id: environment.projectId })
-    : null;
-  if (!project)
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Database project not found",
-    });
-  await checkPermission(
-    ctx.session.user.id,
-    project.organizationId,
-    `resource:${action}`,
-  );
-  return resource;
 }
 
 export const databaseRouter = router({
@@ -135,20 +107,20 @@ export const databaseRouter = router({
           await ctx.scope.resolve(CreateResourceUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
   get: twoFactorVerifiedProcedure
     .input(GetResourceInputSchema)
     .query(async ({ ctx, input }) =>
-      publicDatabase(await getAuthorizedDatabase(ctx, input.id, "view")),
+      publicDatabase(await authorizeDatabase(ctx, input.id, "resource:view")),
     ),
 
   update: twoFactorVerifiedProcedure
     .input(UpdateDatabaseInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await getAuthorizedDatabase(ctx, input.id, "update");
+      await authorizeDatabase(ctx, input.id, "resource:update");
       try {
         const resource = await ctx.scope
           .resolve(UpdateResourceUseCaseToken)
@@ -160,59 +132,59 @@ export const databaseRouter = router({
           });
         return publicDatabase(resource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
   control: twoFactorVerifiedProcedure
     .input(ControlResourceInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await getAuthorizedDatabase(ctx, input.id, "update");
+      await authorizeDatabase(ctx, input.id, "resource:update");
       try {
         return publicDatabase(
           await ctx.scope.resolve(ControlResourceUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
   rebuild: twoFactorVerifiedProcedure
     .input(RebuildDatabaseInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await getAuthorizedDatabase(ctx, input.id, "update");
+      await authorizeDatabase(ctx, input.id, "resource:update");
       try {
         return publicDatabase(
           await ctx.scope.resolve(RebuildDatabaseUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
   command: twoFactorVerifiedProcedure
     .input(DatabaseCommandInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await getAuthorizedDatabase(ctx, input.id, "update");
+      await authorizeDatabase(ctx, input.id, "resource:update");
       try {
         return await ctx.scope
           .resolve(DatabaseCommandUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
   delete: twoFactorVerifiedProcedure
     .input(DeleteResourceInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await getAuthorizedDatabase(ctx, input.id, "delete");
+      await authorizeDatabase(ctx, input.id, "resource:delete");
       try {
         return await ctx.scope
           .resolve(DeleteResourceUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

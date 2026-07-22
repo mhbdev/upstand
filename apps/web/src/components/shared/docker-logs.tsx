@@ -31,12 +31,20 @@ import {
   Hash,
   Pause,
   Play,
+  RefreshCw,
   Search,
   XCircle,
 } from "@/components/huge-icons";
 import { CodeSurface } from "@/components/shared/code-editor";
 import { copyText, downloadText } from "@/lib/browser";
 import { askUpGalWithLogs } from "@/lib/upgal-events";
+
+export function stripAnsi(str: string): string {
+  const ansiRegex =
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequence parser intentionally matches control characters.
+    /[\x1b\x9b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+  return str.replace(ansiRegex, "");
+}
 
 // Log parser and style rules
 export type LogType = "error" | "warning" | "success" | "info" | "debug";
@@ -165,9 +173,10 @@ export const getLogType = (message: string): LogStyle => {
 };
 
 const parseLogLine = (line: string): LogLine => {
-  const trimmed = line.trim();
+  const cleaned = stripAnsi(line);
+  const trimmed = cleaned.trim();
   if (!trimmed) {
-    return { rawTimestamp: null, timestamp: null, message: line };
+    return { rawTimestamp: null, timestamp: null, message: cleaned };
   }
 
   // 1. JSON logs (e.g. Caddy logs or structured application logs)
@@ -188,7 +197,7 @@ const parseLogLine = (line: string): LogLine => {
           return {
             rawTimestamp: String(rawTs),
             timestamp: date,
-            message: line,
+            message: cleaned,
           };
         }
       }
@@ -208,7 +217,7 @@ const parseLogLine = (line: string): LogLine => {
       return {
         rawTimestamp: rawTs,
         timestamp: date,
-        message: dateMatch[2] || line,
+        message: dateMatch[2] || cleaned,
       };
     }
   }
@@ -224,7 +233,7 @@ const parseLogLine = (line: string): LogLine => {
       return {
         rawTimestamp: rawTs,
         timestamp: date,
-        message: syslogMatch[2] || line,
+        message: syslogMatch[2] || cleaned,
       };
     }
   }
@@ -240,12 +249,12 @@ const parseLogLine = (line: string): LogLine => {
       return {
         rawTimestamp: timeOnlyMatch[1],
         timestamp: date,
-        message: timeOnlyMatch[2] || line,
+        message: timeOnlyMatch[2] || cleaned,
       };
     }
   }
 
-  return { rawTimestamp: null, timestamp: null, message: line };
+  return { rawTimestamp: null, timestamp: null, message: cleaned };
 };
 
 const getServiceColor = (name: string): string => {
@@ -377,12 +386,23 @@ export function TerminalLine({
   );
 }
 
-interface DockerLogsProps {
+export interface DockerLogsProps {
   containerId: string;
-  logs?: string[];
+  logs?: string[] | string;
+  isFetching?: boolean;
+  emptyMessage?: string;
+  className?: string;
+  maxHeightClass?: string;
 }
 
-export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
+export const ShowDockerLogs = ({
+  containerId,
+  logs,
+  isFetching = false,
+  emptyMessage = "No matching logs found.",
+  className,
+  maxHeightClass = "h-[min(28rem,60svh)]",
+}: DockerLogsProps) => {
   const [logsList, setLogsList] = useState<LogLine[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<LogLine[]>([]);
   const [linesLimit, setLinesLimit] = useState<number>(100);
@@ -400,9 +420,17 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
   const [unseenCount, setUnseenCount] = useState<number>(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const rawLogsArray = useMemo(() => {
+    if (!logs) return [];
+    if (Array.isArray(logs)) return logs;
+    return logs.split(/\r?\n/);
+  }, [logs]);
+
   // Parse logs list and count differences when paused / scrolled up
   useEffect(() => {
-    const parsed = logs.filter(Boolean).map(parseLogLine);
+    const parsed = rawLogsArray
+      .filter((line) => Boolean(line?.trim()))
+      .map(parseLogLine);
     if (!isPaused) {
       if (!autoScroll && logsList.length > 0) {
         const diff = parsed.length - logsList.length;
@@ -419,7 +447,7 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
         setUnseenCount((prev) => prev + diff);
       }
     }
-  }, [isPaused, logs, autoScroll, logsList.length]);
+  }, [isPaused, rawLogsArray, autoScroll, logsList.length]);
 
   // Compute log level matches counts for current list
   const levelCounts = useMemo(() => {
@@ -535,10 +563,17 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
   };
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className={cn("flex min-w-0 flex-col gap-4", className)}>
       {/* Filters & Control bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/40 bg-card/60 p-2 text-xs">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {isFetching && (
+            <span className="mr-1 inline-flex animate-pulse items-center gap-1 font-medium font-mono text-[10px] text-primary">
+              <RefreshCw className="size-3 animate-spin" />
+              <span className="hidden sm:inline">Refreshing…</span>
+            </span>
+          )}
+
           {/* Ask UpGal AI Button */}
           <Button
             variant="outline"
@@ -820,7 +855,8 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
             ref={scrollRef}
             onScroll={handleScroll}
             className={cn(
-              "custom-logs-scrollbar h-[min(28rem,60svh)] space-y-0.5 overflow-y-auto bg-muted/30 p-2 font-mono transition-all sm:p-3",
+              "custom-logs-scrollbar space-y-0.5 overflow-y-auto bg-muted/30 p-2 font-mono transition-all sm:p-3",
+              maxHeightClass,
               fontSize === "sm"
                 ? "text-[10px]"
                 : fontSize === "md"
@@ -839,8 +875,8 @@ export const ShowDockerLogs = ({ containerId, logs = [] }: DockerLogsProps) => {
                 />
               ))
             ) : (
-              <div className="flex h-full items-center justify-center font-sans text-muted-foreground text-xs">
-                No matching logs found.
+              <div className="flex h-full min-h-[160px] items-center justify-center py-8 font-sans text-muted-foreground text-xs">
+                {emptyMessage}
               </div>
             )}
           </div>

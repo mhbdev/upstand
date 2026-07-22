@@ -1,17 +1,17 @@
 import { ServiceCollection } from "@circulo-ai/di";
-import { registerApplicationFeatures } from "./di/application";
-import { registerBackups } from "./di/backups";
+import { registerApplicationFeatures } from "@upstand/api/di/application";
+import { registerBackups } from "@upstand/api/di/backups";
 import {
   configureDockerInfrastructure,
   configureMonitoringAgent,
   createDockerInfrastructureResolver,
   createMonitoringAgentPort,
   getDockerInstance,
-} from "./di/dependencies";
-import { registerPersistence } from "./di/persistence";
-import { registerRuntime } from "./di/runtime";
-import { validateCompositionGraph } from "./di/validation";
-import { registerWebServer } from "./di/web-server";
+} from "@upstand/api/di/dependencies";
+import { registerPersistence } from "@upstand/api/di/persistence";
+import { registerRuntime } from "@upstand/api/di/runtime";
+import { validateCompositionGraph } from "@upstand/api/di/validation";
+import { registerWebServer } from "@upstand/api/di/web-server";
 
 const services = new ServiceCollection();
 
@@ -38,5 +38,4 @@ registerRuntime(services);
 provider = services.build();
 validateCompositionGraph(provider);
 
-/** @deprecated Prefer getServiceProvider() so composition stays behind a factory boundary. */
-export const serviceProvider = getServiceProvider();
+export const serviceProvider = provider;

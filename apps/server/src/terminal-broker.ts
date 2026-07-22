@@ -110,6 +110,24 @@ export class TerminalBroker {
     );
   }
 
+  async connectForSession(
+    userId: string,
+    sessionId: string,
+    onData: (data: Uint8Array) => void,
+    onClose: (message: string) => void,
+    validateSession: (identity: TerminalSessionIdentity) => Promise<boolean>,
+  ): Promise<string> {
+    const pending = [...this.sessions.entries()].find(
+      ([, session]) =>
+        session.userId === userId &&
+        session.sessionId === sessionId &&
+        session.expiresAt >= Date.now(),
+    );
+    if (!pending) throw new Error("Terminal session is not available.");
+    await this.connect(pending[0], onData, onClose, validateSession);
+    return pending[0];
+  }
+
   write(token: string, data: string): void {
     this.connections.get(token)?.channel.write(data);
   }

@@ -3,6 +3,32 @@ import * as dependencies from "./dependencies";
 type ServiceCollection = InstanceType<typeof dependencies.ServiceCollection>;
 
 export function registerApplicationFeatures(services: ServiceCollection) {
+  services.addSingleton(
+    dependencies.ManagedUserProvisionerToken,
+    () => new dependencies.BetterAuthManagedUserProvisioner(),
+  );
+  services.addTransient(
+    dependencies.ScimUseCaseToken,
+    (c) =>
+      new dependencies.ScimUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.ManagedUserProvisionerToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.GetSetupStatusUseCaseToken,
+    (c) =>
+      new dependencies.GetSetupStatusUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ResetTwoFactorUseCaseToken,
+    (c) =>
+      new dependencies.ResetTwoFactorUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
   // 4. Use Cases (transient)
   services.addTransient(
     dependencies.CreateProjectUseCaseToken,
@@ -354,7 +380,7 @@ export function registerApplicationFeatures(services: ServiceCollection) {
       new dependencies.ExecContainerCommandUseCase(
         c.resolve(dependencies.UnitOfWorkToken),
         c.resolve(dependencies.DockerExecToken),
-        c.resolve(dependencies.DockerServiceToken),
+        c.resolve(dependencies.DockerInventoryReaderToken),
       ),
   );
   services.addTransient(

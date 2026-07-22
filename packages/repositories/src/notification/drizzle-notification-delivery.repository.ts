@@ -6,7 +6,18 @@ import type {
   ListNotificationDeliveriesResult,
   NotificationDelivery,
 } from "@upstand/domain";
-import { and, desc, eq, gte, isNull, like, lt, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  like,
+  lt,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { Executor } from "../shared/types";
 
 export class DrizzleNotificationDeliveryRepository
@@ -175,6 +186,51 @@ export class DrizzleNotificationDeliveryRepository
       .update(notificationDelivery)
       .set(patch)
       .where(eq(notificationDelivery.id, id))
+      .returning();
+    return (delivery as NotificationDelivery | undefined) ?? null;
+  }
+
+  async updateClaimed(
+    id: string,
+    processingStartedAt: Date,
+    patch: Partial<CreateNotificationDeliveryDTO>,
+  ): Promise<NotificationDelivery | null> {
+    const [delivery] = await this.executor
+      .update(notificationDelivery)
+      .set(patch)
+      .where(
+        and(
+          eq(notificationDelivery.id, id),
+          eq(notificationDelivery.status, "processing"),
+          eq(notificationDelivery.processingStartedAt, processingStartedAt),
+        ),
+      )
+      .returning();
+    return (delivery as NotificationDelivery | undefined) ?? null;
+  }
+
+  async requeueIfRetryable(
+    id: string,
+    expectedUpdatedAt: Date,
+  ): Promise<NotificationDelivery | null> {
+    const [delivery] = await this.executor
+      .update(notificationDelivery)
+      .set({
+        status: "queued",
+        attempts: 0,
+        error: null,
+        deliveredAt: null,
+        processingStartedAt: null,
+        lastAttemptAt: null,
+        nextAttemptAt: null,
+      })
+      .where(
+        and(
+          eq(notificationDelivery.id, id),
+          eq(notificationDelivery.updatedAt, expectedUpdatedAt),
+          inArray(notificationDelivery.status, ["failed", "dead_letter"]),
+        ),
+      )
       .returning();
     return (delivery as NotificationDelivery | undefined) ?? null;
   }

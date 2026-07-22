@@ -146,7 +146,7 @@ function serviceNameFor(
   const appName = (resource.appName || resource.name)
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9-_]/g, "-");
+    .replace(/[^a-z0-9_-]/g, "-");
   return resource.type === "compose" && serviceName
     ? `${appName}_${serviceName}`
     : appName;

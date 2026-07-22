@@ -24,6 +24,12 @@
       "skillPath": "skills/hono/SKILL.md",
       "computedHash": "24bad73932f309cec73a5a9171b838f59050990a634d8590c2d2c204507e64f9"
     },
+    "improve-ui": {
+      "source": "ibelick/ui-skills",
+      "sourceType": "github",
+      "skillPath": "skills/improve-ui/SKILL.md",
+      "computedHash": "31c09b79a1c196adccb1637a225cef54f537da87430fda0ba309ef83e78f10e5"
+    },
     "opentui": {
       "source": "anomalyco/opentui",
       "sourceType": "github",

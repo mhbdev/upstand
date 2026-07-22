@@ -98,7 +98,8 @@ describe("Environment Usecases", () => {
     expect(updated.envVars).toBeDefined();
 
     // Check if env vars are serialised/encrypted JSON
-    const parsed = JSON.parse(updated.envVars!);
+    expect(updated.envVars).toBeDefined();
+    const parsed = JSON.parse(updated.envVars ?? "{}");
     // Since it's encrypted via serializeResourceEnvironmentVariables, it will be in the encrypted payload format
     expect(parsed.ciphertext).toBeDefined();
     expect(parsed.iv).toBeDefined();
