@@ -57,9 +57,12 @@ const validatedEnv = createEnv({
       .default("https://api.search.brave.com/res/v1/web/search"),
     UPSTAND_INSTANCE_OWNER_USER_ID: z.string().min(1).optional(),
     DOCKER_NETWORK: z.string().min(1).default("upstand-network"),
-    REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
-    UPSTAND_BASE_URL: z.string().url().optional(),
-    APP_URL: z.string().url().optional(),
+    REDIS_HOST: z.string().optional(),
+    REDIS_PORT: z.coerce.number().optional(),
+    REDIS_PASSWORD: z.string().optional(),
+    REDIS_URL: z.string().min(1).optional(),
+    UPSTAND_BASE_URL: z.url().optional(),
+    APP_URL: z.url().optional(),
     UPSTAND_POSTGRES_CONTAINER: z.string().min(1).optional(),
     SSH_KEY_ENCRYPTION_KEY_V1: isTest
       ? z.string().optional()

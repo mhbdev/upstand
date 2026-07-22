@@ -57,15 +57,23 @@ export class DeploymentRuntime {
               if (settings) return settings;
 
               const concurrency = serverId === "local" ? 2 : 1;
-              await uow.serverBuildSettingsRepository.create({
-                id: serverId,
-                hostname:
-                  serverId === "local"
-                    ? "Upstand Server"
-                    : `Swarm Node ${serverId}`,
-                ip: "127.0.0.1",
-                concurrency,
-              });
+              try {
+                await uow.serverBuildSettingsRepository.create({
+                  id: serverId,
+                  hostname:
+                    serverId === "local"
+                      ? "Upstand Server"
+                      : `Swarm Node ${serverId}`,
+                  ip: "127.0.0.1",
+                  concurrency,
+                });
+              } catch (createErr) {
+                log.warn({
+                  message: "Could not create server build settings record",
+                  serverId,
+                  err: createErr,
+                });
+              }
               return { concurrency };
             } finally {
               await scope.dispose();

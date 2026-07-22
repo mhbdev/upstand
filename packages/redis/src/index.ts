@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { env } from "@upstand/env/server";
 import { log } from "evlog";
 import Redis, { type RedisOptions } from "ioredis";
@@ -47,7 +48,23 @@ export type CreateRedisOptions = {
  * Each caller gets its own connection — use for workers, subscribers, etc.
  */
 export function createRedis(options?: CreateRedisOptions) {
-  const url = options?.url ?? env.REDIS_URL ?? "redis://localhost:6379";
+  let defaultUrl = "redis://localhost:6379";
+  if (env.REDIS_HOST) {
+    let password = env.REDIS_PASSWORD;
+    if (!password && fs.existsSync("/run/secrets/redis_password")) {
+      try {
+        password = fs
+          .readFileSync("/run/secrets/redis_password", "utf-8")
+          .trim();
+      } catch {
+        // ignore read error
+      }
+    }
+    const auth = password ? `:${encodeURIComponent(password)}@` : "";
+    const port = env.REDIS_PORT ?? 6379;
+    defaultUrl = `redis://${auth}${env.REDIS_HOST}:${port}`;
+  }
+  const url = options?.url ?? env.REDIS_URL ?? defaultUrl;
   const loggerName = options?.loggerName ?? "redis";
 
   const isTls = url.startsWith("rediss://");

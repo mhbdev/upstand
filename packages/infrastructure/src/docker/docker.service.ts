@@ -1584,6 +1584,7 @@ export class DockerService {
     rawCompose: string,
     onLog: (log: string) => void,
     constraints?: string[],
+    envVars?: Record<string, string>,
   ): Promise<void> {
     const stackName = this.sanitizeName(resource.appName || resource.name);
     const deploymentNetwork = await this.ensureDeploymentNetwork(resource);
@@ -1669,7 +1670,8 @@ export class DockerService {
         ? `Deploying Docker Compose project '${stackName}'...\n`
         : `Deploying Docker Swarm stack '${stackName}'...\n`,
     );
-    const composeEnv = parseResourceEnvironmentVariables(resource.envVars);
+    const composeEnv =
+      envVars ?? parseResourceEnvironmentVariables(resource.envVars);
     await this.runCommandAsync(
       "docker",
       composeCommand,
@@ -2914,13 +2916,35 @@ export class DockerService {
     targetDocker: any,
     onLog?: (log: string) => void,
   ): Promise<void> {
+    if (!targetDocker || targetDocker === this.docker) {
+      onLog?.(
+        `Image '${imageName}' is already present on target production server. ✅\n`,
+      );
+      return;
+    }
     onLog?.(
       `Transferring image '${imageName}' to target production server...\n`,
     );
     try {
       const image = this.docker.getImage(imageName);
       const stream = await image.get();
-      await targetDocker.loadImage(stream);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const tarBuffer = Buffer.concat(chunks);
+      const responseStream = await targetDocker.loadImage(tarBuffer);
+      if (responseStream && typeof responseStream.on === "function") {
+        await new Promise<void>((resolve, reject) => {
+          responseStream.on("data", (chunk: Buffer) => {
+            const text = chunk.toString("utf-8");
+            onLog?.(text);
+          });
+          responseStream.on("end", resolve);
+          responseStream.on("error", reject);
+          responseStream.resume();
+        });
+      }
       onLog?.(`Image '${imageName}' transferred successfully! ✅\n`);
     } catch (err: any) {
       log.error({

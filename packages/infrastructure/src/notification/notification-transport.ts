@@ -155,8 +155,20 @@ function resolveNotificationActions(
   ) {
     const cleanBase = trimTrailingSlash(baseUrl);
     actions.push({
-      label: "View Deployment",
+      label: "🚀 View Deployment",
       url: `${cleanBase}/deployments/${meta.deploymentId}`,
+    });
+  }
+
+  if (
+    meta.backupRunId &&
+    baseUrl &&
+    !actions.some((a) => a.url.includes("/backups"))
+  ) {
+    const cleanBase = trimTrailingSlash(baseUrl);
+    actions.push({
+      label: "💾 View Backups",
+      url: `${cleanBase}/backups`,
     });
   }
 
@@ -181,6 +193,14 @@ function formatNotificationText(message: NotificationMessage): string {
   if (metaFields.length > 0) {
     lines.push("", ...metaFields.map((field) => `• ${field}`));
   }
+
+  const logs = meta.logs ?? meta.logTail ?? meta.logsSnippet;
+  if (typeof logs === "string" && logs.trim()) {
+    const trimmedLogs = logs.trim();
+    const tailLines = trimmedLogs.split("\n").slice(-15).join("\n");
+    lines.push("", "📋 Recent Logs:", tailLines);
+  }
+
   return lines.join("\n");
 }
 

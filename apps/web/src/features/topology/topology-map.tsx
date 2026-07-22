@@ -112,6 +112,13 @@ import {
 } from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
+import {
+  getDagreLayout,
+  getElkLayout,
+  type LayoutAlgorithm,
+  type LayoutDirection,
+  resolveNodeCollisions,
+} from "./topology-layout";
 
 type TopologyKind =
   | "server"
@@ -1521,6 +1528,65 @@ export function TopologyMap() {
     enabled: ready && detailTab === "metrics" && Boolean(selectedResource),
     refetchInterval: 5_000,
   });
+
+  const isLogsLoading = selectedResource
+    ? resourceLogsQuery.isLoading
+    : selectedContainer || selectedService
+      ? logsQuery.isLoading
+      : false;
+
+  const isMetricsLoading = selectedResource
+    ? resourceStatsQuery.isLoading
+    : selectedContainer
+      ? metricsQuery.isLoading
+      : false;
+
+  const [layoutAlgo, setLayoutAlgo] = useState<LayoutAlgorithm>("dagre");
+  const [layoutDir, setLayoutDir] = useState<LayoutDirection>("vertical");
+
+  const handleApplyLayout = useCallback(
+    async (
+      algo: LayoutAlgorithm = layoutAlgo,
+      dir: LayoutDirection = layoutDir,
+    ) => {
+      if (canvasNodes.length === 0) return;
+      try {
+        let result: { nodes: TopologyNode[]; edges: Edge[] };
+        if (algo === "elk") {
+          result = await getElkLayout(canvasNodes, edges, dir);
+        } else {
+          result = getDagreLayout(canvasNodes, edges, dir);
+        }
+        const resolvedNodes = resolveNodeCollisions(result.nodes);
+        nodePositionsRef.current = {};
+        for (const n of resolvedNodes) {
+          nodePositionsRef.current[n.id] = n.position;
+        }
+        setCanvasNodes(resolvedNodes);
+        setTimeout(() => {
+          fitView({ padding: 0.22, duration: 350 });
+        }, 50);
+        toast.success(`Applied ${algo.toUpperCase()} (${dir}) layout`);
+      } catch (err: any) {
+        toast.error(`Layout failed: ${err.message || String(err)}`);
+      }
+    },
+    [canvasNodes, edges, fitView, layoutAlgo, layoutDir],
+  );
+
+  const handleResolveCollisionsOnly = useCallback(() => {
+    if (canvasNodes.length === 0) return;
+    const resolvedNodes = resolveNodeCollisions(canvasNodes);
+    nodePositionsRef.current = {};
+    for (const n of resolvedNodes) {
+      nodePositionsRef.current[n.id] = n.position;
+    }
+    setCanvasNodes(resolvedNodes);
+    setTimeout(() => {
+      fitView({ padding: 0.22, duration: 350 });
+    }, 50);
+    toast.success("Resolved node collisions");
+  }, [canvasNodes, fitView]);
   const controlContainerMutation = useMutation({
     ...trpc.server.controlContainer.mutationOptions(),
     onSuccess: () => {
@@ -1864,15 +1930,70 @@ export function TopologyMap() {
                 </Panel>
                 <Panel
                   position="top-right"
-                  className="flex gap-1 rounded-xl border bg-background/90 p-1 shadow-sm backdrop-blur"
+                  className="flex items-center gap-1.5 rounded-xl border bg-background/90 p-1.5 shadow-sm backdrop-blur"
                 >
+                  <Select
+                    value={layoutAlgo}
+                    onValueChange={(val) => {
+                      const nextAlgo = val as LayoutAlgorithm;
+                      setLayoutAlgo(nextAlgo);
+                      void handleApplyLayout(nextAlgo, layoutDir);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-[85px] px-2 text-xs">
+                      <SelectValue placeholder="Algorithm" />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      <SelectItem value="dagre">Dagre</SelectItem>
+                      <SelectItem value="elk">ELK.js</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={layoutDir}
+                    onValueChange={(val) => {
+                      const nextDir = val as LayoutDirection;
+                      setLayoutDir(nextDir);
+                      void handleApplyLayout(layoutAlgo, nextDir);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-[100px] px-2 text-xs">
+                      <SelectValue placeholder="Direction" />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      <SelectItem value="vertical">Vertical</SelectItem>
+                      <SelectItem value="horizontal">Horizontal</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    onClick={() =>
+                      void handleApplyLayout(layoutAlgo, layoutDir)
+                    }
+                  >
+                    <RefreshCw className="mr-1 size-3" />
+                    Layout
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    onClick={handleResolveCollisionsOnly}
+                  >
+                    Fix Collisions
+                  </Button>
+
                   <Button
                     size="icon-sm"
                     variant="ghost"
                     onClick={() => fitView({ padding: 0.22, duration: 350 })}
                     aria-label="Fit map to view"
                   >
-                    <LineChart />
+                    <LineChart className="size-4" />
                   </Button>
                   <Button
                     size="icon-sm"
@@ -1880,18 +2001,7 @@ export function TopologyMap() {
                     onClick={() => setSelectedKinds(ALL_KINDS)}
                     aria-label="Show all object types"
                   >
-                    <Layers />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => {
-                      nodePositionsRef.current = {};
-                      setCanvasNodes(topology.nodes);
-                    }}
-                    aria-label="Reset node layout"
-                  >
-                    <RefreshCw />
+                    <Layers className="size-4" />
                   </Button>
                 </Panel>
               </ReactFlow>
@@ -2192,16 +2302,18 @@ export function TopologyMap() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
-                      {logsQuery.isPending || resourceLogsQuery.isPending ? (
+                      {isLogsLoading ? (
                         <div className="flex min-h-56 items-center justify-center">
                           <Spinner />
                         </div>
                       ) : (
                         <pre className="max-h-[520px] min-h-56 overflow-auto whitespace-pre-wrap p-4 font-mono text-[11px] leading-5">
                           {String(
-                            logsQuery.data ||
-                              resourceLogsQuery.data ||
-                              "No logs reported by this object.",
+                            selectedResource
+                              ? resourceLogsQuery.data ||
+                                  "No logs reported by this resource."
+                              : logsQuery.data ||
+                                  "No logs reported by this object.",
                           )}
                         </pre>
                       )}
@@ -2221,19 +2333,19 @@ export function TopologyMap() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
-                      {metricsQuery.isPending ||
-                      resourceStatsQuery.isPending ? (
+                      {isMetricsLoading ? (
                         <div className="flex min-h-56 items-center justify-center">
                           <Spinner />
                         </div>
                       ) : (
                         <pre className="max-h-130 min-h-56 overflow-auto whitespace-pre-wrap p-4 font-mono text-[11px] leading-5">
                           {JSON.stringify(
-                            metricsQuery.data ||
-                              resourceStatsQuery.data || {
-                                message:
-                                  "Select a running container to inspect runtime metrics.",
-                              },
+                            (selectedResource
+                              ? resourceStatsQuery.data
+                              : metricsQuery.data) || {
+                              message:
+                                "Select a running container or resource to inspect runtime metrics.",
+                            },
                             null,
                             2,
                           )}

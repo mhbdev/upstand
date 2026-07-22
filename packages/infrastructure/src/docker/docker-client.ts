@@ -6,10 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import type { IUnitOfWork, Resource } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
-import {
-  hostVerifierForFingerprint,
-  verifyHostKeyFingerprint,
-} from "@upstand/platform/ssh/host-key";
+import { hostVerifierForFingerprint } from "@upstand/platform/ssh/host-key";
 import {
   isSafeSshHost,
   isSafeSshUsername,
@@ -102,6 +99,8 @@ function ensureRemoteDockerProxy(
     let streamReady = false;
     let targetStream: any = null;
 
+    let socketEnded = false;
+
     socket.on("data", (chunk) => {
       const buf = Buffer.isBuffer(chunk)
         ? chunk
@@ -116,6 +115,7 @@ function ensureRemoteDockerProxy(
     });
 
     socket.on("end", () => {
+      socketEnded = true;
       if (targetStream) targetStream.end();
     });
 
@@ -129,11 +129,15 @@ function ensureRemoteDockerProxy(
         client.exec("docker system dial-stdio", (error, stream) => {
           if (error) return fail();
           targetStream = stream;
+          stream.stderr?.resume?.();
           for (const chunk of bufferedChunks) {
             stream.write(chunk);
           }
           bufferedChunks.length = 0;
           streamReady = true;
+          if (socketEnded) {
+            targetStream.end();
+          }
 
           stream.on("data", (chunk: Buffer) => {
             socket.write(chunk);
@@ -194,149 +198,24 @@ export function createRemoteDockerCliEnvironment(
   if (!connection.hostKeyFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
-  const host = assertSafeRemoteConnection(connection);
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "upstand-docker-"));
-  const sshDirectory = path.join(home, ".ssh");
-  const keyPath = path.join(sshDirectory, "id_deployment");
-  fs.mkdirSync(sshDirectory, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(keyPath, `${connection.privateKey.trim()}\n`, {
-    mode: 0o600,
-  });
-  fs.writeFileSync(
-    path.join(sshDirectory, "known_hosts"),
-    getTrustedKnownHostsEntry(connection),
-    { mode: 0o600 },
-  );
-  fs.writeFileSync(
-    path.join(sshDirectory, "config"),
-    [
-      "Host upstand-deployment",
-      `HostName ${host}`,
-      `Port ${connection.port}`,
-      `User ${connection.username}`,
-      `IdentityFile ${keyPath}`,
-      "StrictHostKeyChecking yes",
-      "LogLevel ERROR",
-      "",
-    ].join("\n"),
-    { mode: 0o600 },
-  );
+
+  // Docker CLI's SSH transport invokes an external `ssh` process. In the
+  // production worker that process can inherit DOCKER_HOST but not the
+  // temporary HOME/configuration directory, leaving the configured alias
+  // unresolved. Reuse the same host-key-verified tunnel as Dockerode instead
+  // of depending on external SSH config discovery.
+  const entry = ensureRemoteDockerProxy(connection);
+  const dockerHost =
+    "socketPath" in entry
+      ? `unix://${entry.socketPath}`
+      : `tcp://${entry.host}:${entry.port}`;
 
   return {
     environment: {
-      DOCKER_HOST: "ssh://upstand-deployment",
-      HOME: home,
+      DOCKER_HOST: dockerHost,
     },
-    cleanup: () => fs.rmSync(home, { recursive: true, force: true }),
+    cleanup: () => {},
   };
-}
-
-function getTrustedKnownHostsEntry(connection: RemoteDockerConnection): string {
-  const trustedFingerprint = connection.hostKeyFingerprint;
-  if (!trustedFingerprint) {
-    throw new Error("Remote Docker SSH host key is not trusted");
-  }
-  const host = assertSafeRemoteConnection(connection);
-
-  const scan = spawnSync(
-    "ssh-keyscan",
-    ["-T", "10", "-p", String(connection.port), host],
-    { encoding: "utf8", timeout: 12_000 },
-  );
-
-  if (!scan.error && scan.stdout.trim()) {
-    for (const line of scan.stdout.split("\n")) {
-      const [host, algorithm, encodedKey] = line.trim().split(/\s+/, 3);
-      if (!host || !algorithm || !encodedKey) continue;
-      const fingerprint = `SHA256:${createHash("sha256")
-        .update(Buffer.from(encodedKey, "base64"))
-        .digest("base64")
-        .replace(/=+$/, "")}`;
-      if (verifyHostKeyFingerprint(trustedFingerprint, fingerprint)) {
-        return `upstand-deployment ${algorithm} ${encodedKey}\n`;
-      }
-    }
-  }
-
-  const fallback = scanHostKeyWithSsh2Sync(
-    host,
-    connection.port,
-    trustedFingerprint,
-  );
-  if (fallback) {
-    return fallback;
-  }
-
-  throw new Error(
-    `The SSH host key for ${host}:${connection.port} does not match its trusted fingerprint`,
-  );
-}
-
-function scanHostKeyWithSsh2Sync(
-  host: string,
-  port: number,
-  expectedFp: string,
-): string | null {
-  const hostKeyModule = path
-    .resolve(__dirname, "../../platform/src/ssh/host-key")
-    .replace(/\\/g, "/");
-
-  const code = `
-const { Client } = require("ssh2");
-const crypto = require("crypto");
-let verifyHostKeyFingerprint;
-try {
-  verifyHostKeyFingerprint = require("${hostKeyModule}").verifyHostKeyFingerprint;
-} catch {
-  verifyHostKeyFingerprint = (exp, rec) => exp.trim().replace(/=+$/, "") === rec.trim().replace(/=+$/, "");
-}
-
-const host = process.env.TARGET_HOST;
-const port = parseInt(process.env.TARGET_PORT || "22", 10);
-const expectedFp = process.env.EXPECTED_FP;
-
-const conn = new Client();
-conn.connect({
-  host,
-  port,
-  username: "root",
-  hostVerifier: (keyBuf) => {
-    try {
-      const algLen = keyBuf.readUInt32BE(0);
-      const algorithm = keyBuf.subarray(4, 4 + algLen).toString("utf8");
-      const encodedKey = keyBuf.toString("base64");
-      const fp = "SHA256:" + crypto.createHash("sha256").update(keyBuf).digest("base64");
-      if (verifyHostKeyFingerprint(expectedFp, fp)) {
-        console.log("upstand-deployment " + algorithm + " " + encodedKey);
-        process.exit(0);
-      }
-    } catch (e) {}
-    process.exit(1);
-  }
-}).on("error", () => process.exit(1));
-`;
-
-  const nodeModulesPath =
-    path.resolve(__dirname, "../../../node_modules") +
-    path.delimiter +
-    path.resolve(__dirname, "../../node_modules");
-
-  const res = spawnSync("node", ["-e", code], {
-    encoding: "utf8",
-    timeout: 12_000,
-    env: {
-      ...process.env,
-      NODE_PATH: nodeModulesPath,
-      TARGET_HOST: host,
-      TARGET_PORT: String(port),
-      EXPECTED_FP: expectedFp,
-    },
-  });
-
-  if (res.status === 0 && res.stdout.trim()) {
-    return `${res.stdout.trim()}\n`;
-  }
-  return null;
 }
 
 export async function resolveDockerCliEnvironmentForServer(
