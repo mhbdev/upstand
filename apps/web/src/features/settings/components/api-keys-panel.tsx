@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  API_KEY_PERMISSION_ACTIONS,
+  API_KEY_SCOPE_ACTIONS,
   type ApiKeyPreset,
   type Capability,
 } from "@upstand/domain";
@@ -224,7 +224,7 @@ export function ApiKeysPanel() {
           </Label>
           {advanced ? (
             <div className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
-              {API_KEY_PERMISSION_ACTIONS.map((permission) => (
+              {API_KEY_SCOPE_ACTIONS.map((permission) => (
                 <Label
                   key={permission}
                   className="flex cursor-pointer items-center gap-2 font-medium text-xs"

@@ -1,0 +1,51 @@
+---
+title: Projects, environments, and resources
+description: Create the deployment hierarchy and configure applications, Compose stacks, and databases.
+---
+
+## Create the hierarchy
+
+Open **Workloads → Projects**. Create a project, open it, and create one or more environments. An environment can be default or protected, can have shared variables, and can optionally inherit variables from a parent environment.
+
+Environment variables are stored as an encrypted serialized document. Resource variables are layered with environment variables at runtime; use environment scope for values shared by several resources and resource scope for values that must stay local to one workload.
+
+## Applications
+
+An application is a Git-backed or image-backed workload. Its configuration includes:
+
+- source/provider and repository selection;
+- push or tag deployment triggers, tag patterns, and watched paths;
+- build type and build-specific paths/options;
+- build and rollback registries;
+- environment variables and build secrets;
+- deployment server and optional dedicated build server;
+- preview-deployment settings;
+- runtime command, arguments, ports, volumes, replicas, resources, placement, restart policy, and health check;
+- domains, deployments, logs, console, monitoring, tags, and cron jobs.
+
+Use the resource **General** and **Advanced** tabs to review the effective configuration before deploying.
+
+## Compose and Stack resources
+
+Create a Docker Compose resource and choose one of the supported modes:
+
+- **Compose** uses standard Docker Compose semantics and is suited to a single Docker host.
+- **Stack** converts the configuration for Docker Swarm deployment.
+
+Compose resources can be created from inline YAML or a repository source. When Upstand prepares a stack, it removes incompatible fixed container names and translates restart behavior for Swarm. Optional name randomization and isolated deployment settings prevent collisions when the same definition is deployed more than once.
+
+Keep service names stable: domains, service-level operations, internal service discovery, and backup selection use the Compose service model.
+
+## Databases
+
+The database form supports PostgreSQL, MySQL, MariaDB, MongoDB, Redis, and libSQL. The application validates the selected image against the engine's supported image list; custom image references are accepted only where the corresponding flow explicitly permits them.
+
+Database resources use persistent named storage and expose engine-specific credentials and ports. The resource page provides database operations, containers, logs, monitoring, tags, and backups. Database resources do not expose application-only tabs such as Advanced, Domains, or Cron Jobs.
+
+Rebuilding a database recreates its managed storage and is potentially data-destructive. Take and verify a backup first.
+
+## Resource tabs
+
+For applications and Compose resources, the detail page contains General, Environment, Advanced, Domains, Deployments, Containers, Backups, Logs, Console, Monitoring, Tags, and Cron Jobs. Databases omit Advanced, Domains, and Cron Jobs.
+
+The Console is an interactive operation. It is deliberately separate from read-only logs and statistics and is subject to the active user's permissions and step-up authentication policy.

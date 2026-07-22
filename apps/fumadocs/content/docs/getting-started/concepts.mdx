@@ -1,0 +1,73 @@
+---
+title: Upstand concepts
+description: Understand the boundaries between organizations, projects, environments, resources, servers, and integrations.
+---
+
+Upstand is an organization-scoped control plane for deploying and operating containerized workloads. The most reliable way to use it is to understand where each piece of configuration lives.
+
+## The resource hierarchy
+
+```text
+Organization
+└── Project
+    └── Environment
+        ├── Application
+        ├── Docker Compose / Stack resource
+        └── Database
+```
+
+### Organization
+
+An organization is the authorization and ownership boundary. Servers, projects, environments, resources, domains, certificates, credentials, Git providers, registries, storage destinations, tags, notification channels, and audit records are resolved through the active organization. Switching organizations changes the scope of the dashboard and API requests.
+
+### Project
+
+A project groups related delivery targets. It has a name and owns environments. Projects can be duplicated or deleted from **Workloads → Projects**; deletion is a destructive operation for the environments and resources below it.
+
+### Environment
+
+An environment is a deployable stage within a project, such as `production`, `staging`, or `preview`. Environments have a slug, optional description, default/protected flags, optional parent environment, and optional shared variables. An environment can inherit variables from its parent when inheritance is enabled.
+
+### Resource
+
+Resources are the units Upstand deploys and operates. The dashboard currently creates three kinds:
+
+| Type | Purpose | Git build | Domains | Cron tab |
+| --- | --- | --- | --- | --- |
+| Application | Build an application from Git or deploy an image | Yes | Yes | Yes |
+| Compose / Stack | Run a multi-service Compose definition | Optional | Yes | Yes |
+| Database | Run a supported database image with persistent storage | No | No | No |
+
+Every resource has environment variables, runtime state, deployments or operations, logs, container inspection, monitoring, backups where applicable, and tags. Applications and Compose resources also expose advanced runtime settings, domains, and schedules.
+
+## Servers and placement
+
+Servers are registered at organization scope and are assigned a role during setup:
+
+- **Deploy server** runs Swarm workloads, Caddy ingress, and monitoring.
+- **Build server** runs Docker builds and monitoring. It is not a deployment target.
+- **Database server** runs database resources and monitoring. It cannot host application or Compose resources and cannot be used as an application build server.
+
+An application may use a dedicated build server. Only application resources can use that dedicated build-server assignment.
+
+## Configuration ownership
+
+Use the narrowest scope that matches the intent:
+
+- Organization settings: members, custom roles, API keys, provider integrations, certificates, notifications, and shared infrastructure.
+- Environment settings: shared variables and environment inheritance.
+- Resource settings: build configuration, runtime configuration, secrets, domains, deployment behavior, and schedules.
+- Repository configuration: optional `upstand.json` declarations for build, runtime, and cron settings.
+
+Secrets are not treated as ordinary display data. API responses redact configured provider credentials and resource secrets; the UpGal model receives redacted configuration rather than raw secret values.
+
+## A production workflow
+
+1. Create or select an organization.
+2. Add an SSH key and connect a server with the appropriate role.
+3. Create a project and environment; mark production as protected when it should receive extra review.
+4. Add Git, registry, and S3 integrations as needed.
+5. Create a resource, configure its build/runtime settings, environment variables, domains, and health checks.
+6. Deploy, inspect logs and metrics, configure backups and notifications, and verify the audit trail.
+
+The rest of this documentation follows this same workflow.

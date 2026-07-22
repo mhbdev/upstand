@@ -1,4 +1,12 @@
 {
   "title": "Operations & Security",
-  "pages": ["upgal", "security-auth", "backups-cleanup", "audit-logs"]
+  "pages": [
+    "upgal",
+    "security-auth",
+    "organization-admin",
+    "infrastructure",
+    "api-automation",
+    "backups-cleanup",
+    "audit-logs"
+  ]
 }

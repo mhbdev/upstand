@@ -1,11 +1,16 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { IUnitOfWork, Resource } from "@upstand/domain";
+import {
+  type IUnitOfWork,
+  parseResourceAdvancedConfig,
+  type Resource,
+} from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { closeRedis, createRedis, type Redis, redis } from "@upstand/redis";
 import { DelayedError, type Job, Worker } from "bullmq";
 import { log } from "evlog";
+import { resolveEnvironmentVariables } from "../environment/update-environment.usecase";
 import { assertSafeGitUrl } from "../git-provider/git-url-sanitizer";
 import { getInstallationToken } from "../git-provider/github-client";
 import type { NotificationPublisher } from "../notification/publish-notification.usecase";
@@ -15,6 +20,7 @@ import { createRemoteServices } from "../resource/docker-client";
 import { parseResourceCredentials } from "../resource/resource-credentials";
 import { resolveResourceEnvironmentVariables } from "../resource/resource-environment";
 import { SyncUpstandConfigUseCase } from "../schedule/sync-upstand-config.usecase";
+import { requestMonitoringAgent } from "../server/monitoring-agent.client";
 import {
   assertBuildServerSupportsResource,
   assertDeploymentServerSupportsResource,
@@ -35,6 +41,79 @@ export interface DeploymentWorkerScope {
 export interface DeploymentWorkerDependencies {
   getBuildSettings: () => Promise<{ concurrency: number } | null>;
   createScope: () => Promise<DeploymentWorkerScope>;
+}
+
+function numericMetric(
+  record: Record<string, unknown>,
+  names: string[],
+): number | undefined {
+  for (const name of names) {
+    const value = record[name];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
+async function verifyProgressiveDeliveryMetrics(
+  uow: IUnitOfWork,
+  resource: Resource,
+  bakeTimeSeconds: number,
+): Promise<string | null> {
+  if (bakeTimeSeconds > 0) {
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, bakeTimeSeconds * 1_000),
+    );
+  }
+  try {
+    const result = await requestMonitoringAgent<unknown>(
+      uow,
+      resource.serverId || "local",
+      "/metrics/containers",
+      {
+        query: new URLSearchParams({
+          appName: resource.appName || resource.name,
+          limit: "20",
+        }),
+      },
+    );
+    const records = Array.isArray(result)
+      ? result.filter((value): value is Record<string, unknown> =>
+          Boolean(value && typeof value === "object"),
+        )
+      : [];
+    for (const record of records) {
+      const errorRate = numericMetric(record, [
+        "errorRate",
+        "ErrorRate",
+        "http5xxRate",
+        "Http5xxRate",
+      ]);
+      const p95 = numericMetric(record, [
+        "p95LatencyMs",
+        "P95LatencyMs",
+        "latency.p95",
+      ]);
+      const cpu = numericMetric(record, ["CPU", "cpu", "Cpu.Percent"]);
+      const memory = numericMetric(record, [
+        "Memory.Percentage",
+        "memoryPercent",
+        "memory.percentage",
+        "Memory",
+      ]);
+      if (errorRate !== undefined && errorRate > 5)
+        return `error rate ${errorRate}% exceeded 5%`;
+      if (p95 !== undefined && p95 > 5_000)
+        return `p95 latency ${p95}ms exceeded 5000ms`;
+      if (cpu !== undefined && cpu > 95)
+        return `cpu utilization ${cpu}% exceeded 95%`;
+      if (memory !== undefined && memory > 95)
+        return `memory utilization ${memory}% exceeded 95%`;
+    }
+  } catch {
+    // Metrics are an optional deployment gate. Health convergence remains the
+    // mandatory gate when the monitoring agent is unavailable.
+  }
+  return null;
 }
 
 export class DeploymentWorker {
@@ -597,8 +676,49 @@ export class DeploymentWorker {
       );
       const envVars = resolveResourceEnvironmentVariables(
         resource.envVars,
-        deployEnvironment?.envVars,
+        deployEnvironment
+          ? JSON.stringify(
+              await resolveEnvironmentVariables(uow, deployEnvironment.id),
+            )
+          : undefined,
       );
+      const advancedConfig = parseResourceAdvancedConfig(
+        deployedResource.advancedConfig,
+      );
+      const deploymentStrategy = advancedConfig.deploymentStrategy;
+      const stableServiceExists =
+        deployedResource.type === "application" && dockerService.serviceExists
+          ? await dockerService.serviceExists(deployedResource)
+          : false;
+      const stagedDelivery =
+        deployedResource.type === "application" &&
+        !previewDeploymentId &&
+        stableServiceExists &&
+        deploymentStrategy.type !== "rolling";
+      if (
+        stagedDelivery &&
+        !deployedResource.appName &&
+        !deployedResource.name
+      ) {
+        throw new Error(
+          "Progressive delivery requires a stable application service name",
+        );
+      }
+      const baseServiceName = dockerService.sanitizeName(
+        deployedResource.appName || deployedResource.name,
+      );
+      const revisionServiceName = stagedDelivery
+        ? `${baseServiceName.slice(0, 48)}-upstand-${deploymentId.slice(0, 8)}`
+        : undefined;
+      const revisionOptions = stagedDelivery
+        ? {
+            serviceNameOverride: revisionServiceName,
+            replicasOverride:
+              deploymentStrategy.type === "canary"
+                ? (deploymentStrategy.canaryReplicas ?? 1)
+                : (advancedConfig.replicas ?? 1),
+          }
+        : undefined;
 
       if (resource.type === "database") {
         appendLog("Preparing database deployment...\n");
@@ -613,6 +733,15 @@ export class DeploymentWorker {
           appendLog,
           constraints,
         );
+        const replicationConfig = parseResourceAdvancedConfig(
+          resource.advancedConfig,
+        ).databaseReplication;
+        if (replicationConfig.enabled) {
+          await dockerService.configureDatabaseReplication(resource, finalEnv);
+          appendLog(
+            "Managed PostgreSQL replication service reconciled successfully.\n",
+          );
+        }
         appendLog("Database Swarm service deployed successfully!\n");
       } else if (resource.type === "compose") {
         appendLog(
@@ -704,6 +833,7 @@ export class DeploymentWorker {
             appendLog,
             constraints,
             imageRegistryAuth,
+            revisionOptions,
           );
           appendLog("Application image deployed successfully!\n");
         } else {
@@ -853,6 +983,7 @@ export class DeploymentWorker {
                 );
               }
             },
+            revisionOptions,
           );
           appendLog(
             "Build compiled successfully and Swarm Service registered.\n",
@@ -868,6 +999,7 @@ export class DeploymentWorker {
           deployedResource,
           {
             destinationDocker: targetDestinationDocker,
+            serviceNameOverride: revisionServiceName,
             onLog: appendLog,
           },
         );
@@ -880,7 +1012,14 @@ export class DeploymentWorker {
             "Triggering Automated Rollback Engine to preserve zero-downtime availability...\n",
           );
           try {
-            await dockerService.rollbackService(deployedResource);
+            if (stagedDelivery && revisionServiceName) {
+              await dockerService.removeServiceRevision(
+                deployedResource,
+                revisionServiceName,
+              );
+            } else {
+              await dockerService.rollbackService(deployedResource);
+            }
             appendLog(
               "Automated Rollback Engine: Successfully reverted Swarm service to previous healthy container image. ✅\n",
             );
@@ -897,6 +1036,115 @@ export class DeploymentWorker {
           );
         }
 
+        if (stagedDelivery && revisionServiceName) {
+          const originalAdvancedConfig = deployedResource.advancedConfig;
+          let revisionPromoted = false;
+          const percentages = stagedTrafficPercentages(
+            deploymentStrategy.type,
+            deploymentStrategy.canaryPercent,
+            deploymentStrategy.steps,
+          );
+          try {
+            for (const percentage of percentages) {
+              appendLog(
+                `Routing ${percentage}% of traffic to revision '${revisionServiceName}'...\n`,
+              );
+              await syncCaddyRouting(
+                uow,
+                caddyService,
+                deployedResource,
+                previewDeploymentId,
+                trafficSplitConfig(
+                  originalAdvancedConfig,
+                  baseServiceName,
+                  revisionServiceName,
+                  percentage,
+                ),
+              );
+              const metricFailure = await verifyProgressiveDeliveryMetrics(
+                uow,
+                { ...deployedResource, appName: revisionServiceName },
+                deploymentStrategy.bakeTimeSeconds,
+              );
+              if (metricFailure) {
+                appendLog(
+                  `Progressive delivery metric gate failed: ${metricFailure}.\n`,
+                );
+                if (deploymentStrategy.automaticRollback) {
+                  throw new Error(
+                    `Progressive delivery rolled back after metric gate failure: ${metricFailure}`,
+                  );
+                }
+                appendLog(
+                  "Automatic rollback is disabled; continuing promotion after the metric warning.\n",
+                );
+              }
+            }
+
+            appendLog(
+              "Promoting the verified revision into the stable service...\n",
+            );
+            await dockerService.promoteServiceRevision(
+              deployedResource,
+              revisionServiceName,
+            );
+            revisionPromoted = true;
+            const promotedConvergence =
+              await dockerService.waitForServiceConvergence(deployedResource, {
+                destinationDocker: targetDestinationDocker,
+                onLog: appendLog,
+              });
+            if (!promotedConvergence.healthy) {
+              throw new Error(
+                `Stable service failed after revision promotion: ${promotedConvergence.message || "unhealthy service"}`,
+              );
+            }
+            await syncCaddyRouting(
+              uow,
+              caddyService,
+              deployedResource,
+              previewDeploymentId,
+              originalAdvancedConfig,
+            );
+            await dockerService
+              .removeServiceRevision(deployedResource, revisionServiceName)
+              .catch((cleanupError) => {
+                appendLog(
+                  `Warning: verified revision cleanup failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
+                );
+              });
+          } catch (revisionError) {
+            if (revisionPromoted) {
+              await dockerService
+                .rollbackService(deployedResource)
+                .catch((rollbackError) => {
+                  appendLog(
+                    `Warning: failed to roll back the promoted stable service: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}\n`,
+                  );
+                });
+            }
+            await syncCaddyRouting(
+              uow,
+              caddyService,
+              deployedResource,
+              previewDeploymentId,
+              originalAdvancedConfig,
+            ).catch((routingError) => {
+              appendLog(
+                `Warning: failed to restore stable traffic routing: ${routingError instanceof Error ? routingError.message : String(routingError)}\n`,
+              );
+            });
+            await dockerService
+              .removeServiceRevision(deployedResource, revisionServiceName)
+              .catch((cleanupError) => {
+                appendLog(
+                  `Warning: failed to clean up failed revision: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
+                );
+              });
+            throw revisionError;
+          }
+        }
+
         appendLog(
           "Container health check passed healthy! Proceeding with Health-Check Gated Traffic Switching in Caddy...\n",
         );
@@ -906,83 +1154,12 @@ export class DeploymentWorker {
       const updatedResource = await uow.transaction(async (tx) => {
         return await tx.resourceRepository.findById(resourceId);
       });
-
-      if (updatedResource?.domains || previewDeploymentId) {
-        const [resources, settings, allPreviews] = await uow.transaction(
-          async (tx) => [
-            await tx.resourceRepository.findMany(),
-            await tx.webServerSettingsRepository.findGlobal(),
-            await tx.previewDeploymentRepository.findMany(),
-          ],
-        );
-        const routingResources =
-          deployedResource.serverId &&
-          !["local", "manager"].includes(deployedResource.serverId)
-            ? resources.filter(
-                (candidate) => candidate.serverId === deployedResource.serverId,
-              )
-            : resources.filter(
-                (candidate) =>
-                  !candidate.serverId ||
-                  candidate.serverId === "local" ||
-                  candidate.serverId === "manager",
-              );
-
-        // Fetch all active preview deployments
-        const activePreviews = allPreviews.filter(
-          (p) => p.status === "success" || p.id === previewDeploymentId,
-        );
-        const routingPreviews: any[] = [];
-        for (const preview of activePreviews) {
-          const parentResource = resources.find(
-            (r) => r.id === preview.resourceId,
-          );
-          if (parentResource) {
-            const matchesServer =
-              deployedResource.serverId &&
-              !["local", "manager"].includes(deployedResource.serverId)
-                ? parentResource.serverId === deployedResource.serverId
-                : !parentResource.serverId ||
-                  parentResource.serverId === "local" ||
-                  parentResource.serverId === "manager";
-
-            if (matchesServer) {
-              const parentDomains = JSON.parse(parentResource.domains || "[]");
-              const parentPort = parentDomains[0]?.port || 80;
-              const parentHttps = parentDomains[0]?.https ?? false;
-              const parentCert = parentDomains[0]?.certificateType ?? "none";
-              const parentMiddlewares = parentDomains[0]?.middlewares ?? [];
-
-              const previewDomains = [
-                {
-                  host: preview.domain,
-                  path: "/",
-                  port: parentPort,
-                  https: parentHttps,
-                  certificateType: parentCert,
-                  middlewares: parentMiddlewares,
-                },
-              ];
-
-              routingPreviews.push({
-                id: preview.id,
-                name: preview.appName,
-                type: "application",
-                appName: preview.appName,
-                domains: JSON.stringify(previewDomains),
-                composeType: parentResource.composeType,
-                advancedConfig: parentResource.advancedConfig,
-              });
-            }
-          }
-        }
-
-        const certificates =
-          (await uow.certificateRepository.findAll?.()) ?? [];
-        await caddyService.syncResourceConfigs(
-          [...routingResources, ...routingPreviews],
-          settings || {},
-          certificates,
+      if (updatedResource) {
+        await syncCaddyRouting(
+          uow,
+          caddyService,
+          updatedResource,
+          previewDeploymentId,
         );
         appendLog("Caddy routing reloaded successfully.\n");
       }
@@ -1045,6 +1222,125 @@ export class DeploymentWorker {
       });
     }
   }
+}
+
+function resourceMatchesServer(
+  resource: Resource,
+  serverId: string | null | undefined,
+): boolean {
+  if (serverId && !["local", "manager"].includes(serverId)) {
+    return resource.serverId === serverId;
+  }
+  return !resource.serverId || ["local", "manager"].includes(resource.serverId);
+}
+
+async function syncCaddyRouting(
+  uow: IUnitOfWork,
+  caddyService: CaddyService,
+  deployedResource: Resource,
+  previewDeploymentId?: string,
+  advancedConfigOverride?: string,
+): Promise<void> {
+  if (!deployedResource.domains && !previewDeploymentId) return;
+  const [resources, settings, allPreviews] = await uow.transaction(
+    async (tx) => [
+      await tx.resourceRepository.findMany(),
+      await tx.webServerSettingsRepository.findGlobal(),
+      await tx.previewDeploymentRepository.findMany(),
+    ],
+  );
+  const routingResources = resources
+    .filter((candidate) =>
+      resourceMatchesServer(candidate, deployedResource.serverId),
+    )
+    .map((candidate) =>
+      candidate.id === deployedResource.id
+        ? {
+            ...candidate,
+            ...deployedResource,
+            advancedConfig:
+              advancedConfigOverride ?? deployedResource.advancedConfig,
+          }
+        : candidate,
+    );
+  const activePreviews = allPreviews.filter(
+    (preview) =>
+      preview.status === "success" || preview.id === previewDeploymentId,
+  );
+  const routingPreviews: any[] = [];
+  for (const preview of activePreviews) {
+    const parentResource = resources.find(
+      (candidate) => candidate.id === preview.resourceId,
+    );
+    if (
+      !parentResource ||
+      !resourceMatchesServer(parentResource, deployedResource.serverId)
+    )
+      continue;
+    const parentDomains = JSON.parse(parentResource.domains || "[]");
+    const parentDomain = parentDomains[0] ?? {};
+    routingPreviews.push({
+      id: preview.id,
+      name: preview.appName,
+      type: "application",
+      appName: preview.appName,
+      domains: JSON.stringify([
+        {
+          host: preview.domain,
+          path: "/",
+          port: parentDomain.port || 80,
+          https: parentDomain.https ?? false,
+          certificateType: parentDomain.certificateType ?? "none",
+          middlewares: parentDomain.middlewares ?? [],
+        },
+      ]),
+      composeType: parentResource.composeType,
+      advancedConfig: parentResource.advancedConfig,
+    });
+  }
+  const certificates = (await uow.certificateRepository.findAll?.()) ?? [];
+  await caddyService.syncResourceConfigs(
+    [...routingResources, ...routingPreviews],
+    settings || {},
+    certificates,
+  );
+}
+
+function stagedTrafficPercentages(
+  type: "rolling" | "canary" | "blue-green" | "progressive",
+  canaryPercent: number | undefined,
+  steps: number[],
+): number[] {
+  if (type === "rolling") return [100];
+  if (type === "blue-green") return [100];
+  if (type === "canary") return [...new Set([canaryPercent ?? 10, 100])];
+  const normalized = [
+    ...new Set(steps.filter((step) => step > 0 && step <= 100)),
+  ].sort((a, b) => a - b);
+  return [...new Set([...normalized, 100])];
+}
+
+function trafficSplitConfig(
+  originalAdvancedConfig: string | undefined,
+  baseServiceName: string,
+  revisionServiceName: string,
+  revisionPercent: number,
+): string {
+  const config = parseResourceAdvancedConfig(originalAdvancedConfig);
+  config.trafficSplits =
+    revisionPercent >= 100
+      ? [{ serviceName: revisionServiceName, weight: 100 }]
+      : [
+          {
+            serviceName: baseServiceName,
+            weight: Math.max(1, 100 - revisionPercent),
+          },
+          {
+            serviceName: revisionServiceName,
+            weight: Math.max(1, revisionPercent),
+          },
+        ];
+  return JSON.stringify(config);
 }
 
 async function resolveGitSource(

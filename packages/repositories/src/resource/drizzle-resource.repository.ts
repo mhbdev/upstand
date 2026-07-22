@@ -1,4 +1,9 @@
-import { resource, resourceConfiguration, resourceSecret } from "@upstand/db";
+import {
+  resource,
+  resourceConfiguration,
+  resourceSecret,
+  secretVersion,
+} from "@upstand/db";
 import type {
   CreateResourceDTO,
   IResourceRepository,
@@ -247,6 +252,16 @@ export class DrizzleResourceRepository implements IResourceRepository {
       resourceId,
       ...secrets,
     });
+    await this.executor.insert(secretVersion).values({
+      id: `secret-${resourceId}-1`,
+      scopeType: "resource",
+      scopeId: resourceId,
+      version: secrets.version,
+      credentials: secrets.credentials,
+      buildSecrets: secrets.buildSecrets,
+      envVars: secrets.envVars,
+      source: "local",
+    });
   }
 
   private async patchConfiguration(
@@ -276,9 +291,15 @@ export class DrizzleResourceRepository implements IResourceRepository {
     patch: Partial<ResourceSecretValues>,
   ): Promise<void> {
     const defaultVals = defaultSecrets();
+    const [current] = await this.executor
+      .select()
+      .from(resourceSecret)
+      .where(eq(resourceSecret.resourceId, resourceId))
+      .limit(1);
+    const nextVersion = (current?.version ?? defaultVals.version) + 1;
     const insertVals = {
       resourceId,
-      version: patch.version ?? defaultVals.version,
+      version: nextVersion,
       credentials: patch.credentials ?? defaultVals.credentials,
       buildSecrets: patch.buildSecrets ?? defaultVals.buildSecrets,
       envVars: patch.envVars ?? defaultVals.envVars,
@@ -288,8 +309,28 @@ export class DrizzleResourceRepository implements IResourceRepository {
       .values(insertVals)
       .onConflictDoUpdate({
         target: resourceSecret.resourceId,
-        set: patch,
+        set: { ...patch, version: nextVersion },
       });
+    const [updated] = await this.executor
+      .select()
+      .from(resourceSecret)
+      .where(eq(resourceSecret.resourceId, resourceId))
+      .limit(1);
+    if (updated) {
+      await this.executor
+        .insert(secretVersion)
+        .values({
+          id: `secret-${resourceId}-${nextVersion}`,
+          scopeType: "resource",
+          scopeId: resourceId,
+          version: nextVersion,
+          credentials: updated.credentials,
+          buildSecrets: updated.buildSecrets,
+          envVars: updated.envVars,
+          source: "local",
+        })
+        .onConflictDoNothing();
+    }
   }
 }
 

@@ -185,6 +185,119 @@ export function registerApplicationFeatures(services: ServiceCollection) {
         c.resolve(dependencies.UnitOfWorkToken),
       ),
   );
+  services.addTransient(
+    dependencies.ListSecretVersionsUseCaseToken,
+    (c) =>
+      new dependencies.ListSecretVersionsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RestoreSecretVersionUseCaseToken,
+    (c) =>
+      new dependencies.RestoreSecretVersionUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.CreateSecretProviderUseCaseToken,
+    (c) =>
+      new dependencies.CreateSecretProviderUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListSecretProvidersUseCaseToken,
+    (c) =>
+      new dependencies.ListSecretProvidersUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteSecretProviderUseCaseToken,
+    (c) =>
+      new dependencies.DeleteSecretProviderUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateSecretProviderUseCaseToken,
+    (c) =>
+      new dependencies.UpdateSecretProviderUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.SyncSecretProviderUseCaseToken,
+    (c) =>
+      new dependencies.SyncSecretProviderUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.ExternalSecretProviderToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RotateSecretsUseCaseToken,
+    (c) =>
+      new dependencies.RotateSecretsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.CreateSecretRotationScheduleUseCaseToken,
+    (c) =>
+      new dependencies.CreateSecretRotationScheduleUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.ListSecretRotationSchedulesUseCaseToken,
+    (c) =>
+      new dependencies.ListSecretRotationSchedulesUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.UpdateSecretRotationScheduleUseCaseToken,
+    (c) =>
+      new dependencies.UpdateSecretRotationScheduleUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DeleteSecretRotationScheduleUseCaseToken,
+    (c) =>
+      new dependencies.DeleteSecretRotationScheduleUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RunDueSecretRotationsUseCaseToken,
+    (c) =>
+      new dependencies.RunDueSecretRotationsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.CloneEnvironmentUseCaseToken,
+    (c) =>
+      new dependencies.CloneEnvironmentUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.DiffEnvironmentsUseCaseToken,
+    (c) =>
+      new dependencies.DiffEnvironmentsUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.PromoteEnvironmentUseCaseToken,
+    (c) =>
+      new dependencies.PromoteEnvironmentUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
 
   services.addTransient(
     dependencies.CreateResourceUseCaseToken,
@@ -251,6 +364,14 @@ export function registerApplicationFeatures(services: ServiceCollection) {
     dependencies.DatabaseCommandUseCaseToken,
     (c) =>
       new dependencies.DatabaseCommandUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerServiceToken),
+      ),
+  );
+  services.addTransient(
+    dependencies.RunDatabaseMigrationUseCaseToken,
+    (c) =>
+      new dependencies.RunDatabaseMigrationUseCase(
         c.resolve(dependencies.UnitOfWorkToken),
         c.resolve(dependencies.DockerServiceToken),
       ),

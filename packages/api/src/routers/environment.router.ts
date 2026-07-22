@@ -1,19 +1,25 @@
 import { TRPCError } from "@trpc/server";
 import type { Environment } from "@upstand/domain";
 import {
+  CloneEnvironmentInputSchema,
   CreateEnvironmentInputSchema,
   DeleteEnvironmentInputSchema,
+  DiffEnvironmentsInputSchema,
   GetEnvironmentInputSchema,
   GetEnvironmentsInputSchema,
+  PromoteEnvironmentInputSchema,
   parseResourceEnvironmentVariables,
   UpdateEnvironmentInputSchema,
 } from "@upstand/usecases";
 import {
+  CloneEnvironmentUseCaseToken,
   CreateEnvironmentUseCaseToken,
   DeleteEnvironmentUseCaseToken,
+  DiffEnvironmentsUseCaseToken,
   GetEnvironmentsUseCaseToken,
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
+  PromoteEnvironmentUseCaseToken,
   UpdateEnvironmentUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { handleUseCaseError } from "../errors";
@@ -185,6 +191,111 @@ export const environmentRouter = router({
       const deleteUseCase = ctx.scope.resolve(DeleteEnvironmentUseCaseToken);
       try {
         return await deleteUseCase.execute(input);
+      } catch (error) {
+        handleUseCaseError(error, ctx.log);
+      }
+    }),
+
+  clone: twoFactorVerifiedProcedure
+    .input(CloneEnvironmentInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const source = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: input.sourceEnvironmentId });
+      if (!source)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Environment not found",
+        });
+      const project = await ctx.scope
+        .resolve(GetProjectUseCaseToken)
+        .execute({ id: source.projectId });
+      if (!project)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "environment:create",
+      );
+      try {
+        return publicEnvironment(
+          await ctx.scope.resolve(CloneEnvironmentUseCaseToken).execute(input),
+        );
+      } catch (error) {
+        handleUseCaseError(error, ctx.log);
+      }
+    }),
+
+  diff: twoFactorVerifiedProcedure
+    .input(DiffEnvironmentsInputSchema)
+    .query(async ({ ctx, input }) => {
+      const source = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: input.sourceEnvironmentId });
+      const target = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: input.targetEnvironmentId });
+      if (!source || !target)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Environment not found",
+        });
+      const project = await ctx.scope
+        .resolve(GetProjectUseCaseToken)
+        .execute({ id: source.projectId });
+      if (!project || project.id !== target.projectId)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Environments must belong to the same project",
+        });
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "environment:view",
+      );
+      try {
+        return await ctx.scope
+          .resolve(DiffEnvironmentsUseCaseToken)
+          .execute(input);
+      } catch (error) {
+        handleUseCaseError(error, ctx.log);
+      }
+    }),
+
+  promote: twoFactorVerifiedProcedure
+    .input(PromoteEnvironmentInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const source = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: input.sourceEnvironmentId });
+      const target = await ctx.scope
+        .resolve(GetEnvironmentUseCaseToken)
+        .execute({ id: input.targetEnvironmentId });
+      if (!source || !target)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Environment not found",
+        });
+      const project = await ctx.scope
+        .resolve(GetProjectUseCaseToken)
+        .execute({ id: source.projectId });
+      if (!project || project.id !== target.projectId)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Environments must belong to the same project",
+        });
+      await checkPermission(
+        ctx.session.user.id,
+        project.organizationId,
+        "environment:update",
+      );
+      try {
+        return await ctx.scope
+          .resolve(PromoteEnvironmentUseCaseToken)
+          .execute(input);
       } catch (error) {
         handleUseCaseError(error, ctx.log);
       }

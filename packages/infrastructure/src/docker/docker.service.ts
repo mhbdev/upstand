@@ -17,6 +17,7 @@ import type {
   ContainerRuntimeStats,
   ConvergenceOptions,
   ConvergenceResult,
+  DeploymentRevisionOptions,
   DockerRegistryAuth,
   ServerRuntimeStats,
 } from "@upstand/usecases/ports/docker";
@@ -225,6 +226,32 @@ export class DockerService {
       unknown
     >;
     const update = config.updateConfig;
+    const strategy = config.deploymentStrategy;
+    if (strategy.type === "canary") {
+      serviceConfig.UpdateConfig = {
+        ...(serviceConfig.UpdateConfig as Record<string, unknown> | undefined),
+        Parallelism: strategy.canaryReplicas ?? update.parallelism ?? 1,
+        FailureAction: "pause",
+        Monitor: (strategy.bakeTimeSeconds ?? 60) * 1_000_000_000,
+        Order: "start-first",
+      };
+    } else if (strategy.type === "progressive") {
+      serviceConfig.UpdateConfig = {
+        ...(serviceConfig.UpdateConfig as Record<string, unknown> | undefined),
+        Parallelism: 1,
+        FailureAction: strategy.automaticRollback ? "rollback" : "pause",
+        Monitor: (strategy.bakeTimeSeconds ?? 60) * 1_000_000_000,
+        Order: "start-first",
+      };
+    } else if (strategy.type === "blue-green") {
+      serviceConfig.UpdateConfig = {
+        ...(serviceConfig.UpdateConfig as Record<string, unknown> | undefined),
+        Parallelism: config.replicas ?? 1,
+        FailureAction: strategy.automaticRollback ? "rollback" : "pause",
+        Monitor: (strategy.bakeTimeSeconds ?? 60) * 1_000_000_000,
+        Order: "start-first",
+      };
+    }
     if (Object.keys(update).length) {
       const updateConfig = {
         ...update,
@@ -237,7 +264,10 @@ export class DockerService {
       } as Record<string, unknown>;
       delete updateConfig.delaySeconds;
       delete updateConfig.monitorSeconds;
-      serviceConfig.UpdateConfig = updateConfig;
+      serviceConfig.UpdateConfig = {
+        ...(serviceConfig.UpdateConfig as Record<string, unknown> | undefined),
+        ...updateConfig,
+      };
     }
     const rollback = config.rollbackConfig;
     if (Object.keys(rollback).length) {
@@ -414,6 +444,19 @@ export class DockerService {
       throw new Error(`Unsupported database type: ${dbType}`);
     }
 
+    const replicationConfig = parseResourceAdvancedConfig(
+      resource.advancedConfig,
+    ).databaseReplication;
+    if (
+      dbType === "postgres" &&
+      replicationConfig.enabled &&
+      !image.toLowerCase().includes("bitnami/postgresql-repmgr")
+    ) {
+      throw new ConflictError(
+        "Managed PostgreSQL replication requires the bitnami/postgresql-repmgr image",
+      );
+    }
+
     if (onLog) onLog(`Pulling database image: ${image}...\n`);
     try {
       const stream = await this.docker.pull(image);
@@ -439,6 +482,29 @@ export class DockerService {
     }
 
     const mergedEnv = { ...defaultEnv, ...envVars };
+    if (dbType === "postgres" && replicationConfig.enabled) {
+      const primaryName = this.sanitizeName(resource.appName || resource.name);
+      const password =
+        mergedEnv.POSTGRES_PASSWORD || mergedEnv.POSTGRESQL_PASSWORD || "";
+      Object.assign(mergedEnv, {
+        POSTGRESQL_POSTGRES_PASSWORD:
+          mergedEnv.POSTGRES_POSTGRES_PASSWORD || password,
+        POSTGRESQL_USERNAME: mergedEnv.POSTGRES_USER || "upstand",
+        POSTGRESQL_PASSWORD: password,
+        POSTGRESQL_DATABASE: mergedEnv.POSTGRES_DB || "upstand",
+        POSTGRESQL_REPLICATION_MODE: "master",
+        REPMGR_USERNAME: replicationConfig.replicationUser,
+        REPMGR_PASSWORD: mergedEnv.REPMGR_PASSWORD || password,
+        REPMGR_PRIMARY_HOST: primaryName,
+        REPMGR_PRIMARY_PORT: "5432",
+        REPMGR_PARTNER_NODES: `${primaryName}:5432,${primaryName}-replica:5432`,
+        REPMGR_NODE_NAME: primaryName,
+        REPMGR_NODE_NETWORK_NAME: primaryName,
+        REPMGR_FAILOVER: replicationConfig.automaticFailover
+          ? "automatic"
+          : "manual",
+      });
+    }
     const envArray = Object.entries(mergedEnv).map(([k, v]) => `${k}=${v}`);
     const volumeName = `upstand-db-data-${resource.id}`;
 
@@ -503,6 +569,7 @@ export class DockerService {
     };
     const spec: Docker.CreateServiceOptions = {
       Name: serviceName,
+      Labels: { "com.upstand.resource-id": resource.id },
       TaskTemplate: {
         ContainerSpec: containerSpec,
         RestartPolicy: {
@@ -546,8 +613,11 @@ export class DockerService {
       password?: string;
       serveraddress?: string;
     },
+    revision?: DeploymentRevisionOptions,
   ): Promise<void> {
-    const serviceName = this.sanitizeName(resource.appName || resource.name);
+    const serviceName = this.sanitizeName(
+      revision?.serviceNameOverride || resource.appName || resource.name,
+    );
     const networkId = (await this.ensureDeploymentNetwork(resource)).id;
 
     if (!resource.dockerImage) {
@@ -584,6 +654,12 @@ export class DockerService {
 
     const spec: Docker.CreateServiceOptions = {
       Name: serviceName,
+      Labels: {
+        "com.upstand.resource-id": resource.id,
+        ...(revision?.serviceNameOverride
+          ? { "com.upstand.deployment-revision": "true" }
+          : {}),
+      },
       TaskTemplate: {
         ContainerSpec: {
           Image: resource.dockerImage,
@@ -608,6 +684,11 @@ export class DockerService {
       constraints,
       spec as Record<string, unknown>,
     );
+    if (revision?.replicasOverride !== undefined) {
+      (spec as Record<string, unknown>).Mode = {
+        Replicated: { Replicas: revision.replicasOverride },
+      };
+    }
 
     await this.upsertService(serviceName, spec, registryAuth);
     await this.ensureServiceNetwork(serviceName, networkId);
@@ -629,10 +710,13 @@ export class DockerService {
     destinationDocker?: Docker,
     sourceRevision?: string,
     onGitCloned?: (clonePath: string) => Promise<Resource | undefined>,
+    revision?: DeploymentRevisionOptions,
   ): Promise<void> {
     let currentResource = resource;
     const serviceName = this.sanitizeName(
-      currentResource.appName || currentResource.name,
+      revision?.serviceNameOverride ||
+        currentResource.appName ||
+        currentResource.name,
     );
     const imageName = `upstand-app-${currentResource.id}:latest`;
     const buildImageName = registryInfo ? registryInfo.imageTag : imageName;
@@ -798,6 +882,12 @@ export class DockerService {
 
       const spec: Docker.CreateServiceOptions = {
         Name: serviceName,
+        Labels: {
+          "com.upstand.resource-id": currentResource.id,
+          ...(revision?.serviceNameOverride
+            ? { "com.upstand.deployment-revision": "true" }
+            : {}),
+        },
         TaskTemplate: {
           ContainerSpec: {
             Image: buildImageName,
@@ -823,6 +913,11 @@ export class DockerService {
         constraints,
         spec as Record<string, unknown>,
       );
+      if (revision?.replicasOverride !== undefined) {
+        (spec as Record<string, unknown>).Mode = {
+          Replicated: { Replicas: revision.replicasOverride },
+        };
+      }
 
       const authConfig =
         registryInfo?.username && registryInfo.password
@@ -1713,6 +1808,7 @@ export class DockerService {
   async rollbackService(
     resource: Resource,
     registryAuth?: DockerRegistryAuth,
+    serviceNameOverride?: string,
   ): Promise<void> {
     if (resource.type === "compose") {
       throw new ConflictError(
@@ -1720,7 +1816,9 @@ export class DockerService {
       );
     }
 
-    const serviceName = this.sanitizeName(resource.appName || resource.name);
+    const serviceName = this.sanitizeName(
+      serviceNameOverride || resource.appName || resource.name,
+    );
     const service = this.docker.getService(serviceName);
     const inspect = await service.inspect();
 
@@ -1747,6 +1845,203 @@ export class DockerService {
       version: inspect.Version.Index,
       rollback: "previous",
     });
+  }
+
+  async promoteServiceRevision(
+    resource: Resource,
+    revisionServiceName: string,
+  ): Promise<void> {
+    if (resource.type !== "application") {
+      throw new ConflictError("Only application revisions can be promoted");
+    }
+    const baseServiceName = this.sanitizeName(
+      resource.appName || resource.name,
+    );
+    const revisionName = this.sanitizeName(revisionServiceName);
+    if (
+      !revisionName ||
+      revisionName === baseServiceName ||
+      !revisionName.startsWith(`${baseServiceName}-`)
+    ) {
+      throw new ConflictError("Invalid deployment revision service name");
+    }
+    const baseService = this.docker.getService(baseServiceName);
+    const revisionService = this.docker.getService(revisionName);
+    const [base, revision] = await Promise.all([
+      baseService.inspect(),
+      revisionService.inspect(),
+    ]);
+    const revisionLabels = revision.Spec?.Labels ?? {};
+    if (
+      revisionLabels["com.upstand.resource-id"] !== resource.id ||
+      revisionLabels["com.upstand.deployment-revision"] !== "true"
+    ) {
+      throw new ConflictError(
+        "Deployment revision does not belong to this resource",
+      );
+    }
+    await baseService.update({
+      version: base.Version.Index,
+      Name: baseServiceName,
+      Mode: base.Spec.Mode,
+      TaskTemplate: revision.Spec.TaskTemplate,
+      EndpointSpec: base.Spec.EndpointSpec,
+      UpdateConfig: base.Spec.UpdateConfig,
+      RollbackConfig: base.Spec.RollbackConfig,
+    });
+  }
+
+  async removeServiceRevision(
+    resource: Resource,
+    revisionServiceName: string,
+  ): Promise<void> {
+    const baseServiceName = this.sanitizeName(
+      resource.appName || resource.name,
+    );
+    const revisionName = this.sanitizeName(revisionServiceName);
+    if (
+      !revisionName ||
+      revisionName === baseServiceName ||
+      !revisionName.startsWith(`${baseServiceName}-`)
+    ) {
+      throw new ConflictError("Invalid deployment revision service name");
+    }
+    const service = this.docker.getService(revisionName);
+    try {
+      const inspect = await service.inspect();
+      const labels = inspect.Spec?.Labels ?? {};
+      if (
+        labels["com.upstand.resource-id"] !== resource.id ||
+        labels["com.upstand.deployment-revision"] !== "true"
+      ) {
+        throw new ConflictError(
+          "Deployment revision does not belong to this resource",
+        );
+      }
+      await service.remove();
+    } catch (error: any) {
+      if (error?.statusCode === 404) return;
+      throw error;
+    }
+  }
+
+  async scaleService(resource: Resource, replicas: number): Promise<void> {
+    if (!Number.isInteger(replicas) || replicas < 0 || replicas > 1000) {
+      throw new ConflictError(
+        "Replica count must be an integer between 0 and 1000",
+      );
+    }
+    if (resource.type === "compose") {
+      throw new ConflictError(
+        "Autoscaling Compose resources is not supported; configure replicas in the Compose file",
+      );
+    }
+    const serviceName = this.sanitizeName(resource.appName || resource.name);
+    const service = this.docker.getService(serviceName);
+    const inspect = await service.inspect();
+    await service.update({
+      version: inspect.Version.Index,
+      Name: serviceName,
+      Mode: { Replicated: { Replicas: replicas } },
+      TaskTemplate: inspect.Spec.TaskTemplate,
+      EndpointSpec: inspect.Spec.EndpointSpec,
+      UpdateConfig: inspect.Spec.UpdateConfig,
+      RollbackConfig: inspect.Spec.RollbackConfig,
+    });
+  }
+
+  async serviceExists(
+    resource: Resource,
+    serviceNameOverride?: string,
+  ): Promise<boolean> {
+    const serviceName = this.sanitizeName(
+      serviceNameOverride || resource.appName || resource.name,
+    );
+    try {
+      await this.docker.getService(serviceName).inspect();
+      return true;
+    } catch (error: any) {
+      if (error?.statusCode === 404) return false;
+      throw error;
+    }
+  }
+
+  async configureDatabaseReplication(
+    resource: Resource,
+    envVars: Record<string, string>,
+  ): Promise<void> {
+    if (
+      resource.type !== "database" ||
+      resource.dbType?.toLowerCase() !== "postgres"
+    ) {
+      throw new ConflictError(
+        "Managed replication currently supports PostgreSQL resources only",
+      );
+    }
+    const config = parseResourceAdvancedConfig(
+      resource.advancedConfig,
+    ).databaseReplication;
+    const primaryName = this.sanitizeName(resource.appName || resource.name);
+    const replicaName = `${primaryName}-replica`;
+    if (!config.enabled) {
+      try {
+        await this.docker.getService(replicaName).remove();
+      } catch (error: any) {
+        if (error?.statusCode !== 404) throw error;
+      }
+      return;
+    }
+    const image = (resource.dockerImage || "").toLowerCase();
+    if (!image.includes("bitnami/postgresql-repmgr")) {
+      throw new ConflictError(
+        "PostgreSQL replication requires a bitnami/postgresql-repmgr primary image so replication is configured safely",
+      );
+    }
+    const network = await this.ensureDeploymentNetwork(resource);
+    const password =
+      envVars.POSTGRES_PASSWORD || envVars.POSTGRESQL_PASSWORD || "";
+    const repmgrPassword = envVars.REPMGR_PASSWORD || password;
+    const serviceSpec: Docker.CreateServiceOptions = {
+      Name: replicaName,
+      Labels: {
+        "com.upstand.resource-id": resource.id,
+        "com.upstand.database-replica": "true",
+      },
+      TaskTemplate: {
+        ContainerSpec: {
+          Image: resource.dockerImage ?? "bitnami/postgresql-repmgr:16",
+          Env: [
+            `POSTGRESQL_POSTGRES_PASSWORD=${envVars.POSTGRES_POSTGRES_PASSWORD || password}`,
+            `POSTGRESQL_USERNAME=${envVars.POSTGRES_USER || "upstand"}`,
+            `POSTGRESQL_PASSWORD=${password}`,
+            `POSTGRESQL_DATABASE=${envVars.POSTGRES_DB || "upstand"}`,
+            "POSTGRESQL_REPLICATION_MODE=slave",
+            `REPMGR_USERNAME=${config.replicationUser}`,
+            `REPMGR_PASSWORD=${repmgrPassword}`,
+            `REPMGR_PRIMARY_HOST=${primaryName}`,
+            "REPMGR_PRIMARY_PORT=5432",
+            `REPMGR_PARTNER_NODES=${primaryName}:5432,${replicaName}:5432`,
+            `REPMGR_NODE_NAME=${replicaName}`,
+            `REPMGR_NODE_NETWORK_NAME=${replicaName}`,
+            `REPMGR_FAILOVER=${config.automaticFailover ? "automatic" : "manual"}`,
+          ],
+        },
+        Networks: [{ Target: network.id }],
+        RestartPolicy: { Condition: "on-failure" },
+      },
+      Mode: { Replicated: { Replicas: config.replicaCount } },
+      UpdateConfig: {
+        Parallelism: 1,
+        FailureAction: "rollback",
+        Order: "start-first",
+      },
+      RollbackConfig: {
+        Parallelism: 1,
+        FailureAction: "pause",
+        Order: "stop-first",
+      },
+    };
+    await this.upsertService(replicaName, serviceSpec);
   }
 
   async controlContainer(
@@ -2643,7 +2938,9 @@ export class DockerService {
     resource: Resource,
     options: ConvergenceOptions = {},
   ): Promise<ConvergenceResult> {
-    const serviceName = this.sanitizeName(resource.appName || resource.name);
+    const serviceName = this.sanitizeName(
+      options.serviceNameOverride || resource.appName || resource.name,
+    );
     const docker = options.destinationDocker || this.docker;
     const timeoutSeconds = options.timeoutSeconds ?? 60;
     const stabilityWindowSeconds = options.stabilityWindowSeconds ?? 5;

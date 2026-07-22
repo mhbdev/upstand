@@ -54,6 +54,23 @@ function mockGitHub(releaseData: unknown, manifestData: unknown) {
 }
 
 describe("GetUpdateStatusUseCase", () => {
+  test("marks cloud control planes as managed and never updateable", async () => {
+    const originalCloud = process.env.IS_CLOUD;
+    process.env.IS_CLOUD = "true";
+    try {
+      await expect(
+        new GetUpdateStatusUseCase().execute(),
+      ).resolves.toMatchObject({
+        channel: "managed",
+        canUpdate: false,
+        updateAvailable: false,
+        images: null,
+      });
+    } finally {
+      process.env.IS_CLOUD = originalCloud;
+    }
+  });
+
   test("only reports an update when the release manifest contains every image", async () => {
     const originalVersion = process.env.UPSTAND_VERSION;
     const originalImage = process.env.UPSTAND_SERVER_IMAGE;

@@ -11,7 +11,7 @@ export class AutoUpdateRuntime {
   private inFlight = false;
 
   start(): void {
-    if (!env.UPSTAND_AUTO_UPDATE) return;
+    if (!env.UPSTAND_AUTO_UPDATE || env.IS_CLOUD) return;
     this.timer = setInterval(
       () => void this.checkAndApplyUpdate(),
       30 * 60_000,

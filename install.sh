@@ -15,6 +15,7 @@ readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE:-$0}")" && pwd)"
 STACK_FILE="$INSTALL_DIR/docker-compose.prod.yml"
 INTERACTIVE=false
 IS_CLOUD="${IS_CLOUD:-false}"
+MODE_OVERRIDE=""
 
 usage() {
   cat <<'EOF'
@@ -36,8 +37,8 @@ parse_args() {
   while (($# > 0)); do
     case "$1" in
       --interactive) INTERACTIVE=true ;;
-      --cloud) IS_CLOUD=true ;;
-      --self-hosted) IS_CLOUD=false ;;
+      --cloud) IS_CLOUD=true; MODE_OVERRIDE=true ;;
+      --self-hosted) IS_CLOUD=false; MODE_OVERRIDE=false ;;
       --help|-h) usage; exit 0 ;;
       *) fail "unknown option '$1' (use --help for usage)" ;;
     esac
@@ -177,6 +178,7 @@ write_environment() {
   local requested_trusted_proxy_cidrs="${TRUSTED_PROXY_CIDRS:-}"
   local requested_server_image="${UPSTAND_SERVER_IMAGE:-}"
   local requested_web_image="${UPSTAND_WEB_IMAGE:-}"
+  local requested_web_cloud_image="${UPSTAND_WEB_CLOUD_IMAGE:-}"
   local requested_docs_image="${UPSTAND_DOCS_IMAGE:-}"
   local requested_monitoring_image="${UPSTAND_MONITORING_IMAGE:-}"
   local requested_auto_update="${UPSTAND_AUTO_UPDATE:-}"
@@ -185,6 +187,10 @@ write_environment() {
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
     source "$ENV_FILE"
+  fi
+  if [[ -n "$MODE_OVERRIDE" ]]; then
+    IS_CLOUD="$MODE_OVERRIDE"
+    NEXT_PUBLIC_IS_CLOUD="$MODE_OVERRIDE"
   fi
 
   # A first-run install should be usable without requiring DNS setup up front.
@@ -235,9 +241,14 @@ write_environment() {
   [[ -n "$TRUSTED_PROXY_CIDRS" ]] || fail "could not determine the trusted proxy CIDR for '$NETWORK_NAME'"
   UPSTAND_SERVER_IMAGE="${requested_server_image:-${UPSTAND_SERVER_IMAGE:-}}"
   UPSTAND_WEB_IMAGE="${requested_web_image:-${UPSTAND_WEB_IMAGE:-}}"
+  UPSTAND_WEB_CLOUD_IMAGE="${requested_web_cloud_image:-${UPSTAND_WEB_CLOUD_IMAGE:-}}"
   UPSTAND_DOCS_IMAGE="${requested_docs_image:-${UPSTAND_DOCS_IMAGE:-}}"
   UPSTAND_MONITORING_IMAGE="${requested_monitoring_image:-${UPSTAND_MONITORING_IMAGE:-}}"
   UPSTAND_AUTO_UPDATE="${requested_auto_update:-${UPSTAND_AUTO_UPDATE:-false}}"
+
+  if [[ "$IS_CLOUD" == true && -n "$UPSTAND_WEB_CLOUD_IMAGE" ]]; then
+    UPSTAND_WEB_IMAGE="$UPSTAND_WEB_CLOUD_IMAGE"
+  fi
 
   local advertise_ip
   advertise_ip="$(detect_advertise_address)"
@@ -269,6 +280,9 @@ write_environment() {
   if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE$UPSTAND_MONITORING_IMAGE" ]]; then
     build_source_images
   fi
+  if [[ "$IS_CLOUD" == true && "${SOURCE_BUILD:-false}" != true && -z "$UPSTAND_WEB_CLOUD_IMAGE" ]]; then
+    fail "UPSTAND_WEB_CLOUD_IMAGE must be set to the immutable cloud web image in cloud mode"
+  fi
   if [[ "${SOURCE_BUILD:-false}" != true ]]; then
     require_digest_image UPSTAND_SERVER_IMAGE
     require_digest_image UPSTAND_WEB_IMAGE
@@ -287,6 +301,7 @@ UPSTAND_API_HOST=$UPSTAND_API_HOST
 UPSTAND_DOCS_HOST=${UPSTAND_DOCS_HOST:-docs.$UPSTAND_API_HOST}
 UPSTAND_SERVER_IMAGE=$UPSTAND_SERVER_IMAGE
 UPSTAND_WEB_IMAGE=$UPSTAND_WEB_IMAGE
+UPSTAND_WEB_CLOUD_IMAGE=$UPSTAND_WEB_CLOUD_IMAGE
 UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE
 UPSTAND_MONITORING_IMAGE=$UPSTAND_MONITORING_IMAGE
 UPSTAND_AUTO_UPDATE=$UPSTAND_AUTO_UPDATE
@@ -373,6 +388,28 @@ wait_for_stack() {
   fail "Upstand services did not become ready within 10 minutes"
 }
 
+validate_external_origins() {
+  local api_probe dashboard_probe docs_probe
+
+  # These probes intentionally run from the deployment host. curl validates
+  # DNS resolution and, for HTTPS origins, the complete TLS certificate chain.
+  api_probe="${BETTER_AUTH_URL%/}/health/ready"
+  dashboard_probe="${CORS_ORIGIN%/}/"
+  docs_probe="$(
+    case "$BETTER_AUTH_URL" in
+      https://*) printf 'https://%s/' "$UPSTAND_DOCS_HOST" ;;
+      *) printf 'http://%s/' "$UPSTAND_DOCS_HOST" ;;
+    esac
+  )"
+
+  curl --fail --silent --show-error --location --max-time 30 "$api_probe" >/dev/null \
+    || fail "API origin failed DNS/TLS/readiness validation: $BETTER_AUTH_URL"
+  curl --fail --silent --show-error --location --max-time 30 "$dashboard_probe" >/dev/null \
+    || fail "dashboard origin failed DNS/TLS/HTTP validation: $CORS_ORIGIN"
+  curl --fail --silent --show-error --location --max-time 30 "$docs_probe" >/dev/null \
+    || fail "documentation origin failed DNS/TLS/HTTP validation: $docs_probe"
+}
+
 main() {
   parse_args "$@"
   require_root
@@ -389,10 +426,15 @@ main() {
   write_environment "$advertise_address"
   deploy_stack
   wait_for_stack
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  validate_external_origins
 
   echo "Upstand has been deployed and all services report ready."
   echo "Control-plane state is pinned to node label upstand.control-plane=true."
   echo "Use 'docker stack services upstand' to watch rollout status."
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

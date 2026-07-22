@@ -1,4 +1,5 @@
-import { environment, environmentSecret } from "@upstand/db";
+import { randomUUID } from "node:crypto";
+import { environment, environmentSecret, secretVersion } from "@upstand/db";
 import type {
   CreateEnvironmentDTO,
   Environment,
@@ -63,6 +64,20 @@ export class DrizzleEnvironmentRepository
     return this.hydrateWithSecrets(rows);
   }
 
+  async findAncestors(id: string): Promise<Environment[]> {
+    const chain: Environment[] = [];
+    const seen = new Set<string>();
+    let currentId: string | null = id;
+    while (currentId && !seen.has(currentId)) {
+      seen.add(currentId);
+      const current = await this.findById(currentId);
+      if (!current) break;
+      chain.push(current);
+      currentId = current.parentEnvironmentId ?? null;
+    }
+    return chain;
+  }
+
   override async findMany(_options?: unknown): Promise<Environment[]> {
     const rows = await this.executor.select().from(environment);
     return this.hydrateWithSecrets(rows);
@@ -99,17 +114,36 @@ export class DrizzleEnvironmentRepository
 
     // Upsert environment_secret when env vars are included in the patch.
     if (envVars !== undefined) {
+      const [current] = await this.executor
+        .select()
+        .from(environmentSecret)
+        .where(eq(environmentSecret.environmentId, id))
+        .limit(1);
+      const nextVersion = (current?.version ?? 0) + 1;
       await this.executor
         .insert(environmentSecret)
         .values({
           environmentId: id,
           envVars,
-          version: 1,
+          version: nextVersion,
         })
         .onConflictDoUpdate({
           target: environmentSecret.environmentId,
-          set: { envVars, updatedAt: new Date() },
+          set: { envVars, version: nextVersion, updatedAt: new Date() },
         });
+      await this.executor
+        .insert(secretVersion)
+        .values({
+          id: randomUUID(),
+          scopeType: "environment",
+          scopeId: id,
+          version: nextVersion,
+          credentials: null,
+          buildSecrets: null,
+          envVars,
+          source: "local",
+        })
+        .onConflictDoNothing();
     }
 
     return this.findById(id);

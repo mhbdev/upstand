@@ -7,6 +7,7 @@ import type {
 export interface IEnvironmentRepository {
   findById(id: string): Promise<Environment | null>;
   findByProjectId(projectId: string): Promise<Environment[]>;
+  findAncestors?(id: string): Promise<Environment[]>;
   create(data: CreateEnvironmentDTO): Promise<Environment>;
   findMany(options?: unknown): Promise<Environment[]>;
   createMany(values: CreateEnvironmentDTO[]): Promise<Environment[]>;

@@ -34,6 +34,15 @@ export const backupSchedule = pgTable(
     volumeName: text("volume_name"),
     stopService: boolean("stop_service").notNull().default(false),
     encryptedConfiguration: text("encrypted_configuration"),
+    pointInTimeRecovery: boolean("point_in_time_recovery")
+      .notNull()
+      .default(false),
+    restoreVerification: boolean("restore_verification")
+      .notNull()
+      .default(true),
+    replicaCount: integer("replica_count").notNull().default(0),
+    failoverEnabled: boolean("failover_enabled").notNull().default(false),
+    migrationCommand: text("migration_command"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -73,6 +82,10 @@ export const backupRun = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    verificationStatus: text("verification_status"),
+    verifiedAt: timestamp("verified_at"),
+    restoreTestedAt: timestamp("restore_tested_at"),
+    recoveryPoint: text("recovery_point"),
   },
   (table) => [
     index("backup_run_schedule_created_idx").on(

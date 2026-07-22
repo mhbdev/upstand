@@ -7,7 +7,7 @@ export interface UpdateStatusResult {
   currentVersion: string;
   latestVersion: string;
   updateAvailable: boolean;
-  channel: "stable" | "canary" | "source";
+  channel: "stable" | "canary" | "source" | "managed";
   canUpdate: boolean;
   checkedAt: string;
   images: {
@@ -113,6 +113,22 @@ export class GetUpdateStatusUseCase {
     fetcher?: typeof fetch;
     repository?: string;
   }): Promise<UpdateStatusResult> {
+    // Cloud control planes are updated by the hosting rollout. Exposing the
+    // self-hosted mutation here would let a tenant race that rollout and
+    // could also make the UI suggest that a managed instance is stale.
+    if (env.IS_CLOUD) {
+      const managedVersion =
+        process.env.UPSTAND_VERSION || env.UPSTAND_VERSION || "managed";
+      return {
+        currentVersion: managedVersion,
+        latestVersion: managedVersion,
+        updateAvailable: false,
+        channel: "managed",
+        canUpdate: false,
+        checkedAt: new Date().toISOString(),
+        images: null,
+      };
+    }
     const requestFetch = options?.fetcher ?? fetch;
     let currentVersion = process.env.UPSTAND_VERSION || env.UPSTAND_VERSION;
     if (!currentVersion) {

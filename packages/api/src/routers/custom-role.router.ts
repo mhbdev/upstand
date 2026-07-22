@@ -4,8 +4,9 @@ import { db } from "@upstand/db";
 import { invitation, member } from "@upstand/db/schema/auth";
 import { customRole } from "@upstand/db/schema/custom-role";
 import {
-  CUSTOM_ROLE_CAPABILITY_ACTIONS,
   capabilitiesForRole,
+  MEMBER_SCOPE_ACTIONS,
+  MemberPermissionsSchema,
   parseCapabilities,
 } from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
@@ -17,11 +18,11 @@ import {
   ROLE_PERMISSIONS,
 } from "../permissions";
 
-const permissionActions = CUSTOM_ROLE_CAPABILITY_ACTIONS as [
+const permissionActions = MEMBER_SCOPE_ACTIONS as [
   PermissionAction,
   ...PermissionAction[],
 ];
-const permissionsSchema = z.array(z.enum(permissionActions)).max(100);
+const permissionsSchema = MemberPermissionsSchema;
 const baseInput = z.object({ organizationId: z.string().min(1) });
 
 async function assertManager(userId: string, organizationId: string) {
@@ -39,7 +40,7 @@ function assertDelegablePermissions(
 ): void {
   const allowed = new Set(
     actorRole === "owner"
-      ? CUSTOM_ROLE_CAPABILITY_ACTIONS
+      ? MEMBER_SCOPE_ACTIONS
       : capabilitiesForRole(actorRole),
   );
   if (permissions.some((permission) => !allowed.has(permission))) {

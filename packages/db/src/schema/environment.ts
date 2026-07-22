@@ -17,6 +17,8 @@ export const environment = pgTable(
     projectId: text("project_id")
       .notNull()
       .references(() => project.id, { onDelete: "cascade" }),
+    parentEnvironmentId: text("parent_environment_id"),
+    inheritsVariables: boolean("inherits_variables").default(false).notNull(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     description: text("description"),
@@ -31,6 +33,7 @@ export const environment = pgTable(
   },
   (table) => [
     index("environment_project_idx").on(table.projectId),
+    index("environment_parent_idx").on(table.parentEnvironmentId),
     uniqueIndex("environment_project_slug_uidx").on(
       table.projectId,
       table.slug,
@@ -61,6 +64,11 @@ export const environmentRelations = relations(environment, ({ one }) => ({
   project: one(project, {
     fields: [environment.projectId],
     references: [project.id],
+  }),
+  parent: one(environment, {
+    fields: [environment.parentEnvironmentId],
+    references: [environment.id],
+    relationName: "environment_parent",
   }),
   secrets: one(environmentSecret, {
     fields: [environment.id],

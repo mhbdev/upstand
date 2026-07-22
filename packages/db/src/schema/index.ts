@@ -17,6 +17,7 @@ export * from "./resource";
 export * from "./s3-destination";
 export * from "./schedule";
 export * from "./scim";
+export * from "./secret";
 export * from "./server";
 export * from "./server-build-settings";
 export * from "./ssh-key";

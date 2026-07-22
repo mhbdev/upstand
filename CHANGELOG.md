@@ -4,6 +4,18 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.113 - 2026-07-22
+
+### Added
+- **External Secret Management & Secret Rotation**: Introduced secret provider integration, rotation schedules, claim locks, version repositories, and dedicated API routers (`secret.router.ts`, DB migrations `0051`-`0055`).
+- **Container Auto-scaling Engine & Runtime**: Added `autoscaling-runtime.ts` and use-case evaluation logic for dynamic metric-driven container replica scaling.
+- **Backup Verification & Recovery Workflows**: Added automated post-backup verification (`verify-backup-run.usecase.ts`), retention sync, and database backup/restore workflows.
+- **Environment Promotion & Workflow Management**: Added environment cloning, promotion policies into protected environments, and environment variable override management.
+- **Expanded Fumadocs Documentation**: Added comprehensive documentation pages covering backups, builds/previews, integrations, notifications, projects/resources, secrets/scaling, operations, and API automation.
+
+### Improved
+- **Infrastructure & Monitoring Client**: Enhanced SSH channel HTTP transport, container health check handling, and Docker service convergence validation.
+
 ## 0.1.112 - 2026-07-22
 
 ### Fixed

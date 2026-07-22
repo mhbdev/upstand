@@ -61,6 +61,7 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/upstand
         run: |
           bun run db:generate
+          bun run db:check
           git diff --exit-code -- packages/db/src/migrations packages/db/src/schema
       - name: Check affected types
         if: github.event_name == 'pull_request'

@@ -70,6 +70,7 @@ describe("API router contract", () => {
       "search",
       "scim",
       "schedule",
+      "secret",
       "sso",
     ];
 

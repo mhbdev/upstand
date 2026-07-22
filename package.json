@@ -1,6 +1,6 @@
 {
   "name": "upstand",
-  "version": "0.1.112",
+  "version": "0.1.113",
   "private": true,
   "workspaces": {
     "packages": [
@@ -65,6 +65,7 @@
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",
     "db:push": "turbo run db:push -F @upstand/db",
+    "db:check": "turbo run db:check -F @upstand/db",
     "db:studio": "turbo run db:studio -F @upstand/db",
     "db:generate": "turbo run db:generate -F @upstand/db",
     "db:migrate": "turbo run db:migrate -F @upstand/db",

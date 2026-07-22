@@ -21,3 +21,4 @@ export type {
   RateLimitResult,
 } from "./rate-limit";
 export { RateLimiter } from "./rate-limit";
+export { SecretProviderRegistry } from "./secrets/secret-provider.registry";

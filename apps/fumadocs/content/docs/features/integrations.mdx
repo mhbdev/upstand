@@ -1,0 +1,30 @@
+---
+title: Git, registries, SSH, storage, and certificates
+description: Configure the external systems Upstand uses to fetch source, publish images, reach hosts, store backups, and serve TLS.
+---
+
+## Git providers
+
+Upstand supports GitHub, GitLab, Bitbucket, and Gitea. GitHub and Bitbucket use their provider credentials; GitLab and Gitea support OAuth-style configuration and custom HTTPS host URLs. Provider configuration is redacted in browser responses and secret markers are preserved when a provider is edited.
+
+For GitLab or Gitea, custom provider URLs must use HTTPS, a hostname rather than an IP address, and cannot target local/private hosts. Operators can further restrict hosts with `UPSTAND_GIT_PROVIDER_ALLOWED_HOSTS`.
+
+After connecting a provider, use it when creating an application or Compose resource to browse repositories and branches. Configure the provider webhook secret when enabling push or tag deployments.
+
+## Docker registries
+
+Docker registries provide credentials for pulling or publishing private images. A resource can reference a build registry and, when configured, a separate rollback registry. Keep registry credentials organization-scoped and select the smallest set of resources that needs them.
+
+## SSH keys
+
+SSH keys are reusable organization credentials for remote servers and Git access. The dashboard can generate Ed25519 or RSA 2048-bit keys, import an existing private/public pair, rotate a key, copy a private key, and delete a key. Store the private key only in Upstand or an approved secret manager and rotate it when a host or operator relationship changes.
+
+The remote-server wizard can install a selected public key by copying a command or public key. A successful SSH connection is not the same as a completed server setup; continue through provisioning and health verification.
+
+## S3-compatible storage
+
+S3 destinations are used by resource and Web Server backups. The connection test checks the configured endpoint and credentials before the destination is used by a backup worker. Do not use a bucket with public write access.
+
+## Certificates
+
+The Certificates page stores custom certificate and private-key material for the active organization. The certificate editor requires PEM material and supports create, update, and delete. Use custom certificates when your routing policy requires them; otherwise configure the Web Server/Caddy certificate strategy and let the routing layer manage issuance and renewal.

@@ -4,6 +4,7 @@ import {
   type CreateBackupScheduleInput,
   CreateBackupScheduleInputSchema,
   type IUnitOfWork,
+  parseResourceAdvancedConfig,
   type Resource,
   ValidationError,
 } from "@upstand/domain";
@@ -77,6 +78,32 @@ export function normalizeBackupScheduleInput(
   }
 
   if (rawInput.kind === "database" && databaseEngine) {
+    if (
+      (rawInput.pointInTimeRecovery ||
+        (rawInput.replicaCount ?? 0) > 0 ||
+        rawInput.failoverEnabled) &&
+      (resource.type !== "database" ||
+        resource.dbType?.toLowerCase() !== "postgres" ||
+        databaseEngine !== "postgres")
+    ) {
+      throw new ValidationError(
+        "Point-in-time recovery, managed replicas, and failover require a first-class PostgreSQL database resource",
+      );
+    }
+    if ((rawInput.replicaCount ?? 0) > 0 || rawInput.failoverEnabled) {
+      const replication = parseResourceAdvancedConfig(
+        resource.advancedConfig,
+      ).databaseReplication;
+      if (
+        !replication.enabled ||
+        replication.replicaCount !== rawInput.replicaCount ||
+        replication.automaticFailover !== Boolean(rawInput.failoverEnabled)
+      ) {
+        throw new ValidationError(
+          "Managed replica and failover settings must match Advanced > Health & Deploy on the PostgreSQL resource",
+        );
+      }
+    }
     const defaults = defaultsForDatabase(resource);
     const normalized = CreateBackupScheduleInputSchema.parse({
       ...rawInput,
@@ -140,6 +167,11 @@ export function toScheduleUpdate(
     serviceName: input.serviceName ?? null,
     volumeName: input.volumeName ?? null,
     stopService: input.stopService,
+    pointInTimeRecovery: input.pointInTimeRecovery ?? false,
+    restoreVerification: input.restoreVerification ?? true,
+    replicaCount: input.replicaCount ?? 0,
+    failoverEnabled: input.failoverEnabled ?? false,
+    migrationCommand: input.migrationCommand ?? null,
     encryptedConfiguration,
   };
 }
@@ -167,5 +199,10 @@ export function scheduleWithInput(
     serviceName: schedule.serviceName ?? undefined,
     volumeName: schedule.volumeName ?? undefined,
     stopService: schedule.stopService,
+    pointInTimeRecovery: schedule.pointInTimeRecovery,
+    restoreVerification: schedule.restoreVerification,
+    replicaCount: schedule.replicaCount,
+    failoverEnabled: schedule.failoverEnabled,
+    migrationCommand: schedule.migrationCommand ?? undefined,
   };
 }

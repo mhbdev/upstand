@@ -7,6 +7,7 @@ import {
   DeleteResourceInputSchema,
   GetResourceInputSchema,
   RebuildDatabaseInputSchema,
+  RunDatabaseMigrationInputSchema,
   UpdateResourceInputSchema,
 } from "@upstand/usecases";
 import {
@@ -17,6 +18,7 @@ import {
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
   RebuildDatabaseUseCaseToken,
+  RunDatabaseMigrationUseCaseToken,
   UpdateResourceUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { z } from "zod";
@@ -182,6 +184,19 @@ export const databaseRouter = router({
       try {
         return await ctx.scope
           .resolve(DeleteResourceUseCaseToken)
+          .execute(input);
+      } catch (error) {
+        handleUseCaseError(error, ctx.log);
+      }
+    }),
+
+  runMigration: twoFactorVerifiedProcedure
+    .input(RunDatabaseMigrationInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await authorizeDatabase(ctx, input.resourceId, "resource:update");
+      try {
+        return await ctx.scope
+          .resolve(RunDatabaseMigrationUseCaseToken)
           .execute(input);
       } catch (error) {
         handleUseCaseError(error, ctx.log);

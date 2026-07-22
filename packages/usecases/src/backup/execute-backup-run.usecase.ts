@@ -97,6 +97,44 @@ export class ExecuteBackupRunUseCase {
       if (!completed)
         throw new Error("Backup run disappeared during execution");
 
+      if (schedule.restoreVerification) {
+        try {
+          if (schedule.kind === "web-server") {
+            await this.runtime.verifyBackup(schedule, destination, fileKey);
+          } else {
+            await withBackupRuntime(
+              this.uow,
+              resource as NonNullable<typeof resource>,
+              this.runtime,
+              (runtime) =>
+                runtime.verifyBackup(
+                  schedule,
+                  destination,
+                  fileKey,
+                  resource as NonNullable<typeof resource>,
+                ),
+            );
+          }
+          await this.uow.backupRunRepository.updateById(run.id, {
+            verificationStatus: "verified",
+            verifiedAt: new Date(),
+            restoreTestedAt: new Date(),
+            recoveryPoint: completedAt(completed),
+          });
+        } catch (verificationError) {
+          await this.uow.backupRunRepository.updateById(run.id, {
+            verificationStatus: "failed",
+            verifiedAt: new Date(),
+            error:
+              `Backup created but verification failed: ${verificationError instanceof Error ? verificationError.message : String(verificationError)}`.slice(
+                0,
+                1_000,
+              ),
+          });
+          throw verificationError;
+        }
+      }
+
       await this.enforceRetention(
         schedule.id,
         schedule.retentionCount,
@@ -207,4 +245,8 @@ export class ExecuteBackupRunUseCase {
         });
       });
   }
+}
+
+function completedAt(run: { completedAt?: Date | null }): string | null {
+  return run.completedAt?.toISOString() ?? new Date().toISOString();
 }

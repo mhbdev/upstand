@@ -12,7 +12,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - upstand-network
+      upstand-network:
+        aliases:
+          - postgres
+          - upstand_postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U upstand -d upstand"]
       interval: 10s
@@ -21,6 +24,7 @@ services:
       start_period: 20s
     deploy:
       replicas: 1
+      endpoint_mode: dnsrr
       placement:
         constraints:
           - node.labels.upstand.control-plane == true
@@ -67,7 +71,10 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - upstand-network
+      upstand-network:
+        aliases:
+          - redis
+          - upstand_redis
     healthcheck:
       test:
         [
@@ -80,6 +87,7 @@ services:
       start_period: 10s
     deploy:
       replicas: 1
+      endpoint_mode: dnsrr
       placement:
         constraints:
           - node.labels.upstand.control-plane == true
@@ -162,6 +170,7 @@ services:
       start_period: 30s
     deploy:
       replicas: 1
+      endpoint_mode: dnsrr
       placement:
         constraints:
           - node.labels.upstand.control-plane == true
@@ -193,7 +202,10 @@ services:
           cpus: "1.0"
           memory: 2G
     ports:
-      - ${UPSTAND_SERVER_PORT:-3000}:3000
+      - target: 3000
+        published: ${UPSTAND_SERVER_PORT:-3000}
+        protocol: tcp
+        mode: host
     logging:
       driver: "json-file"
       options:

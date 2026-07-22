@@ -37,10 +37,20 @@ export class DuplicateProjectUseCase {
           name: environment.name,
           slug: `${environment.slug}-copy`.slice(0, 64),
           description: environment.description,
+          parentEnvironmentId: null,
+          inheritsVariables: environment.inheritsVariables,
           isDefault: environment.isDefault,
           isProtected: environment.isProtected,
           resourceCount: 0,
         });
+        if (environment.envVars) {
+          await tx.environmentRepository.updateEnvironment(
+            copiedEnvironment.id,
+            {
+              envVars: environment.envVars,
+            },
+          );
+        }
         const resources = await tx.resourceRepository.findByEnvironmentId(
           environment.id,
         );

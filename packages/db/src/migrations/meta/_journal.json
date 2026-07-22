@@ -358,6 +358,41 @@
       "when": 1784666216253,
       "tag": "0050_furry_quentin_quire",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1784682774830,
+      "tag": "0051_smooth_old_lace",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1784683276782,
+      "tag": "0052_woozy_maggott",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1784683570817,
+      "tag": "0053_glossy_la_nuit",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1784686172674,
+      "tag": "0054_secret_rotation_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1784687125540,
+      "tag": "0055_secret_rotation_claim",
+      "breakpoints": true
     }
   ]
 }

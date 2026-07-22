@@ -1,15 +1,16 @@
 import { z } from "zod";
 import {
-  API_KEY_CAPABILITY_ACTIONS,
   type Capability,
   isCapability,
   MCP_READ_ONLY_TOOL_NAMES,
   MCP_TOOL_CAPABILITIES,
 } from "./authorization";
+import { API_KEY_SCOPE_ACTIONS } from "./permission-scopes";
 
 export const API_KEY_CONFIG_ID = "upstand" as const;
 
-export const API_KEY_PERMISSION_ACTIONS = API_KEY_CAPABILITY_ACTIONS;
+/** Backwards-compatible name for the canonical API-key permission scope. */
+export const API_KEY_PERMISSION_ACTIONS = API_KEY_SCOPE_ACTIONS;
 
 export type ApiKeyPermissionAction = Capability;
 

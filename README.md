@@ -154,13 +154,21 @@ In cloud mode, local server target deployments are blocked for security and reso
 
 To deploy Upstand in cloud mode, enable the following flags in your environment configuration before starting the control-plane containers:
 
-```env
-# Client-side validation flag
-NEXT_PUBLIC_IS_CLOUD=true
+```bash
+export BETTER_AUTH_URL=https://api.example.com
+export CORS_ORIGIN=https://app.example.com
+export NEXT_PUBLIC_SERVER_URL=https://api.example.com
 
-# Server-side validation flag
-IS_CLOUD=true
+# Pin all release images. The cloud web image contains the cloud client build.
+export UPSTAND_SERVER_IMAGE=ghcr.io/mhbdev/upstand-server@sha256:<digest>
+export UPSTAND_WEB_CLOUD_IMAGE=ghcr.io/mhbdev/upstand-web-cloud@sha256:<digest>
+export UPSTAND_MONITORING_IMAGE=ghcr.io/mhbdev/upstand-monitoring@sha256:<digest>
+export UPSTAND_DOCS_IMAGE=ghcr.io/mhbdev/upstand-fumadocs@sha256:<digest>
+
+curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash - --cloud
 ```
+
+The `--cloud` flag sets the server and client cloud modes and selects `UPSTAND_WEB_CLOUD_IMAGE`. The installer validates all configured API, dashboard, and documentation origins from the deployment host before reporting success.
 
 For detailed guides, refer to the local documentation site (`apps/fumadocs`) or navigate to `/docs/getting-started` once deployed.
 

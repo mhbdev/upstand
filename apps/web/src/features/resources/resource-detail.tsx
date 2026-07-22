@@ -311,18 +311,16 @@ export default function ResourceDetail({
           />
         </TabsContent>
 
-        {resource.type !== "database" && (
-          <TabsContent
-            value="advanced"
-            className="min-w-0 space-y-6 outline-none"
-          >
-            <ResourceAdvancedSettings
-              resourceId={resourceId}
-              resourceType={resource.type}
-              advancedConfig={resource.advancedConfig}
-            />
-          </TabsContent>
-        )}
+        <TabsContent
+          value="advanced"
+          className="min-w-0 space-y-6 outline-none"
+        >
+          <ResourceAdvancedSettings
+            resourceId={resourceId}
+            resourceType={resource.type}
+            advancedConfig={resource.advancedConfig}
+          />
+        </TabsContent>
 
         {resource.type !== "database" && (
           <TabsContent

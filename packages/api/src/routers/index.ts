@@ -24,6 +24,7 @@ import { s3DestinationRouter } from "./s3-destination.router";
 import { scheduleRouter } from "./schedule.router";
 import { scimRouter } from "./scim.router";
 import { searchRouter } from "./search.router";
+import { secretRouter } from "./secret.router";
 import { serverRouter } from "./server.router";
 import { sshKeyRouter } from "./ssh-key.router";
 import { ssoRouter } from "./sso.router";
@@ -69,6 +70,7 @@ export const appRouter = router({
   scim: scimRouter,
   schedule: scheduleRouter,
   sso: ssoRouter,
+  secret: secretRouter,
 });
 
 export type AppRouter = typeof appRouter;

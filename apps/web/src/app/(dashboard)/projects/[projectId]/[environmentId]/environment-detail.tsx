@@ -1241,6 +1241,7 @@ export default function EnvironmentDetail({
     name: string;
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [targetEnvironmentId, setTargetEnvironmentId] = useState("");
 
   // Fetch project
   const { data: project } = useQuery({
@@ -1250,6 +1251,9 @@ export default function EnvironmentDetail({
   // Fetch environment details
   const { data: env, isPending: loadingEnv } = useQuery({
     ...trpc.environment.get.queryOptions({ id: environmentId }),
+  });
+  const { data: environments = [] } = useQuery({
+    ...trpc.environment.list.queryOptions({ projectId }),
   });
 
   // Fetch resources
@@ -1289,6 +1293,20 @@ export default function EnvironmentDetail({
       toast.error(
         err.message || "Failed to update project environment variables",
       ),
+  });
+  const cloneEnvironmentMutation = useMutation({
+    ...trpc.environment.clone.mutationOptions(),
+    onSuccess: (created) => {
+      toast.success(`Cloned environment ${created.name}`);
+      router.push(`/projects/${projectId}/${created.id}` as any);
+    },
+    onError: (err) => toast.error(err.message || "Failed to clone environment"),
+  });
+  const promoteEnvironmentMutation = useMutation({
+    ...trpc.environment.promote.mutationOptions(),
+    onSuccess: () => toast.success("Environment promoted successfully"),
+    onError: (err) =>
+      toast.error(err.message || "Failed to promote environment"),
   });
 
   useEffect(() => {
@@ -1395,6 +1413,25 @@ export default function EnvironmentDetail({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const name = window.prompt(
+                  "Name for the cloned environment",
+                  `${env.name}-copy`,
+                );
+                if (name?.trim())
+                  cloneEnvironmentMutation.mutate({
+                    sourceEnvironmentId: environmentId,
+                    name: name.trim(),
+                    includeResources: true,
+                    includeSecrets: false,
+                  });
+              }}
+              disabled={cloneEnvironmentMutation.isPending}
+            >
+              Clone
+            </Button>
           </div>
         </div>
       </div>
@@ -1490,6 +1527,105 @@ export default function EnvironmentDetail({
 
         <TabsContent value="settings" className="outline-none">
           <div className="max-w-2xl space-y-6">
+            <Card className="border border-border/40 bg-card/20">
+              <CardHeader>
+                <CardTitle className="font-semibold text-lg">
+                  Environment workflows
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Inherit shared variables, compare environments, or promote a
+                  tested configuration.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 border-border/20 border-t pt-4">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      updateEnvMutation.mutate({
+                        id: environmentId,
+                        inheritsVariables: !env.inheritsVariables,
+                      })
+                    }
+                    disabled={updateEnvMutation.isPending}
+                  >
+                    {env.inheritsVariables
+                      ? "Disable variable inheritance"
+                      : "Enable variable inheritance"}
+                  </Button>
+                  <span className="text-muted-foreground text-xs">
+                    {env.inheritsVariables
+                      ? "Inherited variables are resolved during deployment."
+                      : "This environment uses only its own variables."}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Select
+                    value={targetEnvironmentId}
+                    onValueChange={(value) =>
+                      setTargetEnvironmentId(value ?? "")
+                    }
+                  >
+                    <SelectTrigger className="sm:w-64">
+                      <SelectValue placeholder="Target environment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {environments
+                        .filter(
+                          (candidate: any) => candidate.id !== environmentId,
+                        )
+                        .map((candidate: any) => (
+                          <SelectItem key={candidate.id} value={candidate.id}>
+                            {candidate.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    disabled={!targetEnvironmentId}
+                    onClick={async () => {
+                      const diff = await queryClient.fetchQuery(
+                        trpc.environment.diff.queryOptions({
+                          sourceEnvironmentId: environmentId,
+                          targetEnvironmentId,
+                        }),
+                      );
+                      window.alert(
+                        `Variables changed: ${diff.variables.length}\nResources changed: ${diff.resources.filter((entry: any) => entry.changed).length}`,
+                      );
+                    }}
+                  >
+                    Compare
+                  </Button>
+                  <Button
+                    disabled={
+                      !targetEnvironmentId ||
+                      promoteEnvironmentMutation.isPending
+                    }
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Promote ${env.name} to the selected environment?`,
+                        )
+                      ) {
+                        const includeSecrets = window.confirm(
+                          "Include environment and resource secrets in this promotion? Choose Cancel to promote configuration only.",
+                        );
+                        promoteEnvironmentMutation.mutate({
+                          sourceEnvironmentId: environmentId,
+                          targetEnvironmentId,
+                          includeResources: true,
+                          includeSecrets,
+                        });
+                      }
+                    }}
+                  >
+                    Promote
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
             <Card className="border border-destructive/20 bg-destructive/5">
               <CardHeader>
                 <CardTitle className="font-semibold text-destructive">

@@ -12,6 +12,7 @@ import type {
   DockerResourceControllerPort,
   DockerServicePort,
 } from "./ports/docker";
+import type { ExternalSecretProviderPort } from "./ports/external-secrets";
 import type { ManagedUserProvisioner } from "./ports/managed-user-provisioner";
 
 // Application composition token. The domain exposes the IUnitOfWork contract,
@@ -24,11 +25,63 @@ export const NotificationTransportToken = createToken<NotificationTransport>(
 export const ManagedUserProvisionerToken = createToken<ManagedUserProvisioner>(
   "ManagedUserProvisioner",
 );
+export const ExternalSecretProviderToken =
+  createToken<ExternalSecretProviderPort>("ExternalSecretProvider");
+export const ListSecretVersionsUseCaseToken =
+  createToken<UseCases.ListSecretVersionsUseCase>("ListSecretVersionsUseCase");
+export const RestoreSecretVersionUseCaseToken =
+  createToken<UseCases.RestoreSecretVersionUseCase>(
+    "RestoreSecretVersionUseCase",
+  );
+export const CreateSecretProviderUseCaseToken =
+  createToken<UseCases.CreateSecretProviderUseCase>(
+    "CreateSecretProviderUseCase",
+  );
+export const ListSecretProvidersUseCaseToken =
+  createToken<UseCases.ListSecretProvidersUseCase>(
+    "ListSecretProvidersUseCase",
+  );
+export const DeleteSecretProviderUseCaseToken =
+  createToken<UseCases.DeleteSecretProviderUseCase>(
+    "DeleteSecretProviderUseCase",
+  );
+export const UpdateSecretProviderUseCaseToken =
+  createToken<UseCases.UpdateSecretProviderUseCase>(
+    "UpdateSecretProviderUseCase",
+  );
+export const SyncSecretProviderUseCaseToken =
+  createToken<UseCases.SyncSecretProviderUseCase>("SyncSecretProviderUseCase");
+export const RotateSecretsUseCaseToken =
+  createToken<UseCases.RotateSecretsUseCase>("RotateSecretsUseCase");
+export const CreateSecretRotationScheduleUseCaseToken =
+  createToken<UseCases.CreateSecretRotationScheduleUseCase>(
+    "CreateSecretRotationScheduleUseCase",
+  );
+export const ListSecretRotationSchedulesUseCaseToken =
+  createToken<UseCases.ListSecretRotationSchedulesUseCase>(
+    "ListSecretRotationSchedulesUseCase",
+  );
+export const UpdateSecretRotationScheduleUseCaseToken =
+  createToken<UseCases.UpdateSecretRotationScheduleUseCase>(
+    "UpdateSecretRotationScheduleUseCase",
+  );
+export const DeleteSecretRotationScheduleUseCaseToken =
+  createToken<UseCases.DeleteSecretRotationScheduleUseCase>(
+    "DeleteSecretRotationScheduleUseCase",
+  );
+export const RunDueSecretRotationsUseCaseToken =
+  createToken<UseCases.RunDueSecretRotationsUseCase>(
+    "RunDueSecretRotationsUseCase",
+  );
 export const CaddyServiceToken = createToken<CaddyServicePort>("CaddyService");
 export const DockerServiceToken =
   createToken<DockerServicePort>("DockerService");
 export const DatabaseCommandUseCaseToken =
   createToken<UseCases.DatabaseCommandUseCase>("DatabaseCommandUseCase");
+export const RunDatabaseMigrationUseCaseToken =
+  createToken<UseCases.RunDatabaseMigrationUseCase>(
+    "RunDatabaseMigrationUseCase",
+  );
 export const DockerInventoryReaderToken =
   createToken<DockerInventoryReaderPort>("DockerInventoryReader");
 export const DockerContainerControllerToken =
@@ -90,6 +143,12 @@ export const DeleteEnvironmentUseCaseToken =
   createToken<UseCases.DeleteEnvironmentUseCase>("DeleteEnvironmentUseCase");
 export const UpdateEnvironmentUseCaseToken =
   createToken<UseCases.UpdateEnvironmentUseCase>("UpdateEnvironmentUseCase");
+export const CloneEnvironmentUseCaseToken =
+  createToken<UseCases.CloneEnvironmentUseCase>("CloneEnvironmentUseCase");
+export const DiffEnvironmentsUseCaseToken =
+  createToken<UseCases.DiffEnvironmentsUseCase>("DiffEnvironmentsUseCase");
+export const PromoteEnvironmentUseCaseToken =
+  createToken<UseCases.PromoteEnvironmentUseCase>("PromoteEnvironmentUseCase");
 export const CreateResourceUseCaseToken =
   createToken<UseCases.CreateResourceUseCase>("CreateResourceUseCase");
 export const GetResourcesUseCaseToken =
@@ -258,6 +317,8 @@ export const TriggerBackupRunUseCaseToken =
   createToken<UseCases.TriggerBackupRunUseCase>("TriggerBackupRunUseCase");
 export const RestoreBackupRunUseCaseToken =
   createToken<UseCases.RestoreBackupRunUseCase>("RestoreBackupRunUseCase");
+export const VerifyBackupRunUseCaseToken =
+  createToken<UseCases.VerifyBackupRunUseCase>("VerifyBackupRunUseCase");
 export const ExecuteBackupRunUseCaseToken =
   createToken<UseCases.ExecuteBackupRunUseCase>("ExecuteBackupRunUseCase");
 export const ListBackupVolumesUseCaseToken =

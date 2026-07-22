@@ -42,7 +42,13 @@ export interface ConvergenceOptions {
   timeoutSeconds?: number;
   stabilityWindowSeconds?: number;
   destinationDocker?: any;
+  serviceNameOverride?: string;
   onLog?: (log: string) => void;
+}
+
+export interface DeploymentRevisionOptions {
+  serviceNameOverride?: string;
+  replicasOverride?: number;
 }
 
 export interface ConvergenceResult {
@@ -66,6 +72,7 @@ export interface DockerServicePort {
     onLog?: (log: string) => void,
     constraints?: string[],
     registryAuth?: DockerRegistryAuth,
+    revision?: DeploymentRevisionOptions,
   ): Promise<void>;
   deployAppGit(
     resource: Resource,
@@ -83,6 +90,7 @@ export interface DockerServicePort {
     destination?: any,
     sourceRevision?: string,
     onGitCloned?: (clonePath: string) => Promise<Resource | undefined>,
+    revision?: DeploymentRevisionOptions,
   ): Promise<void>;
   readComposeFileFromGit(
     resource: Resource,
@@ -110,7 +118,28 @@ export interface DockerServicePort {
     resource: Resource,
     command: "start" | "stop" | "restart",
   ): Promise<void>;
-  rollbackService(resource: Resource, auth?: DockerRegistryAuth): Promise<void>;
+  rollbackService(
+    resource: Resource,
+    auth?: DockerRegistryAuth,
+    serviceNameOverride?: string,
+  ): Promise<void>;
+  promoteServiceRevision(
+    resource: Resource,
+    revisionServiceName: string,
+  ): Promise<void>;
+  removeServiceRevision(
+    resource: Resource,
+    revisionServiceName: string,
+  ): Promise<void>;
+  scaleService(resource: Resource, replicas: number): Promise<void>;
+  configureDatabaseReplication(
+    resource: Resource,
+    envVars: Record<string, string>,
+  ): Promise<void>;
+  serviceExists?(
+    resource: Resource,
+    serviceNameOverride?: string,
+  ): Promise<boolean>;
   controlContainer(
     resource: Resource,
     containerId: string,
@@ -148,7 +177,11 @@ export type DockerDeploymentPort = Pick<
   | "deployComposeStack"
   | "waitForServiceConvergence"
   | "rollbackService"
+  | "promoteServiceRevision"
+  | "removeServiceRevision"
   | "transferImage"
+  | "configureDatabaseReplication"
+  | "serviceExists"
 >;
 export type DockerResourceReadPort = Pick<
   DockerServicePort,

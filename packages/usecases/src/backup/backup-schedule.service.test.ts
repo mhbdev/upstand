@@ -78,4 +78,31 @@ describe("backup schedule validation", () => {
     expect(input.databaseEngine).toBe("redis");
     expect(() => validateBackupSchedule(input)).not.toThrow();
   });
+
+  test("requires backup replica settings to match the resource HA policy", () => {
+    expect(() =>
+      normalizeBackupScheduleInput(
+        { ...baseInput, replicaCount: 1, failoverEnabled: true },
+        databaseResource,
+      ),
+    ).toThrow("must match Advanced > Health & Deploy");
+
+    const haResource = {
+      ...databaseResource,
+      advancedConfig: JSON.stringify({
+        databaseReplication: {
+          enabled: true,
+          replicaCount: 1,
+          automaticFailover: true,
+          replicationUser: "repmgr",
+        },
+      }),
+    };
+    expect(() =>
+      normalizeBackupScheduleInput(
+        { ...baseInput, replicaCount: 1, failoverEnabled: true },
+        haResource,
+      ),
+    ).not.toThrow();
+  });
 });

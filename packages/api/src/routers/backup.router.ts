@@ -25,6 +25,7 @@ import {
   UnitOfWorkToken,
   UpdateBackupScheduleUseCaseToken,
   UpdateWebServerBackupScheduleUseCaseToken,
+  VerifyBackupRunUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { z } from "zod";
 import type { AuthenticatedContext } from "../context";
@@ -221,6 +222,31 @@ export const backupRouter = router({
       try {
         await ctx.scope.resolve(RestoreBackupRunUseCaseToken).execute(input);
         return { restored: true };
+      } catch (error) {
+        handleUseCaseError(error, ctx.log);
+      }
+    }),
+
+  verifyRun: twoFactorVerifiedProcedure
+    .input(z.object({ runId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const run = await ctx.scope
+        .resolve(UnitOfWorkToken)
+        .backupRunRepository.findById(input.runId);
+      if (!run)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Backup run not found",
+        });
+      await assertOrganizationPermission(
+        ctx,
+        run.organizationId,
+        "backup:manage",
+      );
+      try {
+        return await ctx.scope
+          .resolve(VerifyBackupRunUseCaseToken)
+          .execute(input.runId);
       } catch (error) {
         handleUseCaseError(error, ctx.log);
       }

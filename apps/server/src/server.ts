@@ -13,6 +13,7 @@ import {
   DeliverNotificationUseCaseToken,
   GeneralSchedulerToken,
   GetWebServerSettingsUseCaseToken,
+  RunDueSecretRotationsUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
 import { type DrainContext, initLogger, log } from "evlog";
@@ -26,6 +27,7 @@ import { createOTLPDrain } from "evlog/otlp";
 import { Hono } from "hono";
 import { websocket } from "hono/bun";
 import { AutoUpdateRuntime } from "./auto-update-runtime";
+import { AutoscalingRuntime } from "./autoscaling-runtime";
 import { createBackupRunHandler } from "./backup-runtime";
 import { DeploymentRuntime } from "./deployment-runtime";
 import { getServiceProvider } from "./di";
@@ -129,6 +131,8 @@ const accessLogCleanupScheduler = new AccessLogCleanupScheduler(
 );
 const scheduledDockerCleanup = new ScheduledDockerCleanup();
 const autoUpdateRuntime = new AutoUpdateRuntime();
+const autoscalingRuntime = new AutoscalingRuntime();
+let secretRotationTimer: ReturnType<typeof setInterval> | null = null;
 let shuttingDown = false;
 let caddyReady = false;
 
@@ -194,6 +198,21 @@ await backupScheduler.start();
 await generalScheduler.start();
 await accessLogCleanupScheduler.start();
 await outboxRuntime.start();
+autoscalingRuntime.start();
+secretRotationTimer = setInterval(() => {
+  const scope = getServiceProvider().createScope();
+  void scope
+    .resolve(RunDueSecretRotationsUseCaseToken)
+    .execute()
+    .catch((error) => {
+      log.warn({
+        message: "Secret rotation reconciliation failed",
+        err: error,
+      });
+    })
+    .finally(() => scope.dispose());
+}, 60_000);
+secretRotationTimer.unref?.();
 log.info({ message: "Background job workers and schedulers started" });
 
 initializeMonitoring().catch((err) => {
@@ -217,6 +236,8 @@ async function shutdown(signal: string): Promise<void> {
   const outboxDrain = outboxRuntime.shutdown();
   scheduledDockerCleanup.stop();
   autoUpdateRuntime.stop();
+  autoscalingRuntime.stop();
+  if (secretRotationTimer) clearInterval(secretRotationTimer);
 
   const drain = Promise.all([
     deploymentDrain,

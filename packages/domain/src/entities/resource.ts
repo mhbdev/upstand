@@ -86,6 +86,89 @@ const ResourceHealthcheckSchema = z.object({
 });
 
 export const ResourceAdvancedConfigSchema = z.object({
+  autoscaling: z
+    .object({
+      enabled: z.boolean().default(false),
+      minReplicas: z.number().int().min(0).max(1000).default(1),
+      maxReplicas: z.number().int().min(1).max(1000).default(10),
+      targetCpuPercent: z.number().min(1).max(100).optional(),
+      targetMemoryPercent: z.number().min(1).max(100).optional(),
+      targetRequestsPerSecond: z.number().positive().optional(),
+      customMetric: z.string().trim().max(128).optional(),
+      customMetricTarget: z.number().finite().optional(),
+      scaleUpStep: z.number().int().min(1).max(100).default(1),
+      scaleDownStep: z.number().int().min(1).max(100).default(1),
+      cooldownSeconds: z.number().int().min(10).max(86400).default(180),
+    })
+    .superRefine((value, context) => {
+      if (value.minReplicas > value.maxReplicas) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "minReplicas cannot exceed maxReplicas",
+          path: ["minReplicas"],
+        });
+      }
+      if (
+        value.enabled &&
+        value.targetCpuPercent === undefined &&
+        value.targetMemoryPercent === undefined &&
+        value.targetRequestsPerSecond === undefined &&
+        value.customMetricTarget === undefined
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Autoscaling requires at least one target metric",
+          path: ["targetCpuPercent"],
+        });
+      }
+    })
+    .default({
+      enabled: false,
+      minReplicas: 1,
+      maxReplicas: 10,
+      scaleUpStep: 1,
+      scaleDownStep: 1,
+      cooldownSeconds: 180,
+    }),
+  deploymentStrategy: z
+    .object({
+      type: z
+        .enum(["rolling", "canary", "blue-green", "progressive"])
+        .default("rolling"),
+      canaryReplicas: z.number().int().min(1).max(1000).optional(),
+      canaryPercent: z.number().min(1).max(99).optional(),
+      bakeTimeSeconds: z.number().int().min(0).max(86400).default(60),
+      steps: z.array(z.number().int().min(1).max(100)).max(20).default([]),
+      automaticRollback: z.boolean().default(true),
+    })
+    .default({
+      type: "rolling",
+      bakeTimeSeconds: 60,
+      steps: [],
+      automaticRollback: true,
+    }),
+  databaseReplication: z
+    .object({
+      enabled: z.boolean().default(false),
+      replicaCount: z.number().int().min(1).max(5).default(1),
+      automaticFailover: z.boolean().default(true),
+      replicationUser: z.string().trim().min(1).max(128).default("repmgr"),
+    })
+    .default({
+      enabled: false,
+      replicaCount: 1,
+      automaticFailover: true,
+      replicationUser: "repmgr",
+    }),
+  trafficSplits: z
+    .array(
+      z.object({
+        serviceName: z.string().trim().min(1).max(253),
+        weight: z.number().int().min(1).max(100),
+      }),
+    )
+    .max(8)
+    .default([]),
   serviceName: z
     .string()
     .trim()

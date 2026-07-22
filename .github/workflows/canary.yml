@@ -35,6 +35,14 @@ jobs:
             scope: upstand-web
             build_args: |
               NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
+              NEXT_PUBLIC_IS_CLOUD=false
+              NEXT_PUBLIC_UPSTAND_VERSION=canary
+          - name: web-cloud
+            file: apps/web/Dockerfile
+            scope: upstand-web-cloud
+            build_args: |
+              NEXT_PUBLIC_SERVER_URL=https://api.example.invalid
+              NEXT_PUBLIC_IS_CLOUD=true
               NEXT_PUBLIC_UPSTAND_VERSION=canary
           - name: fumadocs
             file: apps/fumadocs/Dockerfile

@@ -1,53 +1,82 @@
 ---
-title: Environment Variables Reference
-description: Complete reference of all validated configuration variables used by Upstand.
+title: Environment variables reference
+description: Variables validated by the Upstand server, web console, documentation app, and installer.
 ---
 
-Upstand strictly validates all configuration variables on startup using Zod schemas defined in `packages/env`.
+The server validates its environment with `packages/env/src/server.ts`; the web console validates its public variables with `packages/env/src/web.ts`. Optional values have defaults or enable specific integrations. A variable mentioned in a deployment file is not necessarily read by the application, so use this page together with the installer and compose files for your deployment mode.
 
----
+## Server runtime
 
-## Required Control Plane Variables
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Production | PostgreSQL connection string. |
+| `BETTER_AUTH_SECRET` | Production | Better Auth signing/session secret; the server schema requires at least 32 characters. |
+| `BETTER_AUTH_URL` | Production | Canonical auth API URL. |
+| `CORS_ORIGIN` | Production | Allowed dashboard origin. |
+| `SSH_KEY_ENCRYPTION_KEY_V1` | Production | Encryption key for stored SSH and provider secrets. |
+| `REDIS_URL` | No | Redis connection URL; defaults to `redis://localhost:6379`. |
+| `PORT` | No | Server listen port; defaults to `3000`. |
+| `NODE_ENV` | No | `development`, `production`, or `test`; defaults to `development`. |
+| `DOCKER_NETWORK` | No | Docker network name; defaults to `upstand-network`. |
+| `TRUSTED_PROXY_CIDRS` | No | Comma-separated proxy CIDRs whose forwarded client headers may be trusted. |
 
-These variables are required for the Hono API server and worker runtimes to boot:
+## URLs and deployment topology
 
-- **`DATABASE_URL`**: The PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/db`).
-- **`REDIS_URL`**: The Redis connection URI (e.g. `redis://:password@host:6379`).
-- **`BETTER_AUTH_SECRET`**: Random secret key used by Better Auth to hash tokens and secure sessions.
-- **`BETTER_AUTH_URL`**: The canonical URL of your auth API (e.g. `https://api.example.com`).
-- **`CORS_ORIGIN`**: The allowed origin for dashboard requests (e.g. `https://app.example.com`).
-- **`NEXT_PUBLIC_SERVER_URL`**: The public-facing HTTP origin of the Hono API (e.g. `https://api.example.com`).
-- **`SSH_KEY_ENCRYPTION_KEY_V1`**: A secure 32-byte key (base64 encoded) used to encrypt remote server SSH keys and AI provider keys at rest.
+| Variable | Purpose |
+| --- | --- |
+| `UPSTAND_BASE_URL` | Optional public Upstand base URL. |
+| `APP_URL` | Optional application/dashboard URL. |
+| `UPSTAND_DASHBOARD_HOST` | Dashboard host used by deployment configuration. |
+| `UPSTAND_API_HOST` | API host used by deployment configuration. |
+| `UPSTAND_DOCS_HOST` | Documentation host used by deployment configuration. |
+| `UPSTAND_SERVER_UPSTREAM` | Server upstream override. |
+| `UPSTAND_WEB_UPSTREAM` | Web upstream override. |
+| `UPSTAND_FUMADOCS_UPSTREAM` | Fumadocs upstream override. |
+| `UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT` | Optional host-key pin for control-plane SSH operations. |
 
----
+## Release and runtime services
 
-## Production Security Variables
+| Variable | Purpose |
+| --- | --- |
+| `UPSTAND_VERSION` | Release version shown by the application/update flow. |
+| `UPSTAND_AUTO_UPDATE` | Boolean; enables the optional update runtime. Defaults to `false`. |
+| `UPSTAND_SERVER_IMAGE` | Server image reference. |
+| `UPSTAND_WEB_IMAGE` | Web image reference. |
+| `UPSTAND_WEB_CLOUD_IMAGE` | Dedicated cloud-built web image; required for immutable cloud installs. |
+| `UPSTAND_MONITORING_IMAGE` | Monitoring image reference. |
+| `DB_MIGRATIONS_PATH` | Optional database migrations path. |
+| `UPSTAND_POSTGRES_CONTAINER` | Optional PostgreSQL container identifier/name. |
+| `UPSTAND_DOCKER_VERSION` | Optional Docker version used by provisioning/update flows. |
+| `SERVER_ID` | Optional server identity for a runtime instance. |
+| `UPSTAND_INSTANCE_OWNER_USER_ID` | Optional explicit instance-owner identity for instance-scoped operations. |
 
-- **`TRUSTED_PROXY_CIDRS`**: Subnet CIDR strings representing trusted reverse proxy networks (e.g., `10.0.0.0/24`). The API only trusts headers like `X-Forwarded-For` from IPs within these CIDRs. Never include client-facing subnets.
+## Git and AI integrations
 
----
+| Variable | Purpose |
+| --- | --- |
+| `UPSTAND_GIT_PROVIDER_ALLOWED_HOSTS` | Comma-separated allowlist for custom Git provider hosts. HTTPS and public-host validation still apply. |
+| `GITHUB_REPOSITORY` | Repository used by release/update flows; defaults to `mhbdev/upstand`. |
+| `GITHUB_TOKEN` | Optional GitHub token. |
+| `UPSTAND_GITHUB_TOKEN` | Optional Upstand GitHub token. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional Google auth credentials. |
+| `UPGAL_WEB_SEARCH_API_KEY` | Optional key for UpGal public-web search. |
+| `UPGAL_WEB_SEARCH_BASE_URL` | Search endpoint; defaults to the Brave-compatible endpoint. |
+| `UPGAL_MCP_SERVERS` | Optional MCP server configuration. |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | Optional OpenRouter configuration used by runtime AI flows. |
+| `IS_CLOUD` | Boolean cloud-mode flag; defaults to `false`. |
 
-## Update and Channel Settings
+## Web console
 
-- **`UPSTAND_VERSION`**: Pinned release tag (e.g. `v1.6.69`) displayed on the dashboard.
-- **`UPSTAND_AUTO_UPDATE`**: Set to `true` to enable automated release checks and background rolling updates. Defaults to `false`.
-- **`UPSTAND_SERVER_IMAGE`**: Immutable digest of the API server image.
-- **`UPSTAND_MONITORING_IMAGE`**: Immutable digest of the monitoring service image.
-- **`UPSTAND_WEB_IMAGE`**: Immutable digest of the Next.js web console image.
-- **`UPSTAND_DOCS_IMAGE`**: Immutable digest of the documentation service image.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SERVER_URL` | Yes | Public API origin used by the browser. |
+| `NEXT_PUBLIC_UPSTAND_VERSION` | No | Version shown by the web console. |
+| `NEXT_PUBLIC_IS_CLOUD` | No | Boolean cloud-mode flag; defaults to `false`. |
 
----
+## Documentation app
 
-## UpGal AI Assistant Variables
+The Fumadocs app reads `OPENROUTER_API_KEY` and optional `OPENROUTER_MODEL` for its documentation chat route. `NEXT_PUBLIC_FUMADOCS_URL` controls the canonical URL used by the documentation layout, and `OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT` can enable telemetry export. Documentation builds may set `SKIP_TYPECHECK` or the repository's standard build-time validation flags according to the deployment pipeline.
 
-- **`UPGAL_WEB_SEARCH_API_KEY`**: Optional API key for Brave-compatible web search integration.
-- **`UPGAL_WEB_SEARCH_BASE_URL`**: Optional custom base URL endpoint for web search queries. Defaults to Brave Search API.
+## Secret handling
 
----
-
-## Location of Secrets
-
-During production installations via `install.sh`, variables are split based on sensitivity:
-
-- **Non-sensitive settings**: Placed in `/etc/upstand/.env` (mode `0600`).
-- **Sensitive credentials**: Managed as Docker Secrets and written under `/etc/upstand/secrets/` (mode `0600` individual files).
+Do not commit production values to `.env` files. The production installer separates ordinary configuration from sensitive Docker Secret material under `/etc/upstand/secrets/` with restrictive permissions. Keep backups of encryption keys separately from database backups: losing `SSH_KEY_ENCRYPTION_KEY_V1` can make encrypted credentials unrecoverable.

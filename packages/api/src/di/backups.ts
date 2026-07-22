@@ -404,6 +404,13 @@ export function registerBackups(
       ),
   );
   services.addTransient(
+    dependencies.VerifyBackupRunUseCaseToken,
+    (c) =>
+      new dependencies.VerifyBackupRunUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
     dependencies.ExecuteBackupRunUseCaseToken,
     (c) =>
       new dependencies.ExecuteBackupRunUseCase(

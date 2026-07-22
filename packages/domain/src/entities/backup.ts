@@ -39,6 +39,11 @@ export const BackupScheduleSchema = z.object({
   volumeName: z.string().nullable(),
   stopService: z.boolean(),
   encryptedConfiguration: z.string().nullable(),
+  pointInTimeRecovery: z.boolean(),
+  restoreVerification: z.boolean(),
+  replicaCount: z.number().int().nonnegative(),
+  failoverEnabled: z.boolean(),
+  migrationCommand: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -58,6 +63,10 @@ export const BackupRunSchema = z.object({
   completedAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
+  verificationStatus: z.string().nullable(),
+  verifiedAt: z.date().nullable(),
+  restoreTestedAt: z.date().nullable(),
+  recoveryPoint: z.string().nullable(),
 });
 export type BackupRun = z.infer<typeof BackupRunSchema>;
 
@@ -91,6 +100,11 @@ export const CreateBackupScheduleInputObjectSchema = z.object({
     .regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/)
     .optional(),
   stopService: z.boolean().default(false),
+  pointInTimeRecovery: z.boolean().optional(),
+  restoreVerification: z.boolean().optional(),
+  replicaCount: z.number().int().min(0).max(9).optional(),
+  failoverEnabled: z.boolean().optional(),
+  migrationCommand: z.string().trim().max(4096).optional(),
   sourceCredentials: z
     .object({
       databaseUser: z.string().trim().min(1).max(255),
@@ -126,6 +140,30 @@ export const CreateBackupScheduleInputSchema =
         code: "custom",
         path: ["volumeName"],
         message: "Volume name is required for a volume backup",
+      });
+    }
+    if (input.pointInTimeRecovery && input.databaseEngine !== "postgres") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["pointInTimeRecovery"],
+        message: "Point-in-time recovery currently requires PostgreSQL",
+      });
+    }
+    if ((input.replicaCount ?? 0) > 0 && input.databaseEngine !== "postgres") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["replicaCount"],
+        message: "Managed database replicas currently require PostgreSQL",
+      });
+    }
+    if (
+      input.failoverEnabled &&
+      (input.databaseEngine !== "postgres" || (input.replicaCount ?? 0) < 1)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["failoverEnabled"],
+        message: "Failover requires at least one PostgreSQL replica",
       });
     }
   });
@@ -179,6 +217,11 @@ export interface CreateBackupScheduleDTO {
   serviceName?: string | null;
   volumeName?: string | null;
   stopService?: boolean;
+  pointInTimeRecovery?: boolean;
+  restoreVerification?: boolean;
+  replicaCount?: number;
+  failoverEnabled?: boolean;
+  migrationCommand?: string | null;
   encryptedConfiguration?: string | null;
 }
 
@@ -194,6 +237,10 @@ export interface CreateBackupRunDTO {
   error?: string | null;
   startedAt?: Date | null;
   completedAt?: Date | null;
+  verificationStatus?: string | null;
+  verifiedAt?: Date | null;
+  restoreTestedAt?: Date | null;
+  recoveryPoint?: string | null;
 }
 
 export type BackupScheduleView = Omit<BackupSchedule, "encryptedConfiguration">;

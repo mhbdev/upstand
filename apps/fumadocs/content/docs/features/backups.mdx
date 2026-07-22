@@ -1,0 +1,31 @@
+---
+title: Backups and restores
+description: Configure S3-compatible storage, schedule resource backups, verify backup runs, and restore data safely.
+---
+
+Upstand stores backups in organization-owned S3-compatible destinations. Configure a destination under **Integrations → S3 Storage**, test the connection, and then select it from a resource or Web Server backup panel.
+
+## Storage destinations
+
+The S3 destination form accepts a name, provider, access key, secret access key, bucket, region, optional endpoint, and optional additional flags. The UI is designed for AWS S3 and compatible services such as Cloudflare R2, Wasabi, and DigitalOcean Spaces. Always test the connection after changing credentials or endpoints.
+
+## Resource backup schedules
+
+From a resource's **Backups** tab, create a schedule with its destination and retention settings. Upstand can list eligible volumes and Compose services, run a backup immediately, list historical runs, verify a run, and restore a run. The scheduler and worker record the run status and logs so a failed backup is visible in Observation.
+
+Backups are also a supported Cron Job target. A Cron Job can trigger an existing backup schedule; it does not replace the backup schedule's storage and retention configuration.
+
+## Web Server backups
+
+The Web Server page has a separate backup area for control-plane/web-server data. It supports listing schedules and runs, running now, verifying, restoring, and configuring an S3 destination. Treat a web-server restore as an infrastructure operation and plan for the service impact before approving it.
+
+## Safe restore procedure
+
+1. Confirm the destination, backup run, resource, and target volume/service.
+2. Check the run status and verify the archive when the option is available.
+3. Record the restore in the incident or change record.
+4. Pause conflicting deployment or maintenance work.
+5. Approve the restore with the required permissions and verified 2FA.
+6. Inspect containers, logs, health checks, and application behavior after the restore.
+
+Restores and database rebuilds are not read-only actions. Protect the S3 credentials, test recovery periodically, and keep at least one destination outside the host being backed up.

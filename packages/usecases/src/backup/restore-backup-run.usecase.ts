@@ -7,6 +7,7 @@ import {
 
 export const RestoreBackupRunInputSchema = z.object({
   runId: z.string().min(1),
+  targetTime: z.string().datetime({ offset: true }).optional(),
 });
 export type RestoreBackupRunInput = z.infer<typeof RestoreBackupRunInputSchema>;
 
@@ -50,6 +51,9 @@ export class RestoreBackupRunUseCase {
           resource as NonNullable<typeof resource>,
           destination,
           fileKey,
+          input.targetTime
+            ? new Date(input.targetTime).toISOString()
+            : undefined,
         ),
     );
   }

@@ -35,6 +35,7 @@ type CaddyRoute = DomainMapping & {
   resourceId: string;
   resourceName: string;
   upstream: string;
+  upstreams?: string[];
   customCertificate?: CaddyCertificate;
 };
 
@@ -274,11 +275,25 @@ function getRoutes(
         mapping.serviceName
           ? `${sanitizeServiceName(resource.appName || resource.name)}_${sanitizeServiceName(mapping.serviceName)}`
           : serviceName;
+      const trafficSplits = parseResourceAdvancedConfig(
+        resource.advancedConfig,
+      ).trafficSplits;
+      const upstreams =
+        trafficSplits.length > 0
+          ? trafficSplits.flatMap((split) =>
+              Array.from(
+                { length: split.weight },
+                () =>
+                  `${sanitizeServiceName(split.serviceName)}:${mapping.port}`,
+              ),
+            )
+          : undefined;
       routes.push({
         ...mapping,
         resourceId: resource.id,
         resourceName: resource.name,
         upstream: `${upstreamServiceName}:${mapping.port}`,
+        upstreams,
         customCertificate,
       });
     }
@@ -370,7 +385,13 @@ function routeBlock(route: CaddyRoute, index: number): string[] {
     lines.push(`\t\t\trewrite ${route.internalPath}{uri}`);
   }
 
-  lines.push(`\t\t\treverse_proxy ${route.upstream} {`);
+  if (route.upstreams?.length) {
+    lines.push("\t\t\treverse_proxy {");
+    lines.push(`\t\t\tto ${route.upstreams.join(" ")}`);
+    lines.push("\t\t\tlb_policy random");
+  } else {
+    lines.push(`\t\t\treverse_proxy ${route.upstream} {`);
+  }
   // Swarm tasks can briefly disappear during a rolling update. Retry the
   // upstream while Docker's service DNS converges instead of returning an
   // avoidable 502 to the browser.

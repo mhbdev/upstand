@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Switch } from "@upstand/ui/components/switch";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { type AdvancedCardProps, splitLines } from "./types";
 
@@ -32,6 +33,8 @@ import { type AdvancedCardProps, splitLines } from "./types";
 type UpdateConfig = ResourceAdvancedConfig["updateConfig"];
 type RollbackConfig = ResourceAdvancedConfig["rollbackConfig"];
 type Healthcheck = NonNullable<ResourceAdvancedConfig["healthcheck"]>;
+type Autoscaling = ResourceAdvancedConfig["autoscaling"];
+type DeploymentStrategy = ResourceAdvancedConfig["deploymentStrategy"];
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Update / Rollback shared sub-form
@@ -152,6 +155,7 @@ const HEALTHCHECK_TIMING_FIELDS: Array<{
  */
 export function HealthcheckDeploymentCard({
   config,
+  resourceType,
   onChange,
 }: AdvancedCardProps) {
   // ── Healthcheck helpers ──
@@ -181,6 +185,20 @@ export function HealthcheckDeploymentCard({
 
   const updateRollbackConfig = (partial: Partial<RollbackConfig>) =>
     onChange("rollbackConfig", { ...config.rollbackConfig, ...partial });
+  const updateAutoscaling = (partial: Partial<Autoscaling>) =>
+    onChange("autoscaling", { ...config.autoscaling, ...partial });
+  const updateDeploymentStrategy = (partial: Partial<DeploymentStrategy>) =>
+    onChange("deploymentStrategy", {
+      ...config.deploymentStrategy,
+      ...partial,
+    });
+  const updateReplication = (
+    partial: Partial<ResourceAdvancedConfig["databaseReplication"]>,
+  ) =>
+    onChange("databaseReplication", {
+      ...config.databaseReplication,
+      ...partial,
+    });
 
   return (
     <Card>
@@ -286,6 +304,175 @@ export function HealthcheckDeploymentCard({
             />
           </Field>
         </FieldGroup>
+
+        {resourceType !== "database" && (
+          <Field>
+            <FieldLabel>Autoscaling</FieldLabel>
+            <FieldDescription>
+              Reconcile Swarm replicas from CPU, memory, request rate, or a
+              custom monitoring metric.
+            </FieldDescription>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={config.autoscaling.enabled}
+                onCheckedChange={(enabled) => updateAutoscaling({ enabled })}
+              />
+              <span className="text-sm">Enable autoscaling</span>
+            </div>
+            {config.autoscaling.enabled && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {(
+                  [
+                    ["minReplicas", "Min replicas"],
+                    ["maxReplicas", "Max replicas"],
+                    ["targetCpuPercent", "CPU target %"],
+                    ["targetMemoryPercent", "Memory target %"],
+                    ["targetRequestsPerSecond", "Requests / second"],
+                    ["cooldownSeconds", "Cooldown seconds"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <Input
+                    key={key}
+                    type="number"
+                    min={key === "cooldownSeconds" ? 10 : 1}
+                    placeholder={label}
+                    value={config.autoscaling[key] ?? ""}
+                    onChange={(event) =>
+                      updateAutoscaling({
+                        [key]: event.target.value
+                          ? Number(event.target.value)
+                          : undefined,
+                      })
+                    }
+                    aria-label={label}
+                  />
+                ))}
+              </div>
+            )}
+          </Field>
+        )}
+
+        {resourceType === "application" && (
+          <Field>
+            <FieldLabel>Progressive delivery</FieldLabel>
+            <FieldDescription>
+              Canary, blue-green, and progressive strategies create an isolated
+              revision, gate it on health and metrics, then promote or remove
+              it.
+            </FieldDescription>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Select
+                value={config.deploymentStrategy.type}
+                onValueChange={(type) =>
+                  type &&
+                  updateDeploymentStrategy({
+                    type: type as DeploymentStrategy["type"],
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Deployment strategy" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rolling">Rolling</SelectItem>
+                  <SelectItem value="canary">Canary</SelectItem>
+                  <SelectItem value="blue-green">Blue-green</SelectItem>
+                  <SelectItem value="progressive">Progressive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={1}
+                max={99}
+                placeholder="Canary percent"
+                value={config.deploymentStrategy.canaryPercent ?? ""}
+                onChange={(event) =>
+                  updateDeploymentStrategy({
+                    canaryPercent: event.target.value
+                      ? Number(event.target.value)
+                      : undefined,
+                  })
+                }
+              />
+              <Input
+                type="number"
+                min={0}
+                placeholder="Bake time seconds"
+                value={config.deploymentStrategy.bakeTimeSeconds}
+                onChange={(event) =>
+                  updateDeploymentStrategy({
+                    bakeTimeSeconds: Number(event.target.value) || 0,
+                  })
+                }
+              />
+              <Input
+                placeholder="Progressive steps (10,25,50)"
+                value={config.deploymentStrategy.steps.join(",")}
+                onChange={(event) =>
+                  updateDeploymentStrategy({
+                    steps: event.target.value
+                      .split(",")
+                      .map((value) => Number(value.trim()))
+                      .filter((value) => Number.isFinite(value)),
+                  })
+                }
+              />
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <Switch
+                checked={config.deploymentStrategy.automaticRollback}
+                onCheckedChange={(automaticRollback) =>
+                  updateDeploymentStrategy({ automaticRollback })
+                }
+              />
+              <span className="text-sm">
+                Automatically roll back on a failed metric gate
+              </span>
+            </div>
+          </Field>
+        )}
+
+        {resourceType === "database" && (
+          <Field>
+            <FieldLabel>PostgreSQL high availability</FieldLabel>
+            <FieldDescription>
+              Use the bitnami/postgresql-repmgr image to reconcile replicas and
+              automatic failover.
+            </FieldDescription>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={config.databaseReplication.enabled}
+                onCheckedChange={(enabled) => updateReplication({ enabled })}
+              />
+              <span className="text-sm">Enable managed replication</span>
+            </div>
+            {config.databaseReplication.enabled && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  placeholder="Replica count"
+                  value={config.databaseReplication.replicaCount}
+                  onChange={(event) =>
+                    updateReplication({
+                      replicaCount: Number(event.target.value) || 1,
+                    })
+                  }
+                />
+                <div className="flex items-center gap-3 rounded-md border px-3">
+                  <Switch
+                    checked={config.databaseReplication.automaticFailover}
+                    onCheckedChange={(automaticFailover) =>
+                      updateReplication({ automaticFailover })
+                    }
+                  />
+                  <span className="text-sm">Automatic failover</span>
+                </div>
+              </div>
+            )}
+          </Field>
+        )}
       </CardContent>
     </Card>
   );

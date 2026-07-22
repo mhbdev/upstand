@@ -1,12 +1,17 @@
 import type { Environment, IUnitOfWork } from "@upstand/domain";
 import { ValidationError } from "@upstand/domain";
 import { z } from "zod";
-import { serializeResourceEnvironmentVariables } from "../resource/resource-environment";
+import {
+  parseResourceEnvironmentVariables,
+  serializeResourceEnvironmentVariables,
+} from "../resource/resource-environment";
 
 export const UpdateEnvironmentInputSchema = z.object({
   id: z.string().min(1, "Environment ID is required"),
   name: z.string().min(1, "Name must not be empty").max(255).optional(),
   description: z.string().max(1024).nullable().optional(),
+  parentEnvironmentId: z.string().min(1).nullable().optional(),
+  inheritsVariables: z.boolean().optional(),
   /**
    * Plain key/value map of project-level environment variables.
    * The use case encrypts and serialises the map before persisting.
@@ -40,6 +45,28 @@ export class UpdateEnvironmentUseCase {
       if (input.description !== undefined) {
         patch.description = input.description;
       }
+      if (input.parentEnvironmentId !== undefined) {
+        if (input.parentEnvironmentId === input.id) {
+          throw new ValidationError(
+            "An environment cannot inherit from itself.",
+          );
+        }
+        const ancestors =
+          input.parentEnvironmentId && tx.environmentRepository.findAncestors
+            ? await tx.environmentRepository.findAncestors(
+                input.parentEnvironmentId,
+              )
+            : [];
+        if (ancestors.some((environment) => environment.id === input.id)) {
+          throw new ValidationError(
+            "Environment inheritance cannot contain a cycle.",
+          );
+        }
+        patch.parentEnvironmentId = input.parentEnvironmentId;
+      }
+      if (input.inheritsVariables !== undefined) {
+        patch.inheritsVariables = input.inheritsVariables;
+      }
       if (input.envVars !== undefined) {
         patch.envVars = serializeResourceEnvironmentVariables(input.envVars);
       }
@@ -56,4 +83,27 @@ export class UpdateEnvironmentUseCase {
       return updated;
     });
   }
+}
+
+export async function resolveEnvironmentVariables(
+  uow: IUnitOfWork,
+  environmentId: string,
+): Promise<Record<string, string>> {
+  const chain = uow.environmentRepository.findAncestors
+    ? await uow.environmentRepository.findAncestors(environmentId)
+    : [await uow.environmentRepository.findById(environmentId)].filter(
+        (environment): environment is NonNullable<typeof environment> =>
+          Boolean(environment),
+      );
+  const resolved: Record<string, string> = {};
+  for (const environment of [...chain].reverse()) {
+    if (environment.id !== environmentId && !environment.inheritsVariables) {
+      continue;
+    }
+    Object.assign(
+      resolved,
+      parseResourceEnvironmentVariables(environment.envVars),
+    );
+  }
+  return resolved;
 }

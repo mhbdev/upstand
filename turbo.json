@@ -92,6 +92,10 @@
       "cache": false,
       "env": ["DATABASE_URL"]
     },
+    "db:check": {
+      "cache": false,
+      "env": ["DATABASE_URL"]
+    },
     "db:generate": {
       "cache": false,
       "env": [

@@ -13,6 +13,8 @@ import type {
   IProjectRepository,
   IResourceRepository,
   IS3DestinationRepository,
+  ISecretProviderRepository,
+  ISecretVersionRepository,
   ISshKeyRepository,
   ITagRepository,
   ITemplateRepository,
@@ -51,6 +53,10 @@ export const GitProviderRepositoryToken = createToken<IGitProviderRepository>(
 );
 export const WebServerSettingsRepositoryToken =
   createToken<IWebServerSettingsRepository>("IWebServerSettingsRepository");
+export const SecretProviderRepositoryToken =
+  createToken<ISecretProviderRepository>("ISecretProviderRepository");
+export const SecretVersionRepositoryToken =
+  createToken<ISecretVersionRepository>("ISecretVersionRepository");
 export const S3DestinationRepositoryToken =
   createToken<IS3DestinationRepository>("IS3DestinationRepository");
 export const NotificationChannelRepositoryToken =

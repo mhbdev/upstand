@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
-import * as http from "node:http";
 import type { IUnitOfWork } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { hostVerifierForFingerprint } from "@upstand/platform/ssh/host-key";
 import type { MonitoringAgentPort } from "@upstand/usecases/ports/monitoring";
 import { Client, type ClientChannel } from "ssh2";
+import { requestHttpOverSshChannel } from "./ssh-channel-http.client";
 
 type LocalMonitoringAgentTarget = {
   baseUrl: string;
@@ -154,75 +154,10 @@ async function requestThroughSsh<T>(
         else resolve(stream);
       });
     });
-    return await requestOverChannel<T>(channel, options);
+    return await requestHttpOverSshChannel<T>(channel, options);
   } finally {
     client.end();
   }
-}
-
-async function requestOverChannel<T>(
-  channel: ClientChannel,
-  options: MonitoringRequestOptions,
-): Promise<T> {
-  const body = options.body ? JSON.stringify(options.body) : undefined;
-  return new Promise<T>((resolve, reject) => {
-    const request = http.request(
-      {
-        host: "127.0.0.1",
-        port: "3001",
-        path: options.path,
-        method: options.method,
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${options.token}`,
-          ...(body
-            ? {
-                "Content-Type": "application/json",
-                "Content-Length": Buffer.byteLength(body),
-              }
-            : {}),
-        },
-        createConnection: () => channel,
-        agent: false,
-      },
-      (response) => {
-        const chunks: Buffer[] = [];
-        let size = 0;
-        response.on("data", (chunk: Buffer) => {
-          size += chunk.length;
-          if (size > 2 * 1024 * 1024) {
-            request.destroy(
-              new Error("Monitoring agent response is too large"),
-            );
-            return;
-          }
-          chunks.push(chunk);
-        });
-        response.on("end", () => {
-          const payload = Buffer.concat(chunks).toString("utf8");
-          if ((response.statusCode ?? 500) >= 400) {
-            reject(
-              new Error(
-                `Monitoring agent request failed (${response.statusCode}): ${payload}`,
-              ),
-            );
-            return;
-          }
-          try {
-            resolve(JSON.parse(payload) as T);
-          } catch (error) {
-            reject(error);
-          }
-        });
-      },
-    );
-    request.setTimeout(10_000, () =>
-      request.destroy(new Error("Monitoring agent request timed out")),
-    );
-    request.once("error", reject);
-    if (body) request.write(body);
-    request.end();
-  });
 }
 
 export function createMonitoringAgentPort(): MonitoringAgentPort {

@@ -10,6 +10,7 @@
     }
   },
   "scripts": {
+    "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
     "db:generate": "bun scripts/db-generate.ts",
     "db:studio": "drizzle-kit studio",

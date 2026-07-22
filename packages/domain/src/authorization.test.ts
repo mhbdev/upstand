@@ -9,6 +9,11 @@ import {
   isCapability,
   parseCapabilities,
 } from "./authorization";
+import {
+  MEMBER_SCOPE_ACTIONS,
+  MemberPermissionsSchema,
+  PERMISSION_SCOPE_ACTIONS,
+} from "./permission-scopes";
 
 describe("authorization catalog", () => {
   test("every API-key route points to a catalog capability", () => {
@@ -35,5 +40,19 @@ describe("authorization catalog", () => {
     ]);
     expect(capabilityRequiresRecentTwoFactor("resource:delete")).toBe(true);
     expect(capabilityRequiresRecentTwoFactor("resource:view")).toBe(false);
+  });
+
+  test("keeps exposed permission scopes derived from the catalog", () => {
+    expect(PERMISSION_SCOPE_ACTIONS.apiKey).toEqual(API_KEY_CAPABILITY_ACTIONS);
+    expect(PERMISSION_SCOPE_ACTIONS.member).toEqual(
+      CUSTOM_ROLE_CAPABILITY_ACTIONS,
+    );
+    expect(MEMBER_SCOPE_ACTIONS).toEqual(CUSTOM_ROLE_CAPABILITY_ACTIONS);
+    expect(MemberPermissionsSchema.safeParse(["resource:view"]).success).toBe(
+      true,
+    );
+    expect(MemberPermissionsSchema.safeParse(["instance:manage"]).success).toBe(
+      false,
+    );
   });
 });

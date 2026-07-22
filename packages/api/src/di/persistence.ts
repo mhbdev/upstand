@@ -132,6 +132,24 @@ export function registerPersistence(services: ServiceCollection) {
         c.resolve(dependencies.DbToken),
       ),
   );
+  services.addSingleton(
+    dependencies.ExternalSecretProviderToken,
+    () => new dependencies.SecretProviderRegistry(),
+  );
+  services.addScoped(
+    dependencies.SecretVersionRepositoryToken,
+    (c) =>
+      new dependencies.DrizzleSecretVersionRepository(
+        c.resolve(dependencies.DbToken),
+      ),
+  );
+  services.addScoped(
+    dependencies.SecretProviderRepositoryToken,
+    (c) =>
+      new dependencies.DrizzleSecretProviderRepository(
+        c.resolve(dependencies.DbToken),
+      ),
+  );
   services.addScoped(
     dependencies.NotificationChannelRepositoryToken,
     (c) =>

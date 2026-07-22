@@ -87,6 +87,10 @@ type BackupSchedule = {
   serviceName: string | null;
   volumeName: string | null;
   stopService: boolean;
+  pointInTimeRecovery: boolean;
+  restoreVerification: boolean;
+  replicaCount: number;
+  failoverEnabled: boolean;
 };
 
 type BackupRun = {
@@ -143,6 +147,10 @@ function makeForm(
     serviceName: schedule?.serviceName ?? "",
     volumeName: schedule?.volumeName ?? "",
     stopService: schedule?.stopService ?? false,
+    pointInTimeRecovery: schedule?.pointInTimeRecovery ?? false,
+    restoreVerification: schedule?.restoreVerification ?? true,
+    replicaCount: schedule?.replicaCount?.toString() ?? "0",
+    failoverEnabled: schedule?.failoverEnabled ?? false,
     databaseUser: "",
     databasePassword: "",
   };
@@ -227,7 +235,16 @@ export function BackupPanel({
         serviceName: value.serviceName.trim() || undefined,
         volumeName:
           value.kind === "volume" ? value.volumeName.trim() : undefined,
-        stopService: value.kind === "volume" && value.stopService,
+        stopService:
+          value.kind === "volume"
+            ? value.stopService
+            : value.pointInTimeRecovery,
+        pointInTimeRecovery:
+          value.kind === "database" && value.pointInTimeRecovery,
+        restoreVerification: value.restoreVerification,
+        replicaCount:
+          value.kind === "database" ? Number(value.replicaCount || 0) : 0,
+        failoverEnabled: value.kind === "database" && value.failoverEnabled,
         sourceCredentials,
       };
 
@@ -843,6 +860,79 @@ export function BackupPanel({
                           </p>
                         </div>
                       )}
+                      <div className="grid gap-3 rounded-lg border border-border/50 p-4 sm:grid-cols-2">
+                        <form.Field name="restoreVerification">
+                          {(field) => (
+                            <Label className="flex items-center gap-3 text-sm">
+                              <Switch
+                                checked={field.state.value}
+                                onCheckedChange={(value) =>
+                                  field.handleChange(value)
+                                }
+                              />
+                              Verify the restore in an isolated database after
+                              each backup
+                            </Label>
+                          )}
+                        </form.Field>
+                        <form.Subscribe
+                          selector={(state) => state.values.databaseEngine}
+                        >
+                          {(engine) =>
+                            engine === "postgres" && (
+                              <>
+                                <form.Field name="pointInTimeRecovery">
+                                  {(field) => (
+                                    <Label className="flex items-center gap-3 text-sm">
+                                      <Switch
+                                        checked={field.state.value}
+                                        onCheckedChange={(value) =>
+                                          field.handleChange(value)
+                                        }
+                                      />
+                                      Enable PostgreSQL point-in-time recovery
+                                      (requires WAL-G)
+                                    </Label>
+                                  )}
+                                </form.Field>
+                                <form.Field name="replicaCount">
+                                  {(field) => (
+                                    <Field>
+                                      <FieldLabel>Managed replicas</FieldLabel>
+                                      <p className="text-muted-foreground text-xs">
+                                        Configure the operational replica policy
+                                        under Advanced → Health & Deploy.
+                                      </p>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max="9"
+                                        value={field.state.value}
+                                        onChange={(event) =>
+                                          field.handleChange(event.target.value)
+                                        }
+                                      />
+                                    </Field>
+                                  )}
+                                </form.Field>
+                                <form.Field name="failoverEnabled">
+                                  {(field) => (
+                                    <Label className="flex items-center gap-3 text-sm">
+                                      <Switch
+                                        checked={field.state.value}
+                                        onCheckedChange={(value) =>
+                                          field.handleChange(value)
+                                        }
+                                      />
+                                      Automatic failover for managed replicas
+                                    </Label>
+                                  )}
+                                </form.Field>
+                              </>
+                            )
+                          }
+                        </form.Subscribe>
+                      </div>
                     </>
                   ) : (
                     <>

@@ -23,6 +23,11 @@ export class TriggerUpdateUseCase {
   constructor(private readonly notificationPublisher?: NotificationPublisher) {}
 
   async execute(input: TriggerUpdateInput): Promise<{ success: boolean }> {
+    if (env.IS_CLOUD) {
+      throw new Error(
+        "Cloud Upstand instances are updated by the managed release rollout.",
+      );
+    }
     const version = input.version;
     if (!/^v?\d+\.\d+\.\d+(?:[-+].*)?$/.test(version) && version !== "canary") {
       throw new Error(

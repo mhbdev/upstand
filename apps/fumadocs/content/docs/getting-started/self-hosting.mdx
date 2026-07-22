@@ -16,6 +16,7 @@ Prepare a fresh Linux Virtual Machine matching these requirements:
 3. **DNS Configuration**: Configure two A records pointing to your server's public IP:
    - `app.example.com` (for the dashboard UI)
    - `api.example.com` (for the Hono/tRPC API server)
+   - `docs.example.com` (for the documentation app)
 4. **Firewall Rules**:
    - Open public TCP **80** and **443** for Caddy HTTPS certificate generation.
    - For multi-node Swarms, restrict TCP **2377** (cluster management), TCP/UDP **7946** (node communication), and UDP **4789** (overlay network ingress) to your internal cluster network.

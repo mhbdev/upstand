@@ -19,6 +19,9 @@ import { DrizzleS3DestinationRepository } from "./s3-destination/drizzle-s3-dest
 import { DrizzleScheduleRepository } from "./schedule/drizzle-schedule.repository";
 import { DrizzleScheduleLogRepository } from "./schedule/drizzle-schedule-log.repository";
 import { DrizzleScimRepository } from "./scim/drizzle-scim.repository";
+import { DrizzleSecretProviderRepository } from "./secret/drizzle-secret-provider.repository";
+import { DrizzleSecretRotationScheduleRepository } from "./secret/drizzle-secret-rotation-schedule.repository";
+import { DrizzleSecretVersionRepository } from "./secret/drizzle-secret-version.repository";
 import { DrizzleServerRepository } from "./server/drizzle-server.repository";
 import { DrizzleServerBuildSettingsRepository } from "./server-build-settings/drizzle-server-build-settings.repository";
 import type { Executor } from "./shared/types";
@@ -58,6 +61,9 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
   public readonly outboxRepository: DrizzleOutboxRepository;
   public readonly scimRepository: DrizzleScimRepository;
   public readonly twoFactorAdminRepository: DrizzleTwoFactorAdminRepository;
+  public readonly secretVersionRepository: DrizzleSecretVersionRepository;
+  public readonly secretProviderRepository: DrizzleSecretProviderRepository;
+  public readonly secretRotationScheduleRepository: DrizzleSecretRotationScheduleRepository;
 
   constructor(private readonly executor: Executor) {
     this.auditLogRepository = new DrizzleAuditLogRepository(this.executor);
@@ -115,6 +121,14 @@ export class DrizzleUnitOfWork implements IUnitOfWork {
     this.twoFactorAdminRepository = new DrizzleTwoFactorAdminRepository(
       this.executor,
     );
+    this.secretVersionRepository = new DrizzleSecretVersionRepository(
+      this.executor,
+    );
+    this.secretProviderRepository = new DrizzleSecretProviderRepository(
+      this.executor,
+    );
+    this.secretRotationScheduleRepository =
+      new DrizzleSecretRotationScheduleRepository(this.executor);
   }
 
   async transaction<T>(work: (uow: IUnitOfWork) => Promise<T>): Promise<T> {

@@ -4,8 +4,8 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   type Capability,
-  CUSTOM_ROLE_CAPABILITY_ACTIONS,
   capabilitiesForRole,
+  MEMBER_SCOPE_ACTIONS,
 } from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
@@ -42,7 +42,7 @@ function capabilityLabel(capability: Capability): string {
 }
 
 const MEMBER_CAPABILITIES: Array<[Capability, string]> =
-  CUSTOM_ROLE_CAPABILITY_ACTIONS.map((capability) => [
+  MEMBER_SCOPE_ACTIONS.map((capability) => [
     capability,
     capabilityLabel(capability),
   ]);

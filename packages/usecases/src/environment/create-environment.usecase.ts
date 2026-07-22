@@ -6,6 +6,8 @@ export const CreateEnvironmentInputSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
   name: z.string().min(1, "Environment name is required"),
   description: z.string().optional(),
+  parentEnvironmentId: z.string().min(1).nullable().optional(),
+  inheritsVariables: z.boolean().optional(),
 });
 
 export type CreateEnvironmentInput = z.infer<
@@ -17,6 +19,14 @@ export class CreateEnvironmentUseCase {
 
   async execute(input: CreateEnvironmentInput): Promise<Environment> {
     return this.uow.transaction(async (tx) => {
+      if (input.parentEnvironmentId) {
+        const parent = await tx.environmentRepository.findById(
+          input.parentEnvironmentId,
+        );
+        if (!parent || parent.projectId !== input.projectId) {
+          throw new Error("Parent environment must belong to the same project");
+        }
+      }
       const slug = input.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
@@ -28,6 +38,8 @@ export class CreateEnvironmentUseCase {
         name: input.name,
         slug: slug || "env",
         description: input.description ?? null,
+        parentEnvironmentId: input.parentEnvironmentId ?? null,
+        inheritsVariables: input.inheritsVariables ?? false,
         isDefault: false,
         isProtected: false,
         resourceCount: 0,

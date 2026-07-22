@@ -56,6 +56,20 @@ You can trigger a manual check for updates from:
 - **Web Server → Check for updates**
 - **Settings → Check for updates**
 
+## Cloud and Remote Servers
+
+Cloud control planes are updated by Upstand's managed rollout. The dashboard
+therefore exposes the current version and channel but does not allow a tenant
+to mutate the platform services.
+
+Remote servers are separate Docker hosts. A control-plane release does not
+silently replace workloads on those hosts. After a self-hosted control-plane
+update, use **Remote Servers → Set up again** for each affected remote server;
+the idempotent provisioning flow pulls the release-pinned monitoring image,
+recreates the monitoring agent, and preserves the server's Docker workloads.
+This explicit action avoids taking remote application traffic down as a side
+effect of a platform update.
+
 Both interfaces read from a cached state that queries the GitHub releases API. Clicking either forces a fresh HTTP request to GitHub, bypassing the 30-minute cache.
 
 ---
