@@ -99,14 +99,14 @@ export class ScheduledDockerCleanup {
           log.error({
             message: "Failed to run scheduled remote Docker cleanup",
             serverId: server.id,
-            err: error instanceof Error ? error.message : String(error),
+            err: error,
           });
         }
       }
     } catch (error) {
       log.error({
         message: "Failed to run scheduled Docker cleanup",
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     } finally {
       await scope.dispose();

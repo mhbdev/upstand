@@ -429,7 +429,7 @@ export const ShowDockerLogs = ({
   // Parse logs list and count differences when paused / scrolled up
   useEffect(() => {
     const parsed = rawLogsArray
-      .filter((line) => Boolean(line && line.trim()))
+      .filter((line) => Boolean(line?.trim()))
       .map(parseLogLine);
     if (!isPaused) {
       if (!autoScroll && logsList.length > 0) {

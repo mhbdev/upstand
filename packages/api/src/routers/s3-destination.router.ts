@@ -32,7 +32,7 @@ export const s3DestinationRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -49,7 +49,7 @@ export const s3DestinationRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -78,7 +78,7 @@ export const s3DestinationRouter = router({
           organizationId: destination.organizationId,
         });
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -104,7 +104,7 @@ export const s3DestinationRouter = router({
       try {
         return await deleteUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -122,7 +122,7 @@ export const s3DestinationRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

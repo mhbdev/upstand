@@ -48,7 +48,7 @@ export const notificationRouter = router({
           .resolve(CreateNotificationChannelUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -75,7 +75,7 @@ export const notificationRouter = router({
           .resolve(UpdateNotificationChannelUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -103,7 +103,7 @@ export const notificationRouter = router({
           .execute(input.id);
         return { success: true };
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -131,7 +131,7 @@ export const notificationRouter = router({
           .execute(input.id);
         return { success: true };
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -170,7 +170,7 @@ export const notificationRouter = router({
           .resolve(RetryNotificationDeliveryUseCaseToken)
           .execute(input.id);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

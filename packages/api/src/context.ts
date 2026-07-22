@@ -1,4 +1,5 @@
 import type { ServiceScope } from "@circulo-ai/di";
+import type { EvlogVariables } from "evlog/hono";
 import {
   type ApiKeyPrincipal,
   authenticateApiKey,
@@ -19,6 +20,8 @@ export type ApiBindings = {
   };
 };
 
+export type RequestLog = EvlogVariables["Variables"]["log"];
+
 export type RequestContext = {
   req: {
     raw: Request;
@@ -26,6 +29,7 @@ export type RequestContext = {
   };
   env: ApiBindings;
   get(name: "scope"): ServiceScope;
+  get(name: "log"): RequestLog;
   header(name: string, value: string): void;
 };
 
@@ -85,12 +89,14 @@ export async function createContext({ context }: CreateContextOptions) {
 
   // Retrieve request-scoped container from Hono context
   const scope = context.get("scope");
+  const log = context.get("log");
 
   return {
     auth: null,
     session,
     actor,
     scope,
+    log,
     honoContext: context,
   };
 }

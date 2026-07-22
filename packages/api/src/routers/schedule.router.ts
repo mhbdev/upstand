@@ -90,7 +90,7 @@ export const scheduleRouter = router({
         await ctx.scope.resolve(GeneralSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
   update: twoFactorVerifiedProcedure
@@ -117,7 +117,7 @@ export const scheduleRouter = router({
         await ctx.scope.resolve(GeneralSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
   runNow: twoFactorVerifiedProcedure

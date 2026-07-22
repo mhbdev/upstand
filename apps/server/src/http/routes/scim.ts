@@ -1,7 +1,6 @@
 import type { ScimMembershipRecord } from "@upstand/domain";
 import { ScimConflictError, ScimNotFoundError } from "@upstand/usecases";
 import { ScimUseCaseToken } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import type { Context, Hono } from "hono";
 import { z } from "zod";
 import { createHttpRateLimitMiddleware } from "../rate-limit";
@@ -112,10 +111,9 @@ export function registerScimRoutes(app: Hono<AppEnv>): void {
       if (error instanceof ScimConflictError) {
         return scimError(c, 409, "SCIM user already exists");
       }
-      log.error({
+      c.get("log").error(error instanceof Error ? error : String(error), {
         message: "Failed to provision SCIM user membership",
         organizationId,
-        err: error instanceof Error ? error.message : String(error),
       });
       return scimError(c, 500, "Unable to provision SCIM user");
     }
@@ -197,11 +195,10 @@ export function registerScimRoutes(app: Hono<AppEnv>): void {
       if (error instanceof ScimNotFoundError) {
         return scimError(c, 404, "SCIM user not found");
       }
-      log.error({
+      c.get("log").error(error instanceof Error ? error : String(error), {
         message: "Failed to update SCIM user",
         organizationId,
         userId,
-        err: error instanceof Error ? error.message : String(error),
       });
       return scimError(c, 500, "Unable to update SCIM user");
     }

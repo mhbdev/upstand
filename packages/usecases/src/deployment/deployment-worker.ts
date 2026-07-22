@@ -70,7 +70,7 @@ export class DeploymentWorker {
       log.error({
         message:
           "Failed to fetch build settings for worker, using default concurrency",
-        err: err.message,
+        err,
       });
     } finally {
     }
@@ -106,14 +106,14 @@ export class DeploymentWorker {
             resourceId: job?.data?.resourceId,
             serverId: this.serverId,
           },
-          err: err.message,
+          err,
         });
       });
       this.worker.on("error", (error) => {
         log.error({
           message: "Deployment worker connection error",
           serverId: this.serverId,
-          err: error.message,
+          err: error,
         });
       });
 
@@ -158,7 +158,7 @@ export class DeploymentWorker {
         } catch (err: any) {
           log.error({
             message: "Error processing concurrency update message",
-            err: err.message,
+            err,
           });
         }
       }
@@ -289,7 +289,7 @@ export class DeploymentWorker {
                 message: "Failed to write build logs to database",
                 deploymentId,
                 resourceId,
-                err: error instanceof Error ? error.message : String(error),
+                err: error,
               });
             })
             .finally(() => {
@@ -1008,7 +1008,7 @@ export class DeploymentWorker {
       );
       log.error({
         message: "Queue worker deploy pipeline error",
-        err: err.message || err,
+        err,
       });
       await flushFinalLogs("failed");
       await publishDeploymentOutcome("failed").catch((notificationError) => {
@@ -1040,7 +1040,7 @@ export class DeploymentWorker {
           message: "Failed to release resource deployment lock",
           resourceId,
           deploymentId,
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       });
     }

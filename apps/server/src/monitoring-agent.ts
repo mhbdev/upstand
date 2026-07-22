@@ -60,7 +60,7 @@ export async function initializeMonitoring(): Promise<void> {
       } else {
         log.warn({
           message: "Could not detect container network for monitoring agent",
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       }
     }
@@ -135,7 +135,7 @@ export async function initializeMonitoring(): Promise<void> {
   } catch (error) {
     log.error({
       message: "Failed to initialize local monitoring agent",
-      err: error instanceof Error ? error.message : String(error),
+      err: error,
     });
   }
 }

@@ -41,7 +41,7 @@ export const scimRouter = router({
             message: "A SCIM provider with this ID already exists",
           });
         }
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -57,7 +57,7 @@ export const scimRouter = router({
         if (error instanceof ScimNotFoundError) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -73,7 +73,7 @@ export const scimRouter = router({
         if (error instanceof ScimNotFoundError) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
       return { success: true };
     }),

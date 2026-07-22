@@ -119,7 +119,7 @@ export class GetQueueUseCase {
       } catch (err: any) {
         log.error({
           message: `Failed to read jobs from queue ${queueName}`,
-          err: err.message,
+          err,
         });
       } finally {
         await queue.close();

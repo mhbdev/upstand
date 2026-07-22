@@ -113,7 +113,7 @@ export const webServerRouter = router({
       try {
         return await getSecurityAudit(ctx.scope.resolve(UnitOfWorkToken));
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -123,7 +123,7 @@ export const webServerRouter = router({
     try {
       return await useCase.execute();
     } catch (error) {
-      handleUseCaseError(error);
+      handleUseCaseError(error, ctx.log);
     }
   }),
 
@@ -135,7 +135,7 @@ export const webServerRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -160,7 +160,7 @@ export const webServerRouter = router({
         });
         return { enabled: settings?.accessLogsEnabled ?? input.enabled };
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -175,7 +175,7 @@ export const webServerRouter = router({
         });
         return { cleanupCron: settings?.accessLogCleanupCron ?? input.cron };
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -215,7 +215,7 @@ export const webServerRouter = router({
       try {
         return await useCase.execute(input.tail);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -263,7 +263,7 @@ export const webServerRouter = router({
     try {
       return await useCase.execute();
     } catch (error) {
-      handleUseCaseError(error);
+      handleUseCaseError(error, ctx.log);
     }
   }),
 
@@ -273,7 +273,7 @@ export const webServerRouter = router({
     try {
       return await useCase.execute({ forceRefresh: true });
     } catch (error) {
-      handleUseCaseError(error);
+      handleUseCaseError(error, ctx.log);
     }
   }),
 
@@ -285,7 +285,7 @@ export const webServerRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 

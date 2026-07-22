@@ -211,7 +211,7 @@ export class RateLimiter {
       this.lastFailureLogAt = now;
       log.error({
         message: "Redis rate limiter unavailable; using bounded local fallback",
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
         fallbackCooldownMs: this.redisCooldownMs,
       });
     }

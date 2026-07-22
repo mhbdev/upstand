@@ -46,13 +46,13 @@ export class NotificationDeliveryWorker {
           deliveryId: job?.data?.deliveryId,
           jobId: job?.id,
           attemptsMade: job?.attemptsMade,
-          err: error.message,
+          err: error,
         });
       });
       this.worker.on("error", (error) => {
         log.error({
           message: "Notification worker connection error",
-          err: error.message,
+          err: error,
         });
       });
 

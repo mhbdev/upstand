@@ -17,13 +17,13 @@ import {
   UnitOfWorkToken,
   UpdateResourceUseCaseToken,
 } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import type { Hono } from "hono";
 import { z } from "zod";
 import {
   ApplicationArchiveValidationError,
   extractApplicationArchive,
 } from "../../application-archive";
+import { logRequestError } from "../error-logging";
 import type { AppEnv } from "../types";
 
 const DeploymentWebhookPayloadSchema = z
@@ -45,6 +45,7 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
   // Only a SHA-256 digest is persisted; the URL token is never recoverable from
   // the database and must be rotated if it is lost.
   app.on(["POST", "GET"], "/api/deploy/:token", async (c) => {
+    const requestLog = c.get("log");
     const token = c.req.param("token");
     if (!token?.startsWith("upw_") || token.length < 12) {
       return c.json({ error: "Invalid deployment webhook" }, 404);
@@ -117,16 +118,16 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
         202,
       );
     } catch (error) {
-      log.error({
+      logRequestError(requestLog, error, {
         message: "Failed to queue deployment webhook",
         resourceId,
-        err: error instanceof Error ? error.message : String(error),
       });
       return c.json({ error: "Unable to queue deployment" }, 500);
     }
   });
 
   app.post("/api/resources/:resourceId/upload", async (c) => {
+    const requestLog = c.get("log");
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: "Authentication required" }, 401);
 
@@ -191,10 +192,22 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
     try {
       await extractApplicationArchive(archivePath, dropsDir);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       const status =
         error instanceof ApplicationArchiveValidationError ? 400 : 500;
-      return c.json({ error: `Extraction failed: ${message}` }, status);
+      logRequestError(requestLog, error, {
+        message: "Application archive extraction failed",
+        resourceId,
+        status,
+      });
+      return c.json(
+        {
+          error:
+            status === 400
+              ? "Invalid application archive"
+              : "Extraction failed",
+        },
+        status,
+      );
     } finally {
       fs.rmSync(archivePath, { force: true });
     }
@@ -221,16 +234,16 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
         202,
       );
     } catch (error) {
-      return c.json(
-        {
-          error: `Failed to trigger deployment queue: ${error instanceof Error ? error.message : String(error)}`,
-        },
-        500,
-      );
+      logRequestError(requestLog, error, {
+        message: "Failed to trigger deployment queue after archive upload",
+        resourceId,
+      });
+      return c.json({ error: "Failed to trigger deployment queue" }, 500);
     }
   });
 
   app.post("/api/docker/volumes/:volumeName/upload", async (c) => {
+    const requestLog = c.get("log");
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: "Authentication required" }, 401);
 
@@ -319,14 +332,19 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
         .uploadVolume(parsed, buffer);
       return c.json(result, 201);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return c.json({ error: message }, 400);
+      logRequestError(requestLog, error, {
+        message: "Docker volume archive upload failed",
+        organizationId,
+        volumeName: c.req.param("volumeName"),
+      });
+      return c.json({ error: "Unable to upload Docker volume archive" }, 400);
     } finally {
       fs.rmSync(tempArchive, { force: true });
     }
   });
 
   app.post("/api/docker/containers/:containerId/upload", async (c) => {
+    const requestLog = c.get("log");
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: "Authentication required" }, 401);
 
@@ -470,8 +488,16 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
         .uploadContainer(parsed, buffer);
       return c.json(result, 201);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return c.json({ error: message }, 400);
+      logRequestError(requestLog, error, {
+        message: "Docker container archive upload failed",
+        organizationId,
+        resourceId,
+        containerId: c.req.param("containerId"),
+      });
+      return c.json(
+        { error: "Unable to upload Docker container archive" },
+        400,
+      );
     } finally {
       fs.rmSync(tempArchive, { force: true });
     }

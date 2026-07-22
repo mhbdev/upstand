@@ -128,7 +128,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(BackupSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -161,7 +161,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(BackupSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -176,7 +176,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(BackupSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -193,7 +193,7 @@ export const backupRouter = router({
           .resolve(TriggerBackupRunUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -222,7 +222,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(RestoreBackupRunUseCaseToken).execute(input);
         return { restored: true };
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -235,7 +235,7 @@ export const backupRouter = router({
           .resolve(GetBackupSchedulesUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -248,7 +248,7 @@ export const backupRouter = router({
           .resolve(GetBackupRunsUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -261,7 +261,7 @@ export const backupRouter = router({
           .resolve(ListBackupVolumesUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -274,7 +274,7 @@ export const backupRouter = router({
           .resolve(ListComposeServicesUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -289,7 +289,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(BackupSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -324,7 +324,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(BackupSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -359,7 +359,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(BackupSchedulerToken).refresh();
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -394,7 +394,7 @@ export const backupRouter = router({
           .resolve(TriggerBackupRunUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -426,7 +426,7 @@ export const backupRouter = router({
         await ctx.scope.resolve(RestoreBackupRunUseCaseToken).execute(input);
         return { restored: true };
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

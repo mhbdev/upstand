@@ -139,7 +139,7 @@ export const composeRouter = router({
           .resolve(InspectComposeUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -160,7 +160,7 @@ export const composeRouter = router({
           .resolve(InspectComposeUseCaseToken)
           .convert(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -197,7 +197,7 @@ export const composeRouter = router({
           });
         return composePayload(resource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -268,7 +268,7 @@ export const composeRouter = router({
           });
         return composePayload(updated);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -281,7 +281,7 @@ export const composeRouter = router({
           await ctx.scope.resolve(DeployResourceUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -294,7 +294,7 @@ export const composeRouter = router({
           await ctx.scope.resolve(ControlResourceUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -307,7 +307,7 @@ export const composeRouter = router({
           .resolve(DeleteResourceUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -320,7 +320,7 @@ export const composeRouter = router({
           await ctx.scope.resolve(RandomizeComposeUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

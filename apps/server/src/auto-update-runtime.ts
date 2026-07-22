@@ -50,7 +50,7 @@ export class AutoUpdateRuntime {
     } catch (error) {
       log.error({
         message: "Automatic update check failed",
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     } finally {
       this.inFlight = false;

@@ -16,8 +16,8 @@ import {
   RotateSwarmJoinTokenUseCaseToken,
   UpdateSwarmNodeUseCaseToken,
 } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import { z } from "zod";
+import type { AuthenticatedContext } from "../context";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { authorizeContextCapability } from "../permissions";
@@ -38,14 +38,15 @@ function auditClusterOperation({
   organizationId,
   userId,
   target,
+  logger,
 }: {
   action: string;
   organizationId: string;
   userId: string;
   target?: string;
+  logger: Pick<AuthenticatedContext["log"], "info">;
 }) {
-  log.info({
-    message: "Docker Swarm control-plane operation completed",
+  logger.info("Docker Swarm control-plane operation completed", {
     action,
     organizationId,
     userId,
@@ -55,6 +56,7 @@ function auditClusterOperation({
 
 async function notifyClusterOperation(
   scope: Pick<ServiceScope, "resolve">,
+  logger: Pick<AuthenticatedContext["log"], "error">,
   input: {
     organizationId: string;
     event:
@@ -74,11 +76,10 @@ async function notifyClusterOperation(
       idempotencyKey: `cluster:${input.event}:${input.organizationId}:${JSON.stringify(input.metadata ?? {})}`,
     })
     .catch((error) => {
-      log.error({
+      logger.error(error instanceof Error ? error : String(error), {
         message: "Unable to queue cluster notification",
         event: input.event,
         organizationId: input.organizationId,
-        err: error instanceof Error ? error.message : String(error),
       });
     });
 }
@@ -92,7 +93,7 @@ export const swarmRouter = router({
       try {
         return await useCase.execute();
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -104,7 +105,7 @@ export const swarmRouter = router({
       try {
         return await useCase.execute();
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -120,8 +121,9 @@ export const swarmRouter = router({
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
           target: input.nodeId,
+          logger: ctx.log,
         });
-        await notifyClusterOperation(ctx.scope, {
+        await notifyClusterOperation(ctx.scope, ctx.log, {
           organizationId: input.organizationId,
           event: "cluster_node_updated",
           title: "Docker Swarm node updated",
@@ -134,7 +136,7 @@ export const swarmRouter = router({
         });
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -150,8 +152,9 @@ export const swarmRouter = router({
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
           target: input.advertiseAddr,
+          logger: ctx.log,
         });
-        await notifyClusterOperation(ctx.scope, {
+        await notifyClusterOperation(ctx.scope, ctx.log, {
           organizationId: input.organizationId,
           event: "cluster_initialized",
           title: "Docker Swarm cluster initialized",
@@ -164,7 +167,7 @@ export const swarmRouter = router({
         });
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -180,8 +183,9 @@ export const swarmRouter = router({
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
           target: input.nodeId,
+          logger: ctx.log,
         });
-        await notifyClusterOperation(ctx.scope, {
+        await notifyClusterOperation(ctx.scope, ctx.log, {
           organizationId: input.organizationId,
           event: "cluster_node_removed",
           title: "Docker Swarm node removed",
@@ -190,7 +194,7 @@ export const swarmRouter = router({
         });
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -205,10 +209,11 @@ export const swarmRouter = router({
           action: "join-credentials.reveal",
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
+          logger: ctx.log,
         });
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -227,6 +232,7 @@ export const swarmRouter = router({
         action: `join-credentials.reveal.${input.role}`,
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
+        logger: ctx.log,
       });
       return {
         role: input.role,
@@ -249,8 +255,9 @@ export const swarmRouter = router({
           action: `join-token.rotate.${input.role}`,
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
+          logger: ctx.log,
         });
-        await notifyClusterOperation(ctx.scope, {
+        await notifyClusterOperation(ctx.scope, ctx.log, {
           organizationId: input.organizationId,
           event: "cluster_token_rotated",
           title: `Docker Swarm ${input.role} token rotated`,
@@ -259,7 +266,7 @@ export const swarmRouter = router({
         });
         return result;
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -271,7 +278,7 @@ export const swarmRouter = router({
       try {
         return await useCase.execute();
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

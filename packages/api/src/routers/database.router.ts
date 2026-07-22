@@ -107,7 +107,7 @@ export const databaseRouter = router({
           await ctx.scope.resolve(CreateResourceUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -132,7 +132,7 @@ export const databaseRouter = router({
           });
         return publicDatabase(resource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -145,7 +145,7 @@ export const databaseRouter = router({
           await ctx.scope.resolve(ControlResourceUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -158,7 +158,7 @@ export const databaseRouter = router({
           await ctx.scope.resolve(RebuildDatabaseUseCaseToken).execute(input),
         );
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -171,7 +171,7 @@ export const databaseRouter = router({
           .resolve(DatabaseCommandUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -184,7 +184,7 @@ export const databaseRouter = router({
           .resolve(DeleteResourceUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

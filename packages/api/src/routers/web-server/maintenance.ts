@@ -29,7 +29,7 @@ export const webServerMaintenanceProcedures = {
       try {
         return await useCase.execute(input.action);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 

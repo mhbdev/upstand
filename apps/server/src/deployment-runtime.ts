@@ -32,7 +32,7 @@ export class DeploymentRuntime {
         void this.refreshWorkers().catch((error) => {
           log.error({
             message: "Failed to refresh deployment queue workers",
-            err: error instanceof Error ? error.message : String(error),
+            err: error,
           });
         }),
       60_000,
@@ -145,7 +145,7 @@ export class DeploymentRuntime {
     } catch (error) {
       log.warn({
         message: "Unable to discover Docker nodes for deployment workers",
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     }
 

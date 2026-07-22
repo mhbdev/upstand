@@ -1,12 +1,27 @@
 import { TRPCError } from "@trpc/server";
 import { DomainError, OperationalError } from "@upstand/domain";
 import { log } from "evlog";
+import type { RequestLog } from "./context";
+
+type ErrorLogger = Pick<RequestLog, "error">;
+
+const defaultErrorLogger: ErrorLogger = {
+  error(error) {
+    log.error(
+      error instanceof Error ? error.message : String(error),
+      "Unexpected system error in router",
+    );
+  },
+};
 
 export function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-export function handleUseCaseError(error: unknown): never {
+export function handleUseCaseError(
+  error: unknown,
+  logger: ErrorLogger = defaultErrorLogger,
+): never {
   if (error instanceof TRPCError) throw error;
 
   if (error instanceof DomainError) {
@@ -62,9 +77,8 @@ export function handleUseCaseError(error: unknown): never {
 
   // Clean Architecture: Log raw internal errors for server troubleshooting
   // but mask details to avoid leaking database/system internals to client
-  log.error({
+  logger.error(error instanceof Error ? error.message : String(error), {
     message: "Unexpected system error in router",
-    err: error instanceof Error ? error : String(error),
   });
 
   throw new TRPCError({

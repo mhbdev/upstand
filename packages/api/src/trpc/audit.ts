@@ -7,7 +7,6 @@ import {
   CreateAuditLogUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import { ensureOrganizationAccess } from "../access-control";
 import type { Context } from "../context";
 
@@ -43,12 +42,13 @@ export async function recordAuditEvent(
       userAgent: ctx.honoContext.req.header("user-agent") ?? null,
     });
   } catch (error) {
-    log.error({
-      message: "Failed to persist audit event",
-      route: path,
-      organizationId,
-      err: error instanceof Error ? error.message : String(error),
-    });
+    ctx.honoContext
+      .get("log")
+      .error(error instanceof Error ? error : String(error), {
+        message: "Failed to persist audit event",
+        route: path,
+        organizationId,
+      });
   }
 }
 

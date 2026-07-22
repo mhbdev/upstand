@@ -115,7 +115,7 @@ export const gitProviderRouter = router({
         const provider = await useCase.execute(input);
         return redactGitProvider(provider);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -132,7 +132,7 @@ export const gitProviderRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -163,7 +163,7 @@ export const gitProviderRouter = router({
         }
         return redactGitProvider(updated);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -189,7 +189,7 @@ export const gitProviderRouter = router({
       try {
         return await deleteUseCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -217,7 +217,7 @@ export const gitProviderRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -245,7 +245,7 @@ export const gitProviderRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

@@ -6,8 +6,8 @@ import {
 } from "@ai-sdk/mcp";
 import { env } from "@upstand/env/server";
 import type { Tool } from "ai";
-import { log } from "evlog";
 import { z } from "zod";
+import type { RequestLog } from "../context";
 
 const serverSchema = z.object({
   id: z.string().trim().min(1).max(40),
@@ -23,7 +23,7 @@ export type UpGalMCPAppConnection = {
   close: () => Promise<void>;
 };
 
-function configuredServers() {
+function configuredServers(logger: Pick<RequestLog, "warn">) {
   const raw = env.UPGAL_MCP_SERVERS?.trim();
   if (!raw) return [];
 
@@ -34,9 +34,8 @@ function configuredServers() {
       return url.protocol === "https:" || url.hostname === "localhost";
     });
   } catch (error) {
-    log.warn({
-      message: "Ignoring invalid UPGAL_MCP_SERVERS configuration",
-      err: error instanceof Error ? error.message : String(error),
+    logger.warn("Ignoring invalid UPGAL_MCP_SERVERS configuration", {
+      err: error,
     });
     return [];
   }
@@ -68,11 +67,14 @@ function prefixedTools(
  * External servers are opt-in, HTTPS/localhost-only, namespaced, and
  * approval-gated by the UpGal agent.
  */
-export async function connectUpGalMCPApps(): Promise<UpGalMCPAppConnection> {
+export async function connectUpGalMCPApps(
+  requestLog: Pick<RequestLog, "warn">,
+): Promise<UpGalMCPAppConnection> {
+  const logger = requestLog;
   const clients: MCPClient[] = [];
   const tools: MCPAppTools = {};
 
-  for (const server of configuredServers()) {
+  for (const server of configuredServers(logger)) {
     try {
       const client = await createMCPClient({
         clientName: "upgal",
@@ -101,10 +103,9 @@ export async function connectUpGalMCPApps(): Promise<UpGalMCPAppConnection> {
         ),
       );
     } catch (error) {
-      log.warn({
-        message: "UpGal MCP app connection unavailable",
+      logger.warn("UpGal MCP app connection unavailable", {
         serverId: server.id,
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     }
   }
@@ -117,9 +118,8 @@ export async function connectUpGalMCPApps(): Promise<UpGalMCPAppConnection> {
           try {
             await client.close();
           } catch (error) {
-            log.warn({
-              message: "Failed to close UpGal MCP app connection",
-              err: error instanceof Error ? error.message : String(error),
+            logger.warn("Failed to close UpGal MCP app connection", {
+              err: error,
             });
           }
         }),

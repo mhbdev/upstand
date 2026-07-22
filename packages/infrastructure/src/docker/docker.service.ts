@@ -1813,7 +1813,7 @@ export class DockerService {
         } catch (err: any) {
           log.error({
             message: "Error getting Docker Compose containers",
-            err: err.message,
+            err,
           });
           return [];
         }
@@ -1869,7 +1869,7 @@ export class DockerService {
       } catch (err: any) {
         log.error({
           message: "Error getting compose stack containers",
-          err: err.message,
+          err,
         });
         return [];
       }
@@ -1922,7 +1922,7 @@ export class DockerService {
     } catch (err: any) {
       log.error({
         message: "Error getting service containers",
-        err: err.message,
+        err,
       });
       return [];
     }
@@ -1978,7 +1978,7 @@ export class DockerService {
       log.error({
         message: "Failed to discover Caddy routing services",
         resourceId: resource.id,
-        err: error.message || error,
+        err: error,
       });
       return resource.type === "compose" ? [] : [resourceName];
     }
@@ -2322,7 +2322,7 @@ export class DockerService {
     } catch (err: any) {
       log.error({
         message: "Failed to fetch container stats",
-        err: err.message,
+        err,
       });
       return {
         cpu: 0,
@@ -2434,7 +2434,7 @@ export class DockerService {
       } catch (err: any) {
         log.error({
           message: `Failed to remove Compose resource ${serviceName}`,
-          err: err.message,
+          err,
         });
       }
 
@@ -2453,7 +2453,7 @@ export class DockerService {
         } catch (err: any) {
           log.error({
             message: "Failed to clean up compose stack volumes",
-            err: err.message,
+            err,
           });
         }
       }
@@ -2468,7 +2468,7 @@ export class DockerService {
       if (err.statusCode !== 404) {
         log.error({
           message: `Failed to remove Swarm service ${serviceName}`,
-          err: err.message,
+          err,
         });
       }
     }
@@ -2485,7 +2485,7 @@ export class DockerService {
       } catch (err: any) {
         log.error({
           message: `Failed to remove volume for resource ${resource.id}`,
-          err: err.message,
+          err,
         });
       }
     }
@@ -2568,7 +2568,7 @@ export class DockerService {
           log.warn({
             message: `Isolated network for resource '${resource.id}' could not be removed yet.`,
             network: getResourceOverlayNetworkName(resource.id),
-            err: error.message || error,
+            err: error,
           });
           return;
         }
@@ -2631,7 +2631,7 @@ export class DockerService {
       log.error({
         message: "Failed to transfer image between Docker daemons",
         imageName,
-        err: err.message || err,
+        err,
       });
       throw new Error(
         `Failed to transfer image '${imageName}': ${err.message || err}`,

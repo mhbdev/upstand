@@ -9,7 +9,6 @@ import {
   parseCapabilities,
 } from "@upstand/domain";
 import { and, eq } from "drizzle-orm";
-import { log } from "evlog";
 import { z } from "zod";
 import { auth } from "../auth";
 import {
@@ -222,15 +221,16 @@ export const memberRouter = router({
           .delete(user)
           .where(eq(user.id, created.user.id))
           .catch((cleanupError) => {
-            log.error({
-              message:
-                "Failed to clean up user after membership creation failed",
-              userId: created.user.id,
-              err:
-                cleanupError instanceof Error
-                  ? cleanupError.message
-                  : String(cleanupError),
-            });
+            ctx.log.error(
+              cleanupError instanceof Error
+                ? cleanupError
+                : String(cleanupError),
+              {
+                message:
+                  "Failed to clean up user after membership creation failed",
+                userId: created.user.id,
+              },
+            );
           });
         throw error;
       }

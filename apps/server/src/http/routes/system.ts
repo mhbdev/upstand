@@ -5,7 +5,6 @@ import {
   GetSetupStatusUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import type { Hono } from "hono";
 import type { AppEnv } from "../types";
 
@@ -50,9 +49,8 @@ export function registerSystemRoutes(
       await uow.resourceRepository.count();
       databaseReady = true;
     } catch (error) {
-      log.error({
+      c.get("log").error(error instanceof Error ? error : String(error), {
         message: "Database readiness check failed",
-        err: error instanceof Error ? error.message : String(error),
       });
     }
 

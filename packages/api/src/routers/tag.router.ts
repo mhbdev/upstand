@@ -42,7 +42,7 @@ export const tagRouter = router({
       try {
         return await ctx.scope.resolve(CreateTagUseCaseToken).execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
   update: twoFactorVerifiedProcedure
@@ -52,7 +52,7 @@ export const tagRouter = router({
       try {
         return await ctx.scope.resolve(UpdateTagUseCaseToken).execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
   remove: twoFactorVerifiedProcedure
@@ -62,7 +62,7 @@ export const tagRouter = router({
       try {
         return await ctx.scope.resolve(DeleteTagUseCaseToken).execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
   forResource: twoFactorVerifiedProcedure
@@ -82,7 +82,7 @@ export const tagRouter = router({
           .resolve(AssignResourceTagUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
   removeFromResource: twoFactorVerifiedProcedure
@@ -95,7 +95,7 @@ export const tagRouter = router({
           .resolve(RemoveResourceTagUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

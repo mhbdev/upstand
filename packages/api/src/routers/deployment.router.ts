@@ -67,7 +67,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.executeForOrganization(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -83,7 +83,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.executeForOrganization(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -99,7 +99,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.execute(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -116,7 +116,7 @@ export const deploymentRouter = router({
           .resolve(GetDeploymentServerSettingsUseCaseToken)
           .execute(input.organizationId);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -140,7 +140,7 @@ export const deploymentRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -209,7 +209,7 @@ export const deploymentRouter = router({
         }
         throw new ValidationError("Job not found in queue");
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       } finally {
         await queue.close();
       }

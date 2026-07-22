@@ -23,6 +23,7 @@
         "ai": "^7.0.14",
         "class-variance-authority": "^0.7.1",
         "cnfast": "^0.0.8",
+        "evlog": "catalog:",
         "flexsearch": "^0.8.212",
         "fumadocs-core": "16.11.5",
         "fumadocs-mdx": "15.2.0",

@@ -15,13 +15,14 @@ import {
   GetWebServerSettingsUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
-import { initLogger, log } from "evlog";
+import { type DrainContext, initLogger, log } from "evlog";
 import {
   type BetterAuthInstance,
   createAuthMiddleware,
 } from "evlog/better-auth";
 import { createFsDrain } from "evlog/fs";
 import { evlog } from "evlog/hono";
+import { createOTLPDrain } from "evlog/otlp";
 import { Hono } from "hono";
 import { websocket } from "hono/bun";
 import { AutoUpdateRuntime } from "./auto-update-runtime";
@@ -48,9 +49,27 @@ import { initializeMonitoring } from "./monitoring-agent";
 import { OutboxRuntime } from "./outbox-runtime";
 import { runDatabaseMigrations } from "./startup";
 
+const fileDrain = createFsDrain({ maxFiles: 7 });
+const otlpEndpoint =
+  process.env.OTLP_ENDPOINT?.trim() ||
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+const otlpDrain = otlpEndpoint
+  ? createOTLPDrain({
+      endpoint: otlpEndpoint,
+      serviceName: "upstand-server",
+    })
+  : undefined;
+
+const drain = async (context: DrainContext | DrainContext[]) => {
+  await Promise.allSettled([
+    fileDrain(context),
+    ...(otlpDrain ? [otlpDrain(context)] : []),
+  ]);
+};
+
 initLogger({
   env: { service: "upstand-server" },
-  drain: createFsDrain({ maxFiles: 7 }),
+  drain,
 });
 
 await runDatabaseMigrations();
@@ -161,10 +180,10 @@ getCaddySettingsUseCase
     log.info({ message: "Caddy Web Server initialized successfully. ✅" });
   })
   .catch((err) =>
-    log.error({
-      message: "Failed to initialize Caddy Web Server",
-      err: err.message || err,
-    }),
+    log.error(
+      err instanceof Error ? err.message : String(err),
+      "Failed to initialize Caddy Web Server",
+    ),
   )
   .finally(() => caddyInitScope.dispose());
 

@@ -143,7 +143,7 @@ export const applicationRouter = router({
           .execute(input);
         return publicApplication(resource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -178,7 +178,7 @@ export const applicationRouter = router({
           });
         return publicApplication(resource);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -191,7 +191,7 @@ export const applicationRouter = router({
           .resolve(DeleteResourceUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

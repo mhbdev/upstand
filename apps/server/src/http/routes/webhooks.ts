@@ -1,5 +1,4 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { getErrorMessage } from "@upstand/api/errors";
 import { parseDomainMappings } from "@upstand/domain";
 import { CaddyService, getDockerInstance } from "@upstand/infrastructure";
 import {
@@ -9,7 +8,6 @@ import {
 } from "@upstand/usecases";
 import type { CaddyResource } from "@upstand/usecases/ports/caddy";
 import { UnitOfWorkToken } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import type { Context, Hono } from "hono";
 import { createHttpRateLimitMiddleware } from "../rate-limit";
 import type { AppEnv } from "../types";
@@ -72,9 +70,8 @@ export function registerWebhookRoutes(app: Hono<AppEnv>): void {
         if (message === "Invalid webhook signature") {
           return c.json({ error: message }, 401);
         }
-        log.error({
+        c.get("log").error(error instanceof Error ? error : String(error), {
           message: "GitHub webhook processing failed",
-          err: message,
         });
         return c.json({ error: "Unable to process webhook" }, 400);
       }
@@ -136,8 +133,7 @@ export function registerWebhookRoutes(app: Hono<AppEnv>): void {
               (candidate) => candidate.status !== "failed",
             ).length >= previewLimit
           ) {
-            log.warn({
-              message: "Preview deployment limit reached",
+            c.get("log").warn("Preview deployment limit reached", {
               resourceId: resource.id,
               previewLimit,
             });
@@ -177,18 +173,17 @@ export function registerWebhookRoutes(app: Hono<AppEnv>): void {
             prNumber,
           );
         if (preview) {
-          log.info({
-            message: `Cleaning up preview deployment ${preview.appName} on PR close...`,
-          });
+          c.get("log").info(
+            `Cleaning up preview deployment ${preview.appName} on PR close...`,
+          );
 
           try {
             const docker = getDockerInstance();
             const service = docker.getService(preview.appName);
             await service.remove();
           } catch (err) {
-            log.error({
+            c.get("log").error(err instanceof Error ? err : String(err), {
               message: `Failed to remove Swarm service for preview ${preview.appName}`,
-              err: getErrorMessage(err, "Unknown error"),
             });
           }
 
@@ -254,9 +249,8 @@ export function registerWebhookRoutes(app: Hono<AppEnv>): void {
               certificates,
             );
           } catch (err) {
-            log.error({
+            c.get("log").error(err instanceof Error ? err : String(err), {
               message: "Failed to sync Caddy on preview cleanup",
-              err: getErrorMessage(err, "Unknown error"),
             });
           }
         }
@@ -296,9 +290,8 @@ export function registerWebhookRoutes(app: Hono<AppEnv>): void {
       if (message === "Git provider not found") {
         return c.json({ error: message }, 404);
       }
-      log.error({
+      c.get("log").error(error instanceof Error ? error : String(error), {
         message: `${provider} webhook processing failed`,
-        err: message,
       });
       return c.json({ error: "Unable to process webhook" }, 400);
     }

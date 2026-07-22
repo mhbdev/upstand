@@ -1454,7 +1454,7 @@ export default function EnvironmentDetail({
                   To use these variables in your service environments, reference
                   them using the syntax:
                   <code className="mx-1 rounded border border-border/20 bg-background/50 px-1.5 py-0.5 font-mono text-[11px] text-foreground">
-                    {"DATABASE_URL=${{project.DATABASE_URL}}"}
+                    {"DATABASE_URL=$" + "{{project.DATABASE_URL}}"}
                   </code>
                   . They will be resolved and replaced dynamically during
                   deployment.

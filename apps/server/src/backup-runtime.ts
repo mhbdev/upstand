@@ -61,7 +61,7 @@ export function createBackupRunHandler(
                 message: "Unable to renew backup run lock",
                 scheduleId: claimedRun.scheduleId,
                 runId,
-                err: error instanceof Error ? error.message : String(error),
+                err: error,
               });
             }),
         60_000,

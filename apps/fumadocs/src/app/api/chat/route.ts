@@ -8,9 +8,10 @@ import {
   tool,
   toUIMessageStream,
 } from "ai";
+import { createEvlogIntegration } from "evlog/ai";
 import { Document, type DocumentData } from "flexsearch";
 import { z } from "zod";
-
+import { useLogger, withEvlog } from "@/lib/evlog";
 import { source } from "@/lib/source";
 
 import type { ChatUIMessage, SearchTool } from "../../../components/ai/search";
@@ -73,36 +74,45 @@ const systemPrompt = [
   "If you cannot find the answer in search results, say you do not know and suggest a better search query.",
 ].join("\n");
 
-export async function POST(req: Request, _ctx: RouteContext<"/api/chat">) {
-  const reqJson = await req.json();
+export const POST = withEvlog(
+  async (req: Request, _ctx: RouteContext<"/api/chat">) => {
+    const requestLog = useLogger();
+    const reqJson = await req.json();
 
-  const result = streamText({
-    model: openrouter.chat(
-      env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
-    ),
-    stopWhen: stepCountIs(5),
-    tools: {
-      search: searchTool,
-    },
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...(await convertToModelMessages<ChatUIMessage>(reqJson.messages ?? [], {
-        convertDataPart(part) {
-          if (part.type === "data-client")
-            return {
-              type: "text",
-              text: `[Client Context: ${JSON.stringify(part.data)}]`,
-            };
-        },
-      })),
-    ],
-    toolChoice: "auto",
-  });
+    const result = streamText({
+      model: openrouter.chat(
+        env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
+      ),
+      stopWhen: stepCountIs(5),
+      tools: {
+        search: searchTool,
+      },
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...(await convertToModelMessages<ChatUIMessage>(
+          reqJson.messages ?? [],
+          {
+            convertDataPart(part) {
+              if (part.type === "data-client")
+                return {
+                  type: "text",
+                  text: `[Client Context: ${JSON.stringify(part.data)}]`,
+                };
+            },
+          },
+        )),
+      ],
+      toolChoice: "auto",
+      telemetry: {
+        integrations: [createEvlogIntegration(requestLog)],
+      },
+    });
 
-  return createUIMessageStreamResponse({
-    stream: toUIMessageStream({ stream: result.stream }),
-  });
-}
+    return createUIMessageStreamResponse({
+      stream: toUIMessageStream({ stream: result.stream }),
+    });
+  },
+);
 
 const searchTool = tool({
   description: "Search the docs content and return raw JSON results.",

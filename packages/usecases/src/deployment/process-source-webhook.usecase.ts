@@ -3,6 +3,7 @@ import type { IUnitOfWork, Resource } from "@upstand/domain";
 import { parseResourceCredentials } from "../resource/resource-credentials";
 import { matchesDockerImageWebhook } from "./docker-image-webhook";
 import { QueueDeploymentUseCase } from "./queue-deployment.usecase";
+import { matchesSafeGlob } from "./safe-glob";
 
 export type SourceWebhookProvider =
   | "github"
@@ -211,13 +212,7 @@ function normalizeTrigger(value: unknown): "push" | "tag" {
 }
 
 function matchesPath(pattern: string, file: string): boolean {
-  const escaped = pattern
-    .trim()
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, "::DOUBLE_STAR::")
-    .replace(/\*/g, "[^/]*")
-    .replace(/::DOUBLE_STAR::/g, ".*");
-  return new RegExp(`^${escaped}$`).test(file);
+  return matchesSafeGlob(pattern, file);
 }
 
 function matchesTagPattern(
@@ -227,11 +222,7 @@ function matchesTagPattern(
   if (!pattern?.trim()) {
     return true;
   }
-  const escaped = pattern
-    .trim()
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*");
-  return new RegExp(`^${escaped}$`).test(tag);
+  return matchesSafeGlob(pattern, tag, { starMatchesSlash: true });
 }
 
 function resourceConfig(resource: Resource): JsonRecord {

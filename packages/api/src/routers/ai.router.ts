@@ -61,6 +61,7 @@ export const aiRouter = router({
         input.organizationId,
         ctx.scope,
         input.request,
+        ctx.log,
       );
     }),
 
@@ -192,13 +193,18 @@ export const aiRouter = router({
         input.organizationId,
         "ai:manage",
       );
-      return testUpGalProvider(input.organizationId, ctx.scope, {
-        providerConfigId: input.id,
-        provider: input.provider,
-        model: input.model,
-        baseUrl: input.baseUrl,
-        apiKey: input.apiKey,
-      });
+      return testUpGalProvider(
+        input.organizationId,
+        ctx.scope,
+        {
+          providerConfigId: input.id,
+          provider: input.provider,
+          model: input.model,
+          baseUrl: input.baseUrl,
+          apiKey: input.apiKey,
+        },
+        ctx.log,
+      );
     }),
 
   listModels: twoFactorVerifiedProcedure

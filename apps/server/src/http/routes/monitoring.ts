@@ -4,13 +4,13 @@ import {
   PublishNotificationUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import type { Hono } from "hono";
 import type { AppEnv } from "../types";
 
 export function registerMonitoringRoutes(app: Hono<AppEnv>): void {
   // Webhook for receiving threshold alerts from Go Monitoring Agent.
   app.post("/api/monitoring/alerts", async (c) => {
+    const requestLog = c.get("log");
     const body = (await c.req.json().catch(() => null)) as {
       json?: {
         serverId?: string;
@@ -119,8 +119,7 @@ export function registerMonitoringRoutes(app: Hono<AppEnv>): void {
 
     const serverName = serverRecord?.name ?? "Local control plane";
 
-    log.warn({
-      message: `Server alert received: ${type} usage exceeded threshold`,
+    requestLog.warn(`Server alert received: ${type} usage exceeded threshold`, {
       serverId: settings.serverId,
       type,
       value,
@@ -131,12 +130,13 @@ export function registerMonitoringRoutes(app: Hono<AppEnv>): void {
     const cooldownKey = `monitoring-alert-cooldown:${serverId}:${type}`;
     const acquireCooldown = await redis.set(cooldownKey, "1", "EX", 900, "NX");
     if (acquireCooldown !== "OK") {
-      log.info({
-        message:
-          "Server threshold alert notification suppressed due to 15-minute cooldown",
-        serverId: settings.serverId,
-        type,
-      });
+      requestLog.info(
+        "Server threshold alert notification suppressed due to 15-minute cooldown",
+        {
+          serverId: settings.serverId,
+          type,
+        },
+      );
       return c.json({ status: "acknowledged", throttled: true });
     }
 
@@ -162,9 +162,8 @@ export function registerMonitoringRoutes(app: Hono<AppEnv>): void {
         },
       })
       .catch((err) => {
-        log.error({
+        requestLog.error(err instanceof Error ? err : String(err), {
           message: "Failed to publish server threshold alert notification",
-          err: err instanceof Error ? err.message : String(err),
         });
       });
 

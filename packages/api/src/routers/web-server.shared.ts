@@ -3,7 +3,6 @@ import {
   type NotificationPublisher,
 } from "@upstand/usecases";
 import { PublishNotificationUseCaseToken } from "@upstand/usecases/tokens";
-import { log } from "evlog";
 import { z } from "zod";
 import type { AuthenticatedContext } from "../context";
 import { getErrorMessage } from "../errors";
@@ -11,6 +10,7 @@ import { requireInstanceOwnerContext } from "../instance-access";
 
 export async function queueDockerCleanupNotification(
   publisher: NotificationPublisher,
+  logger: Pick<AuthenticatedContext["log"], "error">,
 ): Promise<void> {
   await publisher
     .execute({
@@ -19,9 +19,8 @@ export async function queueDockerCleanupNotification(
       message: "Upstand completed a Docker cleanup operation.",
     })
     .catch((error) => {
-      log.error({
+      logger.error(error instanceof Error ? error : String(error), {
         message: "Unable to queue Docker cleanup notification",
-        err: error instanceof Error ? error.message : error,
       });
     });
 }
@@ -98,6 +97,7 @@ export async function runDockerCleanup(
     await execAsync(command);
     await queueDockerCleanupNotification(
       ctx.scope.resolve(PublishNotificationUseCaseToken),
+      ctx.log,
     );
     return { success: true };
   } catch (error) {

@@ -21,7 +21,6 @@ import { auth } from "@upstand/api/auth";
 import { authorizeMcpTool, checkPermission } from "@upstand/api/permissions";
 import { isJsonObject } from "@upstand/domain";
 import { AIRepositoryToken } from "@upstand/repositories/tokens";
-import { log } from "evlog";
 import type { Hono } from "hono";
 import { z } from "zod";
 import { createHttpRateLimitMiddleware } from "../rate-limit";
@@ -47,6 +46,7 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
   );
 
   app.post("/api/ai/chat", async (c) => {
+    const requestLog = c.get("log");
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: "Authentication required" }, 401);
     const bodyResult = z
@@ -88,6 +88,7 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
       conversationId,
       runId: randomUUID(),
       scope: c.get("scope"),
+      log: c.get("log"),
       allowedToolNames: await getUpGalToolNamesForUser(
         session.user.id,
         body.organizationId,
@@ -98,13 +99,15 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
     try {
       messages = await validateAndRecoverUpGalMessages(body.messages, tools);
     } catch (error) {
-      log.warn({
-        message: "Rejected UpGal request with unrecoverable UI message history",
-        organizationId: body.organizationId,
-        conversationId,
-        messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
-        err: error instanceof Error ? error.message : String(error),
-      });
+      requestLog.warn(
+        "Rejected UpGal request with unrecoverable UI message history",
+        {
+          organizationId: body.organizationId,
+          conversationId,
+          messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
+          err: error,
+        },
+      );
       return c.json(
         {
           error:
@@ -124,13 +127,12 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
       return await createUpGalResponse(context, messages, c.req.raw);
     } catch (error) {
       const info = classifyUpGalError(error);
-      log.error({
+      requestLog.error(error instanceof Error ? error : String(error), {
         message: "UpGal request failed before streaming started",
         organizationId: body.organizationId,
         conversationId,
         code: info.code,
         retryable: info.retryable,
-        err: error instanceof Error ? error.message : String(error),
       });
       return c.json(
         {
@@ -144,6 +146,7 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
   });
 
   app.all("/api/mcp", async (c) => {
+    const requestLog = c.get("log");
     const authorization = c.req.header("authorization") || "";
     const token = authorization.startsWith("Bearer ")
       ? authorization.slice(7)
@@ -263,6 +266,7 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
           conversationId: randomUUID(),
           runId: randomUUID(),
           scope: c.get("scope"),
+          log: requestLog,
         });
         return c.json({
           jsonrpc: "2.0",
@@ -271,12 +275,10 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
         });
       } catch (error) {
         const info = classifyUpGalError(error);
-        log.warn({
-          message: "UpGal MCP tool execution failed",
+        requestLog.warn("UpGal MCP tool execution failed", {
           toolName: name,
           organizationId: key.organizationId,
           code: info.code,
-          err: error instanceof Error ? error.message : String(error),
         });
         return c.json({
           jsonrpc: "2.0",

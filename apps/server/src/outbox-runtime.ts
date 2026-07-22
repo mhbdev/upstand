@@ -64,7 +64,7 @@ export class OutboxRuntime {
       } catch (error) {
         log.error({
           message: "Failed to process transactional outbox",
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       } finally {
         await scope.dispose();
@@ -94,7 +94,7 @@ export class OutboxRuntime {
     } catch (error) {
       log.warn({
         message: "Failed to prune published transactional outbox messages",
-        err: error instanceof Error ? error.message : String(error),
+        err: error,
       });
     } finally {
       await scope.dispose();

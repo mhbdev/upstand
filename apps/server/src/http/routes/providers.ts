@@ -1,5 +1,4 @@
 import { auth } from "@upstand/api/auth";
-import { getErrorMessage } from "@upstand/api/errors";
 import { checkPermission } from "@upstand/api/permissions";
 import { env } from "@upstand/env/server";
 import { redis } from "@upstand/redis";
@@ -96,8 +95,11 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
         );
 
         if (!res.ok) {
-          const errorText = await res.text();
-          return c.text(`GitHub App conversion failed: ${errorText}`, 500);
+          await res.text();
+          c.get("log").warn("GitHub App conversion failed", {
+            status: res.status,
+          });
+          return c.text("GitHub App conversion failed", 500);
         }
 
         const data = (await res.json()) as {
@@ -127,10 +129,11 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
           config: JSON.stringify(configObj),
         });
       } catch (err) {
-        return c.text(
-          `Internal Server Error during GitHub setup: ${getErrorMessage(err, "Unknown error")}`,
-          500,
-        );
+        c.get("log").error(err instanceof Error ? err : String(err), {
+          message: "GitHub setup failed",
+          organizationId,
+        });
+        return c.text("GitHub setup failed", 500);
       }
     } else if (action === "gh_setup") {
       const gitProviderId = rest[0];
@@ -161,10 +164,11 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
           config: JSON.stringify(configObj),
         });
       } catch (err) {
-        return c.text(
-          `Internal Server Error during GitHub installation update: ${getErrorMessage(err, "Unknown error")}`,
-          500,
-        );
+        c.get("log").error(err instanceof Error ? err : String(err), {
+          message: "GitHub installation update failed",
+          gitProviderId,
+        });
+        return c.text("GitHub installation update failed", 500);
       }
     }
 
@@ -241,8 +245,11 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        return c.text(`GitLab OAuth exchange failed: ${errorText}`, 500);
+        await res.text();
+        c.get("log").warn("GitLab OAuth exchange failed", {
+          status: res.status,
+        });
+        return c.text("GitLab OAuth exchange failed", 500);
       }
 
       const data = (await res.json()) as {
@@ -259,10 +266,10 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
         config: JSON.stringify(configObj),
       });
     } catch (err) {
-      return c.text(
-        `Internal Server Error during GitLab setup: ${getErrorMessage(err, "Unknown error")}`,
-        500,
-      );
+      c.get("log").error(err instanceof Error ? err : String(err), {
+        message: "GitLab setup failed",
+      });
+      return c.text("GitLab setup failed", 500);
     }
 
     return c.redirect(getDashboardUrl("/git-providers"), 307);
@@ -340,8 +347,11 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        return c.text(`Gitea OAuth exchange failed: ${errorText}`, 500);
+        await res.text();
+        c.get("log").warn("Gitea OAuth exchange failed", {
+          status: res.status,
+        });
+        return c.text("Gitea OAuth exchange failed", 500);
       }
 
       const data = (await res.json()) as {
@@ -358,10 +368,10 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
         config: JSON.stringify(configObj),
       });
     } catch (err) {
-      return c.text(
-        `Internal Server Error during Gitea setup: ${getErrorMessage(err, "Unknown error")}`,
-        500,
-      );
+      c.get("log").error(err instanceof Error ? err : String(err), {
+        message: "Gitea setup failed",
+      });
+      return c.text("Gitea setup failed", 500);
     }
 
     return c.redirect(getDashboardUrl("/git-providers"), 307);

@@ -311,7 +311,7 @@ export class GetUpdateStatusUseCase {
     } catch (err: any) {
       log.error({
         message: "Failed to check for updates from GitHub",
-        err: err.message,
+        err,
       });
       return unavailableStatus(currentVersion, channel, checkedAt);
     }

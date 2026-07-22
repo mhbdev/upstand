@@ -159,7 +159,7 @@ export class ExecuteBackupRunUseCase {
           scheduleId,
           runId: stale.id,
           fileKey: stale.fileKey,
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       }
     }
@@ -203,7 +203,7 @@ export class ExecuteBackupRunUseCase {
         log.error({
           message: "Unable to queue backup notification",
           backupRunId: input.run.id,
-          err: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       });
   }

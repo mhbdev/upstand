@@ -1,7 +1,6 @@
 import type { DrainContext } from "evlog";
 import { createFsDrain } from "evlog/fs";
 import { createEvlog } from "evlog/next";
-import { createInstrumentation } from "evlog/next/instrumentation/create";
 import { createOTLPDrain } from "evlog/otlp";
 
 const fileDrain = createFsDrain({ maxFiles: 7 });
@@ -11,7 +10,7 @@ const otlpEndpoint =
 const otlpDrain = otlpEndpoint
   ? createOTLPDrain({
       endpoint: otlpEndpoint,
-      serviceName: "upstand-web",
+      serviceName: "upstand-fumadocs",
     })
   : undefined;
 
@@ -22,11 +21,7 @@ const drain = async (context: DrainContext | DrainContext[]) => {
   ]);
 };
 
-export const { withEvlog, useLogger, log, createError } = createEvlog({
-  service: "upstand-web",
+export const { withEvlog, useLogger } = createEvlog({
+  service: "upstand-fumadocs",
   drain,
-});
-
-export const { register, onRequestError } = createInstrumentation({
-  service: "upstand-web",
 });

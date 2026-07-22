@@ -4,6 +4,11 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.112 - 2026-07-22
+
+### Fixed
+- Normalized release configuration formatting after the build-warning cleanup.
+
 ## 0.1.111 - 2026-07-22
 
 ### Fixed

@@ -58,7 +58,7 @@ export const CreateResourceInputSchema = z.object({
     .optional(),
   credentials: z.string().optional(),
   triggerType: z.enum(["push", "tag"]).optional(),
-  tagPattern: z.string().nullable().optional(),
+  tagPattern: z.string().trim().max(512).nullable().optional(),
   watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
   buildConfig: ApplicationBuildConfigSchema.optional(),
   buildSecrets: z.string().optional(),
@@ -266,7 +266,7 @@ export class CreateResourceUseCase {
         } catch (error: unknown) {
           log.error({
             message: "Failed to encrypt resource credentials",
-            err: error instanceof Error ? error.message : String(error),
+            err: error,
           });
           throw new ValidationError(
             "Resource credentials could not be encrypted",
