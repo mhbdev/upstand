@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.115 - 2026-07-22
+
+### Added
+- **Interactive Infrastructure Topology Map**: Added node-based live topology map (`/topology`) built with `@xyflow/react` to visually explore and filter physical servers, Docker Swarm nodes, projects, environments, resources, databases, backups, external secret providers, and monitoring agents.
+- **Dashboard Navigation & UpGal Spotlight**: Integrated Topology navigation into the primary dashboard sidebar under Infrastructure and registered `/topology` spotlight targets for UpGal assistant UI automation.
+
 ## 0.1.113 - 2026-07-22
 
 ### Added

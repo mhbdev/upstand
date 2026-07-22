@@ -86,6 +86,7 @@ const NAVIGATION_GROUPS = [
       },
       { title: "SSH Keys", href: "/ssh-keys", icon: Key01Icon },
       { title: "Docker Swarm", href: "/docker-swarm", icon: Layers01Icon },
+      { title: "Topology", href: "/topology", icon: Layers01Icon },
       { title: "Docker Inventory", href: "/docker", icon: ContainerIcon },
       {
         title: "Docker Registry",

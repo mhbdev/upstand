@@ -83,6 +83,14 @@ export const UPGAL_UI_TARGETS = [
     path: "/docker-swarm",
   },
   {
+    id: "navigation-topology",
+    label: "Infrastructure topology navigation",
+    description: "Open the live infrastructure topology map.",
+    kind: "navigation",
+    action: "spotlight",
+    path: "/topology",
+  },
+  {
     id: "navigation-docker",
     label: "Docker Inventory navigation",
     description: "Open the Docker Inventory page.",

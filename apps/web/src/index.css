@@ -34,9 +34,25 @@
     height 180ms ease;
 }
 
+@keyframes topology-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent);
+  }
+}
+
+.topology-status-pulse {
+  color: color-mix(in srgb, currentColor 100%, transparent);
+  animation: topology-status-pulse 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .upgal-spotlight,
-  .upgal-spotlight-frame {
+  .upgal-spotlight-frame,
+  .topology-status-pulse {
     animation: none;
     transition: none;
   }
