@@ -4,6 +4,11 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.111 - 2026-07-22
+
+### Fixed
+- Removed remaining production build warnings by updating tsdown dependency options, externalizing optional OpenTelemetry instrumentation, and defining Fumadocs `metadataBase`.
+
 ## 0.1.110 - 2026-07-22
 
 ### Security
