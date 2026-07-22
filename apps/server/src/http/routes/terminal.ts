@@ -334,38 +334,69 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
 
     const body = (await c.req.json().catch(() => null)) as {
       organizationId?: string;
+      resourceId?: string;
       serverId?: string;
       containerId?: string;
       sshKeyId?: string;
     } | null;
-    if (!body?.organizationId || !body.containerId) {
-      return c.json({ error: "Organization and container are required" }, 400);
+    if (!body?.organizationId || !body.resourceId || !body.containerId) {
+      return c.json(
+        { error: "Organization, resource, and container are required" },
+        400,
+      );
     }
     if (!isValidContainerIdentifier(body.containerId)) {
       return c.json({ error: "Invalid container identifier" }, 400);
     }
+    const containerId = body.containerId;
 
+    const scope = c.get("scope");
+    const uow = scope.resolve(UnitOfWorkToken);
+    const resource = await uow.resourceRepository.findById(body.resourceId);
+    if (!resource) return c.json({ error: "Resource not found" }, 404);
+    const environment = await uow.environmentRepository.findById(
+      resource.environmentId,
+    );
+    const project = environment
+      ? await uow.projectRepository.findById(environment.projectId)
+      : null;
+    if (!project || project.organizationId !== body.organizationId) {
+      return c.json(
+        { error: "Resource is not part of this organization" },
+        403,
+      );
+    }
     try {
       await checkPermission(
         session.user.id,
         body.organizationId,
-        "server:update",
+        "resource:update",
       );
     } catch {
-      return c.json({ error: "Docker terminal permission is required" }, 403);
+      return c.json({ error: "Resource terminal permission is required" }, 403);
     }
-    const scope = c.get("scope");
-    const uow = scope.resolve(UnitOfWorkToken);
-    const serverId =
-      body.serverId && body.serverId !== "local" ? body.serverId : undefined;
+    const targetServerId =
+      resource.serverId && !["local", "manager"].includes(resource.serverId)
+        ? resource.serverId
+        : "local";
+    const requestedServerId =
+      body.serverId && !["local", "manager"].includes(body.serverId)
+        ? body.serverId
+        : "local";
+    if (requestedServerId !== targetServerId) {
+      return c.json(
+        { error: "Resource is not assigned to the selected Docker server" },
+        403,
+      );
+    }
     let host: string;
     let port: number;
     let username: string;
     let privateKey: string;
     let hostKeyFingerprint: string;
 
-    if (serverId) {
-      const server = await uow.serverRepository.findById(serverId);
+    if (targetServerId !== "local") {
+      const server = await uow.serverRepository.findById(targetServerId);
       if (!server || server.organizationId !== body.organizationId) {
         return c.json(
           { error: "Docker server is not part of this organization" },
@@ -446,7 +477,7 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
       .resolve(GetDockerInventoryUseCaseToken)
       .execute({
         organizationId: body.organizationId,
-        serverId: body.serverId || "local",
+        serverId: targetServerId,
         kind: "containers",
         tail: 150,
       });
@@ -456,7 +487,15 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
         (container) =>
           typeof container === "object" &&
           container !== null &&
-          (container as { id?: string }).id === body.containerId,
+          matchesContainerIdentifier(
+            containerId,
+            (container as { id?: string }).id || "",
+          ) &&
+          Array.isArray((container as { labels?: unknown }).labels) &&
+          containerBelongsToResource(
+            container as { id: string; labels: string[] },
+            resource,
+          ),
       )
     ) {
       return c.json(
@@ -474,7 +513,7 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
       username,
       privateKey,
       hostKeyFingerprint,
-      command: `docker exec -it ${body.containerId} /bin/sh -lc 'exec /bin/sh || exec /bin/bash'`,
+      command: `docker exec -it ${containerId} /bin/sh -lc 'exec /bin/sh || exec /bin/bash'`,
     });
     return c.json({ token, expiresIn: 60 });
   });
@@ -482,16 +521,20 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
   app.get(
     "/api/terminal/connect",
     upgradeWebSocket((c) => {
-      const token = c.req.query("token");
+      let token: string | null = null;
       return {
         onOpen: async (_event, ws) => {
-          if (!token) {
-            ws.close(1008, "Missing terminal token");
+          const currentSession = await auth.api.getSession({
+            headers: c.req.raw.headers,
+          });
+          if (!currentSession) {
+            ws.close(1008, "Authentication required");
             return;
           }
           try {
-            await terminalBroker.connect(
-              token,
+            token = await terminalBroker.connectForSession(
+              currentSession.user.id,
+              currentSession.session.id,
               (data) =>
                 ws.send(
                   data.buffer.slice(
@@ -501,21 +544,21 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
                 ),
               (message) => ws.close(1000, message),
               async (identity) => {
-                const currentSession = await auth.api.getSession({
+                const refreshedSession = await auth.api.getSession({
                   headers: c.req.raw.headers,
                 });
-                if (!currentSession) return false;
+                if (!refreshedSession) return false;
                 if (
                   !matchesTerminalSession(identity, {
-                    userId: currentSession.user.id,
-                    sessionId: currentSession.session.id,
+                    userId: refreshedSession.user.id,
+                    sessionId: refreshedSession.session.id,
                     twoFactorEnabled:
-                      currentSession.user.twoFactorEnabled === true,
+                      refreshedSession.user.twoFactorEnabled === true,
                   })
                 ) {
                   return false;
                 }
-                return isStepUpAuthenticationSatisfied(currentSession);
+                return isStepUpAuthenticationSatisfied(refreshedSession);
               },
             );
             ws.send(JSON.stringify({ type: "terminal.ready" }));

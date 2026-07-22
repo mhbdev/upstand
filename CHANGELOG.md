@@ -4,6 +4,15 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.110 - 2026-07-22
+
+### Security
+- Fixed S3 connection-test command injection by using argument-safe rclone execution and removing arbitrary test flags.
+- Blocked private, link-local, loopback, and metadata destinations for S3 and registry tests and SSH host-key scans, with DNS validation, timeouts, and redirect protection.
+- Enforced organization, resource, server, and container ownership for AI container commands and Docker terminal sessions.
+- Made unknown Docker server references fail closed and hardened SSH host and username validation before generating SSH configuration.
+- Removed terminal handoff credentials from WebSocket query strings.
+
 ## 0.1.109 - 2026-07-22
 
 ### Added

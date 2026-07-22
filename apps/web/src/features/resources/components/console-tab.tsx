@@ -115,6 +115,7 @@ export function ConsoleTab({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             organizationId,
+            resourceId: resource.id,
             serverId: resource.serverId || "local",
             containerId: selectedContainerId,
             ...(isLocal ? { sshKeyId: selectedKeyId } : {}),

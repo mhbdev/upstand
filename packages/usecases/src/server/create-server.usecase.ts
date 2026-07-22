@@ -4,6 +4,10 @@ import {
   type Server,
   ServerTypeSchema,
 } from "@upstand/domain";
+import {
+  isSafeSshHost,
+  isSafeSshUsername,
+} from "@upstand/platform/ssh/validate";
 import { z } from "zod";
 
 export const CreateServerInputSchema = z.object({
@@ -18,9 +22,16 @@ export const CreateServerInputSchema = z.object({
     .regex(/^SHA256:[A-Za-z0-9+/=]+$/)
     .optional()
     .nullable(),
-  ipAddress: z.string().min(1, "IP address is required"),
-  port: z.number().default(22),
-  username: z.string().min(1, "Username is required").default("root"),
+  ipAddress: z
+    .string()
+    .min(1, "IP address is required")
+    .refine(isSafeSshHost, "Host contains unsupported characters"),
+  port: z.number().int().min(1).max(65_535).default(22),
+  username: z
+    .string()
+    .min(1, "Username is required")
+    .refine(isSafeSshUsername, "Username contains unsupported characters")
+    .default("root"),
   enableDockerCleanup: z.boolean().default(false),
 });
 

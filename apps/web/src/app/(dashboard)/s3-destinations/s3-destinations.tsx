@@ -249,7 +249,6 @@ export default function S3Destinations(_props: {
       bucket,
       region,
       endpoint,
-      additionalFlags: additionalFlags.filter((f) => f.trim() !== ""),
     });
   };
 

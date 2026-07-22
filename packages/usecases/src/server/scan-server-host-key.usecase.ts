@@ -1,9 +1,16 @@
+import { assertSafeSshTarget } from "@upstand/platform/network/outbound";
 import { scanHostKey } from "@upstand/platform/ssh/host-key";
+import { isSafeSshHost } from "@upstand/platform/ssh/validate";
 import { z } from "zod";
 
 export const ScanServerHostKeyInputSchema = z.object({
-  ipAddress: z.string().min(1, "IP address is required"),
-  port: z.number().default(22),
+  organizationId: z.string().min(1, "Organization ID is required"),
+  ipAddress: z
+    .string()
+    .trim()
+    .min(1, "IP address is required")
+    .refine(isSafeSshHost, "Host contains unsupported characters"),
+  port: z.number().int().min(1).max(65_535).default(22),
 });
 
 export type ScanServerHostKeyInput = z.infer<
@@ -15,15 +22,11 @@ export class ScanServerHostKeyUseCase {
     input: ScanServerHostKeyInput,
   ): Promise<{ fingerprint: string; algorithm: string }> {
     try {
-      const { fingerprint, algorithm } = await scanHostKey(
-        input.ipAddress,
-        input.port,
-      );
+      const target = await assertSafeSshTarget(input.ipAddress);
+      const { fingerprint, algorithm } = await scanHostKey(target, input.port);
       return { fingerprint, algorithm };
-    } catch (error) {
-      throw new Error(
-        `Failed to scan SSH host key: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    } catch {
+      throw new Error("Failed to scan SSH host key");
     }
   }
 }

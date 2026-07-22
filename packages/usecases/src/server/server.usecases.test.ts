@@ -4,6 +4,7 @@ import { CreateServerInputSchema } from "./create-server.usecase";
 import { DeleteServerUseCase } from "./delete-server.usecase";
 import { GetServerUseCase } from "./get-server.usecase";
 import { GetServerCountUseCase } from "./get-server-count.usecase";
+import { ScanServerHostKeyInputSchema } from "./scan-server-host-key.usecase";
 import {
   assertBuildServerSupportsResource,
   assertDeploymentServerSupportsResource,
@@ -77,6 +78,27 @@ describe("server use cases", () => {
         name: "Build host",
         serverType: "unsupported",
         ipAddress: "203.0.113.10",
+      }).success,
+    ).toBeFalse();
+  });
+
+  test("rejects unsafe SSH host and username values", () => {
+    expect(
+      CreateServerInputSchema.safeParse({
+        organizationId: "org-1",
+        name: "Host",
+        serverType: "deploy",
+        ipAddress: "203.0.113.10\nProxyCommand id",
+        username: "root\nProxyCommand id",
+      }).success,
+    ).toBeFalse();
+  });
+
+  test("requires an organization when scanning an SSH host key", () => {
+    expect(
+      ScanServerHostKeyInputSchema.safeParse({
+        ipAddress: "203.0.113.10",
+        port: 22,
       }).success,
     ).toBeFalse();
   });

@@ -1,3 +1,4 @@
+import { assertPublicHttpUrl } from "@upstand/platform/network/outbound";
 import { z } from "zod";
 
 export const TestDockerRegistryConnectionInputSchema = z.object({
@@ -16,8 +17,10 @@ export class TestDockerRegistryConnectionUseCase {
     input: TestDockerRegistryConnectionInput,
   ): Promise<{ success: boolean; message: string }> {
     try {
-      const url = input.registryUrl || "https://index.docker.io/v2/";
-      const response = await fetch(url, {
+      const validatedUrl = await assertPublicHttpUrl(
+        input.registryUrl || "https://index.docker.io/v2/",
+      );
+      const response = await fetch(validatedUrl, {
         headers:
           input.username && input.password
             ? {
@@ -26,18 +29,20 @@ export class TestDockerRegistryConnectionUseCase {
                 ).toString("base64")}`,
               }
             : {},
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
       });
       if (response.status === 200 || response.status === 401) {
         return {
           success: true,
-          message: `Successfully connected to Docker registry at ${url}. Response status: ${response.status}`,
+          message: `Successfully connected to Docker registry at ${validatedUrl}. Response status: ${response.status}`,
         };
       }
       throw new Error(`Registry returned status code ${response.status}`);
-    } catch (err: any) {
+    } catch {
       return {
         success: false,
-        message: err.message || "Failed to connect to registry",
+        message: "Failed to connect to Docker registry",
       };
     }
   }

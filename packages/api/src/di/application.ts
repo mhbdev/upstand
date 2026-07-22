@@ -380,7 +380,7 @@ export function registerApplicationFeatures(services: ServiceCollection) {
       new dependencies.ExecContainerCommandUseCase(
         c.resolve(dependencies.UnitOfWorkToken),
         c.resolve(dependencies.DockerExecToken),
-        c.resolve(dependencies.DockerServiceToken),
+        c.resolve(dependencies.DockerInventoryReaderToken),
       ),
   );
   services.addTransient(

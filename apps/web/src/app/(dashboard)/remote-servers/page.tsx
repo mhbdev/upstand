@@ -198,6 +198,7 @@ export default function RemoteServersPage() {
       });
       scanHostKeyMutation.mutate(
         {
+          organizationId,
           ipAddress: ipAddress.trim(),
           port,
         },

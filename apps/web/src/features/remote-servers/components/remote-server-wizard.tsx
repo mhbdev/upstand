@@ -286,6 +286,7 @@ export function RemoteServerWizard({
 
     scanHostKeyMutation.mutate(
       {
+        organizationId,
         ipAddress: ipAddress.trim(),
         port,
       },

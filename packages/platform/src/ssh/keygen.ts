@@ -25,7 +25,7 @@ export function generateSshKeyPair(
     });
 
     const parsedPublic = sshpk.parseKey(publicKey, "pem");
-    const openSshPub = parsedPublic.toString("ssh") + ` ${comment}`;
+    const openSshPub = `${parsedPublic.toString("ssh")} ${comment}`;
     const fingerprint = parsedPublic.fingerprint("sha256").toString();
 
     const parsedPrivate = sshpk.parsePrivateKey(privateKey, "pem");
@@ -49,7 +49,7 @@ export function generateSshKeyPair(
   });
 
   const parsedPublic = sshpk.parseKey(publicKey, "pem");
-  const openSshPub = parsedPublic.toString("ssh") + ` ${comment}`;
+  const openSshPub = `${parsedPublic.toString("ssh")} ${comment}`;
   const fingerprint = parsedPublic.fingerprint("sha256").toString();
 
   const parsedPrivate = sshpk.parsePrivateKey(privateKey, "pem");

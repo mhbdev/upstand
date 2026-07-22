@@ -4,6 +4,10 @@ import {
   ServerTypeSchema,
   ValidationError,
 } from "@upstand/domain";
+import {
+  isSafeSshHost,
+  isSafeSshUsername,
+} from "@upstand/platform/ssh/validate";
 import { z } from "zod";
 import {
   assertBuildServerSupportsResource,
@@ -23,9 +27,19 @@ export const UpdateServerInputSchema = z.object({
     .regex(/^SHA256:[A-Za-z0-9+/=]+$/)
     .nullable()
     .optional(),
-  ipAddress: z.string().trim().min(1).max(255).optional(),
+  ipAddress: z
+    .string()
+    .min(1)
+    .max(253)
+    .refine(isSafeSshHost, "Host contains unsupported characters")
+    .optional(),
   port: z.number().int().min(1).max(65_535).optional(),
-  username: z.string().trim().min(1).max(120).optional(),
+  username: z
+    .string()
+    .min(1)
+    .max(64)
+    .refine(isSafeSshUsername, "Username contains unsupported characters")
+    .optional(),
   enableDockerCleanup: z.boolean().optional(),
 });
 

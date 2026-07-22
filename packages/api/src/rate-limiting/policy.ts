@@ -44,7 +44,7 @@ export function rateLimitPolicy(
   }
 
   const isExpensive =
-    /(?:create|update|delete|remove|deploy|control|rebuild|command|generate|restore|run|reload|prune|rotate)/.test(
+    /(?:create|update|delete|remove|deploy|control|rebuild|command|generate|restore|run|reload|prune|rotate|scan)/.test(
       normalizedPath,
     );
   if (isExpensive) {

@@ -1,3 +1,4 @@
+import net from "node:net";
 import sshpk from "sshpk";
 
 export class KeyPairMismatchError extends Error {
@@ -53,4 +54,32 @@ export function normalizePrivateKey(privateKeyPem: string): string {
   } catch {
     return privateKeyPem;
   }
+}
+
+export function isSafeSshHost(value: string): boolean {
+  if (
+    value.trim() !== value ||
+    /\s/.test(value) ||
+    [...value].some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    })
+  ) {
+    return false;
+  }
+  if (net.isIP(value)) return true;
+  if (value.length > 253 || value.startsWith(".") || value.endsWith(".")) {
+    return false;
+  }
+  return value
+    .split(".")
+    .every((label) =>
+      /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label),
+    );
+}
+
+export function isSafeSshUsername(value: string): boolean {
+  return (
+    value.trim() === value && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)
+  );
 }

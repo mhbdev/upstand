@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
-import { Checkbox } from "@upstand/ui/components/checkbox";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
 import {
@@ -42,7 +41,6 @@ import {
   CardGridSkeleton,
   TableSkeleton,
 } from "@/components/dashboard/page-skeleton";
-import { DockerContainerTerminalDialog } from "@/components/docker-container-terminal-dialog";
 import {
   Activity,
   ArrowDown,
@@ -62,7 +60,6 @@ import {
   RotateCw,
   Server,
   Square,
-  Terminal,
   Trash2,
   Upload,
 } from "@/components/huge-icons";
@@ -74,7 +71,6 @@ import {
   validateArchiveDestination,
   validateArchiveFile,
 } from "@/lib/archive-upload";
-import { copyText } from "@/lib/browser";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
@@ -96,13 +92,6 @@ function formatBytes(bytes: number, decimals = 2) {
   const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${Number.parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
-}
-
-function stripAnsi(str: string) {
-  const ansiEscapeSequence =
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape parser intentionally matches control characters.
-    /[\x1b\x9b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
-  return str.replace(ansiEscapeSequence, "");
 }
 
 type PendingRemoval =
@@ -127,20 +116,16 @@ export default function DockerInventoryPage() {
   const [state, setState] = useState("");
   const [since, setSince] = useState("");
   const [tail, setTail] = useState("150");
-  const [logSearch, setLogSearch] = useState("");
-  const [logLevels, setLogLevels] = useState<string[]>([]);
+  const [logSearch] = useState("");
+  const [logLevels] = useState<string[]>([]);
   const [volumeDestination, setVolumeDestination] = useState("/");
   const [containerDestination, setContainerDestination] = useState("/tmp");
-  const [terminalContainer, setTerminalContainer] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(
     null,
   );
 
   // Auto-scroll logic for logs
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [autoScroll] = useState(true);
   const logContainerRef = useRef<HTMLPreElement>(null);
 
   // Developer panel toggle
@@ -719,21 +704,6 @@ export default function DockerInventoryPage() {
                                           aria-label={`Restart container ${c.name}`}
                                         >
                                           <RotateCw className="size-3.5 text-amber-500" />
-                                        </Button>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="size-7"
-                                          onClick={() =>
-                                            setTerminalContainer({
-                                              id: c.id,
-                                              name: c.name,
-                                            })
-                                          }
-                                          title="Terminal Console"
-                                          aria-label={`Open terminal for container ${c.name}`}
-                                        >
-                                          <Terminal className="size-3.5 text-sky-500" />
                                         </Button>
                                         <Label
                                           className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1453,17 +1423,6 @@ export default function DockerInventoryPage() {
             command: pendingRemoval.command,
           });
         }}
-      />
-
-      {/* Terminal emulator modal dialog */}
-      <DockerContainerTerminalDialog
-        open={terminalContainer !== null}
-        onOpenChange={(open) => {
-          if (!open) setTerminalContainer(null);
-        }}
-        organizationId={organizationId}
-        serverId={serverId}
-        container={terminalContainer}
       />
     </DashboardPage>
   );

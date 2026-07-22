@@ -4,10 +4,13 @@ import {
   substituteProjectEnvVars,
 } from "./resource-environment";
 
+const projectRef = (name: string) => `\${{project.${name}}}`;
+const paddedProjectRef = (name: string) => `\${{ project.${name} }}`;
+
 describe("substituteProjectEnvVars", () => {
-  test("replaces a simple ${{project.VAR}} reference", () => {
+  test("replaces a simple project variable reference", () => {
     const result = substituteProjectEnvVars(
-      { DATABASE_URL: "${{project.DATABASE_URL}}" },
+      { DATABASE_URL: projectRef("DATABASE_URL") },
       { DATABASE_URL: "postgres://user:pass@db:5432/app" },
     );
     expect(result).toEqual({
@@ -15,9 +18,9 @@ describe("substituteProjectEnvVars", () => {
     });
   });
 
-  test("resolves whitespace-padded ${{ project.VAR }} reference", () => {
+  test("resolves whitespace-padded project variable reference", () => {
     const result = substituteProjectEnvVars(
-      { DB: "${{ project.DATABASE_URL }}" },
+      { DB: paddedProjectRef("DATABASE_URL") },
       { DATABASE_URL: "pg://host/db" },
     );
     expect(result).toEqual({ DB: "pg://host/db" });
@@ -26,7 +29,7 @@ describe("substituteProjectEnvVars", () => {
   test("resolves multiple references in the same value", () => {
     const result = substituteProjectEnvVars(
       {
-        DSN: "postgres://${{project.DB_USER}}:${{project.DB_PASS}}@db/app",
+        DSN: `postgres://${projectRef("DB_USER")}:${projectRef("DB_PASS")}@db/app`,
       },
       { DB_USER: "admin", DB_PASS: "secret" },
     );
@@ -37,7 +40,7 @@ describe("substituteProjectEnvVars", () => {
 
   test("resolves to empty string when project variable is missing", () => {
     const result = substituteProjectEnvVars(
-      { KEY: "${{project.MISSING_VAR}}" },
+      { KEY: projectRef("MISSING_VAR") },
       {},
     );
     expect(result).toEqual({ KEY: "" });
@@ -53,10 +56,10 @@ describe("substituteProjectEnvVars", () => {
 
   test("does not transform keys", () => {
     const result = substituteProjectEnvVars(
-      { "${{project.KEY}}": "value" },
+      { [projectRef("KEY")]: "value" },
       { KEY: "should-not-touch-keys" },
     );
-    expect(result).toEqual({ "${{project.KEY}}": "value" });
+    expect(result).toEqual({ [projectRef("KEY")]: "value" });
   });
 
   test("returns an empty object when no resource vars provided", () => {
@@ -67,9 +70,9 @@ describe("substituteProjectEnvVars", () => {
   test("handles mixed references and plain values in the same record", () => {
     const result = substituteProjectEnvVars(
       {
-        DB: "${{project.DB_URL}}",
+        DB: projectRef("DB_URL"),
         PORT: "8080",
-        REDIS: "${{project.REDIS_URL}}",
+        REDIS: projectRef("REDIS_URL"),
       },
       { DB_URL: "pg://localhost/db", REDIS_URL: "redis://localhost" },
     );
@@ -94,7 +97,7 @@ describe("resolveResourceEnvironmentVariables", () => {
 
   test("substitutes project vars when both are plain JSON (legacy format)", () => {
     const resourceJson = JSON.stringify({
-      DB: "${{project.DATABASE_URL}}",
+      DB: projectRef("DATABASE_URL"),
       APP: "myapp",
     });
     const projectJson = JSON.stringify({ DATABASE_URL: "pg://db/prod" });
@@ -106,7 +109,7 @@ describe("resolveResourceEnvironmentVariables", () => {
   });
 
   test("unresolvable project references resolve to empty string", () => {
-    const resourceJson = JSON.stringify({ KEY: "${{project.NOPE}}" });
+    const resourceJson = JSON.stringify({ KEY: projectRef("NOPE") });
     const result = resolveResourceEnvironmentVariables(resourceJson, "{}");
     expect(result).toEqual({ KEY: "" });
   });

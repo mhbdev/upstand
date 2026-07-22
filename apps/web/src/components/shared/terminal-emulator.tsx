@@ -21,10 +21,9 @@ type TerminalControlMessage =
   | { type: "terminal.ready" }
   | { type: "terminal.error"; message: string };
 
-function getTerminalSocketUrl(token: string): string {
+function getTerminalSocketUrl(): string {
   const url = new URL(getServerApiUrl("/api/terminal/connect"));
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.searchParams.set("token", token);
   return url.toString();
 }
 
@@ -264,7 +263,7 @@ export function TerminalEmulator({
 
       termRef.current = term;
 
-      ws = new WebSocket(getTerminalSocketUrl(token));
+      ws = new WebSocket(getTerminalSocketUrl());
       ws.binaryType = "arraybuffer";
 
       ws.onmessage = async (event) => {

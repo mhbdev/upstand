@@ -11,6 +11,7 @@ import {
   GetServerMonitoringStatusInputSchema,
   GetServerRuntimeStatsInputSchema,
   GetServersInputSchema,
+  ScanServerHostKeyInputSchema,
   SetupServerInputSchema,
   UpdateMonitoringSettingsInputSchema,
   UpdateServerInputSchema,
@@ -50,7 +51,7 @@ export const serverRouter = router({
           .resolve(GetServerCountUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -65,7 +66,7 @@ export const serverRouter = router({
       try {
         return await ctx.scope.resolve(GetServerUseCaseToken).execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -81,7 +82,7 @@ export const serverRouter = router({
       try {
         return await useCase.controlContainer(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -97,7 +98,7 @@ export const serverRouter = router({
       try {
         return await useCase.controlResource(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -125,7 +126,7 @@ export const serverRouter = router({
           tail: 150,
         });
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -148,7 +149,7 @@ export const serverRouter = router({
       try {
         return await useCase.getHostTime(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -164,7 +165,7 @@ export const serverRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -181,7 +182,7 @@ export const serverRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -234,7 +235,7 @@ export const serverRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -251,7 +252,7 @@ export const serverRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -277,7 +278,7 @@ export const serverRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -310,18 +311,18 @@ export const serverRouter = router({
             cause: error,
           });
         }
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
   scanHostKey: twoFactorVerifiedProcedure
-    .input(
-      z.object({
-        ipAddress: z.string().min(1, "IP address is required"),
-        port: z.number().default(22),
-      }),
-    )
+    .input(ScanServerHostKeyInputSchema)
     .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "server:create",
+      );
       const useCase = ctx.scope.resolve(ScanServerHostKeyUseCaseToken);
       try {
         return await useCase.execute(input);
@@ -333,7 +334,7 @@ export const serverRouter = router({
             cause: error,
           });
         }
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -348,7 +349,7 @@ export const serverRouter = router({
       try {
         return await ctx.scope.resolve(UpdateServerUseCaseToken).execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -365,7 +366,7 @@ export const serverRouter = router({
           .resolve(UpdateMonitoringSettingsUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -382,7 +383,7 @@ export const serverRouter = router({
       try {
         return await useCase.execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 
@@ -399,7 +400,7 @@ export const serverRouter = router({
           .resolve(GetServerMonitoringStatusUseCaseToken)
           .execute(input);
       } catch (error) {
-        handleUseCaseError(error);
+        handleUseCaseError(error, ctx.log);
       }
     }),
 });

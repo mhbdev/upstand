@@ -10,6 +10,10 @@ import {
   hostVerifierForFingerprint,
   verifyHostKeyFingerprint,
 } from "@upstand/platform/ssh/host-key";
+import {
+  isSafeSshHost,
+  isSafeSshUsername,
+} from "@upstand/platform/ssh/validate";
 import type { DockerInfrastructureResolverPort } from "@upstand/usecases/ports/docker";
 import Docker from "dockerode";
 import { Client } from "ssh2";
@@ -43,6 +47,22 @@ export interface RemoteDockerConnection {
   hostKeyFingerprint?: string;
 }
 
+function assertSafeRemoteConnection(
+  connection: RemoteDockerConnection,
+): string {
+  const host = connection.host.replace(/^ssh:\/\//, "");
+  if (
+    !isSafeSshHost(host) ||
+    !isSafeSshUsername(connection.username) ||
+    !Number.isInteger(connection.port) ||
+    connection.port < 1 ||
+    connection.port > 65_535
+  ) {
+    throw new Error("Remote Docker SSH connection contains unsafe values");
+  }
+  return host;
+}
+
 /**
  * Creates a Docker API client for an independently managed deployment server.
  * Remote servers are not Swarm workers of the control-plane node; Docker's
@@ -52,6 +72,7 @@ export function createRemoteDocker(connection: RemoteDockerConnection): Docker {
   if (!connection.hostKeyFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
+  assertSafeRemoteConnection(connection);
   const entry = ensureRemoteDockerProxy(connection);
   return "socketPath" in entry
     ? new Docker({ socketPath: entry.socketPath })
@@ -173,6 +194,7 @@ export function createRemoteDockerCliEnvironment(
   if (!connection.hostKeyFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
+  const host = assertSafeRemoteConnection(connection);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "upstand-docker-"));
   const sshDirectory = path.join(home, ".ssh");
   const keyPath = path.join(sshDirectory, "id_deployment");
@@ -189,7 +211,7 @@ export function createRemoteDockerCliEnvironment(
     path.join(sshDirectory, "config"),
     [
       "Host upstand-deployment",
-      `HostName ${connection.host}`,
+      `HostName ${host}`,
       `Port ${connection.port}`,
       `User ${connection.username}`,
       `IdentityFile ${keyPath}`,
@@ -214,10 +236,11 @@ function getTrustedKnownHostsEntry(connection: RemoteDockerConnection): string {
   if (!trustedFingerprint) {
     throw new Error("Remote Docker SSH host key is not trusted");
   }
+  const host = assertSafeRemoteConnection(connection);
 
   const scan = spawnSync(
     "ssh-keyscan",
-    ["-T", "10", "-p", String(connection.port), connection.host],
+    ["-T", "10", "-p", String(connection.port), host],
     { encoding: "utf8", timeout: 12_000 },
   );
 
@@ -236,7 +259,7 @@ function getTrustedKnownHostsEntry(connection: RemoteDockerConnection): string {
   }
 
   const fallback = scanHostKeyWithSsh2Sync(
-    connection.host,
+    host,
     connection.port,
     trustedFingerprint,
   );
@@ -245,7 +268,7 @@ function getTrustedKnownHostsEntry(connection: RemoteDockerConnection): string {
   }
 
   throw new Error(
-    `The SSH host key for ${connection.host}:${connection.port} does not match its trusted fingerprint`,
+    `The SSH host key for ${host}:${connection.port} does not match its trusted fingerprint`,
   );
 }
 
@@ -311,7 +334,7 @@ conn.connect({
   });
 
   if (res.status === 0 && res.stdout.trim()) {
-    return res.stdout.trim() + "\n";
+    return `${res.stdout.trim()}\n`;
   }
   return null;
 }
@@ -328,9 +351,9 @@ export async function resolveDockerCliEnvironmentForServer(
   }
 
   const server = await uow.serverRepository.findById(serverId);
-  // If the server is not in the registry, fall back to local Docker socket.
-  // This handles stale Swarm node IDs stored before the "local" sentinel fix.
-  if (!server) return { environment: {}, cleanup: () => {} };
+  if (!server) {
+    throw new Error("Target deployment server was not found");
+  }
   if (!server.sshKeyId) {
     throw new Error("Target deployment server has no SSH key configured");
   }
@@ -362,9 +385,7 @@ export async function resolveDockerServiceForServer(
 
   const server = await uow.serverRepository.findById(serverId);
   if (!server) {
-    // If the server is not in the registry, fall back to local Docker socket.
-    // This handles stale Swarm node IDs stored before the "local" sentinel fix.
-    return { dockerService: defaultDockerService, cleanup: () => {} };
+    throw new Error("Target deployment server was not found");
   }
 
   if (!server.sshKeyId) {
@@ -422,14 +443,7 @@ export async function resolveServicesForResource(
 
   const server = await uow.serverRepository.findById(serverId);
   if (!server) {
-    // The serverId was not found in the server table — this can happen when a
-    // resource was previously assigned the raw Swarm node ID instead of "local".
-    // Fall back to the local Docker socket to avoid a hard crash.
-    return {
-      dockerService: defaultDockerService,
-      caddyService: defaultCaddyService,
-      cleanup: () => {},
-    };
+    throw new Error("Resource target server was not found");
   }
 
   if (!server.sshKeyId) {
