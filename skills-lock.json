@@ -36,6 +36,12 @@
       "skillPath": "packages/web/src/content/SKILL.md",
       "computedHash": "d658b7d3539484430b3c5f145d656e0071d2aadb544e29859635177fd9ddc909"
     },
+    "react-flow-usage": {
+      "source": "thedogwiththedataonit/react-flow",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "5821fbb591db073c92808a9c557515cf7936adb3339ee5d4847ad62a5f2f0a96"
+    },
     "review-logging-patterns": {
       "source": "evlog.dev",
       "sourceType": "well-known",
