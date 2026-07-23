@@ -4,7 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.125 - 2026-07-23
+## 0.1.126 - 2026-07-23
+
+### Fixed
+
+- **Database Migrations Synchronization**: Committed generated Drizzle database migration `0058_bent_daredevil.sql` (`ALTER TABLE "project" ADD COLUMN "description" text;`), snapshot, and journal metadata. Fixes the GitHub Actions CI `Verify generated database migrations` workflow step so automated migration verification (`bun run db:generate`) passes with 0 uncommitted git diffs.
+
+
 
 ### Fixed
 
