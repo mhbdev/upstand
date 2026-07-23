@@ -38,6 +38,20 @@ export function registerHttpMiddleware(
     await next();
   });
 
+  // HSTS — instruct browsers and compliant clients to always use HTTPS.
+  // Only applied when the server is behind TLS (i.e. not on plain HTTP localhost).
+  app.use("*", async (c, next) => {
+    await next();
+    const proto =
+      c.req.header("x-forwarded-proto") || new URL(c.req.url).protocol;
+    if (proto === "https:" || proto === "https") {
+      c.header(
+        "Strict-Transport-Security",
+        "max-age=31536000; includeSubDomains",
+      );
+    }
+  });
+
   app.use(
     "/*",
     cors({

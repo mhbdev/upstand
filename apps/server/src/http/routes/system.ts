@@ -75,5 +75,27 @@ export function registerSystemRoutes(
     );
   });
 
+  // OAuth 2.0 Authorization Server Metadata — RFC 8414.
+  // MCP 2025-03-26 clients probe this endpoint to auto-negotiate authentication.
+  // We use API-key bearer tokens (not a full OAuth flow), so we advertise the
+  // subset of RFC 8414 fields that describe our authentication model.
+  app.get("/.well-known/oauth-authorization-server", (c) => {
+    const base = new URL(c.req.url).origin;
+    return c.json({
+      issuer: base,
+      // We do not issue OAuth tokens — clients should use API keys as Bearer tokens.
+      // The token_endpoint and authorization_endpoint are omitted intentionally.
+      response_types_supported: ["token"],
+      token_endpoint_auth_methods_supported: ["none"],
+      grant_types_supported: [],
+      // Document where clients can obtain an API key.
+      service_documentation: `${base}/docs`,
+      // Signal that we accept Bearer tokens in the Authorization header.
+      // MCP clients use this to confirm Bearer auth is valid.
+      introspection_endpoint_auth_methods_supported: ["bearer"],
+      code_challenge_methods_supported: [],
+    });
+  });
+
   app.get("/", (c) => c.text("OK"));
 }

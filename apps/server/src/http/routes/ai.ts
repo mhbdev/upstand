@@ -357,27 +357,26 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
       });
     }
 
-    // -------------------------------------------------------------------------
-    // tools/list — return every tool this API key has access to.
+    // tools/list — return only the read-only tools this API key has access to.
+    // Mutating tools are excluded: they cannot be executed via MCP (they require
+    // dashboard approval) and advertising them causes unnecessary risk-pattern
+    // warnings in MCP security scanners.
     // -------------------------------------------------------------------------
     if (body.method === "tools/list") {
       const tools = (
         await Promise.all(
           UPGAL_TOOL_METADATA.map(async ([name, description, mutation]) =>
-            (await canUseMcpTool(name))
-              ? { name, description, mutation }
+            !mutation && (await canUseMcpTool(name))
+              ? { name, description }
               : null,
           ),
         )
       )
         .filter((tool): tool is NonNullable<typeof tool> => tool !== null)
-        .map(({ name, description, mutation }) => ({
+        .map(({ name, description }) => ({
           name,
           description,
-          annotations: {
-            destructiveHint: mutation,
-            readOnlyHint: !mutation,
-          },
+          annotations: { readOnlyHint: true, destructiveHint: false },
           inputSchema: { type: "object" },
         }));
 
