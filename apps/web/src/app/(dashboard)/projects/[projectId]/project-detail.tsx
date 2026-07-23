@@ -8,12 +8,14 @@ import {
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
@@ -27,6 +29,7 @@ import {
 } from "@upstand/ui/components/dialog";
 import { Input } from "@upstand/ui/components/input";
 import { Label } from "@upstand/ui/components/label";
+import { Separator } from "@upstand/ui/components/separator";
 import { Spinner } from "@upstand/ui/components/spinner";
 import {
   Tabs,
@@ -34,11 +37,18 @@ import {
   TabsList,
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { EditableEntityIcon } from "@/components/editable-entity-icon";
+import { FolderIcon, Trash2Icon } from "@/components/huge-icons";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -61,54 +71,73 @@ function EnvironmentCard({
   };
   onDelete: () => void;
 }) {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete();
+  };
+
   return (
-    <div className="group relative flex flex-col justify-between border border-border/40 bg-card/30 p-5 transition-all duration-300 hover:border-primary/50 hover:bg-accent/5 hover:shadow-lg">
-      <Link
-        href={`/projects/${projectId}/${environment.id}` as any}
-        className="absolute inset-0"
-        aria-label={`Open environment ${environment.name}`}
-      />
-      <div>
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary/10 text-primary">
-            <HugeiconsIcon icon={ComputerIcon} className="size-4" />
+    <Card size="sm" className="flex flex-col justify-between">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <HugeiconsIcon
+              icon={ComputerIcon}
+              className="size-4"
+              aria-hidden="true"
+            />
           </div>
-          <h3 className="line-clamp-1 flex-1 font-semibold text-foreground transition-colors group-hover:text-primary">
-            {environment.name}
-          </h3>
-          {environment.isDefault && (
-            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-[10px] text-primary uppercase tracking-wider">
-              Production
-            </span>
-          )}
+          <div className="min-w-0">
+            <CardTitle className="truncate text-md">
+              <Link
+                href={`/projects/${projectId}/${environment.id}` as any}
+                className="hover:underline"
+              >
+                {environment.name}
+              </Link>
+            </CardTitle>
+            <CardDescription>
+              <span className="text-muted-foreground text-xs">
+                <span className="font-semibold text-foreground">
+                  {environment.resourceCount}
+                </span>{" "}
+                {environment.resourceCount === 1 ? "resource" : "resources"}
+              </span>
+            </CardDescription>
+          </div>
         </div>
-        <p className="mt-2 line-clamp-2 text-muted-foreground text-xs">
-          {environment.description || "No description provided."}
-        </p>
-      </div>
+        {environment.isDefault && <Badge variant="outline">Production</Badge>}
+      </CardHeader>
 
-      <div className="mt-6 flex items-center justify-between border-border/30 border-t pt-3">
-        <span className="font-medium text-muted-foreground text-xs">
-          {environment.resourceCount}{" "}
-          {environment.resourceCount === 1 ? "resource" : "resources"}
-        </span>
+      <CardContent className="text-muted-foreground">
+        {environment.description || "No description provided."}
+      </CardContent>
 
-        {!environment.isDefault && !environment.isProtected && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="relative z-10 p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-            aria-label={`Delete environment ${environment.name}`}
-          >
-            <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-          </button>
-        )}
-      </div>
-    </div>
+      {!environment.isDefault && !environment.isProtected && (
+        <>
+          <Separator />
+
+          <CardFooter className="flex items-center justify-end">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="destructive"
+                    size="icon-sm"
+                    onClick={handleDelete}
+                    aria-label={`Delete environment ${environment.name}`}
+                  >
+                    <Trash2Icon aria-hidden="true" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
+          </CardFooter>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -243,13 +272,13 @@ function DeleteEnvDialog({
       <DialogContent
         className={cn(
           "rounded-2xl border bg-card shadow-2xl",
-          hasResources ? "border-amber-500/30" : "border-destructive/30",
+          hasResources ? "border-warning/30" : "border-destructive/30",
         )}
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-bold text-xl">
             {hasResources ? (
-              <span className="flex items-center gap-2 text-amber-500">
+              <span className="flex items-center gap-2 text-warning">
                 <HugeiconsIcon icon={Alert02Icon} className="size-5" />
                 Cannot Delete Environment
               </span>
@@ -345,6 +374,16 @@ export default function ProjectDetail({
     ...trpc.environment.list.queryOptions({ projectId }),
   });
 
+  const queryClient = useQueryClient();
+  const updateProjectMutation = useMutation({
+    ...trpc.project.update.mutationOptions(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: trpc.project.get.queryKey({ id: projectId }),
+      });
+    },
+  });
+
   // Delete project mutation
   const deleteProjectMutation = useMutation({
     ...trpc.project.deleteProject.mutationOptions(),
@@ -394,13 +433,34 @@ export default function ProjectDetail({
           </span>
         </div>
         <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="truncate font-bold text-2xl text-foreground [text-wrap:balance]">
-              {project.name}
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Project environments and configuration.
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <EditableEntityIcon
+              icon={(project as any).icon}
+              defaultIcon={
+                <FolderIcon
+                  className="size-5 text-primary"
+                  aria-hidden="true"
+                />
+              }
+              entityName={project.name}
+              entityType="project"
+              sizeClassName="size-11 rounded-2xl"
+              bgClassName="bg-primary/10 text-primary"
+              onSaveIcon={async (newIcon) => {
+                await updateProjectMutation.mutateAsync({
+                  id: project.id,
+                  icon: newIcon,
+                });
+              }}
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-balance font-bold text-2xl text-foreground">
+                {project.name}
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Project environments and configuration.
+              </p>
+            </div>
           </div>
           <div className="w-full sm:w-auto">
             <Button
@@ -416,7 +476,7 @@ export default function ProjectDetail({
 
       {/* Tabs */}
       <Tabs defaultValue="environments" className="min-w-0 space-y-6">
-        <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
+        <TabsList className="scrollbar-thin w-full max-w-full justify-start gap-1 overflow-x-auto">
           <TabsTrigger value="environments">Environments</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>

@@ -319,7 +319,7 @@ export function KeyValueEditor({
                 </div>
 
                 {/* Value Input */}
-                <InputGroup className="h-8 min-w-0 border border-border/40 bg-background">
+                <InputGroup className="h-8 min-w-0">
                   <InputGroupInput
                     value={item.value}
                     type={isMasked ? "password" : "text"}

@@ -914,7 +914,7 @@ export default function RemoteServersPage() {
               {setupMutation.isPending ? (
                 <Spinner className="size-5 shrink-0 text-primary" />
               ) : setupMutation.isSuccess ? (
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-500 text-xs">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-success/15 font-bold text-success text-xs">
                   ✓
                 </span>
               ) : (
@@ -940,7 +940,7 @@ export default function RemoteServersPage() {
             )}
 
             {setupMutation.isSuccess && (
-              <p className="text-emerald-600 text-sm dark:text-emerald-400">
+              <p className="text-success text-sm">
                 {setupMutation.data.message}
               </p>
             )}

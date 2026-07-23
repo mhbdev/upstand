@@ -168,12 +168,13 @@ export function GlobalSearch() {
           if (nextOpen) setOpen(true);
           else closeSearch();
         }}
+        className="p-1"
         title="Global search"
         description="Search projects, environments, and resources."
       >
         <Command
           shouldFilter={false}
-          className="rounded-none p-0 [&>[data-slot=command-input-wrapper]]:p-1"
+          className="rounded-none p-0 *:data-[slot=command-input-wrapper]:p-1"
         >
           <CommandInput
             value={input}

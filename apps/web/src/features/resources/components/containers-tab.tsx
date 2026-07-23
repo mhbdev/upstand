@@ -250,7 +250,7 @@ export function ContainersTab({
                             className={cn(
                               "size-2 rounded-full",
                               con.status === "running"
-                                ? "animate-pulse bg-emerald-500"
+                                ? "animate-pulse bg-success"
                                 : "bg-muted-foreground/50",
                             )}
                           />
@@ -259,7 +259,7 @@ export function ContainersTab({
                           </span>
                         </div>
                       </td>
-                      <td className="p-3 font-mono text-xs text-zinc-300">
+                      <td className="p-3 font-mono text-xs text-muted-foreground">
                         {con.ports}
                       </td>
                       <td className="p-3 text-muted-foreground text-xs">

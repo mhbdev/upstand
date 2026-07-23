@@ -1,5 +1,6 @@
 import {
   ApplicationBuildConfigSchema,
+  EntityIconSchema,
   type IUnitOfWork,
   isSupportedDatabaseImage,
   parseDomainMappings,
@@ -75,6 +76,7 @@ export const UpdateResourceInputSchema = z.object({
   serverId: z.string().nullable().optional(),
   buildServerId: z.string().nullable().optional(),
   cronJobsEnabled: z.boolean().optional(),
+  icon: EntityIconSchema,
 });
 
 export type UpdateResourceInput = z.infer<typeof UpdateResourceInputSchema>;
@@ -92,6 +94,9 @@ export class UpdateResourceUseCase {
     }
 
     const patch: Partial<Resource> = {};
+    if (input.icon !== undefined) {
+      patch.icon = input.icon;
+    }
     if (input.cronJobsEnabled !== undefined) {
       patch.cronJobsEnabled = input.cronJobsEnabled;
     }

@@ -54,6 +54,13 @@ export const CAPABILITY_CATALOG = {
     assurance: "standard",
     roles: ownerAdminMember,
   },
+  "project:update": {
+    scope: "organization",
+    apiKey: true,
+    customRole: true,
+    assurance: "standard",
+    roles: ownerAdmin,
+  },
   "project:delete": {
     scope: "organization",
     apiKey: true,
@@ -737,6 +744,7 @@ export const API_KEY_ROUTE_CAPABILITIES = {
   "ai.deleteConversation": "ai:manage",
   "ai.generateTemplate": "ai:manage",
   "project.duplicate": "project:create",
+  "project.update": "project:update",
   "template.catalog": "template:view",
   "search.global": "project:view",
   "server.create": "server:create",

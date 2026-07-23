@@ -618,12 +618,12 @@ export default function DockerInventoryPage() {
                                         variant={badgeVariant}
                                         className={`select-none capitalize ${
                                           isRunning
-                                            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                                            ? "border-success/20 bg-success/10 text-success"
                                             : ""
                                         }`}
                                       >
                                         {isRunning && (
-                                          <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                                          <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-success" />
                                         )}
                                         {c.state}
                                       </Badge>
@@ -664,7 +664,7 @@ export default function DockerInventoryPage() {
                                           title="Start Container"
                                           aria-label={`Start container ${c.name}`}
                                         >
-                                          <Play className="size-3.5 text-emerald-500" />
+                                          <Play className="size-3.5 text-success" />
                                         </Button>
                                         <Button
                                           size="icon"
@@ -685,7 +685,7 @@ export default function DockerInventoryPage() {
                                           title="Stop Container"
                                           aria-label={`Stop container ${c.name}`}
                                         >
-                                          <Square className="size-3.5 text-zinc-400" />
+                                          <Square className="size-3.5 text-muted-foreground" />
                                         </Button>
                                         <Button
                                           size="icon"
@@ -703,7 +703,7 @@ export default function DockerInventoryPage() {
                                           title="Restart Container"
                                           aria-label={`Restart container ${c.name}`}
                                         >
-                                          <RotateCw className="size-3.5 text-amber-500" />
+                                          <RotateCw className="size-3.5 text-warning" />
                                         </Button>
                                         <Label
                                           className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1223,7 +1223,7 @@ export default function DockerInventoryPage() {
                                 <CardContent>
                                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                                     <div
-                                      className="h-full bg-emerald-500 transition-all duration-300"
+                                      className="h-full bg-success transition-all duration-300"
                                       style={{
                                         width: `${Math.min(100, cpuVal)}%`,
                                       }}
@@ -1246,7 +1246,7 @@ export default function DockerInventoryPage() {
                                 <CardContent>
                                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                                     <div
-                                      className="h-full bg-sky-500 transition-all duration-300"
+                                      className="h-full bg-info transition-all duration-300"
                                       style={{
                                         width: `${Math.min(100, memPercentVal)}%`,
                                       }}
@@ -1288,7 +1288,7 @@ export default function DockerInventoryPage() {
                                 <CardContent className="mt-2 space-y-2 p-4 pt-0 font-mono text-xs">
                                   <div className="flex items-center justify-between">
                                     <span className="flex items-center gap-1 text-muted-foreground">
-                                      <ArrowDown className="size-3 text-emerald-500" />{" "}
+                                      <ArrowDown className="size-3 text-success" />{" "}
                                       Rx (Download)
                                     </span>
                                     <span className="font-semibold">
@@ -1299,7 +1299,7 @@ export default function DockerInventoryPage() {
                                   </div>
                                   <div className="flex items-center justify-between border-t pt-2">
                                     <span className="flex items-center gap-1 text-muted-foreground">
-                                      <ArrowUp className="size-3 text-sky-500" />{" "}
+                                      <ArrowUp className="size-3 text-info" />{" "}
                                       Tx (Upload)
                                     </span>
                                     <span className="font-semibold">

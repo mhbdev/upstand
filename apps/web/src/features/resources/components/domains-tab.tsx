@@ -14,6 +14,11 @@ import {
   CardTitle,
 } from "@upstand/ui/components/card";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@upstand/ui/components/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -49,7 +54,12 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
-import { Pencil, Trash2, WandSparkles } from "@/components/huge-icons";
+import {
+  ChevronDownIcon,
+  Pencil,
+  Trash2,
+  WandSparkles,
+} from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 type DomainMapping = {
@@ -806,7 +816,7 @@ export function DomainsTab({
         </CardContent>
 
         <Dialog open={domainDialogOpen} onOpenChange={setDomainDialogOpen}>
-          <DialogContent className="max-h-[min(90dvh,56rem)] w-[calc(100%-1rem)] overflow-y-auto sm:max-w-2xl">
+          <DialogContent className="no-scrollbar max-h-[min(90dvh,56rem)] w-[calc(100%-1rem)] sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>
                 {editingDomainIndex !== null
@@ -948,7 +958,7 @@ export function DomainsTab({
 
                 <form.Field name="stripPath">
                   {(field) => (
-                    <Label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                    <Label className="flex items-center gap-3 text-sm">
                       <Switch
                         checked={field.state.value}
                         onCheckedChange={(val) => field.handleChange(val)}
@@ -960,7 +970,7 @@ export function DomainsTab({
 
                 <form.Field name="https">
                   {(field) => (
-                    <Label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                    <Label className="flex items-center gap-3 text-sm">
                       <Switch
                         checked={field.state.value}
                         onCheckedChange={(val) => field.handleChange(val)}
@@ -1054,200 +1064,227 @@ export function DomainsTab({
                   }
                 </form.Subscribe>
 
-                <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="font-medium text-sm">
-                    Redirect & security policy
-                  </p>
-                  <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-                    <form.Field name="redirectTo">
+                <Collapsible
+                  defaultOpen={false}
+                  className="rounded-2xl bg-muted p-3"
+                >
+                  <CollapsibleTrigger className="group flex w-full items-center justify-between text-left">
+                    <p className="font-medium text-sm">
+                      Redirect & security policy
+                    </p>
+                    <ChevronDownIcon
+                      className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
+                      aria-hidden="true"
+                    />
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent className="flex flex-col gap-3 pt-3">
+                    <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                      <form.Field name="redirectTo">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor={field.name}>
+                              Redirect target (optional)
+                            </FieldLabel>
+                            <Input
+                              id={field.name}
+                              name={field.name}
+                              placeholder="https://www.example.com{uri} or /new-path…"
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
+                            />
+                            <FieldError errors={field.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                      <form.Field name="redirectStatus">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel>Redirect status</FieldLabel>
+                            <Select
+                              items={(
+                                ["301", "302", "307", "308"] as const
+                              ).map((status) => ({
+                                value: status,
+                                label: status,
+                              }))}
+                              value={field.state.value}
+                              onValueChange={(value) =>
+                                field.handleChange(
+                                  value as "301" | "302" | "307" | "308",
+                                )
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(["301", "302", "307", "308"] as const).map(
+                                  (status) => (
+                                    <SelectItem key={status} value={status}>
+                                      {status}
+                                    </SelectItem>
+                                  ),
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                        )}
+                      </form.Field>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <form.Field name="forwardAuth.address">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor={field.name}>
+                              Forward-auth endpoint (optional)
+                            </FieldLabel>
+                            <Input
+                              id={field.name}
+                              name={field.name}
+                              type="url"
+                              placeholder="https://auth.example.com/verify…"
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
+                            />
+                            <FieldError errors={field.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                      <form.Field name="forwardAuth.uri">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor={field.name}>
+                              Auth URI
+                            </FieldLabel>
+                            <Input
+                              id={field.name}
+                              name={field.name}
+                              placeholder="/verify"
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
+                            />
+                            <FieldError errors={field.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                    </div>
+                    <form.Field name="forwardAuth.copyHeaders">
                       {(field) => (
                         <Field>
                           <FieldLabel htmlFor={field.name}>
-                            Redirect target (optional)
+                            Forwarded auth headers (comma separated)
                           </FieldLabel>
                           <Input
                             id={field.name}
                             name={field.name}
-                            placeholder="https://www.example.com{uri} or /new-path…"
-                            value={field.state.value}
+                            placeholder="X-User, X-Email…"
+                            value={(field.state.value ?? []).join(", ")}
                             onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                          />
-                          <FieldError errors={field.state.meta.errors} />
-                        </Field>
-                      )}
-                    </form.Field>
-                    <form.Field name="redirectStatus">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel>Redirect status</FieldLabel>
-                          <Select
-                            items={(["301", "302", "307", "308"] as const).map(
-                              (status) => ({ value: status, label: status }),
-                            )}
-                            value={field.state.value}
-                            onValueChange={(value) =>
+                            onChange={(e) =>
                               field.handleChange(
-                                value as "301" | "302" | "307" | "308",
+                                e.target.value
+                                  .split(",")
+                                  .map((header) => header.trim())
+                                  .filter(Boolean),
                               )
                             }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(["301", "302", "307", "308"] as const).map(
-                                (status) => (
-                                  <SelectItem key={status} value={status}>
-                                    {status}
-                                  </SelectItem>
-                                ),
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                      )}
-                    </form.Field>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <form.Field name="forwardAuth.address">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>
-                            Forward-auth endpoint (optional)
-                          </FieldLabel>
-                          <Input
-                            id={field.name}
-                            name={field.name}
-                            type="url"
-                            placeholder="https://auth.example.com/verify…"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
                           />
                           <FieldError errors={field.state.meta.errors} />
                         </Field>
                       )}
                     </form.Field>
-                    <form.Field name="forwardAuth.uri">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>Auth URI</FieldLabel>
-                          <Input
-                            id={field.name}
-                            name={field.name}
-                            placeholder="/verify"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                          />
-                          <FieldError errors={field.state.meta.errors} />
-                        </Field>
-                      )}
-                    </form.Field>
-                  </div>
-                  <form.Field name="forwardAuth.copyHeaders">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>
-                          Forwarded auth headers (comma separated)
-                        </FieldLabel>
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          placeholder="X-User, X-Email…"
-                          value={(field.state.value ?? []).join(", ")}
-                          onBlur={field.handleBlur}
-                          onChange={(e) =>
-                            field.handleChange(
-                              e.target.value
-                                .split(",")
-                                .map((header) => header.trim())
-                                .filter(Boolean),
-                            )
-                          }
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </Field>
-                    )}
-                  </form.Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <form.Field name="basicAuth.username">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>
-                            Basic-auth username (optional)
-                          </FieldLabel>
-                          <Input
-                            id={field.name}
-                            name={field.name}
-                            autoComplete="username"
-                            placeholder="admin"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                          />
-                          <FieldError errors={field.state.meta.errors} />
-                        </Field>
-                      )}
-                    </form.Field>
-                    <form.Field name="basicAuth.passwordHash">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor={field.name}>
-                            Caddy password hash (optional)
-                          </FieldLabel>
-                          <Input
-                            id={field.name}
-                            name={field.name}
-                            autoComplete="off"
-                            spellCheck={false}
-                            placeholder="$2a$14$…"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                          />
-                          <FieldError errors={field.state.meta.errors} />
-                        </Field>
-                      )}
-                    </form.Field>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <form.Field name="securityHeaders.hsts">
-                      {(field) => (
-                        <Label className="flex items-center gap-2 text-xs">
-                          <Switch
-                            checked={field.state.value}
-                            onCheckedChange={field.handleChange}
-                          />
-                          HSTS
-                        </Label>
-                      )}
-                    </form.Field>
-                    <form.Field name="securityHeaders.nosniff">
-                      {(field) => (
-                        <Label className="flex items-center gap-2 text-xs">
-                          <Switch
-                            checked={field.state.value}
-                            onCheckedChange={field.handleChange}
-                          />
-                          No sniff
-                        </Label>
-                      )}
-                    </form.Field>
-                    <form.Field name="securityHeaders.frameDeny">
-                      {(field) => (
-                        <Label className="flex items-center gap-2 text-xs">
-                          <Switch
-                            checked={field.state.value}
-                            onCheckedChange={field.handleChange}
-                          />
-                          Frame deny
-                        </Label>
-                      )}
-                    </form.Field>
-                  </div>
-                </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <form.Field name="basicAuth.username">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor={field.name}>
+                              Basic-auth username (optional)
+                            </FieldLabel>
+                            <Input
+                              id={field.name}
+                              name={field.name}
+                              autoComplete="username"
+                              placeholder="admin"
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
+                            />
+                            <FieldError errors={field.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                      <form.Field name="basicAuth.passwordHash">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor={field.name}>
+                              Caddy password hash (optional)
+                            </FieldLabel>
+                            <Input
+                              id={field.name}
+                              name={field.name}
+                              autoComplete="off"
+                              spellCheck={false}
+                              placeholder="$2a$14$…"
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
+                            />
+                            <FieldError errors={field.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <form.Field name="securityHeaders.hsts">
+                        {(field) => (
+                          <Label className="flex items-center gap-2 text-xs">
+                            <Switch
+                              checked={field.state.value}
+                              onCheckedChange={field.handleChange}
+                            />
+                            HSTS
+                          </Label>
+                        )}
+                      </form.Field>
+                      <form.Field name="securityHeaders.nosniff">
+                        {(field) => (
+                          <Label className="flex items-center gap-2 text-xs">
+                            <Switch
+                              checked={field.state.value}
+                              onCheckedChange={field.handleChange}
+                            />
+                            No sniff
+                          </Label>
+                        )}
+                      </form.Field>
+                      <form.Field name="securityHeaders.frameDeny">
+                        {(field) => (
+                          <Label className="flex items-center gap-2 text-xs">
+                            <Switch
+                              checked={field.state.value}
+                              onCheckedChange={field.handleChange}
+                            />
+                            Frame deny
+                          </Label>
+                        )}
+                      </form.Field>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               </FieldGroup>
 
               <DialogFooter className="mt-4">

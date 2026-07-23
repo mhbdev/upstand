@@ -838,7 +838,7 @@ export function GeneralTab({
                     Use this endpoint for CI systems that cannot install a
                     provider webhook. Tokens are stored only as hashes.
                     {!webhookToken && resource.webhookTokenPrefix && (
-                      <span className="mt-1 block font-medium text-amber-600 dark:text-amber-400">
+                      <span className="mt-1 block font-medium text-warning">
                         ⚠️ Only the prefix is shown below. Rotate the token to
                         copy the full URL.
                       </span>
@@ -2262,14 +2262,14 @@ export function GeneralTab({
                     </div>
 
                     {!(dockerRegistriesQuery.data || []).length && (
-                      <div className="space-y-1 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-amber-600 text-xs dark:text-amber-400">
+                      <div className="space-y-1 rounded-md border border-warning/30 bg-warning/10 p-3 text-warning text-xs">
                         <p className="font-medium">
                           No registries available. Please configure a registry
                           first to enable rollbacks.
                         </p>
                         <Link
                           href="/docker-registry"
-                          className="mt-1 inline-block font-semibold underline hover:text-amber-700 dark:hover:text-amber-300"
+                          className="mt-1 inline-block font-semibold underline hover:opacity-80"
                         >
                           Go to Docker Registry page &rarr;
                         </Link>
@@ -2336,7 +2336,7 @@ export function GeneralTab({
                 <div className="space-y-4 pt-2">
                   {gitProviders?.filter((p) => p.provider === providerType)
                     .length === 0 && (
-                    <div className="space-y-1 rounded-md border border-yellow-500/20 bg-yellow-500/10 p-3.5 text-xs text-yellow-600">
+                    <div className="space-y-1 rounded-md border border-warning/20 bg-warning/10 p-3.5 text-warning text-xs">
                       <p className="font-semibold capitalize">
                         No {providerType} accounts configured.
                       </p>
@@ -2345,7 +2345,7 @@ export function GeneralTab({
                         configure a connection in{" "}
                         <Link
                           href={"/git-providers" as Route}
-                          className="font-bold underline hover:text-yellow-700"
+                          className="font-bold underline hover:opacity-80"
                         >
                           Git Providers Settings
                         </Link>
@@ -2498,7 +2498,6 @@ export function GeneralTab({
                           value={githubComposePath}
                           onChange={(e) => setGithubComposePath(e.target.value)}
                           placeholder="./docker-compose.yml"
-                          className="border-border/40 bg-card/30"
                         />
                       </div>
                     </div>
@@ -2573,7 +2572,6 @@ export function GeneralTab({
                         value={tagPattern}
                         onChange={(e) => setTagPattern(e.target.value)}
                         placeholder="e.g. v*, release-v1.* (optional)"
-                        className="border-border/40 bg-card/30"
                       />
                       <p className="text-[11px] text-muted-foreground">
                         Optional. If empty, all tags will trigger a deployment.
@@ -2681,7 +2679,6 @@ export function GeneralTab({
                         value={gitUrl}
                         onChange={(e) => setGitUrl(e.target.value)}
                         placeholder="git@github.com:user/repo.git"
-                        className="border-border/40 bg-card/30"
                       />
                     </div>
                     <div className="space-y-2">
@@ -2729,7 +2726,6 @@ export function GeneralTab({
                           value={gitBranch}
                           onChange={(e) => setGitBranch(e.target.value)}
                           placeholder="master"
-                          className="border-border/40 bg-card/30"
                         />
                       </div>
                       <div className="space-y-2">
@@ -2738,7 +2734,6 @@ export function GeneralTab({
                           value={gitComposePath}
                           onChange={(e) => setGitComposePath(e.target.value)}
                           placeholder="./docker-compose.yml"
-                          className="border-border/40 bg-card/30"
                         />
                       </div>
                     </div>
@@ -2749,7 +2744,6 @@ export function GeneralTab({
                         value={gitBranch}
                         onChange={(e) => setGitBranch(e.target.value)}
                         placeholder="master"
-                        className="border-border/40 bg-card/30"
                       />
                     </div>
                   )}
@@ -2784,7 +2778,6 @@ export function GeneralTab({
                         value={tagPattern}
                         onChange={(e) => setTagPattern(e.target.value)}
                         placeholder="e.g. v*, release-v1.* (optional)"
-                        className="border-border/40 bg-card/30"
                       />
                       <p className="text-[11px] text-muted-foreground">
                         Optional. If empty, all tags will trigger a deployment.
@@ -2990,7 +2983,7 @@ export function GeneralTab({
                           ))}
                         </div>
                         {composeInspection.warnings.length > 0 && (
-                          <div className="text-amber-600 text-xs dark:text-amber-400">
+                          <div className="text-warning text-xs">
                             {composeInspection.warnings.join(" ")}
                           </div>
                         )}
@@ -3035,7 +3028,6 @@ export function GeneralTab({
                   id="res-name-set"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  className="border-border/40 bg-card/30"
                 />
               </div>
               <div className="space-y-2">
@@ -3046,7 +3038,6 @@ export function GeneralTab({
                   id="res-service-name-set"
                   value={appNameInput}
                   onChange={(e) => setAppNameInput(e.target.value)}
-                  className="border-border/40 bg-card/30"
                 />
                 <p className="text-muted-foreground text-xs">
                   This stable service or stack name is used by deployment and
@@ -3059,7 +3050,6 @@ export function GeneralTab({
                   id="res-description-set"
                   value={descriptionInput}
                   onChange={(e) => setDescriptionInput(e.target.value)}
-                  className="border-border/40 bg-card/30"
                 />
               </div>
               <Button

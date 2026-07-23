@@ -124,7 +124,7 @@ export function SelfUpdateDialog({ open, version }: SelfUpdateDialogProps) {
             <HugeiconsIcon
               icon={complete ? CheckmarkCircle02Icon : CloudUploadIcon}
               className={
-                complete ? "size-5 text-emerald-500" : "size-5 text-primary"
+                complete ? "size-5 text-success" : "size-5 text-primary"
               }
             />
             {complete ? "Upstand updated" : `Updating Upstand to ${version}`}

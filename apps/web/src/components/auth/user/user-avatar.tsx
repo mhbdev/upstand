@@ -52,7 +52,9 @@ export function UserAvatar({
     !sessionError &&
     !sessionTimedOut
   ) {
-    return <Skeleton className={cn("size-8", className)} />;
+    return (
+      <Skeleton className={cn("size-8 rounded-(--radius-md)", className)} />
+    );
   }
 
   const resolvedUser = user ?? session?.user;
@@ -63,11 +65,14 @@ export function UserAvatar({
 
   return (
     <Avatar
-      className={cn("size-8 bg-muted text-foreground text-sm", className)}
+      className={cn(
+        "size-8 rounded-(--radius) bg-muted text-foreground text-sm",
+        className,
+      )}
     >
       <AvatarImage src={resolvedUser?.image ?? undefined} alt="" />
 
-      <AvatarFallback className="text-muted-foreground!">
+      <AvatarFallback className="rounded-(--radius) text-muted-foreground!">
         {fallback || initials || (
           <HugeiconsIcon icon={UserIcon} className="size-4" />
         )}

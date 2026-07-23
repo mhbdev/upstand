@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { Switch } from "@upstand/ui/components/switch";
+import { Textarea } from "@upstand/ui/components/textarea";
 import { Plus, Trash2 } from "@/components/huge-icons";
 import type { AdvancedCardProps } from "./types";
 
@@ -313,25 +314,23 @@ export function PortsVolumesCard({
               One DNS server IP per line. Overrides the default container DNS
               resolver.
             </FieldDescription>
-            <div className="rounded-4xl border border-transparent bg-input/50 px-3 py-2">
-              <textarea
-                id="advanced-dns"
-                rows={Math.max(2, config.dns.length + 1)}
-                className="w-full resize-none bg-transparent font-mono text-sm outline-none"
-                placeholder={"8.8.8.8\n1.1.1.1"}
-                value={config.dns.join("\n")}
-                onChange={(e) =>
-                  onChange(
-                    "dns",
-                    e.target.value
-                      .split("\n")
-                      .map((l) => l.trim())
-                      .filter(Boolean),
-                  )
-                }
-                aria-label="DNS servers"
-              />
-            </div>
+            <Textarea
+              id="advanced-dns"
+              rows={Math.max(2, config.dns.length + 1)}
+              className="w-full resize-none font-mono text-sm outline-none"
+              placeholder={"8.8.8.8\n1.1.1.1"}
+              value={config.dns.join("\n")}
+              onChange={(e) =>
+                onChange(
+                  "dns",
+                  e.target.value
+                    .split("\n")
+                    .map((l) => l.trim())
+                    .filter(Boolean),
+                )
+              }
+              aria-label="DNS servers"
+            />
           </Field>
 
           <Field>
@@ -341,25 +340,23 @@ export function PortsVolumesCard({
               line. Appended to the container&apos;s{" "}
               <span className="font-mono text-xs">/etc/hosts</span>.
             </FieldDescription>
-            <div className="rounded-4xl border border-transparent bg-input/50 px-3 py-2">
-              <textarea
-                id="advanced-extra-hosts"
-                rows={Math.max(2, config.extraHosts.length + 1)}
-                className="w-full resize-none bg-transparent font-mono text-sm outline-none"
-                placeholder={"myhost:192.168.1.1"}
-                value={config.extraHosts.join("\n")}
-                onChange={(e) =>
-                  onChange(
-                    "extraHosts",
-                    e.target.value
-                      .split("\n")
-                      .map((l) => l.trim())
-                      .filter(Boolean),
-                  )
-                }
-                aria-label="Extra hosts"
-              />
-            </div>
+            <Textarea
+              id="advanced-extra-hosts"
+              rows={Math.max(2, config.extraHosts.length + 1)}
+              className="w-full resize-none font-mono text-sm outline-none"
+              placeholder={"myhost:192.168.1.1"}
+              value={config.extraHosts.join("\n")}
+              onChange={(e) =>
+                onChange(
+                  "extraHosts",
+                  e.target.value
+                    .split("\n")
+                    .map((l) => l.trim())
+                    .filter(Boolean),
+                )
+              }
+              aria-label="Extra hosts"
+            />
           </Field>
         </FieldGroup>
       </CardContent>

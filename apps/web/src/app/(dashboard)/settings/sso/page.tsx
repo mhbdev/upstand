@@ -890,8 +890,8 @@ export default function SsoSettingsPage() {
                         <span
                           className={
                             provider.domainVerified
-                              ? "rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-[10px] text-emerald-600 uppercase"
-                              : "rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-[10px] text-amber-600 uppercase"
+                              ? "rounded-full bg-success/10 px-2 py-0.5 font-medium text-[10px] text-success uppercase"
+                              : "rounded-full bg-warning/10 px-2 py-0.5 font-medium text-[10px] text-warning uppercase"
                           }
                         >
                           {provider.domainVerified ? "Verified" : "Unverified"}

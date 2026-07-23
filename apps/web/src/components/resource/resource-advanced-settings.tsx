@@ -8,6 +8,7 @@ import {
 } from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
+import { Card } from "@upstand/ui/components/card";
 import {
   Tabs,
   TabsContent,
@@ -262,7 +263,7 @@ export function ResourceAdvancedSettings({
 
       {/* ── Global save footer (visible on all non-JSON tabs) ── */}
       {activeTab !== "json" && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
+        <Card className="flex flex-row items-center justify-between gap-3 px-4 py-3 shadow-sm">
           <Badge variant="outline">Applies on next deploy</Badge>
           <Button
             type="button"
@@ -272,7 +273,7 @@ export function ResourceAdvancedSettings({
             <Save data-icon="inline-start" />
             {update.isPending ? "Saving…" : "Save advanced settings"}
           </Button>
-        </div>
+        </Card>
       )}
     </div>
   );

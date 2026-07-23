@@ -121,7 +121,7 @@ export function CronJobsSubpage() {
             <CardHeader>
               <CardDescription className="flex items-center justify-between font-medium text-xs">
                 Total Invocations ({timespan})
-                <Activity className="size-4 text-sky-500" />
+                <Activity className="size-4 text-info" />
               </CardDescription>
               <CardTitle className="font-bold text-2xl">
                 {data?.totalInvocations ?? 0}
@@ -136,7 +136,7 @@ export function CronJobsSubpage() {
             <CardHeader>
               <CardDescription className="flex items-center justify-between font-medium text-xs">
                 P75 Latency
-                <Clock className="size-4 text-amber-500" />
+                <Clock className="size-4 text-warning" />
               </CardDescription>
               <CardTitle className="font-bold text-2xl tabular-nums">
                 {data?.p75DurationMs ?? 0} ms
@@ -151,7 +151,7 @@ export function CronJobsSubpage() {
             <CardHeader>
               <CardDescription className="flex items-center justify-between font-medium text-xs">
                 Success Rate
-                <CheckCircle className="size-4 text-emerald-500" />
+                <CheckCircle className="size-4 text-success" />
               </CardDescription>
               <CardTitle className="font-bold text-2xl tabular-nums">
                 {(data?.successRate ?? 100).toFixed(1)}%
@@ -313,7 +313,7 @@ export function CronJobsSubpage() {
                               runNowMutation.mutate({ id: job.id })
                             }
                           >
-                            <Play className="size-3.5 text-emerald-500" />
+                            <Play className="size-3.5 text-success" />
                           </Button>
                           <Button
                             size="icon"

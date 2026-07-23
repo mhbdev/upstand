@@ -69,6 +69,10 @@ class MockProjectRepository implements IProjectRepository {
     return { ...data, createdAt: new Date(), updatedAt: new Date() };
   }
 
+  async updateById(_id: string, _patch: any) {
+    return null;
+  }
+
   async findByOrganizationId() {
     return [];
   }

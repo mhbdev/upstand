@@ -457,7 +457,7 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
                             <span
                               className={`size-2 rounded-full ${
                                 sch.lastRunStatus === "success"
-                                  ? "bg-emerald-500"
+                                  ? "bg-success"
                                   : "bg-destructive"
                               }`}
                             />
@@ -483,7 +483,7 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
                             }
                             className="h-8 w-8 p-0"
                           >
-                            <Play className="size-3.5 text-emerald-500" />
+                            <Play className="size-3.5 text-success" />
                           </Button>
                           <Button
                             variant="ghost"

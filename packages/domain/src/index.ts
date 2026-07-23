@@ -12,6 +12,7 @@ export * from "./entities/docker-registry.entity";
 export * from "./entities/domain-mapping";
 export * from "./entities/environment";
 export * from "./entities/git-provider";
+export * from "./entities/icon";
 export * from "./entities/monitoring-settings";
 export * from "./entities/notification";
 export * from "./entities/outbox";

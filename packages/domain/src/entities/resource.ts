@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EntityIconSchema } from "./icon";
 
 const RelativeBuildPathSchema = z
   .string()
@@ -407,6 +408,7 @@ export const ResourceSchema = z.object({
   serverId: z.string().nullable().optional(),
   buildServerId: z.string().nullable().optional(),
   cronJobsEnabled: z.boolean().default(true).optional(),
+  icon: EntityIconSchema,
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -450,4 +452,7 @@ export interface CreateResourceDTO {
   serverId?: string | null;
   buildServerId?: string | null;
   cronJobsEnabled?: boolean;
+  icon?: string | null;
 }
+
+export type UpdateResourceDTO = Partial<CreateResourceDTO>;

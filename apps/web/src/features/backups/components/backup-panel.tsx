@@ -462,7 +462,7 @@ export function BackupPanel({
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="no-scrollbar max-h-[90vh] max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingSchedule
@@ -860,10 +860,10 @@ export function BackupPanel({
                           </p>
                         </div>
                       )}
-                      <div className="grid gap-3 rounded-lg border border-border/50 p-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-3 rounded-2xl border border-border/50 p-4 sm:grid-cols-2">
                         <form.Field name="restoreVerification">
                           {(field) => (
-                            <Label className="flex items-center gap-3 text-sm">
+                            <Label className="flex items-center gap-3 text-xs">
                               <Switch
                                 checked={field.state.value}
                                 onCheckedChange={(value) =>
@@ -883,7 +883,7 @@ export function BackupPanel({
                               <>
                                 <form.Field name="pointInTimeRecovery">
                                   {(field) => (
-                                    <Label className="flex items-center gap-3 text-sm">
+                                    <Label className="flex items-center gap-3 text-xs">
                                       <Switch
                                         checked={field.state.value}
                                         onCheckedChange={(value) =>
@@ -897,7 +897,7 @@ export function BackupPanel({
                                 </form.Field>
                                 <form.Field name="replicaCount">
                                   {(field) => (
-                                    <Field>
+                                    <Field className="gap-0">
                                       <FieldLabel>Managed replicas</FieldLabel>
                                       <p className="text-muted-foreground text-xs">
                                         Configure the operational replica policy
@@ -907,6 +907,7 @@ export function BackupPanel({
                                         type="number"
                                         min="0"
                                         max="9"
+                                        className="mt-2"
                                         value={field.state.value}
                                         onChange={(event) =>
                                           field.handleChange(event.target.value)

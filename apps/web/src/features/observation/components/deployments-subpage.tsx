@@ -403,7 +403,7 @@ export function DeploymentsSubpage() {
 
         {/* Tab 3: Concurrency */}
         <TabsContent value="concurrency" className="space-y-4">
-          <Alert className="w-full border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50">
+          <Alert variant="warning" className="w-full">
             <AlertTriangleIcon />
             <AlertTitle>
               Running multiple builds at once increases CPU, memory and disk

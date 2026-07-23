@@ -407,7 +407,7 @@ export default function GitProviders({
                       <span
                         className={
                           isInstalled
-                            ? "size-1.5 rounded-full bg-emerald-500"
+                            ? "size-1.5 rounded-full bg-success"
                             : "size-1.5 rounded-full bg-muted-foreground"
                         }
                       />

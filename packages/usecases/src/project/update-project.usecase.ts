@@ -1,0 +1,37 @@
+import type { IUnitOfWork, Project } from "@upstand/domain";
+import { EntityIconSchema, ValidationError } from "@upstand/domain";
+import { z } from "zod";
+
+export const UpdateProjectInputSchema = z.object({
+  id: z.string().min(1, "Project ID is required"),
+  name: z.string().min(1, "Project name cannot be empty").optional(),
+  icon: EntityIconSchema,
+});
+
+export type UpdateProjectInput = z.infer<typeof UpdateProjectInputSchema>;
+
+export class UpdateProjectUseCase {
+  constructor(private readonly uow: IUnitOfWork) {}
+
+  async execute(input: UpdateProjectInput): Promise<Project> {
+    const project = await this.uow.projectRepository.findById(input.id);
+    if (!project) {
+      throw new ValidationError("Project not found");
+    }
+
+    const patch: { name?: string; icon?: string | null } = {};
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.icon !== undefined) patch.icon = input.icon;
+
+    const updated = await this.uow.projectRepository.updateById(
+      input.id,
+      patch,
+    );
+
+    if (!updated) {
+      throw new ValidationError("Failed to update project");
+    }
+
+    return updated;
+  }
+}

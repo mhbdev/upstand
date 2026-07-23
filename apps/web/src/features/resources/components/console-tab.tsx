@@ -143,8 +143,8 @@ export function ConsoleTab({
   return (
     <div className="grid min-h-[600px] grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
       {/* Multiplexed Logs Card */}
-      <Card className="flex min-h-[500px] flex-col border border-border/40 bg-card/20">
-        <CardHeader className="pb-4">
+      <Card className="flex min-w-37.5 flex-col border border-border/40 bg-card/20">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2 font-semibold text-lg">
             <HugeiconsIcon
               icon={TerminalIcon}
@@ -162,8 +162,8 @@ export function ConsoleTab({
       </Card>
 
       {/* Terminal Card */}
-      <Card className="flex min-h-[500px] flex-col border border-border/40 bg-card/20">
-        <CardHeader className="pb-4">
+      <Card className="flex min-w-37.5 flex-col border border-border/40 bg-card/20">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2 font-semibold text-lg">
             <HugeiconsIcon
               icon={TerminalIcon}
@@ -175,10 +175,10 @@ export function ConsoleTab({
             Open a terminal session inside an active container.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col gap-4 border-border/10 border-t pt-4">
+        <CardContent className="flex flex-1 flex-col gap-4 border-border/10 border-t">
           {/* Controls */}
           <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/30 bg-muted/20 p-3">
-            <div className="flex min-w-[150px] flex-1 flex-col gap-1.5">
+            <div className="flex min-w-37.5 flex-1 flex-col gap-1.5">
               <Label
                 htmlFor="terminal-container-select"
                 className="text-muted-foreground text-xs"

@@ -45,6 +45,7 @@ import {
 } from "@/components/huge-icons";
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
+import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import { BackupPanel } from "@/features/backups";
 import { ConsoleTab } from "./components/console-tab";
 import { ContainersTab } from "./components/containers-tab";
@@ -65,8 +66,8 @@ const TYPE_ICONS: Record<string, IconSvgElement> = {
 
 const TYPE_BG: Record<string, string> = {
   application: "bg-primary/10 text-primary",
-  database: "bg-amber-500/10 text-amber-500",
-  compose: "bg-violet-500/10 text-violet-500",
+  database: "bg-warning/10 text-warning",
+  compose: "bg-info/10 text-info",
 };
 
 const RESOURCE_TABS = new Set([
@@ -192,14 +193,19 @@ export default function ResourceDetail({
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "rounded-xl p-2.5",
-              TYPE_BG[resource.type] || "bg-primary/10",
-            )}
-          >
-            <HugeiconsIcon icon={Icon} className="size-6" />
-          </div>
+          <EditableEntityIcon
+            icon={(resource as any).icon}
+            defaultIcon={<HugeiconsIcon icon={Icon} className="size-6" />}
+            entityName={resource.name}
+            entityType="resource"
+            sizeClassName="size-12 rounded-xl"
+            bgClassName={
+              TYPE_BG[resource.type] || "bg-primary/10 text-primary"
+            }
+            onSaveIcon={async (newIcon) => {
+              await updateResource({ id: resource.id, icon: newIcon });
+            }}
+          />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-bold text-2xl text-foreground">
@@ -215,7 +221,7 @@ export default function ResourceDetail({
                 className={cn(
                   "font-bold",
                   resource.status === "running"
-                    ? "text-emerald-500"
+                    ? "text-success"
                     : "text-muted-foreground",
                 )}
               >

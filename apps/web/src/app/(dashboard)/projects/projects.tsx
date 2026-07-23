@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
@@ -22,6 +22,7 @@ import {
 } from "@upstand/ui/components/dialog";
 import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
+import { Separator } from "@upstand/ui/components/separator";
 import { Spinner } from "@upstand/ui/components/spinner";
 import {
   Tooltip,
@@ -39,6 +40,7 @@ import {
 import { PageEmpty } from "@/components/dashboard/page-empty";
 import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import { PageToolbar } from "@/components/dashboard/page-toolbar";
+import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import {
   AlertTriangleIcon,
   CopyIcon,
@@ -66,6 +68,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 interface Project {
   id: string;
   name: string;
+  icon?: string | null;
   createdAt: Date | string;
 }
 
@@ -78,6 +81,16 @@ function ProjectCard({
   onDelete: () => void;
   onDuplicate: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const updateMutation = useMutation({
+    ...trpc.project.update.mutationOptions(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: trpc.project.list.queryKey(),
+      });
+    },
+  });
+
   const { data: envs } = useQuery({
     ...trpc.environment.list.queryOptions({ projectId: project.id }),
     enabled: !!project.id,
@@ -112,9 +125,22 @@ function ProjectCard({
     <Card size="sm" className="flex flex-col justify-between">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-            <FolderIcon className="size-4 text-primary" aria-hidden="true" />
-          </div>
+          <EditableEntityIcon
+            icon={project.icon}
+            defaultIcon={
+              <FolderIcon className="size-4 text-primary" aria-hidden="true" />
+            }
+            entityName={project.name}
+            entityType="project"
+            sizeClassName="size-9 rounded-2xl"
+            bgClassName="bg-primary/10 text-primary"
+            onSaveIcon={async (newIcon) => {
+              await updateMutation.mutateAsync({
+                id: project.id,
+                icon: newIcon,
+              });
+            }}
+          />
           <div className="min-w-0">
             <CardTitle className="truncate text-base">
               <Link
@@ -124,62 +150,67 @@ function ProjectCard({
                 {project.name}
               </Link>
             </CardTitle>
-            <CardDescription className="mt-1 line-clamp-2 text-xs">
-              Created {formattedDate}
+            <CardDescription>
+              <div className="flex gap-4 text-muted-foreground text-xs">
+                <div>
+                  <span className="font-semibold text-foreground">
+                    {envCount}
+                  </span>{" "}
+                  {envCount === 1 ? "environment" : "environments"}
+                </div>
+                <div>
+                  <span className="font-semibold text-foreground">
+                    {totalResources}
+                  </span>{" "}
+                  {totalResources === 1 ? "resource" : "resources"}
+                </div>
+              </div>
             </CardDescription>
           </div>
         </div>
         <Badge variant="success">Active</Badge>
       </CardHeader>
 
-      <CardContent className="pt-0">
-        <div className="flex gap-4 text-muted-foreground text-xs">
-          <div>
-            <span className="font-semibold text-foreground">{envCount}</span>{" "}
-            {envCount === 1 ? "environment" : "environments"}
-          </div>
-          <div>
-            <span className="font-semibold text-foreground">
-              {totalResources}
-            </span>{" "}
-            {totalResources === 1 ? "resource" : "resources"}
-          </div>
+      <Separator />
+
+      <CardFooter className="flex items-center justify-between">
+        <span className="text-muted-foreground text-xs">
+          Created <span className="font-semibold">{formattedDate}</span>
+        </span>
+
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleDuplicate}
+                  aria-label={`Duplicate project ${project.name}`}
+                >
+                  <CopyIcon aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipContent>Duplicate</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="destructive"
+                  size="icon-sm"
+                  onClick={handleDelete}
+                  aria-label={`Delete project ${project.name}`}
+                >
+                  <Trash2Icon aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
         </div>
-      </CardContent>
-
-      <CardFooter className="flex items-center justify-end gap-2 pt-0">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleDuplicate}
-                aria-label={`Duplicate project ${project.name}`}
-              >
-                <CopyIcon aria-hidden="true" />
-              </Button>
-            }
-          />
-          <TooltipContent>Duplicate</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleDelete}
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                aria-label={`Delete project ${project.name}`}
-              >
-                <Trash2Icon aria-hidden="true" />
-              </Button>
-            }
-          />
-          <TooltipContent>Delete</TooltipContent>
-        </Tooltip>
       </CardFooter>
     </Card>
   );
@@ -412,13 +443,13 @@ function DeleteProjectDialog({
       <DialogContent
         className={cn(
           "rounded-2xl border bg-card shadow-2xl",
-          hasBusyEnvironments ? "border-amber-500/30" : "border-destructive/30",
+          hasBusyEnvironments ? "border-warning/30" : "border-destructive/30",
         )}
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-bold text-xl">
             {hasBusyEnvironments ? (
-              <span className="flex items-center gap-2 text-amber-500">
+              <span className="flex items-center gap-2 text-warning">
                 <AlertTriangleIcon className="size-5" />
                 Cannot Delete Project
               </span>
@@ -452,8 +483,8 @@ function DeleteProjectDialog({
         </DialogHeader>
 
         {hasBusyEnvironments && (
-          <div className="my-2 flex flex-col gap-2 border border-amber-500/10 bg-amber-500/5 p-4">
-            <h4 className="font-semibold text-amber-500 text-xs uppercase tracking-wider">
+          <div className="my-2 flex flex-col gap-2 border-warning/10 bg-warning/5 p-4">
+            <h4 className="font-semibold text-warning text-xs uppercase tracking-wider">
               Environments with Resources
             </h4>
             <ul className="flex flex-col gap-1.5 text-sm">
@@ -463,7 +494,7 @@ function DeleteProjectDialog({
                   className="flex items-center justify-between text-muted-foreground"
                 >
                   <span>{env.name}</span>
-                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-500 text-xs">
+                  <span className="rounded-full bg-warning/10 px-2 py-0.5 font-semibold text-warning text-xs">
                     {env.resourceCount}{" "}
                     {env.resourceCount === 1 ? "resource" : "resources"}
                   </span>

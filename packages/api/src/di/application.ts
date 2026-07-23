@@ -38,6 +38,13 @@ export function registerApplicationFeatures(services: ServiceCollection) {
       ),
   );
   services.addTransient(
+    dependencies.UpdateProjectUseCaseToken,
+    (c) =>
+      new dependencies.UpdateProjectUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
     dependencies.GetProjectsUseCaseToken,
     (c) =>
       new dependencies.GetProjectsUseCase(

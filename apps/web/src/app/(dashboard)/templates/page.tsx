@@ -630,7 +630,7 @@ export default function TemplatesPage() {
                   {generate.isPending ? "Generating draft…" : "Generate draft"}
                 </Button>
                 {generatedModel && (
-                  <p className="flex items-center gap-1.5 text-emerald-600 text-xs dark:text-emerald-400">
+                  <p className="flex items-center gap-1.5 text-success text-xs">
                     <Check className="size-3.5" aria-hidden="true" />
                     Generated and validated with {generatedModel}. Review before
                     saving.
@@ -1043,7 +1043,7 @@ function MetricCard({
         <div>
           <p className="text-muted-foreground text-xs">{label}</p>
           <p
-            className={`mt-1 font-semibold text-lg ${accent ? "text-amber-600 dark:text-amber-400" : ""}`}
+            className={`mt-1 font-semibold text-lg ${accent ? "text-warning" : ""}`}
           >
             {value}
           </p>
@@ -1096,7 +1096,7 @@ function ChecklistItem({ done, label }: { done: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2">
       <span
-        className={`flex size-5 items-center justify-center rounded-full border ${done ? "border-emerald-500 bg-emerald-500 text-white" : "text-muted-foreground"}`}
+        className={`flex size-5 items-center justify-center rounded-full border ${done ? "border-success bg-success text-success-foreground" : "text-muted-foreground"}`}
       >
         {done ? (
           <Check className="size-3" aria-hidden="true" />

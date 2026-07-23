@@ -653,7 +653,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
                       conversations.data.map((conversation) => (
                         <div
                           key={conversation.id}
-                          className="group flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-muted"
+                          className="group flex items-center gap-1 rounded-2xl px-2 py-1.5 hover:bg-muted"
                         >
                           <button
                             type="button"

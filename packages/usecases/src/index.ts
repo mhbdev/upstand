@@ -78,6 +78,7 @@ export * from "./project/delete-project.usecase";
 export * from "./project/duplicate-project.usecase";
 export * from "./project/get-project.usecase";
 export * from "./project/get-projects.usecase";
+export * from "./project/update-project.usecase";
 export * from "./resource/application-build-secrets";
 export * from "./resource/compose-randomization";
 export * from "./resource/control-container.usecase";

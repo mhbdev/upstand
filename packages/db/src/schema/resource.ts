@@ -55,6 +55,7 @@ export const resource = pgTable(
     previewHttps: boolean("preview_https").default(false).notNull(),
     previewPort: integer("preview_port").default(3000).notNull(),
     cronJobsEnabled: boolean("cron_jobs_enabled").default(true).notNull(),
+    icon: text("icon"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

@@ -18,6 +18,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
@@ -45,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Separator } from "@upstand/ui/components/separator";
 import { Spinner } from "@upstand/ui/components/spinner";
 import {
   Tabs,
@@ -52,11 +54,18 @@ import {
   TabsList,
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { EditableEntityIcon } from "@/components/editable-entity-icon";
+import { Trash2Icon } from "@/components/huge-icons";
 import {
   KeyValueEditor,
   keyValuePairsToRecord,
@@ -75,8 +84,8 @@ const TYPE_ICONS: Record<string, IconSvgElement> = {
 
 const TYPE_BG: Record<string, string> = {
   application: "bg-primary/10 text-primary",
-  database: "bg-amber-500/10 text-amber-500",
-  compose: "bg-violet-500/10 text-violet-500",
+  database: "bg-warning/10 text-warning",
+  compose: "bg-info/10 text-info",
 };
 
 // ─── Resource Card ────────────────────────────────────────────────────────────
@@ -95,81 +104,115 @@ function ResourceCard({
     type: string;
     status: string;
     provider: string;
+    icon?: string | null;
   };
   onDelete: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const updateResourceMutation = useMutation({
+    ...trpc.resource.update.mutationOptions(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: trpc.resource.list.queryKey(),
+      });
+    },
+  });
+
   const Icon = TYPE_ICONS[resource.type] || ComputerIcon;
   const isRunning = resource.status === "running";
 
-  return (
-    <div className="group relative flex flex-col justify-between border border-border/40 bg-card/30 p-5 transition-all duration-300 hover:border-primary/50 hover:bg-accent/5 hover:shadow-lg">
-      <Link
-        href={`/projects/${projectId}/${environmentId}/${resource.id}` as any}
-        className="absolute inset-0"
-        aria-label={`Open resource ${resource.name}`}
-      />
-      <div>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center",
-                TYPE_BG[resource.type],
-              )}
-            >
-              <HugeiconsIcon icon={Icon} className="size-4" />
-            </div>
-            <div>
-              <h3 className="line-clamp-1 font-semibold text-foreground transition-colors group-hover:text-primary">
-                {resource.name}
-              </h3>
-              <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-                {resource.type}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-border/30 bg-accent/20 px-2 py-0.5">
-            <span className={cn("relative flex h-2 w-2")}>
-              {isRunning && (
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              )}
-              <span
-                className={cn(
-                  "relative inline-flex h-2 w-2 rounded-full",
-                  isRunning ? "bg-emerald-500" : "bg-muted-foreground/50",
-                )}
-              />
-            </span>
-            <span className="font-semibold text-[10px] text-foreground uppercase tracking-wider">
-              {resource.status}
-            </span>
-          </div>
-        </div>
-        <div className="mt-4 space-y-1">
-          <p className="text-muted-foreground text-xs">
-            Provider:{" "}
-            <span className="font-medium text-foreground uppercase">
-              {resource.provider}
-            </span>
-          </p>
-        </div>
-      </div>
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete();
+  };
 
-      <div className="mt-6 flex items-center justify-end border-border/30 border-t pt-3">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="relative z-10 p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-          aria-label={`Delete resource ${resource.name}`}
-        >
-          <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-        </button>
-      </div>
-    </div>
+  return (
+    <Card size="sm" className="flex flex-col justify-between">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <EditableEntityIcon
+            icon={resource.icon}
+            defaultIcon={
+              <HugeiconsIcon
+                icon={Icon}
+                className="size-4"
+                aria-hidden="true"
+              />
+            }
+            entityName={resource.name}
+            entityType="resource"
+            sizeClassName="size-9 rounded-2xl"
+            bgClassName={TYPE_BG[resource.type] || "bg-primary/10 text-primary"}
+            onSaveIcon={async (newIcon) => {
+              await updateResourceMutation.mutateAsync({
+                id: resource.id,
+                icon: newIcon,
+              });
+            }}
+          />
+          <div className="min-w-0">
+            <CardTitle className="truncate text-base">
+              <Link
+                href={
+                  `/projects/${projectId}/${environmentId}/${resource.id}` as any
+                }
+                className="hover:underline"
+              >
+                {resource.name}
+              </Link>
+            </CardTitle>
+            <CardDescription className="font-semibold text-[10px] uppercase tracking-wider">
+              {resource.type}
+            </CardDescription>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/30 bg-accent/20 px-2 py-0.5">
+          <span className="relative flex h-2 w-2">
+            {isRunning && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+            )}
+            <span
+              className={cn(
+                "relative inline-flex h-2 w-2 rounded-full",
+                isRunning ? "bg-success" : "bg-muted-foreground/50",
+              )}
+            />
+          </span>
+          <span className="font-semibold text-[10px] text-foreground uppercase tracking-wider">
+            {resource.status}
+          </span>
+        </div>
+      </CardHeader>
+
+      <Separator />
+
+      <CardFooter className="flex items-center justify-between">
+        <span className="text-muted-foreground text-xs">
+          Provider:{" "}
+          <span className="font-semibold text-foreground uppercase">
+            {resource.provider}
+          </span>
+        </span>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="destructive"
+                size="icon-sm"
+                onClick={handleDelete}
+                aria-label={`Delete resource ${resource.name}`}
+              >
+                <Trash2Icon aria-hidden="true" />
+              </Button>
+            }
+          />
+          <TooltipContent>Delete</TooltipContent>
+        </Tooltip>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -225,7 +268,7 @@ function CreateAppDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,42rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[32rem]">
+      <DialogContent className="no-scrollbar max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] sm:min-w-xl">
         <DialogHeader>
           <DialogTitle className="font-bold text-xl">
             New Application
@@ -508,7 +551,7 @@ function CreateDbDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[36rem]">
+      <DialogContent className="no-scrollbar max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] sm:min-w-xl">
         <DialogHeader>
           <DialogTitle className="font-bold text-xl">New Database</DialogTitle>
           <DialogDescription className="text-muted-foreground text-sm">
@@ -640,7 +683,7 @@ function CreateDbDialog({
               className="border-border/40 focus:border-primary"
             />
             {formErrors.name && (
-              <span className="text-[10px] text-red-500">
+              <span className="text-[10px] text-destructive">
                 {formErrors.name}
               </span>
             )}
@@ -660,7 +703,7 @@ function CreateDbDialog({
               className="border-border/40 focus:border-primary"
             />
             {formErrors.appName && (
-              <span className="text-[10px] text-red-500">
+              <span className="text-[10px] text-destructive">
                 {formErrors.appName}
               </span>
             )}
@@ -781,7 +824,7 @@ function CreateDbDialog({
               )}
             </div>
             {formErrors.libsqlPorts && (
-              <span className="text-[10px] text-red-500">
+              <span className="text-[10px] text-destructive">
                 {formErrors.libsqlPorts}
               </span>
             )}
@@ -811,7 +854,7 @@ function CreateDbDialog({
                   className="border-border/40 bg-muted/20 focus:border-primary"
                 />
                 {formErrors.dbUser && (
-                  <span className="text-[10px] text-red-500">
+                  <span className="text-[10px] text-destructive">
                     {formErrors.dbUser}
                   </span>
                 )}
@@ -844,7 +887,7 @@ function CreateDbDialog({
                 </Button>
               </div>
               {formErrors.dbPassword && (
-                <span className="text-[10px] text-red-500">
+                <span className="text-[10px] text-destructive">
                   {formErrors.dbPassword}
                 </span>
               )}
@@ -880,7 +923,7 @@ function CreateDbDialog({
                   </Button>
                 </div>
                 {formErrors.dbRootPassword && (
-                  <span className="text-[10px] text-red-500">
+                  <span className="text-[10px] text-destructive">
                     {formErrors.dbRootPassword}
                   </span>
                 )}
@@ -903,7 +946,7 @@ function CreateDbDialog({
                   className="border-border/40 bg-muted/20 focus:border-primary"
                 />
                 {formErrors.dbName && (
-                  <span className="text-[10px] text-red-500">
+                  <span className="text-[10px] text-destructive">
                     {formErrors.dbName}
                   </span>
                 )}
@@ -999,7 +1042,7 @@ function CreateComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,42rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[32rem]">
+      <DialogContent className="no-scrollbar max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] sm:min-w-xl">
         <DialogHeader>
           <DialogTitle className="font-bold text-xl">
             New Docker Compose
@@ -1365,7 +1408,7 @@ export default function EnvironmentDetail({
           <HugeiconsIcon icon={ArrowRight01Icon} className="size-3" />
           <span className="font-medium text-foreground">{env.name}</span>
         </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4">
           <div>
             <h1 className="font-bold text-2xl text-foreground">
               {env.name} Environment
@@ -1374,18 +1417,22 @@ export default function EnvironmentDetail({
               Deploy and manage apps, databases, and microservices.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-row gap-2">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search resources…"
-              className="w-full min-w-0 border-border/40 bg-card/30 sm:w-64"
+              className="w-full min-w-0 flex-1 sm:w-64"
             />
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 border-none bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90">
-                <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
-                New Resource
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <Button>
+                    <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
+                    New Resource
+                  </Button>
+                }
+              />
               <DropdownMenuContent
                 align="end"
                 className="w-48 border border-border/45 bg-card shadow-xl"
@@ -1400,14 +1447,14 @@ export default function EnvironmentDetail({
                 <DropdownMenuItem onClick={() => setCreateDbOpen(true)}>
                   <HugeiconsIcon
                     icon={DatabaseIcon}
-                    className="mr-2 size-4 text-amber-500"
+                    className="mr-2 size-4 text-warning"
                   />
                   Database
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCreateComposeOpen(true)}>
                   <HugeiconsIcon
                     icon={ServerStack01Icon}
-                    className="mr-2 size-4 text-violet-500"
+                    className="mr-2 size-4 text-info"
                   />
                   Docker Compose
                 </DropdownMenuItem>
@@ -1438,7 +1485,7 @@ export default function EnvironmentDetail({
 
       {/* Tabs */}
       <Tabs defaultValue="resources" className="min-w-0 space-y-6">
-        <TabsList className="w-full max-w-full justify-start gap-1 overflow-x-auto border border-border/40 bg-card/45 p-1 [scrollbar-width:thin]">
+        <TabsList className="scrollbar-thin w-full max-w-full justify-start gap-1 overflow-x-auto">
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="env-vars">Shared Variables</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -1638,7 +1685,7 @@ export default function EnvironmentDetail({
               </CardHeader>
               <CardContent className="space-y-4">
                 {isDefaultEnv ? (
-                  <div className="flex items-start gap-3 border border-amber-500/20 bg-amber-500/5 p-4 text-amber-500 text-sm">
+                  <div className="flex items-start gap-3 border border-warning/20 bg-warning/5 p-4 text-sm text-warning">
                     <HugeiconsIcon
                       icon={Alert02Icon}
                       className="mt-0.5 size-5 shrink-0"
@@ -1654,7 +1701,7 @@ export default function EnvironmentDetail({
                     </div>
                   </div>
                 ) : hasResources ? (
-                  <div className="flex items-start gap-3 border border-amber-500/20 bg-amber-500/5 p-4 text-amber-500 text-sm">
+                  <div className="flex items-start gap-3 border border-warning/20 bg-warning/5 p-4 text-sm text-warning">
                     <HugeiconsIcon
                       icon={Alert02Icon}
                       className="mt-0.5 size-5 shrink-0"

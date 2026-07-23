@@ -1160,8 +1160,8 @@ export default function WebServerDashboard(_props: {
                       <span
                         className={`h-2.5 w-2.5 rounded-full ${
                           info?.status?.running
-                            ? "animate-pulse bg-emerald-500"
-                            : "bg-red-500"
+                            ? "animate-pulse bg-success"
+                            : "bg-destructive"
                         }`}
                       />
                       <span className="font-semibold text-foreground text-sm capitalize">
@@ -1188,7 +1188,7 @@ export default function WebServerDashboard(_props: {
                         info.status.ports.map((port: string, idx: number) => (
                           <span
                             key={idx}
-                            className="font-mono text-xs text-zinc-300"
+                            className="font-mono text-muted-foreground text-xs"
                           >
                             {port}
                           </span>
@@ -1240,7 +1240,6 @@ export default function WebServerDashboard(_props: {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="e.g. ssl-admin@yourdomain.com"
-                        className="border-border/40 bg-card/30"
                       />
                       <p className="text-[11px] text-muted-foreground">
                         Let's Encrypt will notify this email address about
@@ -1263,7 +1262,6 @@ export default function WebServerDashboard(_props: {
                           onChange={(e) =>
                             setHttpPort(Number(e.target.value) || 80)
                           }
-                          className="border-border/40 bg-card/30"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1279,7 +1277,6 @@ export default function WebServerDashboard(_props: {
                           onChange={(e) =>
                             setHttpsPort(Number(e.target.value) || 443)
                           }
-                          className="border-border/40 bg-card/30"
                         />
                       </div>
                     </div>
@@ -1714,7 +1711,7 @@ export default function WebServerDashboard(_props: {
               </div>
 
               {!gpuStatus?.runtimeConfigured && gpuStatus?.driverInstalled && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-300 text-xs">
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-warning text-xs">
                   NVIDIA drivers were found, but Docker nvidia-runtime is not
                   active. Click the configure button below to setup
                   `/etc/docker/daemon.json`.

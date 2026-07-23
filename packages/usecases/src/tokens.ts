@@ -99,8 +99,11 @@ export const CreateAuditLogUseCaseToken =
 export const ListAuditLogsUseCaseToken =
   createToken<UseCases.ListAuditLogsUseCase>("ListAuditLogsUseCase");
 
+export * from "./project/update-project.usecase";
 export const CreateProjectUseCaseToken =
   createToken<UseCases.CreateProjectUseCase>("CreateProjectUseCase");
+export const UpdateProjectUseCaseToken =
+  createToken<UseCases.UpdateProjectUseCase>("UpdateProjectUseCase");
 export const GetProjectsUseCaseToken =
   createToken<UseCases.GetProjectsUseCase>("GetProjectsUseCase");
 export const GetProjectUseCaseToken =

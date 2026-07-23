@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@upstand/ui/components/select";
+import { Textarea } from "@upstand/ui/components/textarea";
 import type { AdvancedCardProps } from "./types";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -277,26 +278,24 @@ export function ResourcesCard({ config, onChange }: AdvancedCardProps) {
             One Docker Swarm constraint per line, for example{" "}
             <span className="font-mono text-xs">node.labels.region == eu</span>.
           </FieldDescription>
-          <InputGroup className="h-auto">
-            <textarea
-              id="advanced-placement"
-              data-slot="input-group-control"
-              rows={Math.max(3, config.placementConstraints.length + 1)}
-              className="w-full flex-1 resize-none rounded-none border-0 bg-transparent px-3 py-2 font-mono text-sm shadow-none outline-none ring-0 focus-visible:ring-0 dark:bg-transparent"
-              placeholder={"node.role == worker\nnode.labels.region == eu"}
-              value={config.placementConstraints.join("\n")}
-              onChange={(e) =>
-                onChange(
-                  "placementConstraints",
-                  e.target.value
-                    .split("\n")
-                    .map((l) => l.trim())
-                    .filter(Boolean),
-                )
-              }
-              aria-label="Placement constraints"
-            />
-          </InputGroup>
+          <Textarea
+            id="advanced-placement"
+            data-slot="input-group-control"
+            rows={Math.max(3, config.placementConstraints.length + 1)}
+            className="w-full flex-1 resize-none rounded-none border-0 bg-transparent px-3 py-2 font-mono text-sm shadow-none outline-none ring-0 focus-visible:ring-0 dark:bg-transparent"
+            placeholder={"node.role == worker\nnode.labels.region == eu"}
+            value={config.placementConstraints.join("\n")}
+            onChange={(e) =>
+              onChange(
+                "placementConstraints",
+                e.target.value
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter(Boolean),
+              )
+            }
+            aria-label="Placement constraints"
+          />
         </Field>
       </CardContent>
     </Card>

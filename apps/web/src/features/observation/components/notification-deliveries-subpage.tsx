@@ -251,7 +251,7 @@ export function NotificationDeliveriesSubpage() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="size-7 text-amber-500 hover:text-amber-600"
+                              className="size-7 text-warning hover:text-warning"
                               title="Requeue / Retry Delivery"
                               disabled={retryMutation.isPending}
                               onClick={() =>
@@ -367,7 +367,7 @@ export function NotificationDeliveriesSubpage() {
                     <p className="mb-1 font-medium text-muted-foreground text-xs">
                       Delivered At
                     </p>
-                    <p className="font-mono text-emerald-500 text-xs">
+                    <p className="font-mono text-success text-xs">
                       {new Date(selectedDelivery.deliveredAt).toLocaleString()}
                     </p>
                   </div>
