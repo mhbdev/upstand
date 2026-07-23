@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { streamSSE } from "hono/streaming";
 import {
   createUpGalResponse,
   createUpGalTools,
@@ -21,7 +22,7 @@ import { auth } from "@upstand/api/auth";
 import { authorizeMcpTool, checkPermission } from "@upstand/api/permissions";
 import { isJsonObject } from "@upstand/domain";
 import { AIRepositoryToken } from "@upstand/repositories/tokens";
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import { z } from "zod";
 import { createHttpRateLimitMiddleware } from "../rate-limit";
 import type { AppEnv } from "../types";
@@ -145,25 +146,84 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
     }
   });
 
-  app.all("/api/mcp", async (c) => {
-    const requestLog = c.get("log");
-    const authorization = c.req.header("authorization") || "";
-    const token = authorization.startsWith("Bearer ")
-      ? authorization.slice(7)
-      : "";
-    const key = token
-      ? await authenticateApiKey(new Headers({ "x-api-key": token }))
-      : null;
-    if (!key) return c.json({ error: "Invalid or expired API key" }, 401);
+  // ---------------------------------------------------------------------------
+  // MCP Endpoint — supports both transports:
+  //   • GET  /api/mcp  → SSE (legacy transport, for clients that use EventSource)
+  //   • POST /api/mcp  → Streamable HTTP (current MCP spec, 2025-03-26)
+  //
+  // Authentication accepts:
+  //   1. Authorization: Bearer <key>   (standard)
+  //   2. X-Api-Key: <key>             (explicit header)
+  //   3. ?api_key=<key> or ?token=<key>   (query param for EventSource clients)
+  // ---------------------------------------------------------------------------
+
+  /** Resolve an API key from request headers OR query params (EventSource compat). */
+  const resolveMcpKey = async (c: Context<AppEnv>) => {
+    const headers = c.req.raw.headers;
+    // Try header-based auth first (covers Authorization: Bearer and X-Api-Key).
+    const fromHeaders = await authenticateApiKey(headers);
+    if (fromHeaders) return fromHeaders;
+    // Fall back to query param for clients that cannot set request headers (EventSource).
+    const qp = c.req.query("api_key") || c.req.query("token") || c.req.query("apiKey");
+    if (qp) {
+      return authenticateApiKey(new Headers({ "x-api-key": qp }));
+    }
+    return null;
+  };
+
+  // GET: legacy SSE transport — MCP 2024-11-05 and older clients.
+  // Opens a persistent SSE stream and immediately emits an "endpoint" event
+  // containing the POST URL that the client should use for all subsequent
+  // JSON-RPC messages.  A 30-second heartbeat keeps the connection alive
+  // through proxies and load balancers.
+  app.get("/api/mcp", async (c) => {
+    const key = await resolveMcpKey(c);
+    if (!key) {
+      return c.json({ error: "Invalid or expired API key" }, 401);
+    }
     setApiKeyRateLimitHeaders(key, (name, value) => c.header(name, value));
+
+    return streamSSE(c, async (stream) => {
+      // Derive the base URL so we point the client at the correct host.
+      const requestUrl = new URL(c.req.url);
+      const postUrl = `${requestUrl.origin}/api/mcp`;
+
+      // MCP legacy SSE transport: first event must be "endpoint".
+      await stream.writeSSE({ event: "endpoint", data: postUrl });
+
+      // Keep the SSE connection alive with periodic heartbeats.
+      while (!stream.aborted) {
+        await stream.sleep(30_000);
+        if (!stream.aborted) {
+          await stream.writeSSE({ event: "ping", data: "" });
+        }
+      }
+    });
+  });
+
+  // POST: Streamable HTTP transport + legacy SSE message endpoint.
+  // Handles all MCP JSON-RPC methods.  Clients using the legacy SSE transport
+  // POST here as their message endpoint.  Clients using Streamable HTTP send
+  // all requests here directly.
+  app.post("/api/mcp", async (c) => {
+    const requestLog = c.get("log");
+    const key = await resolveMcpKey(c);
+    if (!key) {
+      return c.json({ error: "Invalid or expired API key" }, 401);
+    }
+    setApiKeyRateLimitHeaders(key, (name, value) => c.header(name, value));
+
+    // Parse the JSON-RPC envelope.
     const bodyResult = z
       .object({
+        jsonrpc: z.literal("2.0").optional(),
         id: z.union([z.string(), z.number(), z.null()]).optional(),
         method: z.string(),
         params: z.record(z.string(), z.json()).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
-    if (!bodyResult.success)
+
+    if (!bodyResult.success) {
       return c.json(
         {
           jsonrpc: "2.0",
@@ -172,9 +232,55 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
         },
         400,
       );
+    }
+
     const body = bodyResult.data;
     const id = body.id ?? null;
-    const canUseMcpTool = async (name: string) => {
+
+    // -------------------------------------------------------------------------
+    // MCP Notifications — fire-and-forget; return 202 No Content (no JSON body).
+    // The spec says servers MUST NOT reply to notifications with a response.
+    // Clients rely on a clean 2xx status, NOT a JSON-RPC response object.
+    // -------------------------------------------------------------------------
+    if (
+      body.method === "notifications/initialized" ||
+      body.method === "notifications/cancelled" ||
+      body.method === "notifications/progress" ||
+      body.method === "notifications/roots/list_changed" ||
+      body.method.startsWith("notifications/")
+    ) {
+      c.status(202);
+      return c.body(null);
+    }
+
+    // -------------------------------------------------------------------------
+    // MCP ping — simple liveness check.
+    // -------------------------------------------------------------------------
+    if (body.method === "ping") {
+      return c.json({ jsonrpc: "2.0", id, result: {} });
+    }
+
+    // -------------------------------------------------------------------------
+    // Optional capability methods — return empty collections so clients that
+    // probe for resources/prompts don't fail.
+    // -------------------------------------------------------------------------
+    if (body.method === "resources/list") {
+      return c.json({ jsonrpc: "2.0", id, result: { resources: [] } });
+    }
+    if (body.method === "resources/templates/list") {
+      return c.json({ jsonrpc: "2.0", id, result: { resourceTemplates: [] } });
+    }
+    if (body.method === "prompts/list") {
+      return c.json({ jsonrpc: "2.0", id, result: { prompts: [] } });
+    }
+    if (body.method === "completion/complete") {
+      return c.json({ jsonrpc: "2.0", id, result: { completion: { values: [] } } });
+    }
+
+    // -------------------------------------------------------------------------
+    // Lazy helper — checks both tool name validity AND API key permission.
+    // -------------------------------------------------------------------------
+    const canUseMcpTool = async (name: string): Promise<boolean> => {
       if (!isUpGalToolName(name)) return false;
       try {
         await authorizeMcpTool(key, name);
@@ -183,45 +289,61 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
         return false;
       }
     };
-    if (body.method === "initialize")
+
+    // -------------------------------------------------------------------------
+    // initialize — MCP handshake.
+    // -------------------------------------------------------------------------
+    if (body.method === "initialize") {
       return c.json({
         jsonrpc: "2.0",
         id,
         result: {
           protocolVersion: "2025-03-26",
-          capabilities: { tools: {} },
+          capabilities: {
+            tools: { listChanged: false },
+            resources: {},
+            prompts: {},
+          },
           serverInfo: { name: "upstand-upgal", version: "1.0.0" },
         },
       });
-    if (body.method === "tools/list")
-      return c.json({
-        jsonrpc: "2.0",
-        id,
-        result: {
-          tools: (
-            await Promise.all(
-              UPGAL_TOOL_METADATA.map(async ([name, description, mutation]) =>
-                (await canUseMcpTool(name))
-                  ? { name, description, mutation }
-                  : null,
-              ),
-            )
-          )
-            .filter((tool): tool is NonNullable<typeof tool> => tool !== null)
-            .map(({ name, description, mutation }) => ({
-              name,
-              description,
-              annotations: {
-                destructiveHint: mutation,
-                readOnlyHint: !mutation,
-              },
-            })),
-        },
-      });
+    }
+
+    // -------------------------------------------------------------------------
+    // tools/list — return every tool this API key has access to.
+    // -------------------------------------------------------------------------
+    if (body.method === "tools/list") {
+      const tools = (
+        await Promise.all(
+          UPGAL_TOOL_METADATA.map(async ([name, description, mutation]) =>
+            (await canUseMcpTool(name))
+              ? { name, description, mutation }
+              : null,
+          ),
+        )
+      )
+        .filter((tool): tool is NonNullable<typeof tool> => tool !== null)
+        .map(({ name, description, mutation }) => ({
+          name,
+          description,
+          annotations: {
+            destructiveHint: mutation,
+            readOnlyHint: !mutation,
+          },
+          inputSchema: { type: "object" },
+        }));
+
+      return c.json({ jsonrpc: "2.0", id, result: { tools } });
+    }
+
+    // -------------------------------------------------------------------------
+    // tools/call — execute a tool, subject to permission checks.
+    // -------------------------------------------------------------------------
     if (body.method === "tools/call") {
       const name = body.params?.name;
       const args = body.params?.arguments ?? {};
-      if (typeof name !== "string" || !isJsonObject(args))
+
+      if (typeof name !== "string" || !isJsonObject(args)) {
         return c.json(
           {
             jsonrpc: "2.0",
@@ -233,10 +355,13 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
           },
           400,
         );
+      }
+
       const metadata = UPGAL_TOOL_METADATA.find(
         ([toolName]) => toolName === name,
       );
-      if (!metadata || !isUpGalToolName(name) || !(await canUseMcpTool(name)))
+
+      if (!metadata || !isUpGalToolName(name) || !(await canUseMcpTool(name))) {
         return c.json({
           jsonrpc: "2.0",
           id,
@@ -245,7 +370,10 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
             message: "Tool is not available for this API key",
           },
         });
-      if (metadata[2])
+      }
+
+      // Mutating tools require dashboard approval — surface this clearly.
+      if (metadata[2]) {
         return c.json({
           jsonrpc: "2.0",
           id,
@@ -259,6 +387,8 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
             ],
           },
         });
+      }
+
       try {
         const result = await executeUpGalReadTool(name, args, {
           organizationId: key.organizationId,
@@ -268,10 +398,13 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
           scope: c.get("scope"),
           log: requestLog,
         });
+
         return c.json({
           jsonrpc: "2.0",
           id,
-          result: { content: [{ type: "text", text: JSON.stringify(result) }] },
+          result: {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+          },
         });
       } catch (error) {
         const info = classifyUpGalError(error);
@@ -290,6 +423,10 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
         });
       }
     }
+
+    // -------------------------------------------------------------------------
+    // Unknown method — return JSON-RPC Method Not Found.
+    // -------------------------------------------------------------------------
     return c.json(
       {
         jsonrpc: "2.0",

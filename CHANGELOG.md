@@ -4,7 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.121 - 2026-07-23
+## 0.1.122 - 2026-07-23
+
+### Fixed
+
+- **MCP Server SSE & Streamable HTTP Transport**: Rewrote `/api/mcp` endpoint to fully comply with the MCP 2025-03-26 specification. `GET /api/mcp` now opens a persistent SSE stream for legacy clients (Cursor, Claude Desktop, Cline) by emitting an `endpoint` event followed by 30-second heartbeat pings. `POST /api/mcp` handles all JSON-RPC methods correctly: MCP notifications (`notifications/initialized`, `notifications/cancelled`, etc.) return `202 No Content` instead of the erroneous `-32601 Method not found`; `ping` returns a proper empty result; `resources/list`, `prompts/list`, and `completion/complete` return empty collections. Authentication is extended to support `Authorization: Bearer`, `X-Api-Key`, and query params (`api_key`, `token`) so EventSource clients that cannot set custom headers can still authenticate.
+
 
 ### Added
 
