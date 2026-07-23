@@ -339,22 +339,26 @@ export default function WebServerDashboard(_props: {
     },
   });
 
-  const cleanupInput = () => {
+  const [cleanupAction, setCleanupAction] = useState<{
+    title: string;
+    description: string;
+    action: (input: { organizationId: string; confirm: "CLEANUP" }) => void;
+    pending: boolean;
+  } | null>(null);
+  const [updateIpDialogOpen, setUpdateIpDialogOpen] = useState(false);
+  const [serverIpInput, setServerIpInput] = useState("");
+
+  const triggerCleanup = (
+    title: string,
+    description: string,
+    action: (input: { organizationId: string; confirm: "CLEANUP" }) => void,
+    pending: boolean,
+  ) => {
     if (!activeOrganization?.id) {
       toast.error("Select an organization before running Docker cleanup.");
-      return null;
+      return;
     }
-    if (
-      !window.confirm(
-        "This is destructive and affects unused Docker data on the host. Continue?",
-      )
-    ) {
-      return null;
-    }
-    return {
-      organizationId: activeOrganization.id,
-      confirm: "CLEANUP" as const,
-    };
+    setCleanupAction({ title, description, action, pending });
   };
 
   const cleanUnusedImagesMutation = useMutation({
@@ -892,16 +896,8 @@ export default function WebServerDashboard(_props: {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
-                          const currentIp = info?.settings?.serverIp || "";
-                          const ip = prompt(
-                            "Enter Server IP Address (leave empty to auto-detect):",
-                            currentIp,
-                          );
-                          if (ip !== null) {
-                            updateServerIpMutation.mutate(
-                              ip.trim() ? { ip: ip.trim() } : {},
-                            );
-                          }
+                          setServerIpInput(info?.settings?.serverIp || "");
+                          setUpdateIpDialogOpen(true);
                         }}
                       >
                         Update Server IP
@@ -912,11 +908,15 @@ export default function WebServerDashboard(_props: {
                         Clean Redis
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          const input = cleanupInput();
-                          if (input)
-                            cleanAllDeploymentQueueMutation.mutate(input);
-                        }}
+                        onClick={() =>
+                          triggerCleanup(
+                            "Clean Deployment Queue",
+                            "This will clean all stuck deployments in the queue and mark them as failed. Continue?",
+                            (input) =>
+                              cleanAllDeploymentQueueMutation.mutate(input),
+                            cleanAllDeploymentQueueMutation.isPending,
+                          )
+                        }
                       >
                         Clean all deployment queue
                       </DropdownMenuItem>
@@ -984,51 +984,75 @@ export default function WebServerDashboard(_props: {
                   <DropdownMenuPortal>
                     <DropdownMenuContent className="w-56 bg-popover text-popover-foreground">
                       <DropdownMenuItem
-                        onClick={() => {
-                          const input = cleanupInput();
-                          if (input) cleanUnusedImagesMutation.mutate(input);
-                        }}
+                        onClick={() =>
+                          triggerCleanup(
+                            "Clean Unused Images",
+                            "This will prune all unused Docker images on the host. Continue?",
+                            (input) => cleanUnusedImagesMutation.mutate(input),
+                            cleanUnusedImagesMutation.isPending,
+                          )
+                        }
                       >
                         Clean unused images
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          const input = cleanupInput();
-                          if (input) cleanUnusedVolumesMutation.mutate(input);
-                        }}
+                        onClick={() =>
+                          triggerCleanup(
+                            "Clean Unused Volumes",
+                            "This will remove unused Docker volumes on the host. Continue?",
+                            (input) => cleanUnusedVolumesMutation.mutate(input),
+                            cleanUnusedVolumesMutation.isPending,
+                          )
+                        }
                       >
                         Clean unused volumes
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          const input = cleanupInput();
-                          if (input)
-                            cleanStoppedContainersMutation.mutate(input);
-                        }}
+                        onClick={() =>
+                          triggerCleanup(
+                            "Clean Stopped Containers",
+                            "This will remove all stopped Docker containers on the host. Continue?",
+                            (input) =>
+                              cleanStoppedContainersMutation.mutate(input),
+                            cleanStoppedContainersMutation.isPending,
+                          )
+                        }
                       >
                         Clean stopped containers
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          const input = cleanupInput();
-                          if (input) cleanDockerBuilderMutation.mutate(input);
-                        }}
+                        onClick={() =>
+                          triggerCleanup(
+                            "Clean Docker Builder Cache",
+                            "This will clear the Docker build cache on the host. Continue?",
+                            (input) => cleanDockerBuilderMutation.mutate(input),
+                            cleanDockerBuilderMutation.isPending,
+                          )
+                        }
                       >
                         Clean Docker Builder
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          const input = cleanupInput();
-                          if (input) cleanDockerPruneMutation.mutate(input);
-                        }}
+                        onClick={() =>
+                          triggerCleanup(
+                            "Clean Docker System",
+                            "This will run docker system prune on the host. Continue?",
+                            (input) => cleanDockerPruneMutation.mutate(input),
+                            cleanDockerPruneMutation.isPending,
+                          )
+                        }
                       >
                         Clean Docker System
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
-                          const input = cleanupInput();
-                          if (input) cleanAllMutation.mutate(input);
-                        }}
+                        onClick={() =>
+                          triggerCleanup(
+                            "Clean All Docker Resources",
+                            "This is destructive and will prune unused images, volumes, build cache, and containers. Continue?",
+                            (input) => cleanAllMutation.mutate(input),
+                            cleanAllMutation.isPending,
+                          )
+                        }
                       >
                         Clean all
                       </DropdownMenuItem>
@@ -1921,6 +1945,73 @@ export default function WebServerDashboard(_props: {
           }
         }}
       />
+      <ConfirmActionDialog
+        open={Boolean(cleanupAction)}
+        onOpenChange={(open) => !open && setCleanupAction(null)}
+        title={cleanupAction?.title || "Docker Cleanup"}
+        description={
+          cleanupAction?.description || "This action is destructive. Continue?"
+        }
+        actionLabel="Run Cleanup"
+        pending={cleanupAction?.pending ?? false}
+        onConfirm={() => {
+          if (cleanupAction && activeOrganization?.id) {
+            cleanupAction.action({
+              organizationId: activeOrganization.id,
+              confirm: "CLEANUP",
+            });
+            setCleanupAction(null);
+          }
+        }}
+      />
+
+      <Dialog open={updateIpDialogOpen} onOpenChange={setUpdateIpDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Server IP</DialogTitle>
+            <DialogDescription>
+              Enter Server IP Address (leave empty to auto-detect).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Label htmlFor="server-ip-input" className="sr-only">
+              Server IP Address
+            </Label>
+            <Input
+              id="server-ip-input"
+              value={serverIpInput}
+              onChange={(e) => setServerIpInput(e.target.value)}
+              placeholder="e.g. 192.168.1.1 or leave empty"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const ip = serverIpInput.trim();
+                  updateServerIpMutation.mutate(ip ? { ip } : {});
+                  setUpdateIpDialogOpen(false);
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setUpdateIpDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const ip = serverIpInput.trim();
+                updateServerIpMutation.mutate(ip ? { ip } : {});
+                setUpdateIpDialogOpen(false);
+              }}
+            >
+              Save IP Address
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardPage>
   );
 }

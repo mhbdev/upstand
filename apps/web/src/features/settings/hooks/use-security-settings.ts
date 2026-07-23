@@ -51,11 +51,6 @@ export function useSecuritySettings(onVerifySuccess?: () => void) {
   };
 
   const handleDisable = async (password: string) => {
-    if (
-      !confirm("Are you sure? Disabling 2FA makes your account less secure.")
-    ) {
-      return;
-    }
     setLoading(true);
     try {
       const { error } = await authClient.twoFactor.disable({ password });
@@ -73,13 +68,6 @@ export function useSecuritySettings(onVerifySuccess?: () => void) {
   };
 
   const handleRegenerateBackupCodes = async () => {
-    if (
-      !confirm(
-        "Generate new recovery codes? All existing recovery codes will stop working.",
-      )
-    ) {
-      return;
-    }
     setLoading(true);
     try {
       const { data, error } = await authClient.twoFactor.generateBackupCodes(

@@ -4,7 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.130 - 2026-07-23
+## 0.1.131 - 2026-07-24
+
+### Changed
+
+- **Native JS Dialogs Replacement**: Replaced native browser `window.confirm`, `window.prompt`, and `window.alert` dialogs across the Web UI with installed `@upstand/ui` components (`AlertDialog`, `Dialog`, `ConfirmActionDialog`, `Checkbox`). Upgraded 2FA disable/regeneration, Docker cleanup operations, Server IP updates, and environment clone, compare, and promote workflows to modern, accessible UI modals.
+
+
 
 ### Fixed
 

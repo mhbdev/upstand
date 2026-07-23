@@ -15,6 +15,16 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DATABASE_IMAGE_OPTIONS, type DatabaseType } from "@upstand/domain";
 import { env } from "@upstand/env/web";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@upstand/ui/components/alert-dialog";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -24,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
+import { Checkbox } from "@upstand/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -1295,6 +1306,16 @@ export default function EnvironmentDetail({
   const [secretSyncOpen, setSecretSyncOpen] = useState(false);
   const [secretRotationOpen, setSecretRotationOpen] = useState(false);
   const [secretHistoryOpen, setSecretHistoryOpen] = useState(false);
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [cloneNameInput, setCloneNameInput] = useState("");
+  const [diffDialogOpen, setDiffDialogOpen] = useState(false);
+  const [diffResult, setDiffResult] = useState<{
+    variablesCount: number;
+    resourcesCount: number;
+  } | null>(null);
+  const [loadingDiff, setLoadingDiff] = useState(false);
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
+  const [includeSecretsInPromote, setIncludeSecretsInPromote] = useState(false);
 
   // Fetch project
   const { data: project } = useQuery({
@@ -1474,17 +1495,8 @@ export default function EnvironmentDetail({
             <Button
               variant="outline"
               onClick={() => {
-                const name = window.prompt(
-                  "Name for the cloned environment",
-                  `${env.name}-copy`,
-                );
-                if (name?.trim())
-                  cloneEnvironmentMutation.mutate({
-                    sourceEnvironmentId: environmentId,
-                    name: name.trim(),
-                    includeResources: true,
-                    includeSecrets: false,
-                  });
+                setCloneNameInput(`${env?.name || ""}-copy`);
+                setCloneDialogOpen(true);
               }}
               disabled={cloneEnvironmentMutation.isPending}
             >
@@ -1732,19 +1744,33 @@ export default function EnvironmentDetail({
                   </Select>
                   <Button
                     variant="outline"
-                    disabled={!targetEnvironmentId}
+                    disabled={!targetEnvironmentId || loadingDiff}
                     onClick={async () => {
-                      const diff = await queryClient.fetchQuery(
-                        trpc.environment.diff.queryOptions({
-                          sourceEnvironmentId: environmentId,
-                          targetEnvironmentId,
-                        }),
-                      );
-                      window.alert(
-                        `Variables changed: ${diff.variables.length}\nResources changed: ${diff.resources.filter((entry: any) => entry.changed).length}`,
-                      );
+                      setLoadingDiff(true);
+                      try {
+                        const diff = await queryClient.fetchQuery(
+                          trpc.environment.diff.queryOptions({
+                            sourceEnvironmentId: environmentId,
+                            targetEnvironmentId,
+                          }),
+                        );
+                        setDiffResult({
+                          variablesCount: diff.variables.length,
+                          resourcesCount: diff.resources.filter(
+                            (entry: any) => entry.changed,
+                          ).length,
+                        });
+                        setDiffDialogOpen(true);
+                      } catch (err: any) {
+                        toast.error(
+                          err.message || "Failed to compare environments",
+                        );
+                      } finally {
+                        setLoadingDiff(false);
+                      }
                     }}
                   >
+                    {loadingDiff && <Spinner data-icon="inline-start" />}
                     Compare
                   </Button>
                   <Button
@@ -1753,21 +1779,8 @@ export default function EnvironmentDetail({
                       promoteEnvironmentMutation.isPending
                     }
                     onClick={() => {
-                      if (
-                        window.confirm(
-                          `Promote ${env.name} to the selected environment?`,
-                        )
-                      ) {
-                        const includeSecrets = window.confirm(
-                          "Include environment and resource secrets in this promotion? Choose Cancel to promote configuration only.",
-                        );
-                        promoteEnvironmentMutation.mutate({
-                          sourceEnvironmentId: environmentId,
-                          targetEnvironmentId,
-                          includeResources: true,
-                          includeSecrets,
-                        });
-                      }
+                      setIncludeSecretsInPromote(false);
+                      setPromoteDialogOpen(true);
                     }}
                   >
                     Promote
@@ -1887,6 +1900,167 @@ export default function EnvironmentDetail({
               });
             }}
           />
+
+          {/* Clone Environment Dialog */}
+          <Dialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Clone Environment</DialogTitle>
+                <DialogDescription>
+                  Create a new environment cloned from{" "}
+                  <strong>{env?.name}</strong>.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-2">
+                <Label htmlFor="clone-env-name">Cloned Environment Name</Label>
+                <Input
+                  id="clone-env-name"
+                  value={cloneNameInput}
+                  onChange={(e) => setCloneNameInput(e.target.value)}
+                  placeholder="e.g. staging-copy"
+                  className="mt-1"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && cloneNameInput.trim()) {
+                      e.preventDefault();
+                      cloneEnvironmentMutation.mutate({
+                        sourceEnvironmentId: environmentId,
+                        name: cloneNameInput.trim(),
+                        includeResources: true,
+                        includeSecrets: false,
+                      });
+                      setCloneDialogOpen(false);
+                    }
+                  }}
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setCloneDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={
+                    !cloneNameInput.trim() || cloneEnvironmentMutation.isPending
+                  }
+                  onClick={() => {
+                    if (cloneNameInput.trim()) {
+                      cloneEnvironmentMutation.mutate({
+                        sourceEnvironmentId: environmentId,
+                        name: cloneNameInput.trim(),
+                        includeResources: true,
+                        includeSecrets: false,
+                      });
+                      setCloneDialogOpen(false);
+                    }
+                  }}
+                >
+                  {cloneEnvironmentMutation.isPending && (
+                    <Spinner data-icon="inline-start" />
+                  )}
+                  Clone Environment
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Environment Comparison Summary Dialog */}
+          <Dialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Environment Comparison</DialogTitle>
+                <DialogDescription>
+                  Summary of differences between <strong>{env?.name}</strong>{" "}
+                  and the target environment.
+                </DialogDescription>
+              </DialogHeader>
+              {diffResult && (
+                <div className="grid grid-cols-2 gap-3 py-3">
+                  <div className="rounded-lg border bg-card p-3 text-card-foreground shadow-xs">
+                    <p className="font-medium text-muted-foreground text-xs">
+                      Variables Changed
+                    </p>
+                    <p className="font-bold text-2xl">
+                      {diffResult.variablesCount}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-card-foreground shadow-xs">
+                    <p className="font-medium text-muted-foreground text-xs">
+                      Resources Changed
+                    </p>
+                    <p className="font-bold text-2xl">
+                      {diffResult.resourcesCount}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button onClick={() => setDiffDialogOpen(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Promote Environment Confirmation Modal */}
+          <AlertDialog
+            open={promoteDialogOpen}
+            onOpenChange={setPromoteDialogOpen}
+          >
+            <AlertDialogContent className="sm:max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Promote Environment?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to promote <strong>{env?.name}</strong>{" "}
+                  to the selected environment?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="py-2">
+                <label className="flex cursor-pointer items-center gap-2 font-medium text-sm">
+                  <Checkbox
+                    checked={includeSecretsInPromote}
+                    onCheckedChange={(c) =>
+                      setIncludeSecretsInPromote(Boolean(c))
+                    }
+                  />
+                  <span>
+                    Include environment and resource secrets in this promotion
+                  </span>
+                </label>
+                <p className="mt-1 ml-6 text-muted-foreground text-xs">
+                  Uncheck to promote environment configuration only.
+                </p>
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel
+                  disabled={promoteEnvironmentMutation.isPending}
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={promoteEnvironmentMutation.isPending}
+                  onClick={() => {
+                    promoteEnvironmentMutation.mutate(
+                      {
+                        sourceEnvironmentId: environmentId,
+                        targetEnvironmentId,
+                        includeResources: true,
+                        includeSecrets: includeSecretsInPromote,
+                      },
+                      {
+                        onSuccess: () => setPromoteDialogOpen(false),
+                      },
+                    );
+                  }}
+                >
+                  {promoteEnvironmentMutation.isPending && (
+                    <Spinner data-icon="inline-start" />
+                  )}
+                  Promote Environment
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </div>

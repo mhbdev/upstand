@@ -1,4 +1,14 @@
 import { useForm } from "@tanstack/react-form";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@upstand/ui/components/alert-dialog";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -12,12 +22,15 @@ import { Field, FieldError, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import { Separator } from "@upstand/ui/components/separator";
 import { Spinner } from "@upstand/ui/components/spinner";
+import { useState } from "react";
 import z from "zod";
 import { authClient } from "@/lib/auth-client";
 import { useSecuritySettings } from "../hooks/use-security-settings";
 
 export function SecurityPanel() {
   const { data: session } = authClient.useSession();
+  const [regenBackupConfirmOpen, setRegenBackupConfirmOpen] = useState(false);
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
 
   const codeForm = useForm({
     defaultValues: {
@@ -70,9 +83,8 @@ export function SecurityPanel() {
     defaultValues: {
       password: "",
     },
-    onSubmit: async ({ value }) => {
-      await handleDisable(value.password);
-      disableForm.reset();
+    onSubmit: async () => {
+      setDisableConfirmOpen(true);
     },
     validators: {
       onSubmit: z.object({
@@ -132,7 +144,7 @@ export function SecurityPanel() {
                     variant="outline"
                     size="sm"
                     disabled={loading}
-                    onClick={handleRegenerateBackupCodes}
+                    onClick={() => setRegenBackupConfirmOpen(true)}
                   >
                     {loading && <Spinner data-icon="inline-start" />}
                     Regenerate recovery codes
@@ -357,6 +369,62 @@ export function SecurityPanel() {
           </CardContent>
         </Card>
       )}
+      {/* Confirm Regenerate Recovery Codes */}
+      <AlertDialog
+        open={regenBackupConfirmOpen}
+        onOpenChange={setRegenBackupConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate New Recovery Codes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All existing recovery codes will stop working immediately. Make
+              sure to save the new codes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setRegenBackupConfirmOpen(false);
+                await handleRegenerateBackupCodes();
+              }}
+            >
+              Generate New Codes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Disable 2FA */}
+      <AlertDialog
+        open={disableConfirmOpen}
+        onOpenChange={setDisableConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Disable Two-Factor Authentication?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure? Disabling 2FA makes your account less secure.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={async () => {
+                setDisableConfirmOpen(false);
+                await handleDisable(disableForm.state.values.password);
+                disableForm.reset();
+              }}
+            >
+              Disable 2FA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
