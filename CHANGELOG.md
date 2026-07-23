@@ -4,7 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.127 - 2026-07-23
+## 0.1.128 - 2026-07-23
+
+### Fixed
+
+- **Idempotent Database Migrations**: Added `IF NOT EXISTS` to Drizzle SQL migration `0058_bent_daredevil.sql` (`ALTER TABLE "project" ADD COLUMN IF NOT EXISTS "description" text;`). Resolves PostgreSQL error `42701` (`column "description" of relation "project" already exists`) during production server startup, preventing container crash-loops and Docker Swarm deployment rollbacks.
+
+
 
 ### Fixed
 
