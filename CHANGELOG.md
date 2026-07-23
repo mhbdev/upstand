@@ -4,7 +4,15 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.122 - 2026-07-23
+## 0.1.123 - 2026-07-23
+
+### Security
+
+- **MCP Destructive Tool Suppression**: Mutating tools (`delete_resource`, `delete_project`, `delete_tag`, `delete_schedule`, and all other write/mutation tools) are no longer advertised in `tools/list`. They were already blocked at `tools/call` and require dashboard approval, but their presence in the listing triggered risk-pattern warnings in MCP security scanners. Only read-only tools are now returned, each annotated with `readOnlyHint: true, destructiveHint: false`.
+- **HSTS Header**: Added global `Strict-Transport-Security: max-age=31536000; includeSubDomains` response header applied to all HTTPS responses. The header is conditioned on `x-forwarded-proto: https` so plain HTTP local development is unaffected.
+- **OAuth 2.0 Authorization Server Metadata** (`/.well-known/oauth-authorization-server`): Added RFC 8414 metadata endpoint required by MCP 2025-03-26 clients for auth auto-negotiation. Documents that the server accepts API keys as Bearer tokens and points to `/docs` for key provisioning. MCP clients can now auto-negotiate authentication without manual configuration.
+- **MCP Rate Limiting**: Added `createHttpRateLimitMiddleware` to `GET /api/mcp` and `POST /api/mcp`, bucketed per API key (`apikey:<keyId>`). Previously only response headers were decorated but no Redis-backed enforcement was applied.
+
 
 ### Fixed
 
