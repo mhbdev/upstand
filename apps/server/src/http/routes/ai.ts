@@ -148,7 +148,7 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
   });
 
   app.use(
-    "/api/mcp",
+    "/api/mcp*",
     createHttpRateLimitMiddleware({
       path: "api.mcp",
       profile: "default",
@@ -190,15 +190,14 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
   );
 
   // ---------------------------------------------------------------------------
-
-  // MCP Endpoint — supports both transports:
-  //   • GET  /api/mcp  → SSE (legacy transport, for clients that use EventSource)
-  //   • POST /api/mcp  → Streamable HTTP (current MCP spec, 2025-03-26)
+  // MCP Endpoints — supports both transports & all endpoint path aliases:
+  //   • GET  /api/mcp, /api/mcp/sse  → SSE (legacy transport, EventSource)
+  //   • POST /api/mcp, /api/mcp/sse  → Streamable HTTP / SSE message endpoint
   //
   // Authentication accepts:
   //   1. Authorization: Bearer <key>   (standard)
   //   2. X-Api-Key: <key>             (explicit header)
-  //   3. ?api_key=<key> or ?token=<key>   (query param for EventSource clients)
+  //   3. ?api_key=<key> or ?token=<key> or ?apiKey=<key> (query param)
   // ---------------------------------------------------------------------------
 
   /** Resolve an API key from request headers OR query params (EventSource compat). */
@@ -217,11 +216,7 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
   };
 
   // GET: legacy SSE transport — MCP 2024-11-05 and older clients.
-  // Opens a persistent SSE stream and immediately emits an "endpoint" event
-  // containing the POST URL that the client should use for all subsequent
-  // JSON-RPC messages.  A 30-second heartbeat keeps the connection alive
-  // through proxies and load balancers.
-  app.get("/api/mcp", async (c) => {
+  const handleMcpGet = async (c: Context<AppEnv>) => {
     const key = await resolveMcpKey(c);
     if (!key) {
       return c.json({ error: "Invalid or expired API key" }, 401);
@@ -232,7 +227,9 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
     const sessionId =
       c.req.query("sessionId") || c.req.query("session_id") || randomUUID();
 
-    const postUrlObj = new URL(`${requestUrl.origin}/api/mcp`);
+    const postUrlObj = new URL(
+      `${requestUrl.origin}${requestUrl.pathname.replace(/\/+$/, "")}`,
+    );
     postUrlObj.searchParams.set("sessionId", sessionId);
 
     // Preserve all query parameters (e.g. api_key, token) so POST requests
@@ -261,13 +258,10 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
         }
       }
     });
-  });
+  };
 
   // POST: Streamable HTTP transport + legacy SSE message endpoint.
-  // Handles all MCP JSON-RPC methods.  Clients using the legacy SSE transport
-  // POST here as their message endpoint.  Clients using Streamable HTTP send
-  // all requests here directly.
-  app.post("/api/mcp", async (c) => {
+  const handleMcpPost = async (c: Context<AppEnv>) => {
     const requestLog = c.get("log");
     const key = await resolveMcpKey(c);
     if (!key) {
@@ -509,5 +503,22 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
       },
       404,
     );
-  });
+  };
+
+  // Register route handlers across all path aliases (/api/mcp, /api/mcp/sse, /api/mcp/messages, etc.)
+  const mcpGetPaths = ["/api/mcp", "/api/mcp/sse", "/api/mcp/*"];
+  for (const path of mcpGetPaths) {
+    app.get(path, handleMcpGet);
+  }
+
+  const mcpPostPaths = [
+    "/api/mcp",
+    "/api/mcp/sse",
+    "/api/mcp/messages",
+    "/api/mcp/*",
+  ];
+  for (const path of mcpPostPaths) {
+    app.post(path, handleMcpPost);
+    app.options(path, (c) => c.body(null, 204));
+  }
 }

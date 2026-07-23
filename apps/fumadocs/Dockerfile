@@ -21,6 +21,7 @@ RUN mkdir -p apps/fumadocs/public
 FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV SKIP_ENV_VALIDATION=1
 
 COPY --from=builder /app/apps/fumadocs/.next/standalone ./
 COPY --from=builder /app/apps/fumadocs/.next/static ./apps/fumadocs/.next/static

@@ -57,6 +57,14 @@ export function registerHttpMiddleware(
     cors({
       origin: (origin, c) => {
         if (!origin) return undefined;
+        // Allow any origin for MCP endpoints and discovery metadata so web-based
+        // MCP tools, playgrounds, and inspectors can connect seamlessly.
+        if (
+          c.req.path.startsWith("/api/mcp") ||
+          c.req.path.startsWith("/.well-known")
+        ) {
+          return origin;
+        }
         if (origin === env.CORS_ORIGIN) return origin;
 
         try {
@@ -85,11 +93,20 @@ export function registerHttpMiddleware(
         return env.CORS_ORIGIN || "http://localhost:3001";
       },
       allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-API-Key",
+        "Mcp-Session-Id",
+        "mcp-session-id",
+        "Last-Event-ID",
+      ],
       exposeHeaders: [
         "X-RateLimit-Limit",
         "X-RateLimit-Remaining",
         "X-RateLimit-Reset",
+        "Mcp-Session-Id",
+        "Location",
       ],
       credentials: true,
     }),

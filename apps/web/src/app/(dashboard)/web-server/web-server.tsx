@@ -1525,7 +1525,7 @@ export default function WebServerDashboard(_props: {
 
           {/* ─── LIVE CONTAINER LOGS (Caddy) ────────────────────────────────── */}
           <Card className="border border-border/40 bg-card/20 shadow-sm">
-            <CardHeader className="flex flex-col gap-4 pb-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="font-semibold text-lg">
                   Live Access & Process Logs

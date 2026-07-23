@@ -4,7 +4,16 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.124 - 2026-07-23
+## 0.1.125 - 2026-07-23
+
+### Fixed
+
+- **MCP Route Path Aliases & Universal CORS for Browser Clients**: Registered MCP route handlers across all path aliases (`/api/mcp`, `/api/mcp/sse`, `/api/mcp/messages`, `/api/mcp/*`) resolving `404 Not Found` when external clients or tester suites connect to `/api/mcp/sse?token=...`. Enabled universal CORS origin matching and session headers (`Mcp-Session-Id`, `Last-Event-ID`) on `/api/mcp*` and `/.well-known/*` so web-based MCP inspectors, tools, and playgrounds can connect without same-origin browser policy blocks.
+- **Fumadocs Container Environment Validation**: Added `ENV SKIP_ENV_VALIDATION=1` to the `runner` stage of `apps/fumadocs/Dockerfile` and updated `packages/env/src/server.ts` to allow `SKIP_ENV_VALIDATION` regardless of `NODE_ENV=production`. Prevents standalone documentation containers from failing with missing server environment variable errors (`DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.).
+- **RFC 8414 OAuth 2.0 Discovery Compliance**: Populated all REQUIRED fields (`issuer`, `authorization_endpoint`, `token_endpoint`, `response_types_supported`, `grant_types_supported`, `token_endpoint_auth_methods_supported`, `code_challenge_methods_supported`) on `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
+- **MCP Tool List Coverage & Zod Schemas**: Exposed all 63 tools in `tools/list` with complete Zod-derived JSON input schemas (`z.toJSONSchema`) and accurate `readOnlyHint` / `destructiveHint` annotations so 3rd party AI models parse tool parameters cleanly.
+
+
 
 ### Fixed
 
