@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.121 - 2026-07-23
+
+### Added
+
+- **Fumadocs MCP Server Integration & Setup Tutorial**: Created comprehensive documentation (`/docs/operations/mcp-server`) detailing setup, authentication, JSON-RPC specifications, and configuration guides for connecting Upstand's `/api/mcp` endpoint to VS Code (Cline, Roo Code, Copilot), Claude Desktop, Claude Code, Cursor, Codex, and Windsurf.
+
 ## 0.1.120 - 2026-07-23
 
 ### Added
