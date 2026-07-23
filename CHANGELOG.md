@@ -4,7 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.126 - 2026-07-23
+## 0.1.127 - 2026-07-23
+
+### Fixed
+
+- **Database Migration Metadata Formatting**: Formatted `packages/db/src/migrations/meta/_journal.json` and `0058_snapshot.json` with Biome, ensuring that `biome check .` passes cleanly across all packages during release workflow verification (`Verify lint, security, and production shell syntax`).
+
+
 
 ### Fixed
 
