@@ -243,6 +243,13 @@ export function registerApplicationFeatures(services: ServiceCollection) {
       ),
   );
   services.addTransient(
+    dependencies.TestSecretProviderConnectionUseCaseToken,
+    (c) =>
+      new dependencies.TestSecretProviderConnectionUseCase(
+        c.resolve(dependencies.ExternalSecretProviderToken),
+      ),
+  );
+  services.addTransient(
     dependencies.RotateSecretsUseCaseToken,
     (c) =>
       new dependencies.RotateSecretsUseCase(

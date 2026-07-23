@@ -2,6 +2,11 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@upstand/ui/components/alert";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -31,6 +36,12 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@upstand/ui/components/tabs";
 import { Textarea } from "@upstand/ui/components/textarea";
 import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
@@ -307,7 +318,7 @@ export default function SSHKeys(_props: {
           Please select an organization to view SSH keys.
         </div>
       ) : keys && keys.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-2 md:grid-cols-2">
           {keys.map((key) => (
             <Card key={key.id}>
               <CardHeader className="flex flex-row items-start justify-between">
@@ -353,7 +364,7 @@ export default function SSHKeys(_props: {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="mt-1 border border-border/30 p-3">
+                <div className="mt-1 rounded-2xl bg-muted p-3">
                   <Label className="font-bold text-[9px] text-muted-foreground uppercase tracking-widest">
                     Fingerprint
                   </Label>
@@ -407,7 +418,7 @@ export default function SSHKeys(_props: {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdate} className="flex flex-col gap-4">
-            <FieldGroup>
+            <FieldGroup className="flex flex-col gap-2">
               <Field>
                 <FieldLabel htmlFor="edit-key-name">Name</FieldLabel>
                 <Input
@@ -427,10 +438,7 @@ export default function SSHKeys(_props: {
                   onChange={(e) => setEditDescription(e.target.value)}
                 />
               </Field>
-              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-muted-foreground text-xs">
-                Leave the rotation fields empty to keep the current key. If you
-                rotate, both key halves are required and will be verified.
-              </div>
+
               <Field>
                 <FieldLabel htmlFor="rotate-private-key">
                   Replacement private key
@@ -455,6 +463,11 @@ export default function SSHKeys(_props: {
                   className="resize-none break-all font-mono text-xs"
                 />
               </Field>
+
+              <div className="rounded-2xl border border-warning/30 bg-warning/5 p-3 text-muted-foreground text-xs">
+                Leave the rotation fields empty to keep the current key. If you
+                rotate, both key halves are required and will be verified.
+              </div>
             </FieldGroup>
             <DialogFooter className="gap-2">
               <Button
@@ -492,205 +505,194 @@ export default function SSHKeys(_props: {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Mode toggle */}
-          <div className="flex gap-1.5 rounded-lg border border-border/40 bg-muted/20 p-1">
-            <UpGalTarget definition={generateNewSshKeyTarget}>
-              <button
-                type="button"
-                onClick={() => setAddKeyMode("generate")}
-                className={cn(
-                  "flex-1 rounded-md py-1.5 font-medium text-xs transition-colors",
-                  addKeyMode === "generate"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                Generate new key
-              </button>
-            </UpGalTarget>
-            <UpGalTarget definition={useExistingSshKeyTarget}>
-              <button
-                type="button"
-                onClick={() => setAddKeyMode("import")}
-                className={cn(
-                  "flex-1 rounded-md py-1.5 font-medium text-xs transition-colors",
-                  addKeyMode === "import"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                Use existing key
-              </button>
-            </UpGalTarget>
-          </div>
+          <Tabs
+            value={addKeyMode}
+            onValueChange={(val) => setAddKeyMode(val as AddKeyMode)}
+            className="flex flex-col gap-4"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <UpGalTarget definition={generateNewSshKeyTarget}>
+                <TabsTrigger value="generate">Generate new key</TabsTrigger>
+              </UpGalTarget>
+              <UpGalTarget definition={useExistingSshKeyTarget}>
+                <TabsTrigger value="import">Use existing key</TabsTrigger>
+              </UpGalTarget>
+            </TabsList>
 
-          {addKeyMode === "generate" ? (
-            <form onSubmit={handleGenerate} className="flex flex-col gap-4">
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="key-name">Name</FieldLabel>
-                  <UpGalTarget definition={sshKeyNameTarget}>
-                    <Input
-                      id="key-name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. My Server Key"
-                      autoComplete="off"
-                      required
-                    />
-                  </UpGalTarget>
-                </Field>
+            <TabsContent value="generate">
+              <form onSubmit={handleGenerate} className="flex flex-col gap-4">
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="key-name">Name</FieldLabel>
+                    <UpGalTarget definition={sshKeyNameTarget}>
+                      <Input
+                        id="key-name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. My Server Key"
+                        autoComplete="off"
+                        required
+                      />
+                    </UpGalTarget>
+                  </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="key-description">Description</FieldLabel>
-                  <UpGalTarget definition={sshKeyDescriptionTarget}>
-                    <Input
-                      id="key-description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Optional details about this key"
-                      autoComplete="off"
-                    />
-                  </UpGalTarget>
-                </Field>
+                  <Field>
+                    <FieldLabel htmlFor="key-description">
+                      Description
+                    </FieldLabel>
+                    <UpGalTarget definition={sshKeyDescriptionTarget}>
+                      <Input
+                        id="key-description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Optional details about this key"
+                        autoComplete="off"
+                      />
+                    </UpGalTarget>
+                  </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="key-algorithm">Key Type</FieldLabel>
-                  <Select
-                    items={[
-                      { value: "ed25519", label: "ED25519 (Recommended)" },
-                      { value: "rsa", label: "RSA 2048-bit" },
-                    ]}
-                    value={algorithm}
-                    onValueChange={(val) =>
-                      val && setAlgorithm(val as "ed25519" | "rsa")
-                    }
-                  >
-                    <SelectTrigger id="key-algorithm">
-                      <SelectValue placeholder="Select key type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="ed25519">
-                          ED25519 (Recommended)
-                        </SelectItem>
-                        <SelectItem value="rsa">RSA 2048-bit</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="key-algorithm">Key Type</FieldLabel>
+                    <Select
+                      items={[
+                        { value: "ed25519", label: "ED25519 (Recommended)" },
+                        { value: "rsa", label: "RSA 2048-bit" },
+                      ]}
+                      value={algorithm}
+                      onValueChange={(val) =>
+                        val && setAlgorithm(val as "ed25519" | "rsa")
+                      }
+                    >
+                      <SelectTrigger id="key-algorithm">
+                        <SelectValue placeholder="Select key type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="ed25519">
+                            ED25519 (Recommended)
+                          </SelectItem>
+                          <SelectItem value="rsa">RSA 2048-bit</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </FieldGroup>
 
-              <DialogFooter className="gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAddKeyOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <UpGalTarget definition={generateSshKeySubmitTarget}>
+                <DialogFooter className="gap-2 pt-2">
                   <Button
-                    type="submit"
-                    className="gap-2 font-medium"
-                    disabled={isSubmitting}
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAddKeyOpen(false)}
                   >
-                    {generateMutation.isPending && (
-                      <Spinner className="size-4" />
-                    )}
-                    {generateMutation.isPending
-                      ? "Generating…"
-                      : "Generate Key"}
+                    Cancel
                   </Button>
-                </UpGalTarget>
-              </DialogFooter>
-            </form>
-          ) : (
-            <form onSubmit={handleImport} className="flex flex-col gap-4">
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="key-name-import">Name</FieldLabel>
-                  <UpGalTarget definition={sshKeyNameTarget}>
-                    <Input
-                      id="key-name-import"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Work Laptop Key"
-                      autoComplete="off"
-                      required
-                    />
+                  <UpGalTarget definition={generateSshKeySubmitTarget}>
+                    <Button
+                      type="submit"
+                      className="gap-2 font-medium"
+                      disabled={isSubmitting}
+                    >
+                      {generateMutation.isPending && (
+                        <Spinner className="size-4" />
+                      )}
+                      {generateMutation.isPending
+                        ? "Generating…"
+                        : "Generate Key"}
+                    </Button>
                   </UpGalTarget>
-                </Field>
+                </DialogFooter>
+              </form>
+            </TabsContent>
 
-                <Field>
-                  <FieldLabel htmlFor="key-desc">Description</FieldLabel>
-                  <UpGalTarget definition={sshKeyDescriptionTarget}>
-                    <Input
-                      id="key-desc"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Used for private git access"
-                      autoComplete="off"
-                    />
-                  </UpGalTarget>
-                </Field>
+            <TabsContent value="import">
+              <form onSubmit={handleImport} className="flex flex-col gap-4">
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="key-name-import">Name</FieldLabel>
+                    <UpGalTarget definition={sshKeyNameTarget}>
+                      <Input
+                        id="key-name-import"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Work Laptop Key"
+                        autoComplete="off"
+                        required
+                      />
+                    </UpGalTarget>
+                  </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="private-key">Private Key</FieldLabel>
-                  <UpGalTarget definition={sshKeyPrivateKeyTarget}>
-                    <Textarea
-                      id="private-key"
-                      value={privateKey}
-                      onChange={(e) => setPrivateKey(e.target.value)}
-                      rows={4}
-                      placeholder="-----BEGIN OPENSSH PRIVATE KEY-----…"
-                      className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
-                      required
-                    />
-                  </UpGalTarget>
-                </Field>
+                  <Field>
+                    <FieldLabel htmlFor="key-desc">Description</FieldLabel>
+                    <UpGalTarget definition={sshKeyDescriptionTarget}>
+                      <Input
+                        id="key-desc"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Used for private git access"
+                        autoComplete="off"
+                      />
+                    </UpGalTarget>
+                  </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="public-key">Public Key</FieldLabel>
-                  <UpGalTarget definition={sshKeyPublicKeyTarget}>
-                    <Textarea
-                      id="public-key"
-                      value={publicKey}
-                      onChange={(e) => setPublicKey(e.target.value)}
-                      rows={2}
-                      placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5…"
-                      className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
-                      required
-                    />
-                  </UpGalTarget>
-                  <p className="text-[11px] text-muted-foreground">
-                    We verify the private and public key actually match before
-                    storing them.
-                  </p>
-                </Field>
-              </FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="private-key">Private Key</FieldLabel>
+                    <UpGalTarget definition={sshKeyPrivateKeyTarget}>
+                      <Textarea
+                        id="private-key"
+                        value={privateKey}
+                        onChange={(e) => setPrivateKey(e.target.value)}
+                        rows={4}
+                        placeholder="-----BEGIN OPENSSH PRIVATE KEY-----…"
+                        className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </UpGalTarget>
+                  </Field>
 
-              <DialogFooter className="gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAddKeyOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <UpGalTarget definition={importSshKeySubmitTarget}>
+                  <Field>
+                    <FieldLabel htmlFor="public-key">Public Key</FieldLabel>
+                    <UpGalTarget definition={sshKeyPublicKeyTarget}>
+                      <Textarea
+                        id="public-key"
+                        value={publicKey}
+                        onChange={(e) => setPublicKey(e.target.value)}
+                        rows={2}
+                        placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5…"
+                        className="resize-none break-all border border-border/40 p-3 font-mono text-xs focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </UpGalTarget>
+                    <p className="text-[11px] text-muted-foreground">
+                      We verify the private and public key actually match before
+                      storing them.
+                    </p>
+                  </Field>
+                </FieldGroup>
+
+                <DialogFooter className="gap-2 pt-2">
                   <Button
-                    type="submit"
-                    className="gap-2 font-medium"
-                    disabled={isSubmitting}
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAddKeyOpen(false)}
                   >
-                    {createMutation.isPending && <Spinner className="size-4" />}
-                    {createMutation.isPending ? "Adding…" : "Add Key"}
+                    Cancel
                   </Button>
-                </UpGalTarget>
-              </DialogFooter>
-            </form>
-          )}
+                  <UpGalTarget definition={importSshKeySubmitTarget}>
+                    <Button
+                      type="submit"
+                      className="gap-2 font-medium"
+                      disabled={isSubmitting}
+                    >
+                      {createMutation.isPending && (
+                        <Spinner className="size-4" />
+                      )}
+                      {createMutation.isPending ? "Adding…" : "Add Key"}
+                    </Button>
+                  </UpGalTarget>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -749,13 +751,14 @@ export default function SSHKeys(_props: {
               </Field>
             </FieldGroup>
 
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs">
-              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
-              <p className="text-muted-foreground">
+            <Alert variant="destructive">
+              <AlertTriangleIcon />
+              <AlertTitle>Save your private key now</AlertTitle>
+              <AlertDescription>
                 Closing this dialog without saving the private key means it's
                 gone for good — you'd need to generate a new key pair.
-              </p>
-            </div>
+              </AlertDescription>
+            </Alert>
           </div>
 
           <DialogFooter className="gap-2 pt-2">

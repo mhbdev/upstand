@@ -1,10 +1,25 @@
 "use client";
 
-import { Cancel01Icon, Menu01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { Menu01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@upstand/ui/components/button";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  navigationMenuTriggerStyle,
+} from "@upstand/ui/components/navigation-menu";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@upstand/ui/components/sheet";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 import { getDocsUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "./auth/user/user-avatar";
@@ -18,51 +33,11 @@ const NAV_LINKS = [
 
 export default function Header() {
   const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (pathname) {
-      setMobileMenuOpen(false);
-    }
-  }, [pathname]);
-
-  useEffect(() => {
-    if (!mobileMenuOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      setMobileMenuOpen(false);
-      mobileMenuButtonRef.current?.focus();
-    };
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !mobileMenuRef.current?.contains(event.target)
-      ) {
-        setMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("pointerdown", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [mobileMenuOpen]);
+  const docsUrl = getDocsUrl();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-border/40 border-b bg-background/20 backdrop-blur-md supports-backdrop-filter:bg-background/60">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-50 w-full border-border/40 border-b bg-background/70 backdrop-blur-md supports-backdrop-filter:bg-background/60">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
         {/* Brand */}
         <div className="flex items-center gap-6">
           <Link
@@ -74,74 +49,80 @@ export default function Header() {
           </Link>
 
           {/* Desktop nav */}
-          <nav
-            aria-label="Main navigation"
-            className="hidden items-center gap-1 sm:flex"
-          >
-            {NAV_LINKS.map(({ href, label, external }) => {
-              const isActive = pathname === href;
-              return external ? (
-                <a
-                  key={href}
-                  href={href === "/docs" ? getDocsUrl() : href}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                    isActive
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {label}
-                </a>
-              ) : (
-                <Link
-                  key={href}
-                  href={href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                    isActive
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
+          <NavigationMenu className="hidden sm:flex">
+            <NavigationMenuList>
+              {NAV_LINKS.map(({ href, label, external }) => {
+                const isActive = pathname === href;
+                const href_ = external && href === "/docs" ? docsUrl : href;
+
+                return (
+                  <NavigationMenuItem key={href}>
+                    <NavigationMenuLink
+                      render={
+                        external ? (
+                          <a href={href_}>{label}</a>
+                        ) : (
+                          <Link href={href}>{label}</Link>
+                        )
+                      }
+                      active={isActive}
+                      className={navigationMenuTriggerStyle()}
+                    />
+                  </NavigationMenuItem>
+                );
+              })}
+            </NavigationMenuList>
+          </NavigationMenu>
         </div>
 
         {/* Controls */}
         <div className="flex shrink-0 items-center gap-2">
-          <div ref={mobileMenuRef} className="relative sm:hidden">
-            <button
-              ref={mobileMenuButtonRef}
-              type="button"
-              aria-controls="mobile-main-navigation"
-              aria-expanded={mobileMenuOpen}
-              aria-label={
-                mobileMenuOpen
-                  ? "Close navigation menu"
-                  : "Open navigation menu"
-              }
-              className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              onClick={() => setMobileMenuOpen((open) => !open)}
-            >
-              <HugeiconsIcon
-                aria-hidden="true"
-                className="size-5"
-                icon={mobileMenuOpen ? Cancel01Icon : Menu01Icon}
+          <ModeToggle />
+
+          <UserAvatar
+            fallback={
+              <Button
+                variant="ghost"
+                size="icon"
+                render={
+                  <Link href="/login" aria-label="Log in">
+                    <HugeiconsIcon size={16} icon={UserIcon} />
+                  </Link>
+                }
+                nativeButton={false}
               />
-            </button>
-            {mobileMenuOpen ? (
+            }
+          />
+
+          {/* Mobile nav */}
+          <Sheet>
+            <SheetTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="sm:hidden"
+                  aria-label="Open navigation menu"
+                >
+                  <HugeiconsIcon
+                    aria-hidden="true"
+                    className="size-5"
+                    icon={Menu01Icon}
+                  />
+                </Button>
+              }
+            />
+            <SheetContent side="right" className="w-72">
+              <SheetHeader>
+                <SheetTitle>Navigation</SheetTitle>
+              </SheetHeader>
               <nav
-                id="mobile-main-navigation"
                 aria-label="Mobile main navigation"
-                className="absolute top-full right-0 mt-2 flex min-w-44 flex-col gap-1 rounded-lg border bg-popover p-2 shadow-lg"
+                className="flex flex-col gap-1 px-4"
               >
                 {NAV_LINKS.map(({ href, label, external }) => {
                   const isActive = pathname === href;
+                  const href_ = external && href === "/docs" ? docsUrl : href;
                   const className = cn(
                     "rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
                     isActive
@@ -149,38 +130,35 @@ export default function Header() {
                       : "text-muted-foreground",
                   );
 
-                  return external ? (
-                    <a
+                  return (
+                    <SheetClose
                       key={href}
-                      href={href === "/docs" ? getDocsUrl() : href}
-                      className={className}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {label}
-                    </a>
-                  ) : (
-                    <Link
-                      key={href}
-                      href={href}
-                      aria-current={isActive ? "page" : undefined}
-                      className={className}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {label}
-                    </Link>
+                      render={
+                        external ? (
+                          <a
+                            href={href_}
+                            className={className}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            {label}
+                          </a>
+                        ) : (
+                          <Link
+                            href={href}
+                            className={className}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            {label}
+                          </Link>
+                        )
+                      }
+                      nativeButton={false}
+                    />
                   );
                 })}
               </nav>
-            ) : null}
-          </div>
-          <ModeToggle />
-          <UserAvatar
-            fallback={
-              <Link className="cursor-pointer" href={"/login"}>
-                <HugeiconsIcon size={"16"} icon={UserIcon} />
-              </Link>
-            }
-          />
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>

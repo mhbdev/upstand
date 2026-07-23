@@ -6,8 +6,9 @@ import {
   InformationCircleIcon,
   Key01Icon,
   Menu01Icon,
-  MoreHorizontalCircle01Icon,
-  Shield01Icon,
+  Monitor,
+  ShieldCheck,
+  UserGroupIcon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
@@ -107,8 +108,8 @@ export function SettingsDialog() {
       label: "User Settings",
       items: [
         { name: "profile", label: "Profile", icon: UserIcon },
-        { name: "sessions", label: "Sessions", icon: InformationCircleIcon },
-        { name: "security", label: "Security & 2FA", icon: Shield01Icon },
+        { name: "sessions", label: "Sessions", icon: Monitor },
+        { name: "security", label: "Security & 2FA", icon: ShieldCheck },
       ],
     },
     {
@@ -117,7 +118,7 @@ export function SettingsDialog() {
       visible: !!activeOrg,
       items: [
         { name: "organization", label: "Workspace", icon: Briefcase01Icon },
-        { name: "members", label: "Members", icon: UserIcon },
+        { name: "members", label: "Members", icon: UserGroupIcon },
         { name: "api-keys", label: "API Keys", icon: Key01Icon },
         { name: "upgal", label: "UpGal Settings", icon: AiBrain01Icon },
       ],
@@ -125,9 +126,7 @@ export function SettingsDialog() {
     {
       id: "system",
       label: "System",
-      items: [
-        { name: "app", label: "About", icon: MoreHorizontalCircle01Icon },
-      ],
+      items: [{ name: "app", label: "About", icon: InformationCircleIcon }],
     },
   ];
 
@@ -151,7 +150,7 @@ export function SettingsDialog() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          className="h-dvh max-h-dvh w-screen max-w-none overflow-hidden p-0! md:h-[min(90dvh,620px)] md:max-h-none md:w-[min(90vw,860px)] md:max-w-none"
+          className="h-dvh max-h-dvh w-screen max-w-none overflow-hidden rounded-none p-0! md:h-[min(90dvh,620px)] md:max-h-none md:w-[min(90vw,860px)] md:max-w-none md:rounded-2xl"
         >
           <DialogTitle className="sr-only">Settings</DialogTitle>
           <DialogDescription className="sr-only">
@@ -167,7 +166,7 @@ export function SettingsDialog() {
               collapsible="none"
               className="hidden w-48 shrink-0 border-r md:flex"
             >
-              <SidebarContent className="gap-3 py-1">
+              <SidebarContent className="gap-3 py-2">
                 {groups.map((group) => {
                   if (group.visible === false) return null;
                   return (

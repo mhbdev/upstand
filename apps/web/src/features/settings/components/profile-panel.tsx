@@ -17,6 +17,7 @@ import { Input } from "@upstand/ui/components/input";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useEffect } from "react";
 import z from "zod";
+import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import { authClient } from "@/lib/auth-client";
 import { useProfileSettings } from "../hooks/use-profile-settings";
 
@@ -108,10 +109,23 @@ export function ProfilePanel() {
             className="flex flex-col gap-4"
           >
             <div className="flex items-center gap-3">
-              <Avatar className="size-10">
-                <AvatarImage src={session.user.image || undefined} />
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
+              <EditableEntityIcon
+                icon={session.user.image}
+                defaultIcon={
+                  <Avatar className="size-full">
+                    <AvatarImage src={session.user.image || undefined} />
+                    <AvatarFallback>{initials}</AvatarFallback>
+                  </Avatar>
+                }
+                entityName={session.user.name || "User"}
+                entityType="profile"
+                sizeClassName="size-12 rounded-full"
+                onSaveIcon={async (newIcon) => {
+                  await updateUser({
+                    image: newIcon ?? "",
+                  });
+                }}
+              />
               <div className="grid text-sm">
                 <span className="font-medium">{session.user.name}</span>
                 <span className="text-muted-foreground text-xs">

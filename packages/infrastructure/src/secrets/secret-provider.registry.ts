@@ -28,6 +28,109 @@ export class SecretProviderRegistry implements ExternalSecretProviderPort {
     return this.readAws(configuration);
   }
 
+  async testConnection(
+    provider: SecretProviderType,
+    configuration: SecretProviderConfiguration,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (provider === "vault") {
+        const address = stringValue(configuration.address)?.replace(/\/$/, "");
+        const path = stringValue(configuration.path);
+        const token = stringValue(configuration.token);
+        if (!address || !path || !token) {
+          return {
+            success: false,
+            message:
+              "Vault requires Vault Address, Secret Path, and Vault Token.",
+          };
+        }
+        const response = await fetch(`${address}/v1/${path}`, {
+          headers: { "X-Vault-Token": token, Accept: "application/json" },
+        }).catch((err) => {
+          throw new Error(
+            `Unable to connect to Vault at ${address}. If Upstand is running in Docker, use http://host.docker.internal:8200 instead of http://localhost:8200 (${err.message}).`,
+          );
+        });
+        if (response.status === 403 || response.status === 401) {
+          return {
+            success: false,
+            message: `Vault returned HTTP ${response.status}: Invalid Vault Token or insufficient permissions.`,
+          };
+        }
+        if (!response.ok && response.status !== 404) {
+          return {
+            success: false,
+            message: `Vault returned HTTP ${response.status}`,
+          };
+        }
+        return {
+          success: true,
+          message: "Successfully connected to Vault server!",
+        };
+      }
+
+      if (provider === "onepassword") {
+        const host = stringValue(configuration.connectHost)?.replace(/\/$/, "");
+        const token = stringValue(configuration.connectToken);
+        const vaultId = stringValue(configuration.vaultId);
+        const itemId = stringValue(configuration.itemId);
+        if (!host || !token || !vaultId || !itemId) {
+          return {
+            success: false,
+            message:
+              "1Password Connect requires Connect Host, Token, Vault ID, and Item ID.",
+          };
+        }
+        const response = await fetch(
+          `${host}/v1/vaults/${encodeURIComponent(vaultId)}/items/${encodeURIComponent(itemId)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          },
+        ).catch((err) => {
+          throw new Error(
+            `Unable to connect to 1Password Connect at ${host} (${err.message}).`,
+          );
+        });
+        if (!response.ok) {
+          return {
+            success: false,
+            message: `1Password Connect returned HTTP ${response.status}`,
+          };
+        }
+        return {
+          success: true,
+          message: "Successfully connected to 1Password Connect!",
+        };
+      }
+
+      // AWS Secrets Manager
+      const region = stringValue(configuration.region);
+      const accessKeyId = stringValue(configuration.accessKeyId);
+      const secretAccessKey = stringValue(configuration.secretAccessKey);
+      const secretId = stringValue(configuration.path);
+      if (!region || !accessKeyId || !secretAccessKey || !secretId) {
+        return {
+          success: false,
+          message:
+            "AWS Secrets Manager requires Region, Access Key ID, Secret Access Key, and Secret Path.",
+        };
+      }
+      await this.readAws(configuration);
+      return {
+        success: true,
+        message: "Successfully connected to AWS Secrets Manager!",
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err.message || "Failed to connect to secret provider.",
+      };
+    }
+  }
+
   private async readVault(
     config: SecretProviderConfiguration,
   ): Promise<Record<string, string>> {
@@ -38,6 +141,10 @@ export class SecretProviderRegistry implements ExternalSecretProviderPort {
       throw new Error("Vault requires address, path, and token");
     const response = await fetch(`${address}/v1/${path}`, {
       headers: { "X-Vault-Token": token, Accept: "application/json" },
+    }).catch((err) => {
+      throw new Error(
+        `Unable to connect to Vault at ${address}. If Upstand is running in Docker, try using http://host.docker.internal:8200 instead of http://localhost:8200 (${err.message}).`,
+      );
     });
     if (!response.ok) throw new Error(`Vault returned HTTP ${response.status}`);
     const body = (await response.json()) as { data?: { data?: unknown } };

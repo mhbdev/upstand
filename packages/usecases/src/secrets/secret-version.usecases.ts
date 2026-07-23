@@ -38,6 +38,10 @@ export const UpdateSecretProviderInputSchema = z.object({
   configuration: z.record(z.string(), z.string()).optional(),
   enabled: z.boolean().optional(),
 });
+export const TestSecretProviderConnectionInputSchema = z.object({
+  provider: z.enum(["vault", "aws-secrets-manager", "onepassword"]),
+  configuration: z.record(z.string(), z.string()).default({}),
+});
 export const SyncSecretProviderInputSchema = z.object({
   providerId: z.string().min(1),
   scopeType: z.enum(["environment", "resource"]),
@@ -308,6 +312,19 @@ export class SyncSecretProviderUseCase {
       "Sync external secrets",
     );
     return merged;
+  }
+}
+
+export class TestSecretProviderConnectionUseCase {
+  constructor(private readonly external: ExternalSecretProviderPort) {}
+  execute(input: z.infer<typeof TestSecretProviderConnectionInputSchema>) {
+    if (!this.external.testConnection) {
+      return Promise.resolve({
+        success: true,
+        message: "Secret provider connection test is unavailable.",
+      });
+    }
+    return this.external.testConnection(input.provider, input.configuration);
   }
 }
 

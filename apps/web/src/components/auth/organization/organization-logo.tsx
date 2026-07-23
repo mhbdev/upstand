@@ -48,10 +48,7 @@ export function OrganizationLogo({
   }) {
   if (isPending && !organization) {
     return (
-      <Skeleton
-        className={cn("rounded-(--radius-md)", sizeClasses[size], className)}
-        style={style}
-      />
+      <Skeleton className={cn(sizeClasses[size], className)} style={style} />
     );
   }
 
@@ -60,7 +57,7 @@ export function OrganizationLogo({
 
   return (
     <Avatar
-      className={cn("rounded-(--radius-md)", sizeClasses[size], className)}
+      className={cn(sizeClasses[size], className)}
       style={style}
       {...props}
     >
@@ -70,10 +67,7 @@ export function OrganizationLogo({
       />
 
       <AvatarFallback
-        className={cn(
-          "rounded-(--radius-md) text-muted-foreground!",
-          fallbackTextClasses[size],
-        )}
+        className={cn("text-muted-foreground!", fallbackTextClasses[size])}
       >
         {fallback || initials || (
           <HugeiconsIcon icon={Briefcase01Icon} className="size-4" />

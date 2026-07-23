@@ -2,6 +2,11 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@upstand/ui/components/alert";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -30,10 +35,15 @@ import {
   DashboardPageHeader,
 } from "@/components/dashboard/dashboard-page";
 import { PageEmpty } from "@/components/dashboard/page-empty";
-import { Copy, KeyRound, RotateCw, Trash2Icon } from "@/components/huge-icons";
+import {
+  AlertTriangleIcon,
+  Copy,
+  KeyRound,
+  RotateCw,
+  Trash2Icon,
+} from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { copyText } from "@/lib/browser";
-import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
 
 export default function ScimSettingsPage() {
@@ -146,31 +156,28 @@ export default function ScimSettingsPage() {
           </form>
 
           {newToken && (
-            <div
-              className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3"
-              role="status"
-              aria-live="polite"
-            >
-              <p className="font-medium text-sm">Copy this token now</p>
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={newToken}
-                  className="font-mono text-xs"
-                />
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => void copyToken()}
-                  aria-label="Copy SCIM token"
-                >
-                  <Copy className="size-4" />
-                </Button>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                Endpoint: {getServerApiUrl(`/api/scim/v2.0/${organizationId}`)}
-              </p>
-            </div>
+            <Alert variant="warning" role="status" aria-live="polite">
+              <AlertTriangleIcon />
+              <AlertTitle>Copy this token now</AlertTitle>
+              <AlertDescription className="space-y-2 pt-1">
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={newToken}
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => void copyToken()}
+                    aria-label="Copy SCIM token"
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+                <p className="text-xs">It will not be shown again.</p>
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>

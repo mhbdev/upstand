@@ -5,6 +5,7 @@ import { z } from "zod";
 export const UpdateProjectInputSchema = z.object({
   id: z.string().min(1, "Project ID is required"),
   name: z.string().min(1, "Project name cannot be empty").optional(),
+  description: z.string().optional().nullable(),
   icon: EntityIconSchema,
 });
 
@@ -19,8 +20,13 @@ export class UpdateProjectUseCase {
       throw new ValidationError("Project not found");
     }
 
-    const patch: { name?: string; icon?: string | null } = {};
+    const patch: {
+      name?: string;
+      description?: string | null;
+      icon?: string | null;
+    } = {};
     if (input.name !== undefined) patch.name = input.name;
+    if (input.description !== undefined) patch.description = input.description;
     if (input.icon !== undefined) patch.icon = input.icon;
 
     const updated = await this.uow.projectRepository.updateById(

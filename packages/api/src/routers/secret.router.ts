@@ -6,6 +6,7 @@ import {
   RestoreSecretVersionInputSchema,
   RotateSecretsInputSchema,
   SyncSecretProviderInputSchema,
+  TestSecretProviderConnectionInputSchema,
   UpdateSecretProviderInputSchema,
   UpdateSecretRotationScheduleInputSchema,
 } from "@upstand/usecases";
@@ -21,6 +22,7 @@ import {
   RestoreSecretVersionUseCaseToken,
   RotateSecretsUseCaseToken,
   SyncSecretProviderUseCaseToken,
+  TestSecretProviderConnectionUseCaseToken,
   UnitOfWorkToken,
   UpdateSecretProviderUseCaseToken,
   UpdateSecretRotationScheduleUseCaseToken,
@@ -154,6 +156,13 @@ export const secretRouter = router({
         "environment:update",
       );
       return ctx.scope.resolve(UpdateSecretProviderUseCaseToken).execute(input);
+    }),
+  testConnection: twoFactorVerifiedProcedure
+    .input(TestSecretProviderConnectionInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      return ctx.scope
+        .resolve(TestSecretProviderConnectionUseCaseToken)
+        .execute(input);
     }),
   sync: twoFactorVerifiedProcedure
     .input(SyncSecretProviderInputSchema)

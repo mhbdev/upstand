@@ -40,6 +40,7 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { Switch } from "@upstand/ui/components/switch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -128,6 +129,10 @@ export default function WebServerDashboard(_props: {
   const [, setServerLogsCopied] = useState(false);
   const [autoRefreshCaddyLogs, setAutoRefreshCaddyLogs] = useState(true);
   const [autoRefreshServerLogs, _setAutoRefreshServerLogs] = useState(true);
+  const [restoreRunIdToConfirm, setRestoreRunIdToConfirm] = useState<
+    string | null
+  >(null);
+  const [updateConfirmOpen, setUpdateConfirmOpen] = useState(false);
 
   // 1. Fetch Caddy/server settings and container status
   const {
@@ -829,16 +834,7 @@ export default function WebServerDashboard(_props: {
                           variant="destructive"
                           disabled={restoreWebBackupMutation.isPending}
                           onClick={() => {
-                            if (
-                              window.confirm(
-                                "This replaces the control-plane database and Caddy volumes. Continue?",
-                              )
-                            ) {
-                              restoreWebBackupMutation.mutate({
-                                runId: run.id,
-                                confirm: "RESTORE_WEB_SERVER",
-                              });
-                            }
+                            setRestoreRunIdToConfirm(run.id);
                           }}
                         >
                           Restore
@@ -1094,16 +1090,7 @@ export default function WebServerDashboard(_props: {
                           onClick={() => {
                             const images = updateData.images;
                             if (!images) return;
-                            if (
-                              confirm(
-                                `Are you sure you want to update Upstand to ${updateData.latestVersion}? This will pull the latest version and update all services in the cluster.`,
-                              )
-                            ) {
-                              triggerUpdateMutation.mutate({
-                                version: updateData.latestVersion,
-                                images,
-                              });
-                            }
+                            setUpdateConfirmOpen(true);
                           }}
                           disabled={triggerUpdateMutation.isPending}
                         >
@@ -1890,6 +1877,50 @@ export default function WebServerDashboard(_props: {
       {updateDialogVersion ? (
         <SelfUpdateDialog open version={updateDialogVersion} />
       ) : null}
+
+      <ConfirmActionDialog
+        open={Boolean(restoreRunIdToConfirm)}
+        onOpenChange={(open) => !open && setRestoreRunIdToConfirm(null)}
+        title="Restore Web Server Backup?"
+        description="This replaces the control-plane database and Caddy configuration volumes with the selected backup state."
+        actionLabel="Restore Backup"
+        pending={restoreWebBackupMutation.isPending}
+        onConfirm={() => {
+          if (restoreRunIdToConfirm) {
+            restoreWebBackupMutation.mutate(
+              {
+                runId: restoreRunIdToConfirm,
+                confirm: "RESTORE_WEB_SERVER",
+              },
+              {
+                onSuccess: () => setRestoreRunIdToConfirm(null),
+              },
+            );
+          }
+        }}
+      />
+
+      <ConfirmActionDialog
+        open={updateConfirmOpen}
+        onOpenChange={setUpdateConfirmOpen}
+        title="Update Upstand Server?"
+        description={`Are you sure you want to update Upstand to ${updateData?.latestVersion}? This will pull the latest version and update all services in the cluster.`}
+        actionLabel="Update Server"
+        pending={triggerUpdateMutation.isPending}
+        onConfirm={() => {
+          if (updateData?.images && updateData?.latestVersion) {
+            triggerUpdateMutation.mutate(
+              {
+                version: updateData.latestVersion,
+                images: updateData.images,
+              },
+              {
+                onSuccess: () => setUpdateConfirmOpen(false),
+              },
+            );
+          }
+        }}
+      />
     </DashboardPage>
   );
 }

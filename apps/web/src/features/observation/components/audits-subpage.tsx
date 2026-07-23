@@ -36,16 +36,10 @@ import { toast } from "sonner";
 import { PageEmpty } from "@/components/dashboard/page-empty";
 import { PagePagination } from "@/components/dashboard/page-pagination";
 import { TableSkeleton } from "@/components/dashboard/page-skeleton";
-import {
-  Copy,
-  Download,
-  Eye,
-  FileClock,
-  Search,
-} from "@/components/huge-icons";
+import { Copy, Eye, FileClock, Search } from "@/components/huge-icons";
 import { CodeBlock } from "@/components/shared/code-block";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
-import { copyText, downloadJson } from "@/lib/browser";
+import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
 
 function getActionBadgeVariant(
@@ -450,44 +444,14 @@ export function AuditsSubpage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-foreground text-sm">
-                    Event Metadata
-                  </h4>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 font-medium text-xs"
-                      onClick={async () => {
-                        await copyText(
-                          JSON.stringify(selectedItem.metadata ?? {}, null, 2),
-                        );
-                        toast.success("Metadata copied to clipboard");
-                      }}
-                    >
-                      <Copy className="size-3.5" /> Copy JSON
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 font-medium text-xs"
-                      onClick={() => {
-                        downloadJson(
-                          selectedItem.metadata ?? {},
-                          `audit-metadata-${selectedItem.id}.json`,
-                        );
-                      }}
-                    >
-                      <Download className="size-3.5" /> Download
-                    </Button>
-                  </div>
-                </div>
+                <h4 className="font-semibold text-foreground text-sm">
+                  Event Metadata
+                </h4>
                 <CodeBlock
                   code={JSON.stringify(selectedItem.metadata ?? {}, null, 2)}
                   language="json"
                   filename="metadata.json"
-                  className="max-h-[350px]"
+                  className="max-h-87.5"
                 />
               </div>
             </div>

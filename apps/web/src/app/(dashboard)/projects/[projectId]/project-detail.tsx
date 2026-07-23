@@ -4,7 +4,6 @@ import {
   Alert02Icon,
   ArrowRight01Icon,
   ComputerIcon,
-  Delete02Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -45,8 +44,10 @@ import {
 import { cn } from "@upstand/ui/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
+import { DangerZoneCard } from "@/components/dashboard/danger-zone-card";
 import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import { FolderIcon, Trash2Icon } from "@/components/huge-icons";
 import type { authClient } from "@/lib/auth-client";
@@ -343,6 +344,99 @@ function DeleteEnvDialog({
   );
 }
 
+// ─── General Settings ─────────────────────────────────────────────────────────
+
+function ProjectGeneralSettings({
+  project,
+}: {
+  project: { id: string; name: string; description?: string | null };
+}) {
+  const [name, setName] = useState(project.name || "");
+  const [description, setDescription] = useState(project.description || "");
+
+  useEffect(() => {
+    setName(project.name || "");
+    setDescription(project.description || "");
+  }, [project.name, project.description]);
+
+  const queryClient = useQueryClient();
+  const updateMutation = useMutation({
+    ...trpc.project.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Project updated successfully");
+      queryClient.invalidateQueries({
+        queryKey: trpc.project.get.queryKey({ id: project.id }),
+      });
+      queryClient.invalidateQueries({
+        queryKey: trpc.project.list.queryKey(),
+      });
+    },
+    onError: (err) => toast.error(err.message || "Failed to update project"),
+  });
+
+  const isChanged =
+    name.trim() !== (project.name || "") ||
+    description.trim() !== (project.description || "");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-semibold text-lg">
+          General Settings
+        </CardTitle>
+        <CardDescription>
+          Update your project name and description.
+        </CardDescription>
+      </CardHeader>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim()) {
+            updateMutation.mutate({
+              id: project.id,
+              name: name.trim(),
+              description: description.trim() || null,
+            });
+          }
+        }}
+      >
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="detail-proj-name">Project Name</Label>
+            <Input
+              id="detail-proj-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Project Name"
+              className="border-border/40 focus:border-primary"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="detail-proj-desc">Description (Optional)</Label>
+            <Input
+              id="detail-proj-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Primary production services and APIs"
+              className="border-border/40 focus:border-primary"
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="float-end pt-4">
+          <Button
+            type="submit"
+            disabled={!isChanged || !name.trim() || updateMutation.isPending}
+            className="gap-2"
+          >
+            {updateMutation.isPending && <Spinner className="size-4" />}
+            Save Changes
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}
+
 // ─── Main Detail ───────────────────────────────────────────────────────────────
 
 export default function ProjectDetail({
@@ -354,6 +448,7 @@ export default function ProjectDetail({
   const router = useRouter();
   const [createEnvOpen, setCreateEnvOpen] = useState(false);
   const [deleteEnvOpen, setDeleteEnvOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedEnv, setSelectedEnv] = useState<{
     id: string;
     name: string;
@@ -458,7 +553,8 @@ export default function ProjectDetail({
                 {project.name}
               </h1>
               <p className="text-muted-foreground text-sm">
-                Project environments and configuration.
+                {(project as any).description ||
+                  "Project environments and configuration."}
               </p>
             </div>
           </div>
@@ -476,7 +572,7 @@ export default function ProjectDetail({
 
       {/* Tabs */}
       <Tabs defaultValue="environments" className="min-w-0 space-y-6">
-        <TabsList className="scrollbar-thin w-full max-w-full justify-start gap-1 overflow-x-auto">
+        <TabsList className="scrollbar-thin w-full max-w-full justify-start">
           <TabsTrigger value="environments">Environments</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -509,67 +605,47 @@ export default function ProjectDetail({
 
         <TabsContent value="settings" className="outline-none">
           <div className="max-w-2xl space-y-6">
+            {/* General Settings */}
+            <ProjectGeneralSettings project={project as any} />
+
             {/* Project deletion */}
-            <Card className="border border-destructive/20 bg-destructive/5">
-              <CardHeader>
-                <CardTitle className="font-semibold text-destructive">
-                  Delete Project
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Permanently delete this project. This will delete all
-                  environments and resources inside them.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {hasResources ? (
-                  <div className="flex items-start gap-3 border border-amber-500/20 bg-amber-500/5 p-4 text-amber-500 text-sm">
-                    <HugeiconsIcon
-                      icon={Alert02Icon}
-                      className="mt-0.5 size-5 shrink-0"
-                    />
-                    <div>
-                      <p className="font-semibold">
-                        Project cannot be deleted yet
-                      </p>
-                      <p className="mt-1 text-muted-foreground">
-                        You must first delete all active resources in your
-                        environments (e.g. Production, Development) to delete
-                        the project.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    This project has no active resources and is safe to delete.
-                  </p>
-                )}
-                <Button
-                  variant="destructive"
-                  disabled={hasResources || deleteProjectMutation.isPending}
-                  className="gap-2"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Are you absolutely sure you want to delete this project?",
-                      )
-                    ) {
-                      deleteProjectMutation.mutate({
-                        id: projectId,
-                        organizationId: project.organizationId,
-                      });
-                    }
-                  }}
-                >
-                  {deleteProjectMutation.isPending && (
-                    <Spinner className="size-4" />
-                  )}
-                  Delete Project
-                </Button>
-              </CardContent>
-            </Card>
+            <DangerZoneCard
+              title="Delete Project"
+              description="Permanently delete this project. This will delete all environments and resources inside them."
+              actionLabel="Delete Project"
+              onAction={() => setDeleteDialogOpen(true)}
+              disabled={hasResources}
+              pending={deleteProjectMutation.isPending}
+              warningText={
+                hasResources
+                  ? "You must first delete all active resources in your environments to delete the project."
+                  : undefined
+              }
+              infoText={
+                !hasResources
+                  ? "This project has no active resources and is safe to delete."
+                  : undefined
+              }
+            />
           </div>
         </TabsContent>
       </Tabs>
+
+      <ConfirmActionDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Project?"
+        description={`Are you sure you want to delete "${project.name}"? All associated environments and data will be permanently removed. This action cannot be undone.`}
+        actionLabel="Delete Project"
+        requireConfirmText={true}
+        pending={deleteProjectMutation.isPending}
+        onConfirm={() => {
+          deleteProjectMutation.mutate({
+            id: projectId,
+            organizationId: project.organizationId,
+          });
+        }}
+      />
 
       {/* Modals */}
       <CreateEnvDialog

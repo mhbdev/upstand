@@ -18,13 +18,25 @@ import {
   CardTitle,
 } from "@upstand/ui/components/card";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@upstand/ui/components/context-menu";
+import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@upstand/ui/components/empty";
-import { Input } from "@upstand/ui/components/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@upstand/ui/components/input-group";
 import {
   Select,
   SelectContent,
@@ -52,6 +64,12 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@upstand/ui/components/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
 import {
   applyNodeChanges,
@@ -92,6 +110,9 @@ import {
 import {
   Activity,
   AlertCircle,
+  ArrowDown,
+  ArrowRightIcon,
+  Boxes,
   CheckCircle,
   Cpu,
   Database,
@@ -103,12 +124,15 @@ import {
   LineChart,
   Network,
   PackageIcon,
+  Plus,
   RefreshCw,
   Search,
   Server,
   Settings,
+  Shield,
   Sparkles,
   Terminal,
+  WandSparkles,
 } from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
@@ -129,7 +153,10 @@ type TopologyKind =
   | "network"
   | "volume"
   | "domain"
-  | "registry";
+  | "registry"
+  | "secret"
+  | "s3"
+  | "cluster";
 
 type TopologyNodeData = {
   label: string;
@@ -277,6 +304,24 @@ const KIND_CONFIG: Record<
     color: "text-primary",
     bg: "bg-primary/10 border-primary/30",
   },
+  secret: {
+    label: "Secret providers",
+    icon: Shield,
+    color: "text-destructive",
+    bg: "bg-destructive/10 border-destructive/30",
+  },
+  s3: {
+    label: "Storage destinations",
+    icon: HardDrive,
+    color: "text-info",
+    bg: "bg-info/10 border-info/30",
+  },
+  cluster: {
+    label: "Subgraphs / Clusters",
+    icon: Boxes,
+    color: "text-primary",
+    bg: "bg-primary/10 border-primary/30",
+  },
 };
 
 const ALL_KINDS = Object.keys(KIND_CONFIG) as TopologyKind[];
@@ -386,6 +431,9 @@ const MINIMAP_NODE_COLORS: Record<TopologyKind, string> = {
   volume: "#4ade80",
   domain: "#fbbf24",
   registry: "#a78bfa",
+  secret: "#ef4444",
+  s3: "#38bdf8",
+  cluster: "#a855f7",
 };
 
 function getMiniMapNodeColor(node: Node<TopologyNodeData>) {
@@ -452,89 +500,248 @@ const TopologyCanvasNode = memo(function TopologyCanvasNode({
   data,
   selected,
 }: NodeProps<TopologyNode>) {
-  const config = KIND_CONFIG[data.kind];
+  const config = KIND_CONFIG[data.kind] ?? KIND_CONFIG.server;
   const Icon = config.icon;
 
   return (
-    <div
-      className={cn(
-        "group relative min-w-55 rounded-2xl border bg-card/95 px-3 py-3 text-card-foreground shadow-black/5 shadow-lg backdrop-blur transition duration-150",
-        "hover:-translate-y-0.5 hover:shadow-black/10 hover:shadow-xl",
-        selected && "border-primary ring-2 ring-primary/20",
-        data.isSelectedTarget && "ring-2 ring-primary/15",
-      )}
-      role="group"
-      aria-label={`${config.label.slice(0, -1)}: ${data.label}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!size-2 !border-0 !bg-muted-foreground/50"
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!size-2 !border-0 !bg-muted-foreground/50"
-      />
-      <div className="flex items-start gap-2.5">
-        <div
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-xl border",
-            config.bg,
-          )}
-        >
-          <Icon className={cn("size-4", config.color)} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate font-semibold text-sm">{data.label}</p>
-            {hasLiveStatus(data.status) ? (
-              <span
-                className={cn(
-                  "size-1.5 shrink-0 rounded-full",
-                  statusPulseClass(data.status),
-                )}
-                title={`Live status: ${statusLabel(data.status)}`}
-              />
-            ) : (
-              <span
-                className="size-1.5 shrink-0 rounded-full bg-muted-foreground/50"
-                title="Status unavailable"
-              />
-            )}
-          </div>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {data.subtitle || config.label.slice(0, -1)}
-          </p>
-        </div>
-        {data.count !== undefined ? (
-          <Badge variant="secondary" className="shrink-0 text-[10px]">
-            {data.count}
-          </Badge>
-        ) : null}
-      </div>
-      {data.meta ? (
-        <p className="mt-2 truncate border-t pt-2 font-mono text-[10px] text-muted-foreground">
-          {data.meta}
-        </p>
-      ) : null}
-      {hasLiveStatus(data.status) ? (
-        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={
+          <div
             className={cn(
-              "size-1.5 rounded-full",
-              statusPulseClass(data.status),
+              "group relative min-w-55 select-none rounded-2xl border bg-card/95 px-3.5 py-3 text-card-foreground shadow-black/5 shadow-lg backdrop-blur transition duration-150",
+              "hover:-translate-y-0.5 hover:shadow-black/10 hover:shadow-xl",
+              selected && "border-primary ring-2 ring-primary/20",
+              Boolean(data.isSelectedTarget) && "ring-2 ring-primary/15",
+              Boolean(data.isCluster) &&
+                "border-primary/50 border-dashed bg-primary/5",
+              data.kind === "cluster" &&
+                "border-primary/60 bg-gradient-to-br from-primary/10 via-card to-primary/5",
             )}
-          />
-          <span className="font-medium text-foreground/80">
-            {statusLabel(data.status)}
-          </span>
-          <span className="ml-auto uppercase tracking-wider opacity-60">
-            live
-          </span>
-        </div>
-      ) : null}
-    </div>
+            role="group"
+            aria-label={`${config.label.slice(0, -1)}: ${data.label}`}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              if (typeof data.onToggleCluster === "function") {
+                (data.onToggleCluster as () => void)();
+              }
+            }}
+          >
+            <Handle
+              type="target"
+              position={Position.Left}
+              className="!size-2 !border-0 !bg-muted-foreground/50"
+            />
+            <Handle
+              type="source"
+              position={Position.Right}
+              className="!size-2 !border-0 !bg-muted-foreground/50"
+            />
+            {data.isCluster && !data.isCollapsed && data.clusterLabel ? (
+              <div className="mb-2 flex items-center justify-between border-b pb-1 text-[10px] text-muted-foreground">
+                <span className="truncate font-semibold text-primary">
+                  {String(data.clusterLabel)}
+                </span>
+                <button
+                  type="button"
+                  className="flex size-4 items-center justify-center rounded text-primary hover:bg-primary/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (typeof data.onToggleCluster === "function") {
+                      (data.onToggleCluster as () => void)();
+                    }
+                  }}
+                  title="Collapse Cluster Subgraph"
+                >
+                  <Boxes className="size-3" />
+                </button>
+              </div>
+            ) : null}
+            <div className="flex items-start gap-2.5">
+              <div
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-xl border",
+                  config.bg || "",
+                )}
+              >
+                <Icon className={cn("size-4", config.color)} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate font-semibold text-sm">{data.label}</p>
+                  {hasLiveStatus(data.status) ? (
+                    <span
+                      className={cn(
+                        "size-1.5 shrink-0 rounded-full",
+                        statusPulseClass(data.status),
+                      )}
+                      title={`Live status: ${statusLabel(data.status)}`}
+                    />
+                  ) : (
+                    <span
+                      className="size-1.5 shrink-0 rounded-full bg-muted-foreground/50"
+                      title="Status unavailable"
+                    />
+                  )}
+                </div>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                  {data.subtitle || config.label.slice(0, -1)}
+                </p>
+              </div>
+              {data.count !== undefined ? (
+                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                  {data.count}
+                </Badge>
+              ) : null}
+            </div>
+            {data.kind === "cluster" &&
+            typeof data.onToggleCluster === "function" ? (
+              <button
+                type="button"
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1.5 font-medium text-primary text-xs transition hover:bg-primary/20 active:scale-[0.98]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (data.onToggleCluster as () => void)();
+                }}
+              >
+                <Boxes className="size-3.5" />
+                Expand Subgraph ({data.count ?? 0})
+              </button>
+            ) : null}
+            {data.meta ? (
+              <p className="mt-2 truncate border-t pt-2 font-mono text-[10px] text-muted-foreground">
+                {data.meta}
+              </p>
+            ) : null}
+            {data.replicas !== undefined &&
+            typeof data.onScale === "function" ? (
+              <div className="mt-2 flex items-center justify-between border-t pt-2 text-xs">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Replicas
+                </span>
+                <div className="flex items-center gap-1 rounded-lg border bg-background/80 px-1 py-0.5">
+                  <button
+                    type="button"
+                    className="flex size-4 items-center justify-center rounded font-bold text-xs hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      (data.onScale as (delta: number) => void)(-1);
+                    }}
+                    title="Scale Down (-1)"
+                  >
+                    -
+                  </button>
+                  <span className="px-1 font-medium font-mono text-xs tabular-nums">
+                    {String(data.replicas)}
+                  </span>
+                  <button
+                    type="button"
+                    className="flex size-4 items-center justify-center rounded font-bold text-xs hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      (data.onScale as (delta: number) => void)(1);
+                    }}
+                    title="Scale Up (+1)"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {hasLiveStatus(data.status) ? (
+              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    statusPulseClass(data.status),
+                  )}
+                />
+                <span className="font-medium text-foreground/80">
+                  {statusLabel(data.status)}
+                </span>
+                <span className="ml-auto uppercase tracking-wider opacity-60">
+                  live
+                </span>
+              </div>
+            ) : null}
+          </div>
+        }
+      />
+      <ContextMenuContent className="w-52">
+        <ContextMenuLabel>{data.label}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        {data.kind === "container" ? (
+          <>
+            <ContextMenuItem
+              onClick={() => {
+                if (typeof data.onControl === "function") {
+                  (
+                    data.onControl as (
+                      command: "start" | "stop" | "restart",
+                    ) => void
+                  )(data.status === "running" ? "restart" : "start");
+                }
+              }}
+            >
+              <RefreshCw className="mr-2 size-4" />
+              {data.status === "running"
+                ? "Restart Container"
+                : "Start Container"}
+            </ContextMenuItem>
+            {data.status === "running" ? (
+              <ContextMenuItem
+                variant="destructive"
+                onClick={() => {
+                  if (typeof data.onControl === "function") {
+                    (
+                      data.onControl as (
+                        command: "start" | "stop" | "restart",
+                      ) => void
+                    )("stop");
+                  }
+                }}
+              >
+                <AlertCircle className="mr-2 size-4" />
+                Stop Container
+              </ContextMenuItem>
+            ) : null}
+            <ContextMenuSeparator />
+          </>
+        ) : null}
+        {data.kind === "service" && typeof data.onScale === "function" ? (
+          <>
+            <ContextMenuItem
+              onClick={() => (data.onScale as (delta: number) => void)(1)}
+            >
+              <Plus className="mr-2 size-4" /> Scale Up (+1 Replica)
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => (data.onScale as (delta: number) => void)(-1)}
+            >
+              <Plus className="mr-2 size-4 rotate-45" /> Scale Down (-1 Replica)
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        ) : null}
+        {data.isCluster && typeof data.onToggleCluster === "function" ? (
+          <ContextMenuItem
+            onClick={() => (data.onToggleCluster as () => void)()}
+          >
+            <Boxes className="mr-2 size-4" />
+            {data.isCollapsed ? "Expand Subgraph" : "Collapse Cluster"}
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem
+          onClick={() => {
+            if (typeof data.onInspect === "function") {
+              (data.onInspect as () => void)();
+            }
+          }}
+        >
+          <Settings className="mr-2 size-4" /> Inspect Node & Logs
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 });
 
@@ -555,12 +762,71 @@ function makeNode(
   };
 }
 
+type RelationInfo = {
+  label: string;
+  color: string;
+  speed?: string;
+};
+
+function getRelationInfo(id: string): RelationInfo {
+  if (id.includes("domain-resource") || id.includes("domain-service")) {
+    return { label: "routes to", color: "var(--warning)", speed: "0.7s" };
+  }
+  if (id.includes("registry-resource")) {
+    return { label: "builds", color: "var(--primary)", speed: "2.8s" };
+  }
+  if (id.includes("server-resource")) {
+    return { label: "hosts", color: "var(--primary)", speed: "2.0s" };
+  }
+  if (id.includes("resource-service")) {
+    return { label: "deploys", color: "var(--success)", speed: "1.4s" };
+  }
+  if (id.includes("task-service")) {
+    return { label: "schedules", color: "var(--info)", speed: "1.2s" };
+  }
+  if (id.includes("service-container")) {
+    return { label: "runs", color: "var(--success)", speed: "1.4s" };
+  }
+  if (
+    id.includes("resource-network") ||
+    id.includes("service-network") ||
+    id.includes("container-network")
+  ) {
+    return { label: "attaches", color: "var(--info)", speed: "1.6s" };
+  }
+  if (id.includes("container-volume") || id.includes("inventory-volume")) {
+    return { label: "mounts", color: "var(--success)", speed: "3.2s" };
+  }
+  if (id.includes("s3-resource") || id.includes("s3-server")) {
+    return { label: "backs up to", color: "var(--info)", speed: "3.0s" };
+  }
+  if (id.includes("swarm-mesh") || id.includes("cross-host")) {
+    return { label: "swarm mesh", color: "var(--primary)", speed: "1.0s" };
+  }
+  if (
+    id.includes("inventory-swarm") ||
+    id.includes("inventory-service") ||
+    id.includes("inventory-container") ||
+    id.includes("inventory-network")
+  ) {
+    return {
+      label: "manages",
+      color: "var(--muted-foreground)",
+      speed: "2.5s",
+    };
+  }
+  return { label: "connects", color: "var(--border)", speed: "2.0s" };
+}
+
 function makeEdge(
   id: string,
   source: string,
   target: string,
   muted = false,
 ): Edge {
+  const relation = getRelationInfo(id);
+  const strokeColor = muted ? "var(--border)" : relation.color;
+
   return {
     id,
     source,
@@ -571,33 +837,36 @@ function makeEdge(
       (id.includes("task-service") ||
         id.includes("service-container") ||
         id.includes("domain-service")),
+    label: relation.label,
+    labelBgPadding: [5, 2] as [number, number],
+    labelBgBorderRadius: 4,
+    labelStyle: {
+      fill: "var(--foreground)",
+      fontSize: 9.5,
+      fontWeight: 500,
+    },
+    labelBgStyle: {
+      fill: "var(--card)",
+      fillOpacity: 0.92,
+      stroke: strokeColor,
+      strokeWidth: 1,
+    },
     style: {
-      stroke: muted
-        ? "var(--border)"
-        : "color-mix(in srgb, var(--primary) 45%, var(--border))",
-      strokeWidth: muted ? 1 : 1.5,
-      opacity: muted ? 0.45 : 0.85,
+      stroke: strokeColor,
+      strokeWidth: muted ? 1 : 1.75,
+      opacity: muted ? 0.35 : 0.8,
     },
     markerEnd: {
       type: MarkerType.ArrowClosed,
-      color: "var(--muted-foreground)",
+      color: strokeColor,
+      width: 14,
+      height: 14,
     },
   };
 }
 
-function edgeRelationLabel(id: string) {
-  if (id.includes("domain-resource")) return "routes to";
-  if (id.includes("domain-service")) return "routes to";
-  if (id.includes("registry-resource")) return "builds";
-  if (id.includes("server-resource")) return "hosts";
-  if (id.includes("resource-service")) return "deploys";
-  if (id.includes("resource-network")) return "uses";
-  if (id.includes("service-network")) return "attaches";
-  if (id.includes("task-service")) return "schedules";
-  if (id.includes("service-container")) return "runs";
-  if (id.includes("container-network")) return "attached";
-  if (id.includes("container-volume")) return "mounts";
-  return undefined;
+function _edgeRelationLabel(id: string) {
+  return getRelationInfo(id).label;
 }
 
 function DetailRow({
@@ -658,20 +927,39 @@ function TopologyLegend({
   counts: Partial<Record<TopologyKind, number>>;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-muted-foreground">
-      {ALL_KINDS.map((kind) => {
-        const config = KIND_CONFIG[kind];
-        const Icon = config.icon;
-        return (
-          <span key={kind} className="flex items-center gap-1.5">
-            <Icon className={cn("size-3", config.color)} />
-            {config.label}
-            <span className="font-mono text-foreground/70">
-              {counts[kind] ?? 0}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+        {ALL_KINDS.map((kind) => {
+          const config = KIND_CONFIG[kind];
+          const Icon = config.icon;
+          return (
+            <span key={kind} className="flex items-center gap-1.5">
+              <Icon className={cn("size-3", config.color)} />
+              {config.label}
+              <span className="font-mono text-foreground/70">
+                {counts[kind] ?? 0}
+              </span>
             </span>
-          </span>
-        );
-      })}
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground/80">
+        <span className="font-medium text-foreground/70">Relations:</span>
+        <span className="flex items-center gap-1">
+          <span className="h-0.5 w-3 rounded-full bg-warning" /> routes to
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-0.5 w-3 rounded-full bg-primary" /> hosts / builds
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-0.5 w-3 rounded-full bg-success" /> deploys / runs
+          / mounts
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-0.5 w-3 rounded-full bg-info" /> attaches /
+          schedules
+        </span>
+      </div>
     </div>
   );
 }
@@ -684,6 +972,16 @@ export function TopologyMap() {
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [selectedKinds, setSelectedKinds] = useState<TopologyKind[]>(ALL_KINDS);
+  const [showEdgeLabels, setShowEdgeLabels] = useState(true);
+  const [groupBy, setGroupBy] = useState<
+    "none" | "environment" | "network" | "server"
+  >("none");
+  const [collapsedClusterIds, setCollapsedClusterIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [serviceReplicas, setServiceReplicas] = useState<
+    Record<string, number>
+  >({});
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "logs" | "metrics">(
     "overview",
@@ -703,6 +1001,11 @@ export function TopologyMap() {
   });
   const registriesQuery = useQuery({
     ...trpc.dockerRegistry.list.queryOptions({ organizationId }),
+    enabled: ready,
+    staleTime: 60_000,
+  });
+  const s3Query = useQuery({
+    ...trpc.s3Destination.list.queryOptions({ organizationId }),
     enabled: ready,
     staleTime: 60_000,
   });
@@ -826,6 +1129,7 @@ export function TopologyMap() {
   const swarmNodes = swarmNodesQuery.data ?? EMPTY_ARRAY;
   const servers = serversQuery.data ?? EMPTY_ARRAY;
   const registries = registriesQuery.data ?? EMPTY_ARRAY;
+  const s3Destinations = s3Query.data ?? EMPTY_ARRAY;
   const dockerInfo =
     infoQuery.data &&
     typeof infoQuery.data === "object" &&
@@ -894,15 +1198,17 @@ export function TopologyMap() {
         .map((resource) => resource.buildRegistryId)
         .filter((id): id is string => Boolean(id)),
     );
-    const scopedRegistries = registries.filter((registry) => {
-      const registryServerId =
-        registry.serverId && registry.serverId !== "manager"
-          ? registry.serverId
-          : "local";
-      return (
-        scopedRegistryIds.has(registry.id) || registryServerId === targetId
-      );
-    });
+    const scopedRegistries = registries.filter(
+      (registry: { id: string; serverId?: string | null }) => {
+        const registryServerId =
+          registry.serverId && registry.serverId !== "manager"
+            ? registry.serverId
+            : "local";
+        return (
+          scopedRegistryIds.has(registry.id) || registryServerId === targetId
+        );
+      },
+    );
     const routeNodeCount = scopedResources.reduce((count, resource) => {
       const mappings = safeJson<Array<{ host?: string }>>(resource.domains, []);
       return count + mappings.filter((mapping) => Boolean(mapping.host)).length;
@@ -1336,33 +1642,271 @@ export function TopologyMap() {
         addEdge(id, `service:${serviceName}`, `domain-service:${id}`);
       });
     });
-    scopedRegistries.forEach((registry, index) => {
+    scopedRegistries.forEach(
+      (
+        registry: {
+          id: string;
+          name: string;
+          registryUrl?: string | null;
+          imagePrefix?: string | null;
+        },
+        index: number,
+      ) => {
+        if (
+          matchesSearch({
+            label: registry.name,
+            kind: "registry",
+            subtitle: registry.registryUrl || "Docker Hub",
+            meta: registry.imagePrefix || "No image prefix",
+          })
+        )
+          add(
+            makeNode(
+              `registry:${registry.id}`,
+              "registry",
+              {
+                label: registry.name,
+                subtitle: registry.registryUrl || "Docker Hub",
+                meta: registry.imagePrefix || "No image prefix",
+                isHealthy: true,
+              },
+              topologyPosition(0, routeNodeCount + index).x,
+              topologyPosition(0, routeNodeCount + index).y,
+            ),
+          );
+      },
+    );
+
+    // Node action handlers
+    const handleScale = (serviceName: string, delta: number) => {
+      setServiceReplicas((prev) => {
+        const current = prev[serviceName] ?? 1;
+        const next = Math.max(0, current + delta);
+        toast.success(`Updated ${serviceName} target replicas to ${next}`);
+        return { ...prev, [serviceName]: next };
+      });
+    };
+
+    const handleInspectNode = (id: string) => {
+      setSelectedNodeId(id);
+      setDetailTab("overview");
+    };
+
+    const handleToggleCluster = (clusterId: string) => {
+      setCollapsedClusterIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(clusterId)) {
+          next.delete(clusterId);
+          toast.success("Expanded cluster view");
+        } else {
+          next.add(clusterId);
+          toast.success("Collapsed cluster view");
+        }
+        return next;
+      });
+    };
+
+    s3Destinations.forEach((s3, index) => {
       if (
         matchesSearch({
-          label: registry.name,
-          kind: "registry",
-          subtitle: registry.registryUrl || "Docker Hub",
-          meta: registry.imagePrefix || "No image prefix",
+          label: s3.name,
+          kind: "s3",
+          subtitle: s3.bucket,
+          meta: s3.endpoint || "AWS S3 / Compatible",
         })
-      )
+      ) {
         add(
           makeNode(
-            `registry:${registry.id}`,
-            "registry",
+            `s3:${s3.id}`,
+            "s3",
             {
-              label: registry.name,
-              subtitle: registry.registryUrl || "Docker Hub",
-              meta: registry.imagePrefix || "No image prefix",
+              label: s3.name,
+              subtitle: `S3 Storage · ${s3.bucket}`,
+              meta: s3.endpoint || "Object Storage",
               isHealthy: true,
+              onInspect: () => handleInspectNode(`s3:${s3.id}`),
             },
-            topologyPosition(0, routeNodeCount + index).x,
-            topologyPosition(0, routeNodeCount + index).y,
+            topologyPosition(
+              0,
+              routeNodeCount + scopedRegistries.length + index,
+            ).x,
+            topologyPosition(
+              0,
+              routeNodeCount + scopedRegistries.length + index,
+            ).y,
           ),
         );
+      }
     });
 
-    // Resolve relationships after all nodes have been materialized. This keeps
-    // edges correct regardless of the order each inventory query finishes in.
+    // Add inter-server Swarm mesh links across distributed Swarm nodes
+    if (visible("swarm") && swarmNodes.length > 1) {
+      swarmNodes.forEach((node, idx) => {
+        const nextNode = swarmNodes[(idx + 1) % swarmNodes.length];
+        if (node.id !== nextNode.id) {
+          addEdge(
+            `swarm:${node.id}`,
+            `swarm:${nextNode.id}`,
+            `swarm-mesh:${node.id}:${nextNode.id}`,
+            false,
+          );
+        }
+      });
+    }
+
+    // Attach callbacks to nodes
+    nodes.forEach((node) => {
+      if (node.data.kind === "service") {
+        const serviceName = node.data.label;
+        const count = serviceReplicas[serviceName] ?? 1;
+        node.data.replicas = count;
+        node.data.onScale = (delta: number) => handleScale(serviceName, delta);
+      }
+      if (node.data.kind === "container") {
+        const containerId = node.id.replace("container:", "");
+        node.data.onControl = (command: "start" | "stop" | "restart") => {
+          setPendingAction({
+            containerId,
+            label: node.data.label,
+            command,
+          });
+        };
+      }
+      node.data.onInspect = () => handleInspectNode(node.id);
+    });
+
+    // Subgraph & Collapsible Cluster Engine
+    if (groupBy !== "none") {
+      const groups = new Map<
+        string,
+        { label: string; nodes: TopologyNode[] }
+      >();
+      nodes.forEach((node) => {
+        let groupKey = "default";
+        let groupLabel = "Cluster";
+        if (groupBy === "environment") {
+          groupKey = String(node.data.meta || "Global Environment");
+          groupLabel = `Env: ${groupKey}`;
+        } else if (groupBy === "network") {
+          groupKey = String(node.data.subtitle || "Network Subnet");
+          groupLabel = `Net: ${groupKey}`;
+        } else if (groupBy === "server") {
+          groupKey = String(node.data.subtitle || "Host Server");
+          groupLabel = `Host: ${groupKey}`;
+        }
+
+        const group = groups.get(groupKey) ?? { label: groupLabel, nodes: [] };
+        group.nodes.push(node);
+        groups.set(groupKey, group);
+      });
+
+      const processedNodes: TopologyNode[] = [];
+      const hiddenNodeIds = new Set<string>();
+
+      groups.forEach((group, key) => {
+        const clusterId = `cluster:${key.replaceAll(/[^a-zA-Z0-9-]/g, "-")}`;
+        const isCollapsed = collapsedClusterIds.has(clusterId);
+
+        const memberList = group.nodes.map((n) => ({
+          id: n.id,
+          label: n.data.label,
+          kind: n.data.kind,
+          status: n.data.status,
+          subtitle: n.data.subtitle,
+        }));
+
+        if (isCollapsed && group.nodes.length > 1) {
+          group.nodes.forEach((n) => {
+            hiddenNodeIds.add(n.id);
+          });
+          const healthyCount = group.nodes.filter(
+            (n) => n.data.isHealthy !== false,
+          ).length;
+          const firstNode = group.nodes[0];
+          processedNodes.push(
+            makeNode(
+              clusterId,
+              "cluster",
+              {
+                label: group.label,
+                subtitle: `${group.nodes.length} objects · ${healthyCount}/${group.nodes.length} healthy`,
+                meta: `Collapsed subgraph (${group.nodes
+                  .map((n) => n.data.label)
+                  .slice(0, 4)
+                  .join(", ")})`,
+                count: group.nodes.length,
+                isHealthy: healthyCount === group.nodes.length,
+                isCluster: true,
+                isCollapsed: true,
+                memberNodes: memberList,
+                onToggleCluster: () => handleToggleCluster(clusterId),
+                onInspect: () => handleInspectNode(clusterId),
+              },
+              firstNode.position.x,
+              firstNode.position.y,
+            ),
+          );
+        } else {
+          group.nodes.forEach((n) => {
+            n.data.isCluster = true;
+            n.data.isCollapsed = false;
+            n.data.clusterLabel = group.label;
+            n.data.onToggleCluster = () => handleToggleCluster(clusterId);
+            processedNodes.push(n);
+          });
+        }
+      });
+
+      const finalNodes = processedNodes.length > 0 ? processedNodes : nodes;
+      const nodeIds = new Set(finalNodes.map((node) => node.id));
+
+      const reroutedEdges = pendingEdges
+        .map((edge) => {
+          let source = edge.source;
+          let target = edge.target;
+
+          if (hiddenNodeIds.has(source)) {
+            for (const [key, group] of groups.entries()) {
+              if (group.nodes.some((n) => n.id === source)) {
+                source = `cluster:${key.replaceAll(/[^a-zA-Z0-9-]/g, "-")}`;
+                break;
+              }
+            }
+          }
+
+          if (hiddenNodeIds.has(target)) {
+            for (const [key, group] of groups.entries()) {
+              if (group.nodes.some((n) => n.id === target)) {
+                target = `cluster:${key.replaceAll(/[^a-zA-Z0-9-]/g, "-")}`;
+                break;
+              }
+            }
+          }
+
+          return { ...edge, source, target };
+        })
+        .filter(
+          (edge) =>
+            edge.source !== edge.target &&
+            nodeIds.has(edge.source) &&
+            nodeIds.has(edge.target),
+        )
+        .map((edge) =>
+          makeEdge(edge.id, edge.source, edge.target, edge.muted ?? false),
+        );
+
+      const uniqueEdges = [
+        ...new Map(reroutedEdges.map((edge) => [edge.id, edge])).values(),
+      ];
+
+      const clusterIds = Array.from(groups.keys()).map(
+        (key) => `cluster:${key.replaceAll(/[^a-zA-Z0-9-]/g, "-")}`,
+      );
+
+      return { nodes: finalNodes, edges: uniqueEdges, counts, clusterIds };
+    }
+
+    // Standard un-grouped layout
     const nodeIds = new Set(nodes.map((node) => node.id));
     const edges = pendingEdges
       .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
@@ -1370,11 +1914,10 @@ export function TopologyMap() {
         makeEdge(edge.id, edge.source, edge.target, edge.muted ?? false),
       );
 
-    // Add only edges that connect visible nodes and deduplicate relationships.
     const uniqueEdges = [
       ...new Map(edges.map((edge) => [edge.id, edge])).values(),
     ];
-    return { nodes, edges: uniqueEdges, counts };
+    return { nodes, edges: uniqueEdges, counts, clusterIds: [] };
   }, [
     containers,
     environments,
@@ -1385,6 +1928,7 @@ export function TopologyMap() {
     remoteInfoByServerId,
     registries,
     resources,
+    s3Destinations,
     deferredSearch,
     selectedKinds,
     servers,
@@ -1393,6 +1937,9 @@ export function TopologyMap() {
     swarmTasks,
     targetId,
     volumes,
+    groupBy,
+    collapsedClusterIds,
+    serviceReplicas,
   ]);
 
   const nodePositionsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -1429,33 +1976,53 @@ export function TopologyMap() {
     [canvasNodes, selectedNodeId],
   );
   const edges = useMemo(() => {
-    if (!selectedNodeId) return topology.edges;
     return topology.edges.map((edge) => {
-      const connected =
-        edge.source === selectedNodeId || edge.target === selectedNodeId;
+      const relation = getRelationInfo(edge.id);
+      const strokeColor = edge.style?.stroke || relation.color;
+      const connected = selectedNodeId
+        ? edge.source === selectedNodeId || edge.target === selectedNodeId
+        : false;
+
       return {
         ...edge,
-        animated: connected && edge.animated,
-        label: connected ? edgeRelationLabel(edge.id) : undefined,
-        labelBgPadding: [4, 2] as [number, number],
-        labelBgBorderRadius: 4,
+        animated: selectedNodeId ? connected && edge.animated : edge.animated,
+        label: showEdgeLabels || connected ? relation.label : undefined,
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 6,
         labelStyle: {
-          fill: "var(--muted-foreground)",
-          fontSize: 9,
-          fontWeight: 600,
+          fill: connected ? "var(--foreground)" : "var(--muted-foreground)",
+          fontSize: connected ? 10 : 9.5,
+          fontWeight: connected ? 600 : 500,
         },
         labelBgStyle: {
-          fill: "var(--background)",
-          fillOpacity: 0.9,
+          fill: "var(--card)",
+          fillOpacity: connected ? 0.98 : 0.9,
+          stroke: connected ? "var(--primary)" : strokeColor,
+          strokeWidth: connected ? 1.5 : 1,
         },
         style: {
           ...edge.style,
-          opacity: connected ? 1 : 0.16,
-          strokeWidth: connected ? 2 : 1,
+          stroke: strokeColor,
+          opacity: selectedNodeId
+            ? connected
+              ? 1
+              : 0.12
+            : (edge.style?.opacity ?? 0.8),
+          strokeWidth: selectedNodeId
+            ? connected
+              ? 2.5
+              : 1.25
+            : (edge.style?.strokeWidth ?? 1.75),
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: strokeColor,
+          width: connected ? 16 : 14,
+          height: connected ? 16 : 14,
         },
       };
     });
-  }, [selectedNodeId, topology.edges]);
+  }, [selectedNodeId, showEdgeLabels, topology.edges]);
   const onNodesChange = useCallback((changes: NodeChange<TopologyNode>[]) => {
     for (const change of changes) {
       if (change.type === "position" && change.position) {
@@ -1466,7 +2033,9 @@ export function TopologyMap() {
   }, []);
 
   const selectedGraphNode =
-    nodes.find((node) => node.id === selectedNodeId) ?? null;
+    topology.nodes.find((node) => node.id === selectedNodeId) ??
+    canvasNodes.find((node) => node.id === selectedNodeId) ??
+    null;
   const selectedContainer =
     selectedGraphNode?.data.kind === "container"
       ? containers.find(
@@ -1548,14 +2117,17 @@ export function TopologyMap() {
     async (
       algo: LayoutAlgorithm = layoutAlgo,
       dir: LayoutDirection = layoutDir,
+      targetNodes: TopologyNode[] = topology.nodes,
+      targetEdges: Edge[] = topology.edges,
+      silent = false,
     ) => {
-      if (canvasNodes.length === 0) return;
+      if (targetNodes.length === 0) return;
       try {
         let result: { nodes: TopologyNode[]; edges: Edge[] };
         if (algo === "elk") {
-          result = await getElkLayout(canvasNodes, edges, dir);
+          result = await getElkLayout(targetNodes, targetEdges, dir);
         } else {
-          result = getDagreLayout(canvasNodes, edges, dir);
+          result = getDagreLayout(targetNodes, targetEdges, dir);
         }
         const resolvedNodes = resolveNodeCollisions(result.nodes);
         nodePositionsRef.current = {};
@@ -1566,13 +2138,47 @@ export function TopologyMap() {
         setTimeout(() => {
           fitView({ padding: 0.22, duration: 350 });
         }, 50);
-        toast.success(`Applied ${algo.toUpperCase()} (${dir}) layout`);
+        if (!silent) {
+          toast.success(`Applied ${algo.toUpperCase()} (${dir}) layout`);
+        }
       } catch (err: any) {
-        toast.error(`Layout failed: ${err.message || String(err)}`);
+        if (!silent) {
+          toast.error(`Layout failed: ${err.message || String(err)}`);
+        }
       }
     },
-    [canvasNodes, edges, fitView, layoutAlgo, layoutDir],
+    [fitView, layoutAlgo, layoutDir, topology.edges, topology.nodes],
   );
+
+  // Auto-run layout engine whenever grouping or cluster collapse state changes
+  useEffect(() => {
+    if (ready && topology.nodes.length > 0 && groupBy !== "none") {
+      let isSubscribed = true;
+      const run = async () => {
+        let result: { nodes: TopologyNode[]; edges: Edge[] };
+        if (layoutAlgo === "elk") {
+          result = await getElkLayout(
+            topology.nodes,
+            topology.edges,
+            layoutDir,
+          );
+        } else {
+          result = getDagreLayout(topology.nodes, topology.edges, layoutDir);
+        }
+        if (!isSubscribed) return;
+        const resolvedNodes = resolveNodeCollisions(result.nodes);
+        nodePositionsRef.current = {};
+        for (const n of resolvedNodes) {
+          nodePositionsRef.current[n.id] = n.position;
+        }
+        setCanvasNodes(resolvedNodes);
+      };
+      void run();
+      return () => {
+        isSubscribed = false;
+      };
+    }
+  }, [groupBy, layoutAlgo, layoutDir, ready, topology.edges, topology.nodes]);
 
   const handleResolveCollisionsOnly = useCallback(() => {
     if (canvasNodes.length === 0) return;
@@ -1602,6 +2208,7 @@ export function TopologyMap() {
     void Promise.all([
       serversQuery.refetch(),
       registriesQuery.refetch(),
+      s3Query.refetch(),
       localInfoQuery.refetch(),
       infoQuery.refetch(),
       containersQuery.refetch(),
@@ -1619,6 +2226,7 @@ export function TopologyMap() {
     networksQuery,
     projectsQuery,
     registriesQuery,
+    s3Query,
     serversQuery,
     servicesQuery,
     swarmInfoQuery,
@@ -1677,10 +2285,11 @@ export function TopologyMap() {
               onClick={refreshAll}
               disabled={graphLoading}
             >
-              <RefreshCw
-                className={cn("size-4", infoQuery.isFetching && "animate-spin")}
-                data-icon="inline-start"
-              />
+              {infoQuery.isFetching ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <RefreshCw data-icon="inline-start" />
+              )}
               Refresh
             </Button>
           </div>
@@ -1689,53 +2298,59 @@ export function TopologyMap() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="border-border/60 bg-card/60">
-          <CardContent className="flex items-center justify-between">
-            <div>
-              <p className="text-muted-foreground text-xs">Visible objects</p>
-              <p className="mt-1 font-semibold text-2xl tabular-nums">
-                {visibleCount}
-              </p>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="font-medium text-muted-foreground text-xs">
+              Visible objects
+            </CardTitle>
+            <Layers className="size-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="font-semibold text-2xl tabular-nums">
+              {visibleCount}
             </div>
-            <Layers className="size-5 text-primary" />
           </CardContent>
         </Card>
         <Card className="border-border/60 bg-card/60">
-          <CardContent className="flex items-center justify-between">
-            <div>
-              <p className="text-muted-foreground text-xs">
-                Running containers
-              </p>
-              <p className="mt-1 font-semibold text-2xl text-success tabular-nums">
-                {runningContainers}
-              </p>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="font-medium text-muted-foreground text-xs">
+              Running containers
+            </CardTitle>
+            <CheckCircle className="size-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="font-semibold text-2xl text-success tabular-nums">
+              {runningContainers}
             </div>
-            <CheckCircle className="size-5 text-success" />
           </CardContent>
         </Card>
         <Card className="border-border/60 bg-card/60">
-          <CardContent className="flex items-center justify-between">
-            <div>
-              <p className="text-muted-foreground text-xs">Attention needed</p>
-              <p className="mt-1 font-semibold text-2xl text-warning tabular-nums">
-                {unhealthyCount}
-              </p>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="font-medium text-muted-foreground text-xs">
+              Attention needed
+            </CardTitle>
+            <AlertCircle className="size-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <div className="font-semibold text-2xl text-warning tabular-nums">
+              {unhealthyCount}
             </div>
-            <AlertCircle className="size-5 text-warning" />
           </CardContent>
         </Card>
         <Card className="border-border/60 bg-card/60">
-          <CardContent className="flex items-center justify-between">
-            <div>
-              <p className="text-muted-foreground text-xs">Swarm quorum</p>
-              <p className="mt-1 font-semibold text-2xl tabular-nums">
-                {swarmInfoQuery.data?.activeManagers ?? "—"}
-                <span className="font-normal text-muted-foreground text-sm">
-                  {" "}
-                  / {swarmInfoQuery.data?.managers ?? "—"}
-                </span>
-              </p>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="font-medium text-muted-foreground text-xs">
+              Swarm quorum
+            </CardTitle>
+            <Server className="size-4 text-info" />
+          </CardHeader>
+          <CardContent>
+            <div className="font-semibold text-2xl tabular-nums">
+              {swarmInfoQuery.data?.activeManagers ?? "—"}
+              <span className="font-normal text-muted-foreground text-sm">
+                {" "}
+                / {swarmInfoQuery.data?.managers ?? "—"}
+              </span>
             </div>
-            <Server className="size-5 text-info" />
           </CardContent>
         </Card>
       </div>
@@ -1753,17 +2368,18 @@ export function TopologyMap() {
                 live operator panel.
               </CardDescription>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-60 flex-1 sm:flex-none">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
+            <div className="flex w-full items-center gap-2">
+              <InputGroup className="min-w-60 flex-1">
+                <InputGroupAddon align="inline-start">
+                  <Search />
+                </InputGroupAddon>
+                <InputGroupInput
                   aria-label="Search topology"
-                  className="h-9 pl-9"
                   placeholder="Search objects…"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
-              </div>
+              </InputGroup>
               <Select
                 value={targetId}
                 onValueChange={(value) => {
@@ -1930,79 +2546,235 @@ export function TopologyMap() {
                 </Panel>
                 <Panel
                   position="top-right"
-                  className="flex items-center gap-1.5 rounded-xl border bg-background/90 p-1.5 shadow-sm backdrop-blur"
+                  className="flex items-center gap-1 rounded-xl border bg-background/95 p-1 shadow-md backdrop-blur"
                 >
-                  <Select
-                    value={layoutAlgo}
-                    onValueChange={(val) => {
-                      const nextAlgo = val as LayoutAlgorithm;
-                      setLayoutAlgo(nextAlgo);
-                      void handleApplyLayout(nextAlgo, layoutDir);
-                    }}
-                  >
-                    <SelectTrigger className="h-7 w-[85px] px-2 text-xs">
-                      <SelectValue placeholder="Algorithm" />
-                    </SelectTrigger>
-                    <SelectContent align="end">
-                      <SelectItem value="dagre">Dagre</SelectItem>
-                      <SelectItem value="elk">ELK.js</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <TooltipProvider>
+                    <Select
+                      value={groupBy}
+                      onValueChange={(val) => setGroupBy(val as typeof groupBy)}
+                    >
+                      <SelectTrigger className="h-7 w-[95px] px-2 text-xs">
+                        <SelectValue placeholder="Group by" />
+                      </SelectTrigger>
+                      <SelectContent align="end">
+                        <SelectGroup>
+                          <SelectItem value="none">Flat View</SelectItem>
+                          <SelectItem value="environment">
+                            Environment
+                          </SelectItem>
+                          <SelectItem value="network">Network</SelectItem>
+                          <SelectItem value="server">Host Server</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
 
-                  <Select
-                    value={layoutDir}
-                    onValueChange={(val) => {
-                      const nextDir = val as LayoutDirection;
-                      setLayoutDir(nextDir);
-                      void handleApplyLayout(layoutAlgo, nextDir);
-                    }}
-                  >
-                    <SelectTrigger className="h-7 w-[100px] px-2 text-xs">
-                      <SelectValue placeholder="Direction" />
-                    </SelectTrigger>
-                    <SelectContent align="end">
-                      <SelectItem value="vertical">Vertical</SelectItem>
-                      <SelectItem value="horizontal">Horizontal</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    {groupBy !== "none" ? (
+                      <>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setCollapsedClusterIds(
+                                    new Set(topology.clusterIds ?? []),
+                                  );
+                                  toast.success(
+                                    "Collapsed all cluster subgraphs",
+                                  );
+                                }}
+                                aria-label="Collapse all clusters"
+                              >
+                                <Boxes className="size-4 text-warning" />
+                              </Button>
+                            }
+                          />
+                          <TooltipContent>
+                            Collapse all subgraphs
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setCollapsedClusterIds(new Set());
+                                  toast.success(
+                                    "Expanded all cluster subgraphs",
+                                  );
+                                }}
+                                aria-label="Expand all clusters"
+                              >
+                                <Sparkles className="size-4 text-primary" />
+                              </Button>
+                            }
+                          />
+                          <TooltipContent>Expand all subgraphs</TooltipContent>
+                        </Tooltip>
+                      </>
+                    ) : null}
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    onClick={() =>
-                      void handleApplyLayout(layoutAlgo, layoutDir)
-                    }
-                  >
-                    <RefreshCw className="mr-1 size-3" />
-                    Layout
-                  </Button>
+                    <div className="my-auto h-4 w-px bg-border" />
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    onClick={handleResolveCollisionsOnly}
-                  >
-                    Fix Collisions
-                  </Button>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 font-mono font-semibold text-xs uppercase tracking-wider"
+                            onClick={() => {
+                              const nextAlgo =
+                                layoutAlgo === "dagre" ? "elk" : "dagre";
+                              setLayoutAlgo(nextAlgo);
+                              void handleApplyLayout(nextAlgo, layoutDir);
+                            }}
+                          >
+                            {layoutAlgo}
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>
+                        Algorithm:{" "}
+                        {layoutAlgo === "dagre"
+                          ? "Dagre (DAG)"
+                          : "ELK.js (Layered)"}{" "}
+                        (click to toggle)
+                      </TooltipContent>
+                    </Tooltip>
 
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => fitView({ padding: 0.22, duration: 350 })}
-                    aria-label="Fit map to view"
-                  >
-                    <LineChart className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => setSelectedKinds(ALL_KINDS)}
-                    aria-label="Show all object types"
-                  >
-                    <Layers className="size-4" />
-                  </Button>
+                    <div className="my-auto h-4 w-px bg-border" />
+
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() => {
+                              const nextDir =
+                                layoutDir === "vertical"
+                                  ? "horizontal"
+                                  : "vertical";
+                              setLayoutDir(nextDir);
+                              void handleApplyLayout(layoutAlgo, nextDir);
+                            }}
+                            aria-label="Toggle layout direction"
+                          >
+                            {layoutDir === "vertical" ? (
+                              <ArrowDown className="size-4" />
+                            ) : (
+                              <ArrowRightIcon className="size-4" />
+                            )}
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>
+                        Direction:{" "}
+                        {layoutDir === "vertical"
+                          ? "Vertical (Top-Down)"
+                          : "Horizontal (Left-Right)"}{" "}
+                        (click to toggle)
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() =>
+                              void handleApplyLayout(layoutAlgo, layoutDir)
+                            }
+                            aria-label="Run auto-layout"
+                          >
+                            <WandSparkles className="size-4 text-primary" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>Run auto-layout engine</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={handleResolveCollisionsOnly}
+                            aria-label="Fix overlapping nodes"
+                          >
+                            <Boxes className="size-4 text-info" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>
+                        Fix overlapping node positions
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <div className="my-auto h-4 w-px bg-border" />
+
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            size="icon-sm"
+                            variant={showEdgeLabels ? "secondary" : "ghost"}
+                            onClick={() => setShowEdgeLabels((prev) => !prev)}
+                            aria-label="Toggle edge labels"
+                          >
+                            <FileText className="size-4" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>
+                        {showEdgeLabels
+                          ? "Hide edge relation labels"
+                          : "Show edge relation labels"}
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() =>
+                              fitView({ padding: 0.22, duration: 350 })
+                            }
+                            aria-label="Fit map to screen"
+                          >
+                            <LineChart className="size-4" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>Fit map to screen</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() => setSelectedKinds(ALL_KINDS)}
+                            aria-label="Show all object types"
+                          >
+                            <Layers className="size-4" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>
+                        Reset type filters (show all)
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </Panel>
               </ReactFlow>
             </div>
@@ -2112,7 +2884,10 @@ export function TopologyMap() {
                 </TabsList>
               </SheetHeader>
               <div className="flex flex-col gap-5 px-6 py-5">
-                <TabsContent value="overview" className="mt-0 space-y-5">
+                <TabsContent
+                  value="overview"
+                  className="mt-0 flex flex-col gap-5"
+                >
                   <div className="grid grid-cols-2 gap-2">
                     <StatPill
                       label="Type"
@@ -2132,6 +2907,113 @@ export function TopologyMap() {
                       }
                     />
                   </div>
+                  {selectedGraphNode.data.isCluster ||
+                  selectedGraphNode.data.kind === "cluster" ? (
+                    <Card className="border-primary/30 bg-primary/5">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm">
+                            Subgraph Cluster
+                          </CardTitle>
+                          <Badge variant="outline">
+                            {selectedGraphNode.data.isCollapsed
+                              ? "Collapsed"
+                              : "Expanded"}
+                          </Badge>
+                        </div>
+                        <CardDescription>
+                          {selectedGraphNode.data.isCollapsed
+                            ? "This cluster consolidates related objects into a single summary node to simplify the map."
+                            : "This node belongs to an active subgraph group on the topology map."}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex flex-col gap-3 pt-0">
+                        {Array.isArray(selectedGraphNode.data.memberNodes) &&
+                        selectedGraphNode.data.memberNodes.length > 0 ? (
+                          <div className="flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1">
+                            <p className="mb-1 font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                              Member Objects (
+                              {selectedGraphNode.data.memberNodes.length})
+                            </p>
+                            {(
+                              selectedGraphNode.data.memberNodes as Array<{
+                                id: string;
+                                label: string;
+                                kind: TopologyKind;
+                                status?: string;
+                                subtitle?: string;
+                              }>
+                            ).map((member) => {
+                              const mConfig =
+                                KIND_CONFIG[member.kind] ?? KIND_CONFIG.server;
+                              const MIcon = mConfig.icon;
+                              return (
+                                <button
+                                  type="button"
+                                  key={member.id}
+                                  className="flex cursor-pointer items-center justify-between rounded-xl border bg-background px-3 py-2 text-left text-xs transition hover:border-primary hover:bg-accent/5"
+                                  onClick={() => setSelectedNodeId(member.id)}
+                                >
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <div
+                                      className={cn(
+                                        "flex size-6 shrink-0 items-center justify-center rounded-lg border",
+                                        mConfig.bg || "",
+                                      )}
+                                    >
+                                      <MIcon
+                                        className={cn("size-3", mConfig.color)}
+                                      />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="truncate font-semibold text-xs">
+                                        {member.label}
+                                      </p>
+                                      <p className="truncate text-[10px] text-muted-foreground">
+                                        {member.subtitle ||
+                                          mConfig.label.slice(0, -1)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2 flex shrink-0 items-center gap-1.5">
+                                    {member.status ? (
+                                      <Badge
+                                        variant={nodeStatusVariant(
+                                          member.status,
+                                        )}
+                                        className="text-[10px]"
+                                      >
+                                        {statusLabel(member.status)}
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                        {typeof selectedGraphNode.data.onToggleCluster ===
+                        "function" ? (
+                          <Button
+                            size="sm"
+                            className="mt-1 w-full"
+                            onClick={() => {
+                              (
+                                selectedGraphNode.data
+                                  .onToggleCluster as () => void
+                              )();
+                            }}
+                          >
+                            <Boxes data-icon="inline-start" />
+                            {selectedGraphNode.data.isCollapsed
+                              ? "Expand Cluster Subgraph"
+                              : "Collapse Cluster Subgraph"}
+                          </Button>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
                   <Card className="bg-muted/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">Configuration</CardTitle>
@@ -2265,29 +3147,33 @@ export function TopologyMap() {
                     ) : null}
                   </div>
                   {selectedGraphNode.data.kind === "domain" ? (
-                    <Card className="border-warning/30 bg-warning/5">
-                      <CardContent className="flex gap-3 p-4 text-xs">
-                        <Globe className="mt-0.5 size-4 shrink-0 text-warning" />
-                        <p className="text-muted-foreground">
-                          This route is represented from the resource’s Caddy
-                          mapping. Open the resource to edit routing,
-                          certificates, middleware, and upstream service
-                          settings.
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <Alert
+                      variant="warning"
+                      className="border-warning/30 bg-warning/5 text-warning-foreground"
+                    >
+                      <Globe className="size-4 text-warning" />
+                      <AlertTitle className="font-medium text-warning">
+                        Route Mapping
+                      </AlertTitle>
+                      <AlertDescription className="text-xs">
+                        This route is represented from the resource’s Caddy
+                        mapping. Open the resource to edit routing,
+                        certificates, middleware, and upstream service settings.
+                      </AlertDescription>
+                    </Alert>
                   ) : null}
                   {selectedGraphNode.data.kind === "registry" ? (
-                    <Card className="border-info/30 bg-info/5">
-                      <CardContent className="flex gap-3 p-4 text-xs">
-                        <Database className="mt-0.5 size-4 shrink-0 text-info" />
-                        <p className="text-muted-foreground">
-                          Registry credentials are never exposed in the
-                          topology. Use the Docker Registry page to test or
-                          update this connection.
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <Alert className="border-info/30 bg-info/5 text-info-foreground">
+                      <Database className="size-4 text-info" />
+                      <AlertTitle className="font-medium text-info">
+                        Registry Credentials
+                      </AlertTitle>
+                      <AlertDescription className="text-xs">
+                        Registry credentials are never exposed in the topology.
+                        Use the Docker Registry page to test or update this
+                        connection.
+                      </AlertDescription>
+                    </Alert>
                   ) : null}
                 </TabsContent>
                 <TabsContent value="logs" className="mt-0">

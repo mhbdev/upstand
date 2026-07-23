@@ -282,7 +282,7 @@ export function ResourcesCard({ config, onChange }: AdvancedCardProps) {
             id="advanced-placement"
             data-slot="input-group-control"
             rows={Math.max(3, config.placementConstraints.length + 1)}
-            className="w-full flex-1 resize-none rounded-none border-0 bg-transparent px-3 py-2 font-mono text-sm shadow-none outline-none ring-0 focus-visible:ring-0 dark:bg-transparent"
+            className="w-full flex-1 resize-none px-3 py-2 font-mono text-sm"
             placeholder={"node.role == worker\nnode.labels.region == eu"}
             value={config.placementConstraints.join("\n")}
             onChange={(e) =>

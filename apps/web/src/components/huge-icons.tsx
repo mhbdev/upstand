@@ -18,6 +18,7 @@ import {
   Boxes as BoxesFreeIcon,
   BoxIcon as BoxIconFreeIcon,
   BrainIcon as BrainIconFreeIcon,
+  Briefcase01Icon as Briefcase01FreeIcon,
   CalendarClock as CalendarClockFreeIcon,
   Cancel01Icon as Cancel01IconFreeIcon,
   CancelCircleIcon as CancelCircleIconFreeIcon,
@@ -67,6 +68,7 @@ import {
   Filter as FilterFreeIcon,
   FolderIcon as FolderIconFreeIcon,
   FolderOpenIcon as FolderOpenIconFreeIcon,
+  GitBranchIcon as GitBranchIconFreeIcon,
   GitCommitIcon as GitCommitIconFreeIcon,
   Globe as GlobeFreeIcon,
   GlobeIcon as GlobeIconFreeIcon,
@@ -77,6 +79,7 @@ import {
   Info as InfoFreeIcon,
   KeyRound as KeyRoundFreeIcon,
   Layers as LayersFreeIcon,
+  LayoutTemplate as LayoutTemplateFreeIcon,
   LineChart as LineChartFreeIcon,
   Link2 as Link2FreeIcon,
   LoaderPinwheelIcon as LoaderPinwheelIconFreeIcon,
@@ -119,6 +122,7 @@ import {
   Square as SquareFreeIcon,
   SquareIcon as SquareIconFreeIcon,
   Sun as SunFreeIcon,
+  Tag01Icon as Tag01IconFreeIcon,
   Terminal as TerminalFreeIcon,
   TerminalIcon as TerminalIconFreeIcon,
   Trash2 as Trash2FreeIcon,
@@ -165,6 +169,7 @@ const iconMap: Record<string, IconSvgElement> = {
   Boxes: BoxesFreeIcon,
   BoxIcon: BoxIconFreeIcon,
   BrainIcon: BrainIconFreeIcon,
+  Briefcase: Briefcase01FreeIcon,
   CalendarClock: CalendarClockFreeIcon,
   Check: CheckFreeIcon,
   CheckCircle: CheckCircleFreeIcon,
@@ -211,6 +216,7 @@ const iconMap: Record<string, IconSvgElement> = {
   Filter: FilterFreeIcon,
   FolderIcon: FolderIconFreeIcon,
   FolderOpenIcon: FolderOpenIconFreeIcon,
+  GitBranchIcon: GitBranchIconFreeIcon,
   GitCommitIcon: GitCommitIconFreeIcon,
   Globe: GlobeFreeIcon,
   GlobeIcon: GlobeIconFreeIcon,
@@ -221,6 +227,7 @@ const iconMap: Record<string, IconSvgElement> = {
   Info: InfoFreeIcon,
   KeyRound: KeyRoundFreeIcon,
   Layers: LayersFreeIcon,
+  LayoutTemplate: LayoutTemplateFreeIcon,
   LineChart: LineChartFreeIcon,
   Link2: Link2FreeIcon,
   Loader2: LoaderPinwheelIconFreeIcon,
@@ -265,6 +272,7 @@ const iconMap: Record<string, IconSvgElement> = {
   Square: SquareFreeIcon,
   SquareIcon: SquareIconFreeIcon,
   Sun: SunFreeIcon,
+  Tag01Icon: Tag01IconFreeIcon,
   Terminal: TerminalFreeIcon,
   TerminalIcon: TerminalIconFreeIcon,
   TransgenderIcon: UserIconFreeIcon,
@@ -312,6 +320,7 @@ export const BotIcon = createHugeIcon(iconMap.BotIcon);
 export const Boxes = createHugeIcon(iconMap.Boxes);
 export const BoxIcon = createHugeIcon(iconMap.BoxIcon);
 export const BrainIcon = createHugeIcon(iconMap.BrainIcon);
+export const Briefcase = createHugeIcon(iconMap.Briefcase);
 export const CalendarClock = createHugeIcon(iconMap.CalendarClock);
 export const Check = createHugeIcon(iconMap.Check);
 export const CheckCircle = createHugeIcon(iconMap.CheckCircle);
@@ -434,3 +443,7 @@ export const AnalyticsUpIcon = LineChart;
 export const Rocket01Icon = Rocket;
 export const Edit3 = Edit2;
 export const ExternalLink = ExternalLinkIcon;
+
+export const GitBranchIcon = createHugeIcon(iconMap.GitBranchIcon);
+export const LayoutTemplate = createHugeIcon(iconMap.LayoutTemplate);
+export const Tag01Icon = createHugeIcon(iconMap.Tag01Icon);

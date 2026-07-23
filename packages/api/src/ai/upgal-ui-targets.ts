@@ -139,6 +139,14 @@ export const UPGAL_UI_TARGETS = [
     path: "/s3-destinations",
   },
   {
+    id: "navigation-secret-providers",
+    label: "Secret Providers navigation",
+    description: "Open the Secret Providers page.",
+    kind: "navigation",
+    action: "spotlight",
+    path: "/secret-providers",
+  },
+  {
     id: "navigation-settings-scim",
     label: "SCIM navigation",
     description: "Open the SCIM settings page.",

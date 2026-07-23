@@ -127,24 +127,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Docs */}
-        <section
-          id="docs"
-          className="mt-24 flex flex-col items-start justify-between gap-4 border-t pt-8 sm:flex-row sm:items-center md:mt-32"
-        >
-          <p className="text-sm">
-            Read the docs and deploy your first project in minutes.
-          </p>
-          <Button
-            variant="link"
-            className="h-auto p-0"
-            render={<a href={getDocsUrl()} />}
-            nativeButton={false}
-          >
-            Read the docs →
-          </Button>
-        </section>
-
         <footer className="mt-16 flex flex-col gap-3 border-t pt-6 text-muted-foreground text-xs sm:flex-row sm:items-center sm:justify-between">
           <span>Upstand — open-source infrastructure for teams that ship.</span>
           <div className="flex gap-4">

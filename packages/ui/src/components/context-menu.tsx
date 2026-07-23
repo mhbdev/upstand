@@ -72,20 +72,25 @@ function ContextMenuGroup({ ...props }: ContextMenuPrimitive.Group.Props) {
 function ContextMenuLabel({
   className,
   inset,
+  children,
   ...props
 }: ContextMenuPrimitive.GroupLabel.Props & {
   inset?: boolean;
 }) {
   return (
-    <ContextMenuPrimitive.GroupLabel
-      data-slot="context-menu-label"
-      data-inset={inset}
-      className={cn(
-        "px-3 py-2.5 text-muted-foreground text-xs data-inset:pl-9.5",
-        className,
-      )}
-      {...props}
-    />
+    <ContextMenuPrimitive.Group>
+      <ContextMenuPrimitive.GroupLabel
+        data-slot="context-menu-label"
+        data-inset={inset}
+        className={cn(
+          "px-3 py-2.5 font-semibold text-muted-foreground text-xs data-inset:pl-9.5",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </ContextMenuPrimitive.GroupLabel>
+    </ContextMenuPrimitive.Group>
   );
 }
 

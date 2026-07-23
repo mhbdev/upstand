@@ -95,9 +95,18 @@ describe("CreateProjectUseCase", () => {
     });
     const usecase = new CreateProjectUseCase(uow);
 
-    await usecase.execute({ name: "Payments", organizationId: "org-1" });
+    await usecase.execute({
+      name: "Payments",
+      description: "Payment gateway microservices",
+      organizationId: "org-1",
+    });
 
     expect(uow.projectRepository.created).toHaveLength(1);
+    expect(uow.projectRepository.created[0]).toMatchObject({
+      name: "Payments",
+      description: "Payment gateway microservices",
+      organizationId: "org-1",
+    });
     expect(uow.environmentRepository.created).toHaveLength(1);
     expect(uow.environmentRepository.created[0]).toMatchObject({
       name: "production",

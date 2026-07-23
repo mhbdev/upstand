@@ -71,6 +71,7 @@ import {
   Code2,
   Download,
   FilePlus2,
+  LayoutTemplate,
   Loader2,
   Pencil,
   Plus,
@@ -373,7 +374,9 @@ export default function TemplatesPage() {
     <DashboardPage className="gap-5 sm:gap-6">
       <DashboardPageHeader
         title="Templates"
-        icon={<Boxes className="size-6 text-primary" aria-hidden="true" />}
+        icon={
+          <LayoutTemplate className="size-6 text-primary" aria-hidden="true" />
+        }
         description="Build reusable Compose blueprints, generate safe drafts with UpGal, and deploy them to any environment."
         actions={
           <>

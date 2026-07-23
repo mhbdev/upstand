@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export const CreateProjectInputSchema = z.object({
   name: z.string().min(1, "Project name is required"),
+  description: z.string().optional().nullable(),
   organizationId: z.string().min(1, "Organization ID is required"),
 });
 
@@ -17,6 +18,7 @@ export class CreateProjectUseCase {
       const project = await tx.projectRepository.create({
         id: randomUUID(),
         name: input.name,
+        description: input.description ?? null,
         organizationId: input.organizationId,
       });
 

@@ -1,20 +1,25 @@
 "use client";
 
 import {
+  Activity01Icon,
   ArrowRight01Icon,
-  BookmarkIcon,
   Certificate01Icon,
   CloudIcon,
   CloudServerIcon,
   ContainerIcon,
-  FileSecurityIcon,
   Folder01Icon,
+  GitBranchIcon,
+  HierarchyIcon,
   Key01Icon,
-  Layers01Icon,
+  LayoutTemplate,
+  LockKeyIcon,
+  Network,
   Notification01Icon,
+  Package01Icon,
   ServerStack01Icon,
-  Shield01Icon,
-  SourceCodeIcon,
+  ShieldCheck,
+  Tag01Icon,
+  UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -73,7 +78,7 @@ const NAVIGATION_GROUPS = [
     title: "Workloads",
     items: [
       { title: "Projects", href: "/projects", icon: Folder01Icon },
-      { title: "Templates", href: "/templates", icon: Layers01Icon },
+      { title: "Templates", href: "/templates", icon: LayoutTemplate },
     ],
   },
   {
@@ -85,13 +90,13 @@ const NAVIGATION_GROUPS = [
         icon: CloudServerIcon,
       },
       { title: "SSH Keys", href: "/ssh-keys", icon: Key01Icon },
-      { title: "Docker Swarm", href: "/docker-swarm", icon: Layers01Icon },
-      { title: "Topology", href: "/topology", icon: Layers01Icon },
+      { title: "Docker Swarm", href: "/docker-swarm", icon: Network },
+      { title: "Topology", href: "/topology", icon: HierarchyIcon },
       { title: "Docker Inventory", href: "/docker", icon: ContainerIcon },
       {
         title: "Docker Registry",
         href: "/docker-registry",
-        icon: ContainerIcon,
+        icon: Package01Icon,
       },
       { title: "Web Server", href: "/web-server", icon: ServerStack01Icon },
       { title: "Certificates", href: "/certificates", icon: Certificate01Icon },
@@ -100,10 +105,15 @@ const NAVIGATION_GROUPS = [
   {
     title: "Integrations",
     items: [
-      { title: "Git Providers", href: "/git-providers", icon: SourceCodeIcon },
+      { title: "Git Providers", href: "/git-providers", icon: GitBranchIcon },
       { title: "S3 Storage", href: "/s3-destinations", icon: CloudIcon },
-      { title: "SCIM", href: "/settings/scim", icon: Key01Icon },
-      { title: "Single Sign-On", href: "/settings/sso", icon: Shield01Icon },
+      {
+        title: "Secret Providers",
+        href: "/secret-providers",
+        icon: LockKeyIcon,
+      },
+      { title: "SCIM", href: "/settings/scim", icon: UserGroupIcon },
+      { title: "Single Sign-On", href: "/settings/sso", icon: ShieldCheck },
     ],
   },
   {
@@ -112,7 +122,7 @@ const NAVIGATION_GROUPS = [
       {
         title: "Observation",
         href: "/observation",
-        icon: FileSecurityIcon,
+        icon: Activity01Icon,
         items: [
           { title: "Audit Logs", href: "/observation?tab=audits" },
           { title: "Cron Jobs", href: "/observation?tab=cron-jobs" },
@@ -130,7 +140,7 @@ const NAVIGATION_GROUPS = [
         href: "/notifications",
         icon: Notification01Icon,
       },
-      { title: "Tags", href: "/tags", icon: BookmarkIcon },
+      { title: "Tags", href: "/tags", icon: Tag01Icon },
     ],
   },
 ];

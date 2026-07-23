@@ -45,6 +45,7 @@ import {
   AlertTriangleIcon,
   CopyIcon,
   FolderIcon,
+  Pencil,
   PlusIcon,
   Trash2Icon,
 } from "@/components/huge-icons";
@@ -68,16 +69,19 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 interface Project {
   id: string;
   name: string;
+  description?: string | null;
   icon?: string | null;
   createdAt: Date | string;
 }
 
 function ProjectCard({
   project,
+  onEdit,
   onDelete,
   onDuplicate,
 }: {
   project: Project;
+  onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
 }) {
@@ -108,6 +112,12 @@ function ProjectCard({
     () => dateFormatter.format(new Date(project.createdAt)),
     [project.createdAt],
   );
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onEdit();
+  };
 
   const handleDuplicate = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -171,6 +181,12 @@ function ProjectCard({
         <Badge variant="success">Active</Badge>
       </CardHeader>
 
+      {project.description && (
+        <CardContent className="line-clamp-2 pt-0 pb-3 text-muted-foreground text-xs">
+          {project.description}
+        </CardContent>
+      )}
+
       <Separator />
 
       <CardFooter className="flex items-center justify-between">
@@ -178,7 +194,23 @@ function ProjectCard({
           Created <span className="font-semibold">{formattedDate}</span>
         </span>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleEdit}
+                  aria-label={`Edit project ${project.name}`}
+                >
+                  <Pencil aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipContent>Edit</TooltipContent>
+          </Tooltip>
+
           <Tooltip>
             <TooltipTrigger
               render={
@@ -327,11 +359,13 @@ function CreateProjectDialog({
   onCreated: () => void;
 }) {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const mutation = useMutation({
     ...trpc.project.create.mutationOptions(),
     onSuccess: () => {
       toast.success("Project created successfully");
       setName("");
+      setDescription("");
       onOpenChange(false);
       onCreated();
     },
@@ -353,7 +387,11 @@ function CreateProjectDialog({
           onSubmit={(e) => {
             e.preventDefault();
             if (name.trim())
-              mutation.mutate({ name: name.trim(), organizationId });
+              mutation.mutate({
+                name: name.trim(),
+                description: description.trim() || undefined,
+                organizationId,
+              });
           }}
           className="flex flex-col gap-4"
         >
@@ -371,6 +409,19 @@ function CreateProjectDialog({
                   className="border-border/40 focus:border-primary"
                 />
               </UpGalTarget>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="proj-desc">
+                Description (Optional)
+              </FieldLabel>
+              <Input
+                id="proj-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Primary production services and APIs"
+                autoComplete="off"
+                className="border-border/40 focus:border-primary"
+              />
             </Field>
           </FieldGroup>
           <DialogFooter className="gap-2">
@@ -391,6 +442,109 @@ function CreateProjectDialog({
                 Create Project
               </Button>
             </UpGalTarget>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditProjectDialog({
+  open,
+  onOpenChange,
+  project,
+  onUpdated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  project: { id: string; name: string; description?: string | null } | null;
+  onUpdated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    if (open && project) {
+      setName(project.name || "");
+      setDescription(project.description || "");
+    }
+  }, [open, project]);
+
+  const mutation = useMutation({
+    ...trpc.project.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Project updated successfully");
+      onOpenChange(false);
+      onUpdated();
+    },
+    onError: (err) => toast.error(err.message || "Failed to update project"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="rounded-2xl border border-border bg-card shadow-2xl">
+        <DialogHeader>
+          <DialogTitle className="font-bold text-xl">Edit Project</DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            Update your project's name and description.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (project && name.trim()) {
+              mutation.mutate({
+                id: project.id,
+                name: name.trim(),
+                description: description.trim() || null,
+              });
+            }
+          }}
+          className="flex flex-col gap-4"
+        >
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="edit-proj-name">Project Name</FieldLabel>
+              <Input
+                id="edit-proj-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Production Web App"
+                autoComplete="off"
+                autoFocus
+                className="border-border/40 focus:border-primary"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="edit-proj-desc">
+                Description (Optional)
+              </FieldLabel>
+              <Input
+                id="edit-proj-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Primary production services and APIs"
+                autoComplete="off"
+                className="border-border/40 focus:border-primary"
+              />
+            </Field>
+          </FieldGroup>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || !name.trim()}
+              className="gap-2"
+            >
+              {mutation.isPending && <Spinner className="size-4" />}
+              Save Changes
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -542,11 +696,13 @@ export default function Projects(_props: {
   const organizationState = useRequiredActiveOrganization();
 
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [duplicateProjectOpen, setDuplicateProjectOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<{
     id: string;
     name: string;
+    description?: string | null;
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -616,6 +772,10 @@ export default function Projects(_props: {
             <ProjectCard
               key={proj.id}
               project={proj}
+              onEdit={() => {
+                setSelectedProject(proj);
+                setEditProjectOpen(true);
+              }}
               onDelete={() => {
                 setSelectedProject(proj);
                 setDeleteProjectOpen(true);
@@ -637,6 +797,13 @@ export default function Projects(_props: {
         onOpenChange={setCreateProjectOpen}
         organizationId={organizationId}
         onCreated={refetch}
+      />
+
+      <EditProjectDialog
+        open={editProjectOpen}
+        onOpenChange={setEditProjectOpen}
+        project={selectedProject}
+        onUpdated={refetch}
       />
 
       <DeleteProjectDialog

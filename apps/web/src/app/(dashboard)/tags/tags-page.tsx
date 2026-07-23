@@ -36,9 +36,9 @@ import {
 import { PageEmpty } from "@/components/dashboard/page-empty";
 import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import {
-  BookmarkIcon,
   Edit2,
   PlusIcon,
+  Tag01Icon,
   Trash2Icon,
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
@@ -113,7 +113,7 @@ export default function TagsPage() {
       <DashboardPageHeader
         title="Tags"
         description="Organize resources with reusable organization-scoped labels."
-        icon={<BookmarkIcon className="size-6 text-primary" />}
+        icon={<Tag01Icon className="size-6 text-primary" />}
         actions={
           <UpGalTarget definition={createTagTarget}>
             <Button
@@ -190,7 +190,7 @@ export default function TagsPage() {
         ) : (
           <div className="col-span-full">
             <PageEmpty
-              icon={BookmarkIcon}
+              icon={Tag01Icon}
               title="No tags yet"
               description="Create a shared label to organize resources, environments, and operations."
               action={

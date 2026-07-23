@@ -27,7 +27,8 @@ import type {
   ThemedToken,
 } from "shiki";
 import { createHighlighter } from "shiki";
-import { CheckIcon, CopyIcon } from "@/components/huge-icons";
+import { CheckIcon, CopyIcon, DownloadIcon } from "@/components/huge-icons";
+import { downloadText } from "@/lib/browser";
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 // oxlint-disable-next-line eslint(no-bitwise)
@@ -507,6 +508,48 @@ export const CodeBlockCopyButton = ({
       {...props}
     >
       {children ?? <Icon size={14} />}
+    </Button>
+  );
+};
+
+export type CodeBlockDownloadButtonProps = ComponentProps<typeof Button> & {
+  filename?: string;
+  onDownload?: () => void;
+  onError?: (error: Error) => void;
+};
+
+export const CodeBlockDownloadButton = ({
+  filename,
+  onDownload,
+  onError,
+  children,
+  className,
+  ...props
+}: CodeBlockDownloadButtonProps) => {
+  const { code } = useContext(CodeBlockContext);
+
+  const handleDownload = useCallback(() => {
+    try {
+      if (!code) return;
+      const name = filename || "code-snippet.txt";
+      downloadText(code, name);
+      onDownload?.();
+    } catch (error) {
+      onError?.(error as Error);
+    }
+  }, [code, filename, onDownload, onError]);
+
+  return (
+    <Button
+      className={cn("shrink-0", className)}
+      onClick={handleDownload}
+      size="icon"
+      variant="ghost"
+      aria-label="Download code snippet"
+      title="Download code snippet"
+      {...props}
+    >
+      {children ?? <DownloadIcon size={14} />}
     </Button>
   );
 };

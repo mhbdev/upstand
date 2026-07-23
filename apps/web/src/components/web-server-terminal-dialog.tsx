@@ -267,7 +267,7 @@ export function WebServerTerminalDialog({
               <FieldLabel className="sr-only">Session action</FieldLabel>
               <Button
                 type="submit"
-                className="w-full sm:w-fit sm:min-w-32"
+                className="w-full"
                 variant={
                   token ? (sessionReady ? "destructive" : "outline") : "default"
                 }

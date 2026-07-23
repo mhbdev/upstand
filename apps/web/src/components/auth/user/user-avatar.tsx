@@ -14,6 +14,8 @@ import type { User } from "better-auth";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import { PRESET_ICON_OPTIONS } from "@/lib/icon-utils";
+
 export type UserAvatarProps = {
   className?: string;
   fallback?: ReactNode;
@@ -46,35 +48,66 @@ export function UserAvatar({
     return () => clearTimeout(timeout);
   }, [sessionPending]);
 
-  if (
-    (isPending || sessionPending) &&
-    !user &&
-    !sessionError &&
-    !sessionTimedOut
-  ) {
-    return (
-      <Skeleton className={cn("size-8 rounded-(--radius-md)", className)} />
-    );
+  const loading =
+    (isPending || sessionPending) && !user && !sessionError && !sessionTimedOut;
+
+  if (loading) {
+    return <Skeleton className={cn("size-8 rounded-full", className)} />;
   }
 
   const resolvedUser = user ?? session?.user;
 
-  const initials = (resolvedUser?.name || resolvedUser?.email)
+  if (!resolvedUser) {
+    return (
+      fallback ?? (
+        <Avatar
+          className={cn(
+            "size-8 rounded-full bg-muted text-foreground text-sm",
+            className,
+          )}
+        >
+          <AvatarFallback className="rounded-full text-muted-foreground!">
+            <HugeiconsIcon icon={UserIcon} className="size-4" />
+          </AvatarFallback>
+        </Avatar>
+      )
+    );
+  }
+
+  const initials = (resolvedUser.name || resolvedUser.email)
     ?.slice(0, 2)
     .toUpperCase();
+
+  const userImage = resolvedUser.image;
+  const isImageSrc =
+    userImage &&
+    (userImage.startsWith("data:image/") ||
+      userImage.startsWith("http://") ||
+      userImage.startsWith("https://"));
+
+  const preset = userImage?.startsWith("preset:")
+    ? PRESET_ICON_OPTIONS.find((p) => p.id === userImage)
+    : null;
+
+  const PresetIcon = preset?.Icon;
 
   return (
     <Avatar
       className={cn(
-        "size-8 rounded-(--radius) bg-muted text-foreground text-sm",
+        "size-8 rounded-full bg-muted text-foreground text-sm",
         className,
       )}
     >
-      <AvatarImage src={resolvedUser?.image ?? undefined} alt="" />
-
-      <AvatarFallback className="rounded-(--radius) text-muted-foreground!">
-        {fallback || initials || (
-          <HugeiconsIcon icon={UserIcon} className="size-4" />
+      <AvatarImage
+        className="rounded-full"
+        src={isImageSrc ? userImage : undefined}
+        alt=""
+      />
+      <AvatarFallback className="rounded-full text-muted-foreground!">
+        {PresetIcon ? (
+          <PresetIcon className="size-4 shrink-0 text-foreground" />
+        ) : (
+          initials || <HugeiconsIcon icon={UserIcon} className="size-4" />
         )}
       </AvatarFallback>
     </Avatar>

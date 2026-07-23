@@ -55,6 +55,7 @@ export const SESSION_ONLY_PROCEDURES = [
   "secret.restore",
   "secret.rotate",
   "secret.sync",
+  "secret.testConnection",
   "secret.updateProvider",
   "secret.versions",
   "secret.rotationSchedules",

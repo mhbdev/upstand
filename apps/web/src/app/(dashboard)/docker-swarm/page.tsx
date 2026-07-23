@@ -6,16 +6,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@upstand/ui/components/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@upstand/ui/components/alert-dialog";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -64,6 +54,7 @@ import {
 } from "@upstand/ui/components/tabs";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -822,7 +813,7 @@ export default function DockerSwarmPage() {
         </>
       )}
 
-      <AlertDialog
+      <ConfirmActionDialog
         open={pendingAction !== null}
         onOpenChange={(open) => {
           if (!open && !mutationPending) {
@@ -830,48 +821,13 @@ export default function DockerSwarmPage() {
             setConfirmation("");
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{pendingCopy?.title}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingCopy?.description}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {pendingAction?.kind === "remove" ? (
-            <Field>
-              <FieldLabel htmlFor="remove-node-confirmation">
-                Type {pendingAction.node.hostname} to confirm
-              </FieldLabel>
-              <Input
-                id="remove-node-confirmation"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-                autoComplete="off"
-              />
-            </Field>
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={mutationPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant={
-                pendingAction?.kind === "remove" ? "destructive" : "default"
-              }
-              onClick={submitAction}
-              disabled={
-                mutationPending ||
-                (pendingAction?.kind === "remove" &&
-                  confirmation !== pendingAction.node.hostname)
-              }
-            >
-              {mutationPending ? <Spinner data-icon="inline-start" /> : null}
-              {pendingCopy?.submitLabel}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={pendingCopy?.title || "Confirm Action"}
+        description={pendingCopy?.description}
+        actionLabel={pendingCopy?.submitLabel || "Confirm"}
+        variant={pendingAction?.kind === "remove" ? "destructive" : "default"}
+        pending={mutationPending}
+        onConfirm={submitAction}
+      />
     </DashboardPage>
   );
 }

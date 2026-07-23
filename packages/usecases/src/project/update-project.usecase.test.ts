@@ -65,10 +65,12 @@ describe("UpdateProjectUseCase", () => {
     const result = await usecase.execute({
       id: "proj-1",
       name: "New Name",
+      description: "Updated description text",
       icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
     });
 
     expect(result.name).toBe("New Name");
+    expect(result.description).toBe("Updated description text");
     expect(result.icon).toBe(
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
     );

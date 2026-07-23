@@ -1,16 +1,6 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@upstand/ui/components/alert-dialog";
 import { Button } from "@upstand/ui/components/button";
 import {
   Dialog,
@@ -27,6 +17,7 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { Textarea } from "@upstand/ui/components/textarea";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   DashboardPage,
   DashboardPageHeader,
@@ -432,53 +423,23 @@ export default function CertificatesPage() {
         onSaved={() => void certificatesQuery.refetch()}
       />
 
-      <AlertDialog
+      <ConfirmActionDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => {
           if (!open && !deleteMutation.isPending) {
             setPendingDelete(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Certificate?</AlertDialogTitle>
-
-            <AlertDialogDescription>
-              <span className="font-medium text-foreground">
-                {pendingDelete?.name}
-              </span>{" "}
-              will be permanently removed from Upstand and cannot be used by
-              Caddy routes afterward.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-
-            <AlertDialogAction
-              disabled={deleteMutation.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-
-                if (!pendingDelete) return;
-
-                deleteMutation.mutate({
-                  id: pendingDelete.id,
-                });
-              }}
-            >
-              {deleteMutation.isPending ? (
-                <Spinner data-icon="inline-start" />
-              ) : null}
-
-              {deleteMutation.isPending ? "Deleting…" : "Delete Certificate"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title="Delete Certificate?"
+        description={`"${pendingDelete?.name}" will be permanently removed from Upstand and cannot be used by Caddy routes afterward.`}
+        actionLabel="Delete Certificate"
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) {
+            deleteMutation.mutate({ id: pendingDelete.id });
+          }
+        }}
+      />
     </DashboardPage>
   );
 }

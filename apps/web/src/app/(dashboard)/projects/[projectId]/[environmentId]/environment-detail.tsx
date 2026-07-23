@@ -3,10 +3,12 @@
 import {
   Alert02Icon,
   ArrowRight01Icon,
+  Clock01Icon,
   ComputerIcon,
   DatabaseIcon,
-  Delete02Icon,
+  Key01Icon,
   PlusSignIcon,
+  RefreshIcon,
   ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
@@ -64,8 +66,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
+import { DangerZoneCard } from "@/components/dashboard/danger-zone-card";
 import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import { Trash2Icon } from "@/components/huge-icons";
+import { SecretHistoryDialog } from "@/components/secrets/secret-history-dialog";
+import { SecretRotationDialog } from "@/components/secrets/secret-rotation-dialog";
+import { SecretSyncDialog } from "@/components/secrets/secret-sync-dialog";
 import {
   KeyValueEditor,
   keyValuePairsToRecord,
@@ -1285,6 +1292,9 @@ export default function EnvironmentDetail({
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [targetEnvironmentId, setTargetEnvironmentId] = useState("");
+  const [secretSyncOpen, setSecretSyncOpen] = useState(false);
+  const [secretRotationOpen, setSecretRotationOpen] = useState(false);
+  const [secretHistoryOpen, setSecretHistoryOpen] = useState(false);
 
   // Fetch project
   const { data: project } = useQuery({
@@ -1320,6 +1330,7 @@ export default function EnvironmentDetail({
   });
 
   const queryClient = useQueryClient();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [envList, setEnvList] = useState<Array<{ key: string; value: string }>>(
     [],
   );
@@ -1485,7 +1496,7 @@ export default function EnvironmentDetail({
 
       {/* Tabs */}
       <Tabs defaultValue="resources" className="min-w-0 space-y-6">
-        <TabsList className="scrollbar-thin w-full max-w-full justify-start gap-1 overflow-x-auto">
+        <TabsList className="scrollbar-thin w-full max-w-full justify-start gap-1">
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="env-vars">Shared Variables</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -1565,6 +1576,97 @@ export default function EnvironmentDetail({
                       <Spinner className="size-4" />
                     )}
                     Save Environment Variables
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Secret Engine & Version Automation Card */}
+            <Card className="border border-border/40 bg-card/20">
+              <CardHeader>
+                <CardTitle className="font-semibold text-lg">
+                  Secret Engine Integrations & Automation
+                </CardTitle>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Sync runtime environment variables from external secret
+                  managers (HashiCorp Vault, AWS Secrets Manager, 1Password),
+                  audit secret version history, or schedule automatic key
+                  rotations.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 border-border/20 border-t pt-4 sm:grid-cols-3">
+                <div className="flex flex-col justify-between rounded-lg border bg-background/50 p-3.5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 font-medium text-xs">
+                      <HugeiconsIcon
+                        icon={RefreshIcon}
+                        className="size-4 text-primary"
+                      />
+                      Sync External Secrets
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Import key-value secrets from connected Vault, AWS Secrets
+                      Manager, or 1Password engines.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 h-8 w-full text-xs"
+                    onClick={() => setSecretSyncOpen(true)}
+                  >
+                    Sync Provider
+                  </Button>
+                </div>
+
+                <div className="flex flex-col justify-between rounded-lg border bg-background/50 p-3.5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 font-medium text-xs">
+                      <HugeiconsIcon
+                        icon={Clock01Icon}
+                        className="size-4 text-primary"
+                      />
+                      Rotation Schedules
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Configure recurring key rotation intervals or trigger
+                      immediate on-demand key rotation.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 h-8 w-full text-xs"
+                    onClick={() => setSecretRotationOpen(true)}
+                  >
+                    Manage Rotation
+                  </Button>
+                </div>
+
+                <div className="flex flex-col justify-between rounded-lg border bg-background/50 p-3.5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 font-medium text-xs">
+                      <HugeiconsIcon
+                        icon={Key01Icon}
+                        className="size-4 text-primary"
+                      />
+                      Version History
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Audit historical secret version snapshots and execute
+                      one-click version rollbacks.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 h-8 w-full text-xs"
+                    onClick={() => setSecretHistoryOpen(true)}
+                  >
+                    View History
                   </Button>
                 </div>
               </CardContent>
@@ -1673,78 +1775,42 @@ export default function EnvironmentDetail({
                 </div>
               </CardContent>
             </Card>
-            <Card className="border border-destructive/20 bg-destructive/5">
-              <CardHeader>
-                <CardTitle className="font-semibold text-destructive">
-                  Delete Environment
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Permanently delete this environment. This will stop and delete
-                  all services running under this environment.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isDefaultEnv ? (
-                  <div className="flex items-start gap-3 border border-warning/20 bg-warning/5 p-4 text-sm text-warning">
-                    <HugeiconsIcon
-                      icon={Alert02Icon}
-                      className="mt-0.5 size-5 shrink-0"
-                    />
-                    <div>
-                      <p className="font-semibold">
-                        Default environment is protected
-                      </p>
-                      <p className="mt-1 text-muted-foreground">
-                        The production/default environment is required and
-                        cannot be deleted.
-                      </p>
-                    </div>
-                  </div>
-                ) : hasResources ? (
-                  <div className="flex items-start gap-3 border border-warning/20 bg-warning/5 p-4 text-sm text-warning">
-                    <HugeiconsIcon
-                      icon={Alert02Icon}
-                      className="mt-0.5 size-5 shrink-0"
-                    />
-                    <div>
-                      <p className="font-semibold">Environment is not empty</p>
-                      <p className="mt-1 text-muted-foreground">
-                        Please delete all resources inside this environment
-                        before attempting deletion.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    This environment is empty and safe to delete.
-                  </p>
-                )}
-                <Button
-                  variant="destructive"
-                  disabled={
-                    isDefaultEnv || hasResources || deleteEnvMutation.isPending
-                  }
-                  className="gap-2"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Are you sure you want to delete this environment?",
-                      )
-                    ) {
-                      deleteEnvMutation.mutate({ id: environmentId });
-                    }
-                  }}
-                >
-                  {deleteEnvMutation.isPending && (
-                    <Spinner className="size-4" />
-                  )}
-                  Delete Environment
-                </Button>
-              </CardContent>
-            </Card>
+            <DangerZoneCard
+              title="Delete Environment"
+              description="Permanently delete this environment. This will stop and delete all services running under this environment."
+              actionLabel="Delete Environment"
+              onAction={() => setDeleteDialogOpen(true)}
+              disabled={isDefaultEnv || hasResources}
+              pending={deleteEnvMutation.isPending}
+              warningText={
+                isDefaultEnv
+                  ? "The production/default environment is required and cannot be deleted."
+                  : hasResources
+                    ? "Please delete all resources inside this environment before attempting deletion."
+                    : undefined
+              }
+              infoText={
+                !isDefaultEnv && !hasResources
+                  ? "This environment is empty and safe to delete."
+                  : undefined
+              }
+            />
           </div>
         </TabsContent>
       </Tabs>
+
+      <ConfirmActionDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Environment?"
+        description={`Are you sure you want to delete "${env.name}"? All running containers and configuration in this environment will be permanently deleted.`}
+        actionLabel="Delete Environment"
+        requireConfirmText={true}
+        pending={deleteEnvMutation.isPending}
+        onConfirm={() => {
+          deleteEnvMutation.mutate({ id: environmentId });
+        }}
+      />
 
       {/* Modals */}
       <CreateAppDialog
@@ -1780,6 +1846,49 @@ export default function EnvironmentDetail({
         resource={selectedRes}
         onDeleted={refetchResources}
       />
+
+      {project?.organizationId && (
+        <>
+          <SecretSyncDialog
+            open={secretSyncOpen}
+            onOpenChange={setSecretSyncOpen}
+            organizationId={project.organizationId}
+            scopeType="environment"
+            scopeId={environmentId}
+            onSuccess={(syncedVars) => {
+              if (syncedVars) {
+                setEnvList(recordToKeyValuePairs(syncedVars));
+              }
+              void queryClient.invalidateQueries({
+                queryKey: trpc.environment.get.queryKey({ id: environmentId }),
+              });
+            }}
+          />
+          <SecretRotationDialog
+            open={secretRotationOpen}
+            onOpenChange={setSecretRotationOpen}
+            organizationId={project.organizationId}
+            scopeType="environment"
+            scopeId={environmentId}
+            onSuccess={() => {
+              void queryClient.invalidateQueries({
+                queryKey: trpc.environment.get.queryKey({ id: environmentId }),
+              });
+            }}
+          />
+          <SecretHistoryDialog
+            open={secretHistoryOpen}
+            onOpenChange={setSecretHistoryOpen}
+            scopeType="environment"
+            scopeId={environmentId}
+            onSuccess={() => {
+              void queryClient.invalidateQueries({
+                queryKey: trpc.environment.get.queryKey({ id: environmentId }),
+              });
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
+import Image from "next/image";
 import type React from "react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -33,7 +34,7 @@ export interface EditableEntityIconProps {
   icon?: string | null;
   defaultIcon: React.ReactNode;
   entityName: string;
-  entityType?: "project" | "resource";
+  entityType?: "project" | "resource" | "profile" | string;
   sizeClassName?: string;
   iconSizeClassName?: string;
   bgClassName?: string;
@@ -56,8 +57,13 @@ export function RenderEntityIcon({
 
   if (icon.startsWith("preset:")) {
     const preset = PRESET_ICON_OPTIONS.find((p) => p.id === icon);
-    if (preset) {
-      return <span className="text-lg leading-none">{preset.emoji}</span>;
+    if (preset?.Icon) {
+      const PresetIcon = preset.Icon;
+      return (
+        <PresetIcon
+          className={cn("size-1/2 shrink-0 text-foreground", className)}
+        />
+      );
     }
   }
 
@@ -67,7 +73,7 @@ export function RenderEntityIcon({
     icon.startsWith("https://")
   ) {
     return (
-      <img
+      <Image
         src={icon}
         alt="Icon"
         className={className}
@@ -87,7 +93,7 @@ export function EditableEntityIcon({
   defaultIcon,
   entityName,
   entityType = "project",
-  sizeClassName = "size-9 rounded-(--radius-md)",
+  sizeClassName = "size-9 rounded-full",
   bgClassName = "bg-primary/10 text-primary",
   onSaveIcon,
   disabled = false,
@@ -113,7 +119,7 @@ export function EditableEntityIcon({
     if (icon && (icon.startsWith("http://") || icon.startsWith("https://"))) {
       setUrlInput(icon);
       setActiveTab("url");
-    } else if (icon && icon.startsWith("preset:")) {
+    } else if (icon?.startsWith("preset:")) {
       setActiveTab("presets");
     } else {
       setActiveTab("upload");
@@ -208,8 +214,8 @@ export function EditableEntityIcon({
       </div>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-card shadow-2xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[85vh] w-[92vw] max-w-md flex-col gap-0 overflow-hidden rounded-2xl border border-border/50 bg-card p-0 shadow-2xl">
+          <DialogHeader className="shrink-0 border-border/40 border-b p-5">
             <DialogTitle className="font-bold text-xl">Change Icon</DialogTitle>
             <DialogDescription className="text-muted-foreground text-xs">
               Customize icon for{" "}
@@ -219,12 +225,12 @@ export function EditableEntityIcon({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 pt-2">
+          <div className="flex-1 space-y-4 overflow-y-auto p-5">
             {/* Current Selected Preview */}
             <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-accent/20 p-3">
               <div
                 className={cn(
-                  "flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-(--radius-md)",
+                  "flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full",
                   bgClassName,
                 )}
               >
@@ -242,7 +248,7 @@ export function EditableEntityIcon({
                     ? selectedIcon.startsWith("data:")
                       ? "Custom uploaded image"
                       : selectedIcon.startsWith("preset:")
-                        ? `Preset: ${selectedIcon.slice(7)}`
+                        ? `Preset: ${PRESET_ICON_OPTIONS.find((p) => p.id === selectedIcon)?.label || selectedIcon.slice(7)}`
                         : selectedIcon
                     : "Default icon"}
                 </p>
@@ -305,7 +311,7 @@ export function EditableEntityIcon({
                     {isProcessing ? (
                       <Spinner className="size-8 text-primary" />
                     ) : (
-                      <div className="flex size-10 items-center justify-center rounded-(--radius-md) bg-primary/10 text-primary">
+                      <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
                         <Pencil className="size-5" />
                       </div>
                     )}
@@ -322,27 +328,46 @@ export function EditableEntityIcon({
               {/* Presets Tab */}
               <TabsContent value="presets" className="space-y-3 pt-3">
                 <div className="grid grid-cols-4 gap-2">
-                  {PRESET_ICON_OPTIONS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedIcon(preset.id);
-                        setValidationError(null);
-                      }}
-                      className={cn(
-                        "flex flex-col items-center justify-center rounded-xl border p-2.5 transition-all hover:border-primary/50 hover:bg-accent/40",
-                        selectedIcon === preset.id
-                          ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/30"
-                          : "border-border/40 bg-card/50 text-foreground",
-                      )}
-                    >
-                      <span className="text-xl">{preset.emoji}</span>
-                      <span className="mt-1 w-full truncate text-center font-medium text-[10px] text-muted-foreground">
-                        {preset.label}
-                      </span>
-                    </button>
-                  ))}
+                  {[...PRESET_ICON_OPTIONS]
+                    .sort((a, b) => {
+                      if (
+                        a.category === entityType &&
+                        b.category !== entityType
+                      )
+                        return -1;
+                      if (
+                        a.category !== entityType &&
+                        b.category === entityType
+                      )
+                        return 1;
+                      return 0;
+                    })
+                    .map((preset) => {
+                      const PresetIcon = preset.Icon;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedIcon(preset.id);
+                            setValidationError(null);
+                          }}
+                          className={cn(
+                            "flex flex-col items-center justify-center rounded-xl border p-2.5 transition-all hover:border-primary/50 hover:bg-accent/40",
+                            selectedIcon === preset.id
+                              ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/30"
+                              : "border-border/40 bg-card/50 text-foreground",
+                          )}
+                        >
+                          <div className="flex size-7 items-center justify-center">
+                            <PresetIcon className="size-5 shrink-0 text-foreground" />
+                          </div>
+                          <span className="mt-1 w-full truncate text-center font-medium text-[10px] text-muted-foreground">
+                            {preset.label}
+                          </span>
+                        </button>
+                      );
+                    })}
                 </div>
               </TabsContent>
 
@@ -374,37 +399,40 @@ export function EditableEntityIcon({
             </Tabs>
           </div>
 
-          <DialogFooter className="flex flex-col-reverse justify-between gap-2 pt-4 sm:flex-row">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={isSaving || !icon}
-              onClick={handleResetToDefault}
-              className="text-muted-foreground text-xs hover:text-foreground"
-            >
-              Reset to Default
-            </Button>
-            <div className="flex gap-2">
+          <DialogFooter className="shrink-0 border-border/40 border-t bg-muted/20 p-4">
+            <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                onClick={() => setModalOpen(false)}
-                disabled={isSaving}
+                disabled={isSaving || !icon}
+                onClick={handleResetToDefault}
+                className="w-full justify-center text-muted-foreground text-xs hover:text-foreground sm:w-auto"
               >
-                Cancel
+                Reset to Default
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSave}
-                disabled={isSaving || isProcessing}
-                className="gap-2"
-              >
-                {isSaving && <Spinner className="size-3.5" />}
-                Save Icon
-              </Button>
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setModalOpen(false)}
+                  disabled={isSaving}
+                  className="w-full sm:w-auto"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isSaving || isProcessing}
+                  className="w-full gap-2 sm:w-auto"
+                >
+                  {isSaving && <Spinner className="size-3.5" />}
+                  Save Icon
+                </Button>
+              </div>
             </div>
           </DialogFooter>
         </DialogContent>

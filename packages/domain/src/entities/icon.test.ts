@@ -42,7 +42,7 @@ describe("EntityIconSchema & IconDataUriSchema validation", () => {
   });
 
   test("rejects oversized data payload exceeding 512KB limit", () => {
-    const oversized = "data:image/png;base64," + "A".repeat(800 * 1024);
+    const oversized = `data:image/png;base64,${"A".repeat(800 * 1024)}`;
     const res = EntityIconSchema.safeParse(oversized);
     expect(res.success).toBe(false);
   });

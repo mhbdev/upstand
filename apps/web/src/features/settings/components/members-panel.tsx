@@ -31,6 +31,7 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
 import { useMembersSettings } from "../hooks/use-members-settings";
@@ -86,6 +87,10 @@ export function MembersPanel() {
   } = useMembersSettings(organizationId);
 
   const [mode, setMode] = useState<"invite" | "create">("invite");
+  const [roleToDelete, setRoleToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [drafts, setDrafts] = useState<
     Record<
       string,
@@ -373,16 +378,10 @@ export function MembersPanel() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
-                                  if (
-                                    confirm(
-                                      `Are you sure you want to delete the custom role "${role.name}"? Active members with this role will be degraded to the Member role.`,
-                                    )
-                                  ) {
-                                    removeCustomRole.mutate({
-                                      organizationId,
-                                      id: role.id,
-                                    });
-                                  }
+                                  setRoleToDelete({
+                                    id: role.id,
+                                    name: role.name,
+                                  });
                                 }}
                               >
                                 <HugeiconsIcon
@@ -712,6 +711,28 @@ export function MembersPanel() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmActionDialog
+        open={Boolean(roleToDelete)}
+        onOpenChange={(open) => !open && setRoleToDelete(null)}
+        title="Delete Custom Role?"
+        description={`Are you sure you want to delete the custom role "${roleToDelete?.name}"? Active members with this role will be degraded to the Member role.`}
+        actionLabel="Delete Role"
+        pending={removeCustomRole.isPending}
+        onConfirm={() => {
+          if (roleToDelete) {
+            removeCustomRole.mutate(
+              {
+                organizationId,
+                id: roleToDelete.id,
+              },
+              {
+                onSuccess: () => setRoleToDelete(null),
+              },
+            );
+          }
+        }}
+      />
     </div>
   );
 }

@@ -6,7 +6,11 @@ import {
   type ApiKeyPreset,
   type Capability,
 } from "@upstand/domain";
-import { Badge } from "@upstand/ui/components/badge";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@upstand/ui/components/alert";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -26,9 +30,15 @@ import {
   SelectValue,
 } from "@upstand/ui/components/select";
 import { Spinner } from "@upstand/ui/components/spinner";
+import { cn } from "@upstand/ui/lib/utils";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Copy, ShieldCheck, Trash2 } from "@/components/huge-icons";
+import {
+  AlertTriangleIcon,
+  Copy,
+  ShieldCheck,
+  Trash2,
+} from "@/components/huge-icons";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { copyText } from "@/lib/browser";
 import { trpc } from "@/utils/trpc";
@@ -99,6 +109,21 @@ export function ApiKeysPanel() {
     onError: (error) => toast.error(error.message),
   });
 
+  const [togglingKeyId, setTogglingKeyId] = useState<string | null>(null);
+
+  const updateKey = useMutation({
+    ...trpc.apiKey.update.mutationOptions(),
+    onSuccess: (data) => {
+      toast.success(data.enabled ? "API key activated" : "API key deactivated");
+      setTogglingKeyId(null);
+      void keys.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update API key");
+      setTogglingKeyId(null);
+    },
+  });
+
   const permissionSelection = useMemo(
     () => ({
       upstand: selectedPermissions,
@@ -144,7 +169,6 @@ export function ApiKeysPanel() {
           <CardTitle className="text-sm">Create an API key</CardTitle>
           <CardDescription className="text-xs">
             Secrets are shown once, hashed by Better Auth, and rate limited
-            through Redis.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -251,27 +275,32 @@ export function ApiKeysPanel() {
             </Button>
           </div>
           {secret ? (
-            <div className="flex flex-col gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
-              <p className="font-medium text-amber-800 dark:text-amber-200">
+            <Alert variant="warning">
+              <AlertTriangleIcon />
+              <AlertTitle>
                 Copy this secret now. It cannot be recovered.
-              </p>
-              <code className="break-all rounded border bg-background/50 p-2 font-mono text-[11px]">
-                {secret}
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  void copyText(secret)
-                    .then(() => toast.success("Secret copied"))
-                    .catch(() => toast.error("Failed to copy secret"));
-                }}
-                className="w-fit"
-              >
-                <Copy data-icon="inline-start" />
-                Copy secret
-              </Button>
-            </div>
+              </AlertTitle>
+              <AlertDescription className="pt-2">
+                <div className="flex items-center gap-2 rounded-2xl bg-muted/60 p-1.5 pl-3">
+                  <code className="min-w-0 flex-1 select-all truncate font-mono text-foreground text-xs">
+                    {secret}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void copyText(secret)
+                        .then(() => toast.success("Secret copied"))
+                        .catch(() => toast.error("Failed to copy secret"));
+                    }}
+                    className="shrink-0 gap-1.5"
+                  >
+                    <Copy className="size-3.5" />
+                    <span>Copy</span>
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
           ) : null}
         </CardContent>
       </Card>
@@ -288,7 +317,7 @@ export function ApiKeysPanel() {
           {keys.data?.apiKeys.map((key) => (
             <div
               key={key.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-xs"
+              className="flex flex-wrap items-center justify-between gap-3 border-b p-3 text-xs"
             >
               <div className="mr-auto min-w-0">
                 <p className="font-semibold text-foreground">
@@ -302,12 +331,39 @@ export function ApiKeysPanel() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge
-                  variant={key.enabled ? "secondary" : "outline"}
-                  className="text-xs"
+                <Button
+                  size="xs"
+                  variant={key.enabled ? "outline" : "secondary"}
+                  onClick={() => {
+                    setTogglingKeyId(key.id);
+                    updateKey.mutate({
+                      organizationId,
+                      keyId: key.id,
+                      enabled: !key.enabled,
+                    });
+                  }}
+                  disabled={updateKey.isPending && togglingKeyId === key.id}
+                  className="gap-1.5 font-medium text-xs transition-colors"
+                  title={
+                    key.enabled
+                      ? "Click to deactivate API key"
+                      : "Click to activate API key"
+                  }
                 >
-                  {key.enabled ? "Active" : "Disabled"}
-                </Badge>
+                  {updateKey.isPending && togglingKeyId === key.id ? (
+                    <Spinner className="size-3" />
+                  ) : (
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        key.enabled
+                          ? "bg-emerald-500"
+                          : "bg-muted-foreground/50",
+                      )}
+                    />
+                  )}
+                  <span>{key.enabled ? "Active" : "Deactivated"}</span>
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"

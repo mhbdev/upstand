@@ -59,20 +59,25 @@ function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
 function DropdownMenuLabel({
   className,
   inset,
+  children,
   ...props
 }: MenuPrimitive.GroupLabel.Props & {
   inset?: boolean;
 }) {
   return (
-    <MenuPrimitive.GroupLabel
-      data-slot="dropdown-menu-label"
-      data-inset={inset}
-      className={cn(
-        "px-3 py-2.5 text-muted-foreground text-xs data-inset:pl-9.5",
-        className,
-      )}
-      {...props}
-    />
+    <MenuPrimitive.Group>
+      <MenuPrimitive.GroupLabel
+        data-slot="dropdown-menu-label"
+        data-inset={inset}
+        className={cn(
+          "px-3 py-2.5 font-semibold text-muted-foreground text-xs data-inset:pl-9.5",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </MenuPrimitive.GroupLabel>
+    </MenuPrimitive.Group>
   );
 }
 

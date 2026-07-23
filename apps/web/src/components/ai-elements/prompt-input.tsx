@@ -81,6 +81,7 @@ import {
   SquareIcon,
   XIcon,
 } from "@/components/huge-icons";
+import { inferMediaType, matchesAcceptPattern } from "@/lib/attachment-utils";
 
 // ============================================================================
 // Helpers
@@ -280,7 +281,7 @@ export const PromptInputProvider = ({
       ...incoming.map((file) => ({
         filename: file.name,
         id: nanoid(),
-        mediaType: file.type,
+        mediaType: inferMediaType(file.name, file.type),
         type: "file" as const,
         url: URL.createObjectURL(file),
       })),
@@ -424,20 +425,28 @@ export type PromptInputActionAddAttachmentsProps = ComponentProps<
 
 export const PromptInputActionAddAttachments = ({
   label = "Add photos or files",
+  onSelect,
+  onClick,
   ...props
 }: PromptInputActionAddAttachmentsProps) => {
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
     (e: any) => {
-      e.preventDefault();
-      attachments.openFileDialog();
+      onSelect?.(e);
+      onClick?.(e);
+      if (e.defaultPrevented) {
+        return;
+      }
+      requestAnimationFrame(() => {
+        attachments.openFileDialog();
+      });
     },
-    [attachments],
+    [attachments, onClick, onSelect],
   );
 
   return (
-    <DropdownMenuItem {...props} onSelect={handleSelect}>
+    <DropdownMenuItem {...props} onClick={handleSelect} onSelect={handleSelect}>
       <ImageIcon className="mr-2 size-4" /> {label}
     </DropdownMenuItem>
   );
@@ -452,6 +461,7 @@ export type PromptInputActionAddScreenshotProps = ComponentProps<
 export const PromptInputActionAddScreenshot = ({
   label = "Take screenshot",
   onSelect,
+  onClick,
   ...props
 }: PromptInputActionAddScreenshotProps) => {
   const attachments = usePromptInputAttachments();
@@ -459,6 +469,7 @@ export const PromptInputActionAddScreenshot = ({
   const handleSelect = useCallback(
     async (event: any) => {
       onSelect?.(event);
+      onClick?.(event);
       if (event.defaultPrevented) {
         return;
       }
@@ -478,11 +489,11 @@ export const PromptInputActionAddScreenshot = ({
         throw error;
       }
     },
-    [onSelect, attachments],
+    [onClick, onSelect, attachments],
   );
 
   return (
-    <DropdownMenuItem {...props} onSelect={handleSelect}>
+    <DropdownMenuItem {...props} onClick={handleSelect} onSelect={handleSelect}>
       <Monitor className="mr-2 size-4" />
       {label}
     </DropdownMenuItem>
@@ -561,25 +572,7 @@ export const PromptInput = ({
   }, []);
 
   const matchesAccept = useCallback(
-    (f: File) => {
-      if (!accept || accept.trim() === "") {
-        return true;
-      }
-
-      const patterns = accept
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      return patterns.some((pattern) => {
-        if (pattern.endsWith("/*")) {
-          // e.g: image/* -> image/
-          const prefix = pattern.slice(0, -1);
-          return f.type.startsWith(prefix);
-        }
-        return f.type === pattern;
-      });
-    },
+    (f: File) => matchesAcceptPattern(f, accept),
     [accept],
   );
 
@@ -623,7 +616,7 @@ export const PromptInput = ({
           next.push({
             filename: file.name,
             id: nanoid(),
-            mediaType: file.type,
+            mediaType: inferMediaType(file.name, file.type),
             type: "file",
             url: URL.createObjectURL(file),
           });
@@ -1200,7 +1193,7 @@ export const PromptInputButton = ({
 
   return (
     <Tooltip>
-      <TooltipTrigger>{button}</TooltipTrigger>
+      <TooltipTrigger render={button} />
       <TooltipContent side={side}>
         {tooltipContent}
         {shortcut && (

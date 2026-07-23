@@ -49,6 +49,8 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
+import { DangerZoneCard } from "@/components/dashboard/danger-zone-card";
 import {
   Code,
   Copy,
@@ -56,7 +58,6 @@ import {
   Play,
   RefreshCw,
   Square,
-  Trash2,
   Upload,
 } from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
@@ -962,7 +963,7 @@ export function GeneralTab({
                   if (value) setDeploymentServerId(value);
                 }}
               >
-                <SelectTrigger id="deployment-server">
+                <SelectTrigger id="deployment-server" className="w-full">
                   <SelectValue
                     placeholder={
                       env.NEXT_PUBLIC_IS_CLOUD
@@ -1016,7 +1017,7 @@ export function GeneralTab({
                     if (value) setBuildServerId(value);
                   }}
                 >
-                  <SelectTrigger id="build-server">
+                  <SelectTrigger id="build-server" className="w-full">
                     <SelectValue placeholder="Build on deployment server" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1061,7 +1062,7 @@ export function GeneralTab({
                     setBuildRegistryId(value === "none" ? "" : (value ?? ""))
                   }
                 >
-                  <SelectTrigger id="build-registry">
+                  <SelectTrigger id="build-registry" className="w-full">
                     <SelectValue placeholder="Choose a registry for build transfer" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1157,7 +1158,7 @@ export function GeneralTab({
                       setCustomDatabaseImage("");
                     }}
                   >
-                    <SelectTrigger id="database-engine">
+                    <SelectTrigger id="database-engine" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1196,7 +1197,7 @@ export function GeneralTab({
                       }
                     }}
                   >
-                    <SelectTrigger id="database-image">
+                    <SelectTrigger id="database-image" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1473,7 +1474,10 @@ export function GeneralTab({
                       setComposeType(value as ResourceComposeType)
                     }
                   >
-                    <SelectTrigger id="compose-deployment-mode">
+                    <SelectTrigger
+                      id="compose-deployment-mode"
+                      className="w-full"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1560,7 +1564,7 @@ export function GeneralTab({
                       setBuildConfig(createBuildConfig(nextType));
                     }}
                   >
-                    <SelectTrigger id="build-type" className="w-full sm:w-72">
+                    <SelectTrigger id="build-type" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1768,7 +1772,7 @@ export function GeneralTab({
                       }
                     }}
                   >
-                    <SelectTrigger id="railpack-version">
+                    <SelectTrigger id="railpack-version" className="w-full">
                       <SelectValue placeholder="Select Railpack version" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1835,7 +1839,7 @@ export function GeneralTab({
                       });
                     }}
                   >
-                    <SelectTrigger id="heroku-version">
+                    <SelectTrigger id="heroku-version" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2201,7 +2205,7 @@ export function GeneralTab({
                       setDockerRegistryId(value === "none" ? "" : (value ?? ""))
                     }
                   >
-                    <SelectTrigger id="application-registry">
+                    <SelectTrigger id="application-registry" className="w-full">
                       <SelectValue placeholder="Use public image credentials" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2303,7 +2307,10 @@ export function GeneralTab({
                               setRollbackRegistryId(value || "")
                             }
                           >
-                            <SelectTrigger id="application-rollback-registry">
+                            <SelectTrigger
+                              id="application-rollback-registry"
+                              className="w-full"
+                            >
                               <SelectValue placeholder="Select a rollback registry" />
                             </SelectTrigger>
                             <SelectContent>
@@ -2381,7 +2388,7 @@ export function GeneralTab({
                           .length === 0
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Account" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2426,7 +2433,7 @@ export function GeneralTab({
                           .length === 0
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue
                           placeholder={
                             loadingRepos
@@ -2469,7 +2476,7 @@ export function GeneralTab({
                             ).length === 0
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue
                               placeholder={
                                 loadingBranches
@@ -2518,7 +2525,7 @@ export function GeneralTab({
                           ).length === 0
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue
                             placeholder={
                               loadingBranches
@@ -2554,7 +2561,7 @@ export function GeneralTab({
                         setGithubTriggerType(value ?? "On Push")
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Trigger" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2702,7 +2709,7 @@ export function GeneralTab({
                         value={gitSshKeyId}
                         onValueChange={(value) => setGitSshKeyId(value ?? "")}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select SSH Key" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2760,7 +2767,7 @@ export function GeneralTab({
                         setGitTriggerType(value ?? "push")
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Trigger" />
                       </SelectTrigger>
                       <SelectContent>
@@ -3067,36 +3074,13 @@ export function GeneralTab({
         </Card>
 
         {/* Danger Zone */}
-        <Card className="border border-destructive/20 bg-destructive/5">
-          <CardHeader>
-            <CardTitle className="font-semibold text-destructive text-lg">
-              Danger Zone
-            </CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">
-              Permanently delete this service. This action is irreversible.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="border-destructive/10 border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="block font-medium font-semibold text-destructive text-sm">
-                  Delete Resource
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  This terminates container states and removes configuration
-                  items.
-                </span>
-              </div>
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteDialogOpen(true)}
-                className="gap-2"
-              >
-                <Trash2 className="size-4" /> Delete Resource
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <DangerZoneCard
+          title="Delete Resource"
+          description="Permanently delete this service and terminate all associated container states and configuration."
+          actionLabel="Delete Resource"
+          onAction={() => setDeleteDialogOpen(true)}
+          pending={isDeletingResource}
+        />
       </div>
 
       {/* Right Column: details info */}
@@ -3143,35 +3127,18 @@ export function GeneralTab({
       </div>
 
       {/* Delete Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete this resource?</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete {resource.name}? This permanently
-              removes all configuration records, docker service states, and
-              active container mappings. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={isDeletingResource}
-              onClick={() => {
-                deleteResource({ id: resource.id });
-              }}
-            >
-              {isDeletingResource ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmActionDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Resource?"
+        description={`Are you sure you want to delete "${resource.name}"? This permanently removes all configuration records, container states, and active service mappings. This cannot be undone.`}
+        actionLabel="Delete Resource"
+        requireConfirmText={true}
+        pending={isDeletingResource}
+        onConfirm={() => {
+          deleteResource({ id: resource.id });
+        }}
+      />
 
       <Dialog open={rebuildDialogOpen} onOpenChange={setRebuildDialogOpen}>
         <DialogContent>

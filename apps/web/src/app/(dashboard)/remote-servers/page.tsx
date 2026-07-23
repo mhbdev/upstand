@@ -10,14 +10,6 @@ import {
 } from "@upstand/ui/components/alert";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@upstand/ui/components/card";
 import { Checkbox } from "@upstand/ui/components/checkbox";
 import {
   Dialog,
@@ -48,20 +40,13 @@ import {
 import { PageEmpty } from "@/components/dashboard/page-empty";
 import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import {
-  StatusBadge,
-  type StatusTone,
-} from "@/components/dashboard/status-badge";
-import {
   AlertTriangleIcon,
-  Edit2,
-  KeyRound,
   PlusIcon,
   ServerIcon,
-  TerminalIcon,
-  Trash2Icon,
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
+import { RemoteServerCard } from "@/features/remote-servers/components/remote-server-card";
 import { RemoteServerWizard } from "@/features/remote-servers/components/remote-server-wizard";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
@@ -299,19 +284,6 @@ export default function RemoteServersPage() {
     setupMutation.reset();
   };
 
-  const getStatusBadgeTone = (status: string): StatusTone => {
-    switch (status) {
-      case "ready":
-        return "success";
-      case "setting_up":
-        return "info";
-      case "failed":
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
-
   return (
     <DashboardPage>
       <DashboardPageHeader
@@ -327,15 +299,6 @@ export default function RemoteServersPage() {
         icon={<ServerIcon className="size-6 text-primary" />}
         actions={
           <div className="flex items-center gap-2">
-            {servers && servers.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => setWizardOpen(true)}
-                className="gap-2 self-start sm:self-auto"
-              >
-                Onboarding Wizard
-              </Button>
-            )}
             <UpGalTarget definition={createServerTarget}>
               <Button
                 onClick={() => {
@@ -360,142 +323,17 @@ export default function RemoteServersPage() {
         <CardGridSkeleton count={3} />
       ) : servers && servers.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {servers.map((srv) => {
-            const matchedKey = sshKeys?.find((k) => k.id === srv.sshKeyId);
-            return (
-              <Card key={srv.id} className="h-full">
-                <CardHeader className="border-b">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <CardTitle className="truncate">{srv.name}</CardTitle>
-                        <StatusBadge
-                          label={srv.status.replace("_", " ")}
-                          tone={getStatusBadgeTone(srv.status)}
-                        />
-                      </div>
-                      <CardDescription className="line-clamp-2">
-                        {srv.description || "Remote deployment environment"}
-                      </CardDescription>
-                    </div>
-
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Open terminal for ${srv.name}`}
-                        onClick={() => handleTerminal(srv.id)}
-                        className="text-primary hover:bg-primary/10 hover:text-primary"
-                      >
-                        <TerminalIcon className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Edit ${srv.name}`}
-                        onClick={() => handleEdit(srv)}
-                      >
-                        <Edit2 />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Delete ${srv.name}`}
-                        onClick={() => handleDelete(srv.id, srv.name)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2Icon />
-                      </Button>
-                    </div>
-                  </div>
-                  {srv.setupError && (
-                    <div className="mt-2.5 flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-destructive text-xs">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <AlertTriangleIcon className="size-3.5 shrink-0" />
-                        <span className="truncate font-medium">
-                          {srv.setupError}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => handleSetup(srv.id)}
-                        className="h-6 shrink-0 text-[11px] text-destructive hover:bg-destructive/20 hover:text-destructive"
-                      >
-                        Retry
-                      </Button>
-                    </div>
-                  )}
-                </CardHeader>
-
-                <CardContent className="flex flex-1 flex-col gap-4">
-                  <dl className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
-                      <dt className="font-medium text-muted-foreground text-xs">
-                        Host address
-                      </dt>
-                      <dd className="mt-1 truncate font-medium font-mono">
-                        {srv.ipAddress}:{srv.port}
-                      </dd>
-                    </div>
-                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
-                      <dt className="font-medium text-muted-foreground text-xs">
-                        Role
-                      </dt>
-                      <dd className="mt-1 flex items-center gap-1 font-medium capitalize">
-                        <ServerIcon />
-                        {srv.serverType}
-                      </dd>
-                    </div>
-                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
-                      <dt className="font-medium text-muted-foreground text-xs">
-                        SSH Key
-                      </dt>
-                      <dd className="mt-1 flex items-center gap-1 truncate font-medium">
-                        <KeyRound />
-                        {matchedKey?.name || "None"}
-                      </dd>
-                    </div>
-                    <div className="min-w-0 rounded-xl bg-muted/30 p-3">
-                      <dt className="font-medium text-muted-foreground text-xs">
-                        Username
-                      </dt>
-                      <dd className="mt-1 truncate font-medium">
-                        {srv.username}
-                      </dd>
-                    </div>
-                  </dl>
-                </CardContent>
-                <CardFooter className="gap-2 border-t">
-                  <Button
-                    size="sm"
-                    className="min-w-0 flex-1"
-                    variant={srv.status === "ready" ? "outline" : "default"}
-                    onClick={() => handleSetup(srv.id)}
-                    disabled={srv.status === "setting_up"}
-                  >
-                    {srv.status === "setting_up" ? (
-                      <>
-                        <Spinner data-icon="inline-start" />
-                        Setting up…
-                      </>
-                    ) : srv.status === "ready" ? (
-                      "Set up again"
-                    ) : (
-                      "Set up server"
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setInspectServerId(srv.id)}
-                  >
-                    Validate
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+          {servers.map((srv) => (
+            <RemoteServerCard
+              key={srv.id}
+              server={srv}
+              onTerminal={handleTerminal}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onSetup={handleSetup}
+              onInspect={setInspectServerId}
+            />
+          ))}
         </div>
       ) : (
         <PageEmpty

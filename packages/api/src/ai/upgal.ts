@@ -530,6 +530,11 @@ const createProjectSchema = z.object({
     .min(1)
     .max(120)
     .describe("Human-readable project name to create."),
+  description: z
+    .string()
+    .max(500)
+    .optional()
+    .describe("Optional description of the project."),
 });
 const createEnvironmentSchema = z.object({
   projectId: z.string().min(1).describe("Stable ID of the parent project."),
@@ -1442,10 +1447,11 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
     create_project: mutationTool(
       "Create a project and its default production environment. This requires approval.",
       createProjectSchema,
-      async ({ name }) =>
+      async ({ name, description }) =>
         run(CreateProjectUseCaseToken).execute({
           organizationId: context.organizationId,
           name,
+          description,
         }),
       projectOutputSchema,
     ),

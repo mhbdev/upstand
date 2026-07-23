@@ -12,6 +12,7 @@ import {
 } from "@upstand/ui/components/card";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { toast } from "sonner";
+import { Tag01Icon } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 export function TagsTab({
@@ -44,7 +45,9 @@ export function TagsTab({
   return (
     <Card className="border border-border/40 bg-card/20">
       <CardHeader>
-        <CardTitle>Resource tags</CardTitle>
+        <CardTitle className="flex items-center gap-2 font-bold text-xl">
+          <Tag01Icon className="size-5 text-primary" /> Resource tags
+        </CardTitle>
         <CardDescription>
           Apply organization tags for filtering and operations.
         </CardDescription>

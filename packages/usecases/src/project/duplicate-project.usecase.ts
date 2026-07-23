@@ -24,6 +24,8 @@ export class DuplicateProjectUseCase {
       const copiedProject = await tx.projectRepository.create({
         id: randomUUID(),
         name: input.name,
+        description: source.description,
+        icon: source.icon,
         organizationId: input.organizationId,
       });
       const environments = await tx.environmentRepository.findByProjectId(

@@ -50,21 +50,19 @@ import {
 } from "@/components/ai-elements/message";
 import {
   PromptInput,
-  PromptInputActionAddAttachments,
-  PromptInputActionAddScreenshot,
-  PromptInputActionMenu,
-  PromptInputActionMenuContent,
-  PromptInputActionMenuTrigger,
   PromptInputAttachments,
   PromptInputBody,
+  PromptInputButton,
   PromptInputFooter,
   PromptInputHeader,
   PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
+  usePromptInputAttachments,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
+import { UPGAL_ACCEPT_PATTERNS } from "@/lib/attachment-utils";
 import type { UpGalDraftEventDetail } from "@/lib/upgal-events";
 
 function UpGalDraftHandler({ onOpen }: { onOpen: () => void }) {
@@ -112,6 +110,7 @@ import {
   History,
   Loader2,
   MessageCircle,
+  PaperclipIcon,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -345,6 +344,19 @@ function Part({
     );
   }
   return null;
+}
+
+function PromptInputDirectAttachButton() {
+  const { openFileDialog } = usePromptInputAttachments();
+  return (
+    <PromptInputButton
+      aria-label="Attach text or markdown file"
+      tooltip="Attach text or markdown file"
+      onClick={() => openFileDialog()}
+    >
+      <PaperclipIcon className="size-4" />
+    </PromptInputButton>
+  );
 }
 
 export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
@@ -797,6 +809,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
             <ConversationScrollButton />
           </Conversation>
           <PromptInput
+            accept={UPGAL_ACCEPT_PATTERNS}
             className="border-t p-3"
             onSubmit={({ text, files }) => send(text, files)}
           >
@@ -812,13 +825,7 @@ export function UpGalChat({ organizationId, pageTitle }: UpGalChatProps) {
             </PromptInputBody>
             <PromptInputFooter>
               <PromptInputTools>
-                <PromptInputActionMenu>
-                  <PromptInputActionMenuTrigger />
-                  <PromptInputActionMenuContent>
-                    <PromptInputActionAddAttachments />
-                    <PromptInputActionAddScreenshot />
-                  </PromptInputActionMenuContent>
-                </PromptInputActionMenu>
+                <PromptInputDirectAttachButton />
               </PromptInputTools>
               <span className="px-2 text-[11px] text-muted-foreground">
                 Shift + Enter for a new line

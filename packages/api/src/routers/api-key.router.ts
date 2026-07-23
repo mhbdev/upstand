@@ -159,6 +159,7 @@ export const apiKeyRouter = router({
         .extend({
           keyId: z.string().min(1),
           name: z.string().trim().min(1).max(120).optional(),
+          enabled: z.boolean().optional(),
           expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
           rateLimitEnabled: z.boolean().optional(),
           rateLimitTimeWindowMs: z
@@ -178,6 +179,7 @@ export const apiKeyRouter = router({
           configId: API_KEY_CONFIG_ID,
           keyId: input.keyId,
           userId: ctx.session.user.id,
+          ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
           ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.expiresInDays === undefined
             ? {}

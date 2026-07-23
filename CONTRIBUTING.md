@@ -1,5 +1,3 @@
-<img width="1220" height="685" alt="image" src="https://github.com/user-attachments/assets/4a2d20aa-9bc5-42d5-b3fc-998efa78ec3e" />
-
 # Contributing to Upstand
 
 Thank you for helping improve Upstand. Small, reviewable pull requests are easier to test and release than large rewrites. Please read this guide together with the repository documentation and the [Code of Conduct](CODE_OF_CONDUCT.md).

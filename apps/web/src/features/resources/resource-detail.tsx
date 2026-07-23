@@ -35,13 +35,13 @@ import { useEffect, useMemo, useState } from "react";
 import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import {
   Activity,
-  BookmarkIcon,
   Clock,
   Code,
   Globe,
   HardDrive,
   RefreshCw,
   Settings,
+  Tag01Icon,
   Terminal,
 } from "@/components/huge-icons";
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
@@ -273,7 +273,7 @@ export default function ResourceDetail({
             <Activity className="size-4" /> Monitoring
           </TabsTrigger>
           <TabsTrigger value="tags" className="shrink-0 gap-2">
-            <BookmarkIcon className="size-4" /> Tags
+            <Tag01Icon className="size-4" /> Tags
           </TabsTrigger>
           {resource.type !== "database" && (
             <TabsTrigger value="crons" className="shrink-0 gap-2">

@@ -46,7 +46,7 @@ export const AudioPlayer = ({
         "--media-font-size": "10px",
         "--media-icon-color": "currentColor",
         "--media-preview-time-background": "var(--color-background)",
-        "--media-preview-time-border-radius": "var(--radius-md)",
+        "--media-preview-time-border-radius": "varfull",
         "--media-preview-time-text-shadow": "none",
         "--media-primary-color": "var(--color-primary)",
         "--media-range-bar-color": "var(--color-primary)",
@@ -55,7 +55,7 @@ export const AudioPlayer = ({
         "--media-text-color": "var(--color-foreground)",
         "--media-tooltip-arrow-display": "none",
         "--media-tooltip-background": "var(--color-background)",
-        "--media-tooltip-border-radius": "var(--radius-md)",
+        "--media-tooltip-border-radius": "varfull",
         ...style,
       } as CSSProperties
     }

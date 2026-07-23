@@ -105,18 +105,171 @@ export async function compressAndConvertToDataUri(
   });
 }
 
-// Preset Icon Options for Projects & Resources
-export const PRESET_ICON_OPTIONS = [
-  { id: "preset:folder", label: "Folder", emoji: "📁" },
-  { id: "preset:rocket", label: "Rocket", emoji: "🚀" },
-  { id: "preset:sparkles", label: "Sparkles", emoji: "✨" },
-  { id: "preset:database", label: "Database", emoji: "🗄️" },
-  { id: "preset:server", label: "Server", emoji: "🖥️" },
-  { id: "preset:cloud", label: "Cloud", emoji: "☁️" },
-  { id: "preset:code", label: "Code", emoji: "💻" },
-  { id: "preset:cpu", label: "Processor", emoji: "⚡" },
-  { id: "preset:shield", label: "Security", emoji: "🛡️" },
-  { id: "preset:terminal", label: "Terminal", emoji: "📟" },
-  { id: "preset:globe", label: "Globe", emoji: "🌐" },
-  { id: "preset:box", label: "Package", emoji: "📦" },
+import {
+  Activity,
+  Bot,
+  Boxes,
+  Briefcase,
+  Code2,
+  Cpu,
+  Database,
+  FolderIcon,
+  Globe,
+  HardDrive,
+  type HugeIcon,
+  KeyRound,
+  Layers,
+  Network,
+  PackageIcon,
+  Rocket,
+  Server,
+  ShieldCheck,
+  Sparkles,
+  Terminal,
+  UserRound,
+  Users,
+} from "@/components/huge-icons";
+
+export interface PresetIconOption {
+  id: string;
+  label: string;
+  category: "project" | "resource" | "profile" | "general";
+  Icon: HugeIcon;
+}
+
+// Entity-Specific Vector Preset Icon Options
+export const PRESET_ICON_OPTIONS: PresetIconOption[] = [
+  // --- Project Presets ---
+  {
+    id: "preset:folder",
+    label: "Project Folder",
+    category: "project",
+    Icon: FolderIcon,
+  },
+  {
+    id: "preset:rocket",
+    label: "Deployment Rocket",
+    category: "project",
+    Icon: Rocket,
+  },
+  {
+    id: "preset:boxes",
+    label: "Cluster Services",
+    category: "project",
+    Icon: Boxes,
+  },
+  {
+    id: "preset:layers",
+    label: "App Stack",
+    category: "project",
+    Icon: Layers,
+  },
+  { id: "preset:code", label: "Source Code", category: "project", Icon: Code2 },
+  {
+    id: "preset:globe",
+    label: "Web Service",
+    category: "project",
+    Icon: Globe,
+  },
+  {
+    id: "preset:package",
+    label: "Build Package",
+    category: "project",
+    Icon: PackageIcon,
+  },
+
+  // --- Resource Presets ---
+  {
+    id: "preset:database",
+    label: "Database Engine",
+    category: "resource",
+    Icon: Database,
+  },
+  {
+    id: "preset:server",
+    label: "Server Node",
+    category: "resource",
+    Icon: Server,
+  },
+  {
+    id: "preset:terminal",
+    label: "CLI / Console",
+    category: "resource",
+    Icon: Terminal,
+  },
+  {
+    id: "preset:cpu",
+    label: "Processor Unit",
+    category: "resource",
+    Icon: Cpu,
+  },
+  {
+    id: "preset:harddrive",
+    label: "Storage Volume",
+    category: "resource",
+    Icon: HardDrive,
+  },
+  {
+    id: "preset:network",
+    label: "Virtual Network",
+    category: "resource",
+    Icon: Network,
+  },
+  {
+    id: "preset:shield",
+    label: "Security Gateway",
+    category: "resource",
+    Icon: ShieldCheck,
+  },
+  {
+    id: "preset:activity",
+    label: "Monitor Stream",
+    category: "resource",
+    Icon: Activity,
+  },
+
+  // --- Profile / User Presets ---
+  {
+    id: "preset:user",
+    label: "Personal Account",
+    category: "profile",
+    Icon: UserRound,
+  },
+  {
+    id: "preset:users",
+    label: "Team Member",
+    category: "profile",
+    Icon: Users,
+  },
+  {
+    id: "preset:developer",
+    label: "Developer",
+    category: "profile",
+    Icon: Code2,
+  },
+  {
+    id: "preset:admin",
+    label: "Admin / Ops",
+    category: "profile",
+    Icon: ShieldCheck,
+  },
+  { id: "preset:bot", label: "AI Agent", category: "profile", Icon: Bot },
+  {
+    id: "preset:sparkles",
+    label: "Pro Account",
+    category: "profile",
+    Icon: Sparkles,
+  },
+  {
+    id: "preset:key",
+    label: "Access Token",
+    category: "profile",
+    Icon: KeyRound,
+  },
+  {
+    id: "preset:briefcase",
+    label: "Organization",
+    category: "profile",
+    Icon: Briefcase,
+  },
 ];

@@ -48,7 +48,7 @@ import { CardGridSkeleton } from "@/components/dashboard/page-skeleton";
 import {
   ArrowRightIcon as ArrowRight,
   CheckCircle2,
-  Code,
+  GitBranchIcon,
   PlusIcon,
   Trash2Icon,
 } from "@/components/huge-icons";
@@ -317,7 +317,7 @@ export default function GitProviders({
       <DashboardPageHeader
         title="Git Providers"
         description="Connect GitHub, GitLab, Bitbucket, or Gitea to access repositories and deploy resources."
-        icon={<Code className="size-6 text-primary" />}
+        icon={<GitBranchIcon className="size-6 text-primary" />}
         actions={
           <UpGalTarget definition={addGitProviderTarget}>
             <Button
@@ -484,7 +484,7 @@ export default function GitProviders({
         </div>
       ) : (
         <PageEmpty
-          icon={Code}
+          icon={GitBranchIcon}
           title="No Git providers yet"
           description="Connect GitHub, GitLab, Bitbucket, or Gitea to access repositories and deploy resources."
           action={

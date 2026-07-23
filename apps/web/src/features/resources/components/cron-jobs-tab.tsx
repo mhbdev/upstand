@@ -41,6 +41,7 @@ import { Tabs, TabsList, TabsTrigger } from "@upstand/ui/components/tabs";
 import { Textarea } from "@upstand/ui/components/textarea";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import {
   Clock,
   Edit3,
@@ -179,6 +180,10 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
   const [logsModalScheduleId, setLogsModalScheduleId] = useState<string | null>(
     null,
   );
+  const [scheduleToDelete, setScheduleToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -509,9 +514,10 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
                             title="Delete"
                             disabled={deleteMutation.isPending}
                             onClick={() => {
-                              if (confirm(`Delete schedule "${sch.name}"?`)) {
-                                deleteMutation.mutate({ id: sch.id });
-                              }
+                              setScheduleToDelete({
+                                id: sch.id,
+                                name: sch.name,
+                              });
                             }}
                             className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                           >
@@ -1068,6 +1074,25 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={Boolean(scheduleToDelete)}
+        onOpenChange={(open) => !open && setScheduleToDelete(null)}
+        title="Delete Cron Job?"
+        description={`Are you sure you want to delete schedule "${scheduleToDelete?.name}"?`}
+        actionLabel="Delete Schedule"
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (scheduleToDelete) {
+            deleteMutation.mutate(
+              { id: scheduleToDelete.id },
+              {
+                onSuccess: () => setScheduleToDelete(null),
+              },
+            );
+          }
+        }}
+      />
     </div>
   );
 }

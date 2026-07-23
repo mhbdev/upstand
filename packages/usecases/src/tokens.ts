@@ -51,6 +51,10 @@ export const UpdateSecretProviderUseCaseToken =
   );
 export const SyncSecretProviderUseCaseToken =
   createToken<UseCases.SyncSecretProviderUseCase>("SyncSecretProviderUseCase");
+export const TestSecretProviderConnectionUseCaseToken =
+  createToken<UseCases.TestSecretProviderConnectionUseCase>(
+    "TestSecretProviderConnectionUseCase",
+  );
 export const RotateSecretsUseCaseToken =
   createToken<UseCases.RotateSecretsUseCase>("RotateSecretsUseCase");
 export const CreateSecretRotationScheduleUseCaseToken =

@@ -135,7 +135,7 @@ export function AddProviderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 py-2">
+        <div className="flex flex-col gap-4">
           <ProviderFormFields
             values={values}
             onChange={handleChange}

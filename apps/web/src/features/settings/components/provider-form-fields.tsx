@@ -1,7 +1,7 @@
 "use client";
 
 import { type AIProvider, isAIProvider } from "@upstand/domain";
-import { Field, FieldLabel } from "@upstand/ui/components/field";
+import { Field, FieldGroup, FieldLabel } from "@upstand/ui/components/field";
 import { Input } from "@upstand/ui/components/input";
 import {
   Select,
@@ -58,45 +58,49 @@ export function ProviderFormFields({
 
   return (
     <>
-      <Field>
-        <FieldLabel htmlFor={`${idPrefix}-name`}>Provider name</FieldLabel>
-        <Input
-          id={`${idPrefix}-name`}
-          value={values.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="e.g. My GPT-4o"
-        />
-      </Field>
+      <FieldGroup className="flex flex-row">
+        <Field>
+          <FieldLabel htmlFor={`${idPrefix}-name`}>Provider name</FieldLabel>
+          <Input
+            id={`${idPrefix}-name`}
+            value={values.name}
+            onChange={(e) => onChange({ name: e.target.value })}
+            placeholder="e.g. My GPT-4o"
+          />
+        </Field>
 
-      <Field>
-        <FieldLabel htmlFor={`${idPrefix}-provider`}>Provider type</FieldLabel>
-        <Select
-          items={(
-            Object.entries(PROVIDER_LABELS) as [AIProvider, string][]
-          ).map(([value, label]) => ({ value, label }))}
-          value={values.provider}
-          onValueChange={(value) => {
-            if (value && isAIProvider(value)) {
-              onChange({ provider: value });
-            }
-          }}
-        >
-          <SelectTrigger id={`${idPrefix}-provider`} className="w-full">
-            <SelectValue placeholder="Select a provider">
-              {PROVIDER_LABELS[values.provider] ?? "Select a provider"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.entries(PROVIDER_LABELS) as [AIProvider, string][]).map(
-              ([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ),
-            )}
-          </SelectContent>
-        </Select>
-      </Field>
+        <Field>
+          <FieldLabel htmlFor={`${idPrefix}-provider`}>
+            Provider type
+          </FieldLabel>
+          <Select
+            items={(
+              Object.entries(PROVIDER_LABELS) as [AIProvider, string][]
+            ).map(([value, label]) => ({ value, label }))}
+            value={values.provider}
+            onValueChange={(value) => {
+              if (value && isAIProvider(value)) {
+                onChange({ provider: value });
+              }
+            }}
+          >
+            <SelectTrigger id={`${idPrefix}-provider`} className="w-full">
+              <SelectValue placeholder="Select a provider">
+                {PROVIDER_LABELS[values.provider] ?? "Select a provider"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(PROVIDER_LABELS) as [AIProvider, string][]).map(
+                ([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ),
+              )}
+            </SelectContent>
+          </Select>
+        </Field>
+      </FieldGroup>
 
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-model`}>Model</FieldLabel>
@@ -124,7 +128,7 @@ export function ProviderFormFields({
         </p>
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <FieldGroup className="flex flex-row">
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-temperature`}>
             Temperature
@@ -166,9 +170,9 @@ export function ProviderFormFields({
             placeholder="Provider default"
           />
         </Field>
-      </div>
+      </FieldGroup>
 
-      <div className="flex items-center justify-between rounded-md border p-3">
+      <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
           <FieldLabel htmlFor={`${idPrefix}-reasoning`}>
             Enable model reasoning
