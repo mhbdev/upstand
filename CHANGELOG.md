@@ -4,6 +4,16 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.117 - 2026-07-23
+
+### Fixed
+- **Dependency Audit & Vulnerability Remediation**: Upgraded `next` to `16.2.11` across `apps/web` and `apps/fumadocs` to resolve `bun audit` advisory vulnerabilities (GHSA-89xv-2m56-2m9x) and fix CI/CD release workflow pipelines.
+- **Topology Sheet Live Logs & Metrics**: Fixed stuck loading spinner in the topology sheet by evaluating loading states dynamically for selected resources, containers, and services.
+
+### Improved
+- **Rich Notification Transports & Action Keyboards**: Enhanced notification delivery formatting across all 12 provider transports. Failed actions now include log tail snippets and error details. Added Telegram `inline_keyboard` buttons linking directly to resources (`📦 View Resource`), deployments (`🚀 View Deployment`), and backups (`💾 View Backups`).
+- **Topology Auto-Layout Engine**: Added Dagre (`@dagrejs/dagre`) and ELK.js (`elkjs`) graph layout strategies with vertical (top-down) and horizontal (left-right) rank direction controls, and `d3-force` node collision avoidance.
+
 ## 0.1.116 - 2026-07-23
 
 ### Added
