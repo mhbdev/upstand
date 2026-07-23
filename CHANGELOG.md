@@ -4,22 +4,36 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.118 - 2026-07-23
+
+### Improved
+
+- UI improvements
+
+### Added
+
+- Setting/Updating project and resource icon
+
 ## 0.1.117 - 2026-07-23
 
 ### Fixed
+
 - **Dependency Audit & Vulnerability Remediation**: Upgraded `next` to `16.2.11` across `apps/web` and `apps/fumadocs` to resolve `bun audit` advisory vulnerabilities (GHSA-89xv-2m56-2m9x) and fix CI/CD release workflow pipelines.
 - **Topology Sheet Live Logs & Metrics**: Fixed stuck loading spinner in the topology sheet by evaluating loading states dynamically for selected resources, containers, and services.
 
 ### Improved
+
 - **Rich Notification Transports & Action Keyboards**: Enhanced notification delivery formatting across all 12 provider transports. Failed actions now include log tail snippets and error details. Added Telegram `inline_keyboard` buttons linking directly to resources (`📦 View Resource`), deployments (`🚀 View Deployment`), and backups (`💾 View Backups`).
 - **Topology Auto-Layout Engine**: Added Dagre (`@dagrejs/dagre`) and ELK.js (`elkjs`) graph layout strategies with vertical (top-down) and horizontal (left-right) rank direction controls, and `d3-force` node collision avoidance.
 
 ## 0.1.116 - 2026-07-23
 
 ### Added
+
 - **DAG Auto-Layout Engine for Infrastructure Topology**: Integrated `@dagrejs/dagre` automatic graph positioning engine (`topology-layout.ts`) offering top-to-bottom and left-to-right hierarchical node layout options, collision resolution, and smooth edge routing.
 
 ### Improved
+
 - **Docker Client & Remote Socket Transport**: Refactored remote Docker socket connections, host socket resolution, and container convergence status tracking (`docker-client.ts`, `docker.service.ts`).
 - **Redis & Notification Transport Resiliency**: Hardened Redis transport reconnection logic and notification transport fallbacks (`redis/index.ts`, `notification-transport.ts`).
 - **Deployment Worker Stability**: Resolved lock acquisition typing and error reporting in `deployment-worker.ts`.
@@ -27,12 +41,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ## 0.1.115 - 2026-07-22
 
 ### Added
+
 - **Interactive Infrastructure Topology Map**: Added node-based live topology map (`/topology`) built with `@xyflow/react` to visually explore and filter physical servers, Docker Swarm nodes, projects, environments, resources, databases, backups, external secret providers, and monitoring agents.
 - **Dashboard Navigation & UpGal Spotlight**: Integrated Topology navigation into the primary dashboard sidebar under Infrastructure and registered `/topology` spotlight targets for UpGal assistant UI automation.
 
 ## 0.1.113 - 2026-07-22
 
 ### Added
+
 - **External Secret Management & Secret Rotation**: Introduced secret provider integration, rotation schedules, claim locks, version repositories, and dedicated API routers (`secret.router.ts`, DB migrations `0051`-`0055`).
 - **Container Auto-scaling Engine & Runtime**: Added `autoscaling-runtime.ts` and use-case evaluation logic for dynamic metric-driven container replica scaling.
 - **Backup Verification & Recovery Workflows**: Added automated post-backup verification (`verify-backup-run.usecase.ts`), retention sync, and database backup/restore workflows.
@@ -40,21 +56,25 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 - **Expanded Fumadocs Documentation**: Added comprehensive documentation pages covering backups, builds/previews, integrations, notifications, projects/resources, secrets/scaling, operations, and API automation.
 
 ### Improved
+
 - **Infrastructure & Monitoring Client**: Enhanced SSH channel HTTP transport, container health check handling, and Docker service convergence validation.
 
 ## 0.1.112 - 2026-07-22
 
 ### Fixed
+
 - Normalized release configuration formatting after the build-warning cleanup.
 
 ## 0.1.111 - 2026-07-22
 
 ### Fixed
+
 - Removed remaining production build warnings by updating tsdown dependency options, externalizing optional OpenTelemetry instrumentation, and defining Fumadocs `metadataBase`.
 
 ## 0.1.110 - 2026-07-22
 
 ### Security
+
 - Fixed S3 connection-test command injection by using argument-safe rclone execution and removing arbitrary test flags.
 - Blocked private, link-local, loopback, and metadata destinations for S3 and registry tests and SSH host-key scans, with DNS validation, timeouts, and redirect protection.
 - Enforced organization, resource, server, and container ownership for AI container commands and Docker terminal sessions.
@@ -64,88 +84,105 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ## 0.1.109 - 2026-07-22
 
 ### Added
+
 - **SCIM 2.0 Identity Management & Admin 2FA Reset**: Added SCIM repository layer and API router endpoints for enterprise user provisioning/deprovisioning. Implemented admin 2FA reset workflow and repositories.
 - **Docker Deployment Convergence & Automated Rollback**: Introduced Docker service deployment convergence validation with automatic rollback triggers upon step failure or container convergence timeouts.
 - **Database Hot-Path & Integrity Indexing**: Added migrations `0049_integrity_and_hot_path_indexes.sql` and `0050_furry_quentin_quire.sql` to optimize query performance across deployments, resources, and notification outbox tables.
 
 ### Improved
+
 - **Modular Server & API Architecture**: De-monolithized server startup (`apps/server`) and `@upstand/api` routers (`web-server.router`, `permissions`, `rate-limit`, `openapi`, `errors`) into clean modular domains (`/scim`, `/trpc`, `/authorization`, `/rate-limiting`, `/routers/web-server`). Added full procedure authorization policy test coverage.
 - **Resilient Redis Rate-Limiting**: Enhanced rate limiter with a circuit breaker and bounded local token-bucket LRU fallback, gracefully maintaining rate limits when Redis experiences timeouts or disconnections.
 - **UpGal AI Stability & Recovery**: Upgraded UpGal error classification, instruction guidelines, and message history persistence to automatically recover from stale tool call states.
 - **Docker Dashboard & Log Viewer**: Expanded Docker logs component with log level filtering (`INFO`, `WARN`, `ERROR`), pause/resume controls, auto-scroll toggle, and enhanced log search.
 
 ### Fixed
+
 - **Codebase Lint & Format Compliance**: Resolved Biome linting and formatting issues across apps and packages, ensuring clean workspace build state for releases.
 
 ## 0.1.108 - 2026-07-21
 
 ### Fixed
+
 - **Role-Based Remote Server Selection**: Updated resource creation dialogs (Application, Database, Compose), resource general settings tab, and templates setup page to filter target server and build server dropdown lists based on server types (`deploy`, `build`, `database`). This prevents selecting incompatible server roles in the UI and aligns with backend role assertions.
+
 ## 0.1.107 - 2026-07-21
 
 ### Added
+
 - **Modern Terminal UI and Split Sidebar Layout**: Redesigned the interactive SSH and Docker terminal Dialog, introducing a spacious dual-column layout on desktop screens with settings placed in a dedicated left sidebar, and auto-collapsing to vertical stack on mobile/tablet.
 - **Upgraded Terminal Toolbar**: Replaced the custom Popover theme menu with the `@upstand/ui` `Select` component. Designed modern font-size adjustment controls with `PlusIcon`/`MinusIcon` buttons, clear action with `Trash2`, download buffer with `Download`, and added `Tooltip` micro-interactions to all actions.
 - **Configuration State Persistence**: Enabled `localStorage` memory caching for the user's font-size and active theme selections to preserve preferences across dialogue instances and page reloads.
 
 ### Fixed
+
 - **Terminal Reconnect Session Expiry**: Prevented active WebSocket/SSH sessions from tearing down and reconnecting when font-size or theme options change, fixing the `"Terminal session expired. Open a new terminal and try again."` toast disconnection bug.
 
 ## 0.1.106 - 2026-07-21
 
 ### Fixed
+
 - **Bypass env validation during Next.js production builds**: Added `process.env.NEXT_PHASE === "phase-production-build"` validation bypass to both `@upstand/env` server and web modules. This allows Next.js static page collection and dynamic routing build traces to compile successfully in CI/CD (GitHub Actions) environments without requiring active database connections or runtime secret environment variables.
 
 ## 0.1.105 - 2026-07-21
 
 ### Fixed
+
 - **Private key formatting compatibility**: Added auto-serialization of generated and imported private keys to standard PKCS#1 PEM (for RSA keys) and OpenSSH PEM (for ED25519 keys) using `sshpk` prior to database encryption. This prevents the `ssh2` parser from throwing `"Cannot parse privateKey: Unsupported key format"` errors which occurred when Node's native `generateKeyPairSync` outputs key pairs in raw PKCS#8 formatting.
 
 ## 0.1.104 - 2026-07-21
 
 ### Added
+
 - **Direct Remote Server Terminals**: Added a dedicated "Open Terminal" button on each Remote Server card, allowing users to connect to that server's terminal directly from the server manager. The terminal pre-selects the server's attached SSH Key, username, and port.
 - **Enhanced Terminal Dialog Width**: Made the terminal emulator dialog wider on tablets and desktops (`max-w-[80rem]` for control-plane terminal and `max-w-[84rem]` for standard terminals) to accommodate longer terminal commands and larger font sizes.
 
 ## 0.1.103 - 2026-07-21
 
 ### Added
+
 - **Multi-Algorithm SSH Key Generation**: Upgraded SSH key generation to support both modern, secure **ED25519** and legacy compatibility **RSA (2048-bit)** key pairs. Added a dropdown/selector in both the main SSH Keys manager panel and the remote server onboarding wizard.
 - **Automated SSH Host Key Scanning & Verification**: Introduced a native, secure, async `scanHostKey` endpoint that queries the remote server's SSH fingerprint before adding it. Both the server wizard and the server manager now auto-scan and trust the host key during server creation, fixing the `"Trust the server SSH host key before provisioning it"` error without requiring any manual terminal commands.
 
 ## 0.1.102 - 2026-07-21
 
 ### Fixed
-- **Remote server setup on Windows**: Provisioning (`SetupServerUseCase`) now runs `docker info --format json` over the existing SSH connection instead of routing through a Unix socket proxy, fixing the *"Was there a typo in the url or port?"* error on Windows ([`server-provisioning.ts`](packages/infrastructure/src/provisioning/server-provisioning.ts)).
+
+- **Remote server setup on Windows**: Provisioning (`SetupServerUseCase`) now runs `docker info --format json` over the existing SSH connection instead of routing through a Unix socket proxy, fixing the _"Was there a typo in the url or port?"_ error on Windows ([`server-provisioning.ts`](packages/infrastructure/src/provisioning/server-provisioning.ts)).
 - **Caddy initialization on Windows**: Replaced `CaddyService` (Docker API / Unix socket) with a pure SSH-command-based `initializeCaddyViaSsh` during server provisioning, enabling the DEPLOY role to complete successfully on Windows without a local Unix socket.
-- **Runtime metrics and Docker API calls on Windows**: `ensureRemoteDockerProxy` now detects `process.platform === "win32"` and listens on a local TCP port (`127.0.0.1:23776+`) instead of a Unix `.sock` file path, fixing *"Was there a typo in the url or port?"* errors when fetching runtime metrics or performing any Docker API operation against remote servers on Windows ([`docker-client.ts`](packages/infrastructure/src/docker/docker-client.ts)).
+- **Runtime metrics and Docker API calls on Windows**: `ensureRemoteDockerProxy` now detects `process.platform === "win32"` and listens on a local TCP port (`127.0.0.1:23776+`) instead of a Unix `.sock` file path, fixing _"Was there a typo in the url or port?"_ errors when fetching runtime metrics or performing any Docker API operation against remote servers on Windows ([`docker-client.ts`](packages/infrastructure/src/docker/docker-client.ts)).
 - **SSH host key fingerprint padding mismatch**: `verifyHostKeyFingerprint` now strips trailing `=` padding before comparing SHA-256 base64 fingerprints, fixing host key verification failures against OpenSSH servers that emit fingerprints with or without trailing padding ([`host-key.ts`](packages/platform/src/ssh/host-key.ts)).
 - **`ssh-keyscan` failure on Windows against OpenSSH 9.6**: `getTrustedKnownHostsEntry` now falls back to a pure Node.js/ssh2 host key scanner (`scanHostKeyWithSsh2Sync`) when `ssh-keyscan` exits with an error (e.g. unsupported KEX algorithm `sntrup761x25519-sha512@openssh.com` on modern Ubuntu 24.04 servers), fixing `"Could not read the SSH host key"` / `"Host denied (verification failed)"` errors on Windows.
 
 ## 0.1.101 - 2026-07-21
 
 ### Changed
+
 - Optimized GitHub Actions release workflow (`release.yml`) by removing non-reusable `cache-to` GHA cache layer exports on tag builds, saving ~1m 45s per release.
 - Added conditional `SKIP_TYPECHECK=1` support to Next.js container builds (`apps/web` and `apps/fumadocs`), eliminating duplicate type-checking inside Docker image builds (~22s saved).
 
 ## 0.1.100 - 2026-07-21
 
 ### Changed
+
 - Release milestone 0.1.100 release hardening and complete synchronization between `master` and `canary` release channels.
 - Verified 100% build type safety across all 15 workspace packages (`check-types`).
 
 ### Added
+
 - **Declarative Repository Configuration (`upstand.json`)**: Added auto-discovery parser, schema validation (`upstand.schema.json`), domain entity Zod schemas, and automatic Git deployment synchronization for build engines, runtime resource limits, monorepo watch paths, and HTTP/Script cron schedules.
 - **Interactive Remote Server Onboarding Wizard**: Added a multi-step onboarding wizard (`RemoteServerWizard`) for VPS hosts featuring provider options, OS installation guides, SSH key pairing, host role selection, automated provisioning, and live Docker/clock/runtime validation dialogs.
 - **Trusted Proxy CIDR IP Resolution**: Added `TRUSTED_PROXY_CIDRS` parsing and robust IP address normalization supporting IPv4 and IPv6 CIDR subnet matching for client IP resolution.
 - **Comprehensive Feature Documentation**: Added dedicated documentation guide (`upstand-json.mdx`) and JSON Schema editor autocompletion file (`public/upstand.schema.json`).
 
 ### Security & Bug Fixes
+
 - Resolved TypeScript null-narrowing build error (`TS18047`) in deployment worker callback (`deployment-worker.ts`).
 - Refactored Docker deployment service parameter reassignment (`noParameterAssign`) and normalized callback return signature types.
 - Fixed fallback master key encoding in `secret-box.ts` to guarantee a 32-byte base64-encoded key during development and test environments.
 
 ### Added
+
 - Cloud mode capability via `IS_CLOUD` and `NEXT_PUBLIC_IS_CLOUD` environment variables.
 - Excluded Local Server deployment target options from resource creation dialogs and General infrastructure tab dropdowns when cloud mode is active.
 - Added client-side and server-side target server validation checks on resource creation, update, and registry creation/updates, preventing cloud tenants from bypassing control plane isolation.
@@ -154,6 +191,7 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ## 0.1.97 - 2026-07-21
 
 ### Changed
+
 - Resource general and advanced tab optimizations (1:1 with Dokploy service general tab).
 - Hid the "Advanced Settings" and "Cron Jobs" tab trigger and panels for Database resources, avoiding configuration noise.
 - Restricted Compose resource advanced settings tabs to only "General" and "Raw JSON" tabs.
@@ -165,6 +203,7 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ## 0.1.96 - 2026-07-21
 
 ### Added
+
 - Refactored the Resource Advanced Settings page into a modular, tabbed UI with seven focused sections: **General & Runtime**, **Resources & Limits**, **Ports & Storage**, **Health & Deployment**, **Security & Capabilities**, **Environment & Labels**, and **Raw JSON**.
 - Each section is extracted into its own self-contained card component (`GeneralCard`, `ResourcesCard`, `PortsVolumesCard`, `HealthcheckDeploymentCard`, `SecurityCard`, `EnvLabelsCard`, `RawJsonCard`) with a shared `AdvancedCardProps` type and `splitLines` utility to eliminate duplication.
 - CPU and memory inputs now display unit adornments (`CPU`, `MB`) via `InputGroup` / `InputGroupAddon` instead of bare placeholder text.
@@ -178,6 +217,7 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ## 0.1.95 - 2026-07-21
 
 ### Security & Bug Fixes
+
 - Resolve CodeQL incomplete string escaping alerts (#35, #36) in `backups.ts` by escaping shell commands with robust single-quote tokenization.
 - Resolve CodeQL incomplete string escaping alert (#34) in `key-value-editor.tsx` by escaping backslashes prior to double quotes in formatted environment string variables.
 - Resolve CodeQL incomplete URL substring sanitization alerts (#32, #33) in `validate-domain.usecase.test.ts` by checking parsed URL hostnames instead of substring matching.
@@ -185,10 +225,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ## 0.1.94 - 2026-07-21
 
 ### Added
+
 - Added Cron Job Observability dashboard, schedule execution logs tracking, and `upstand.json` declarative schedule synchronization.
 - Added live system status diagnostics endpoint (`getSystemStatus`) checking database and Redis health and server time zones.
 
 ### Security & Bug Fixes
+
 - Fixed multi-tenant authorization check in `scheduleRouter.listLogs` to prevent schedule log query leakage across resources.
 - Optimized resource configuration and secret upserts (`patchConfiguration`, `patchSecrets`) for atomic database patches.
 - Cleaned up unused imports and refactored regex search loops in `code-editor.tsx` to achieve 0 biome check lint errors and warnings.
@@ -196,11 +238,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ## 0.1.93 - 2026-07-20
 
 ### Fixed
+
 - Fix Next.js web application Docker image build by adding the `--webpack` flag to match the custom webpack config in `next.config.ts`.
 
 ## 0.1.92 - 2026-07-20
 
 ### Improved
+
 - Redesigned the audit logs list UI into a structured, responsive, and compact table layout.
 - Added a details drawer (`Sheet`) for deep inspection of individual audit records, featuring actor/IP copy actions and raw JSON metadata copying/downloading.
 - Configured dynamic CORS origin verification in the Hono API server.
@@ -228,12 +272,10 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 - Resolve CodeQL `js/polynomial-redos` alerts (#24, #25, #26, #27) by replacing slash trimming regexes in `build-registry.ts`, `backup-storage.ts`, and `notification-transport.ts` with O(n) loop string slicing.
 - Resolve CodeQL CWE-916 heuristic alert (#3) in `oauth-state.ts` by explicitly converting token payloads to UTF-8 binary byte buffers.
 
-
 ### Security & Bug Fixes
 
 - Resolve CodeQL `js/shell-command-constructed-from-input` security finding by enforcing strict parameter tokenization, validation, and clean argument escaping across remote Docker execution and archive transfer methods.
 - Resolve ReDoS (Regular Expression Denial of Service) ambiguities by refactoring `SAFE_PATH_PATTERN` in `domain-mapping.ts` to eliminate nested quantifiers and guarantee linear time complexity matching.
-
 
 ### Added
 
@@ -245,7 +287,6 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 - Resolve CodeQL CWE-916 warning by migrating OAuth state signature and token lookup key derivation to `hkdfSync` key derivation.
 - Resolve CodeQL second-order command injection vulnerability by adding `git-url-sanitizer` validation (rejecting leading `-` flags, whitespace, and control characters) and inserting `--` options terminators across Git CLI commands.
 
-
 ### Added
 
 - Add Unified Live Stream Console & Terminal Split Screen view under Resource details, multiplexing and sorting logs across all running stack containers in real-time with color-coded service badges and hosting an interactive container terminal shell on the same pane.
@@ -255,7 +296,6 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 ### Fixed
 
 - Fix stuck loading state on Docker page logs and live stats tabs by checking query loading status instead of query pending status when queries are disabled.
-
 
 ## 0.1.85 - 2026-07-19
 

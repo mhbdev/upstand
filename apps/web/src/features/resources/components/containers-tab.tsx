@@ -259,7 +259,7 @@ export function ContainersTab({
                           </span>
                         </div>
                       </td>
-                      <td className="p-3 font-mono text-xs text-muted-foreground">
+                      <td className="p-3 font-mono text-muted-foreground text-xs">
                         {con.ports}
                       </td>
                       <td className="p-3 text-muted-foreground text-xs">

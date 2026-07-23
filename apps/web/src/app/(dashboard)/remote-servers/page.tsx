@@ -940,7 +940,7 @@ export default function RemoteServersPage() {
             )}
 
             {setupMutation.isSuccess && (
-              <p className="text-success text-sm">
+              <p className="text-sm text-success">
                 {setupMutation.data.message}
               </p>
             )}

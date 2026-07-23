@@ -32,6 +32,7 @@ import { cn } from "@upstand/ui/lib/utils";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import {
   Activity,
   BookmarkIcon,
@@ -45,7 +46,6 @@ import {
 } from "@/components/huge-icons";
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
-import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import { BackupPanel } from "@/features/backups";
 import { ConsoleTab } from "./components/console-tab";
 import { ContainersTab } from "./components/containers-tab";
@@ -199,9 +199,7 @@ export default function ResourceDetail({
             entityName={resource.name}
             entityType="resource"
             sizeClassName="size-12 rounded-xl"
-            bgClassName={
-              TYPE_BG[resource.type] || "bg-primary/10 text-primary"
-            }
+            bgClassName={TYPE_BG[resource.type] || "bg-primary/10 text-primary"}
             onSaveIcon={async (newIcon) => {
               await updateResource({ id: resource.id, icon: newIcon });
             }}

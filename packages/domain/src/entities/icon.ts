@@ -23,9 +23,10 @@ export const IconDataUriSchema = z.string().superRefine((val, ctx) => {
   }
 
   if (val.startsWith("data:")) {
-    const match = /^data:(image\/(?:png|jpeg|jpg|webp|gif|svg\+xml));(?:base64|utf8),/i.exec(
-      val,
-    );
+    const match =
+      /^data:(image\/(?:png|jpeg|jpg|webp|gif|svg\+xml));(?:base64|utf8),/i.exec(
+        val,
+      );
     if (!match) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

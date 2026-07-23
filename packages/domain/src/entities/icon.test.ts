@@ -10,12 +10,12 @@ describe("EntityIconSchema & IconDataUriSchema validation", () => {
   });
 
   test("accepts valid HTTP/HTTPS URLs", () => {
-    expect(EntityIconSchema.safeParse("https://example.com/icon.png").success).toBe(
-      true,
-    );
-    expect(EntityIconSchema.safeParse("http://example.com/icon.svg").success).toBe(
-      true,
-    );
+    expect(
+      EntityIconSchema.safeParse("https://example.com/icon.png").success,
+    ).toBe(true);
+    expect(
+      EntityIconSchema.safeParse("http://example.com/icon.svg").success,
+    ).toBe(true);
   });
 
   test("accepts valid preset identifiers", () => {
@@ -36,9 +36,9 @@ describe("EntityIconSchema & IconDataUriSchema validation", () => {
 
   test("rejects invalid string format", () => {
     expect(EntityIconSchema.safeParse("not-a-valid-icon").success).toBe(false);
-    expect(EntityIconSchema.safeParse("ftp://example.com/icon.png").success).toBe(
-      false,
-    );
+    expect(
+      EntityIconSchema.safeParse("ftp://example.com/icon.png").success,
+    ).toBe(false);
   });
 
   test("rejects oversized data payload exceeding 512KB limit", () => {

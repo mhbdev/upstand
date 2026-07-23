@@ -19,7 +19,8 @@ import {
   TabsTrigger,
 } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
-import React, { useId, useState } from "react";
+import type React from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangleIcon, Pencil, Trash2Icon } from "@/components/huge-icons";
 import {
@@ -200,7 +201,7 @@ export function EditableEntityIcon({
         <RenderEntityIcon icon={icon} defaultIcon={defaultIcon} />
 
         {!disabled && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-black/60 opacity-0 transition-opacity duration-200 backdrop-blur-[1px] group-hover/icon:opacity-100">
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-black/60 opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover/icon:opacity-100">
             <Pencil className="size-4 text-white" aria-hidden="true" />
           </div>
         )}
@@ -209,12 +210,12 @@ export function EditableEntityIcon({
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-card shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="font-bold text-xl">
-              Change Icon
-            </DialogTitle>
+            <DialogTitle className="font-bold text-xl">Change Icon</DialogTitle>
             <DialogDescription className="text-muted-foreground text-xs">
               Customize icon for{" "}
-              <span className="font-semibold text-foreground">{entityName}</span>
+              <span className="font-semibold text-foreground">
+                {entityName}
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -232,8 +233,8 @@ export function EditableEntityIcon({
                   defaultIcon={defaultIcon}
                 />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-foreground">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-foreground text-sm">
                   Icon Preview
                 </p>
                 <p className="truncate text-muted-foreground text-xs">
@@ -289,7 +290,7 @@ export function EditableEntityIcon({
 
               {/* Upload Tab */}
               <TabsContent value="upload" className="space-y-3 pt-3">
-                <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/60 p-6 text-center transition-colors hover:border-primary/50">
+                <div className="flex flex-col items-center justify-center rounded-xl border-2 border-border/60 border-dashed p-6 text-center transition-colors hover:border-primary/50">
                   <Input
                     id={fileInputId}
                     type="file"
@@ -308,7 +309,7 @@ export function EditableEntityIcon({
                         <Pencil className="size-5" />
                       </div>
                     )}
-                    <span className="font-medium text-sm text-foreground">
+                    <span className="font-medium text-foreground text-sm">
                       Click to choose or drag image file
                     </span>
                     <span className="text-muted-foreground text-xs">
@@ -337,7 +338,7 @@ export function EditableEntityIcon({
                       )}
                     >
                       <span className="text-xl">{preset.emoji}</span>
-                      <span className="mt-1 font-medium text-[10px] text-muted-foreground truncate w-full text-center">
+                      <span className="mt-1 w-full truncate text-center font-medium text-[10px] text-muted-foreground">
                         {preset.label}
                       </span>
                     </button>
@@ -357,7 +358,7 @@ export function EditableEntityIcon({
                       placeholder="https://example.com/logo.png"
                       value={urlInput}
                       onChange={(e) => setUrlInput(e.target.value)}
-                      className="border-border/40 focus:border-primary text-xs"
+                      className="border-border/40 text-xs focus:border-primary"
                     />
                     <Button
                       type="button"
@@ -380,7 +381,7 @@ export function EditableEntityIcon({
               size="sm"
               disabled={isSaving || !icon}
               onClick={handleResetToDefault}
-              className="text-muted-foreground hover:text-foreground text-xs"
+              className="text-muted-foreground text-xs hover:text-foreground"
             >
               Reset to Default
             </Button>

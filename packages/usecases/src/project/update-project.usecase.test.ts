@@ -53,7 +53,11 @@ class MockProjectRepository implements IProjectRepository {
 describe("UpdateProjectUseCase", () => {
   test("updates project icon and name successfully", async () => {
     const repo = new MockProjectRepository();
-    await repo.create({ id: "proj-1", name: "Old Name", organizationId: "org-1" });
+    await repo.create({
+      id: "proj-1",
+      name: "Old Name",
+      organizationId: "org-1",
+    });
 
     const uow = mockUnitOfWork({ projectRepository: repo });
     const usecase = new UpdateProjectUseCase(uow);
