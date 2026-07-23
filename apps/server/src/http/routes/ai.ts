@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { streamSSE } from "hono/streaming";
 import {
   createUpGalResponse,
   createUpGalTools,
@@ -23,6 +22,7 @@ import { authorizeMcpTool, checkPermission } from "@upstand/api/permissions";
 import { isJsonObject } from "@upstand/domain";
 import { AIRepositoryToken } from "@upstand/repositories/tokens";
 import type { Context, Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { createHttpRateLimitMiddleware } from "../rate-limit";
 import type { AppEnv } from "../types";
@@ -164,7 +164,8 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
     const fromHeaders = await authenticateApiKey(headers);
     if (fromHeaders) return fromHeaders;
     // Fall back to query param for clients that cannot set request headers (EventSource).
-    const qp = c.req.query("api_key") || c.req.query("token") || c.req.query("apiKey");
+    const qp =
+      c.req.query("api_key") || c.req.query("token") || c.req.query("apiKey");
     if (qp) {
       return authenticateApiKey(new Headers({ "x-api-key": qp }));
     }
@@ -274,7 +275,11 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
       return c.json({ jsonrpc: "2.0", id, result: { prompts: [] } });
     }
     if (body.method === "completion/complete") {
-      return c.json({ jsonrpc: "2.0", id, result: { completion: { values: [] } } });
+      return c.json({
+        jsonrpc: "2.0",
+        id,
+        result: { completion: { values: [] } },
+      });
     }
 
     // -------------------------------------------------------------------------
