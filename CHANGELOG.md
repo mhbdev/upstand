@@ -4,7 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.128 - 2026-07-23
+## 0.1.129 - 2026-07-23
+
+### Fixed
+
+- **Idempotent Migration Rollout & Diagnostic Logging**: Ensured `0058_bent_daredevil.sql` contains `ALTER TABLE "project" ADD COLUMN IF NOT EXISTS "description" text;` in release builds. Hardened `runDatabaseMigrations` in `apps/server/src/startup.ts` to log explicit error messages, stack traces, and underlying DB causes on migration retries for clear production troubleshooting.
+
+
 
 ### Fixed
 

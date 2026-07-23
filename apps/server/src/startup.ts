@@ -48,7 +48,16 @@ export async function runDatabaseMigrations(options?: {
         message: "Database migration attempt failed",
         attempt,
         attempts,
-        err: error,
+        err:
+          error instanceof Error
+            ? {
+                message: error.message,
+                stack: error.stack,
+                cause: (error as any).cause
+                  ? String((error as any).cause)
+                  : undefined,
+              }
+            : error,
       });
       if (attempt < attempts) await wait(delayMs);
     }
