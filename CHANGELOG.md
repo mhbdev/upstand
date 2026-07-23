@@ -4,7 +4,17 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.118 - 2026-07-23
+## 0.1.120 - 2026-07-23
+
+### Added
+
+- **Download Ability to CodeBlock Component**: Added download button alongside copy button with automatic language-based file extension inference (`.ts`, `.js`, `.json`, `.py`, `.sh`, `.sql`, `.yaml`) and controllable via `showDownload` / `showCopy` props.
+- **Compact DangerZoneCard Component**: Standardized compact Danger Zone layout across project, environment, and resource management pages.
+
+### Improved
+
+- **Confirmation Action Dialog Enforcement**: Unified action confirmation across all dangerous deletion flows with optional uppercase `"DELETE"` text confirmation input for critical entity deletions (Projects, Environments, Resources).
+- **Entity Icon Consistency**: Standardized Hugeicons usage across sidebar navigation, page headers, empty states, and resource tabs (Tags, Git Providers, Templates).
 
 ### Improved
 
