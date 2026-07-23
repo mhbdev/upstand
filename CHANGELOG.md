@@ -4,7 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.129 - 2026-07-23
+## 0.1.130 - 2026-07-23
+
+### Fixed
+
+- **Complete Database Migration Idempotency**: Added `IF NOT EXISTS` to `0057_add_project_description.sql` (`ALTER TABLE "project" ADD COLUMN IF NOT EXISTS "description" text;`). Prevents PostgreSQL column collision error `42701` on existing production databases, resolving container startup crash loops and Docker Swarm deployment rollbacks.
+
+
 
 ### Fixed
 

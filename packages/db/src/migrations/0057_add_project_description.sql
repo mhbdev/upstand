@@ -1,1 +1,1 @@
-ALTER TABLE "project" ADD COLUMN "description" text;
+ALTER TABLE "project" ADD COLUMN IF NOT EXISTS "description" text;
