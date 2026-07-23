@@ -146,7 +146,50 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
     }
   });
 
+  app.use(
+    "/api/mcp",
+    createHttpRateLimitMiddleware({
+      path: "api.mcp",
+      profile: "default",
+      onRejected: (c, message) =>
+        c.json(
+          {
+            jsonrpc: "2.0",
+            id: null,
+            error: { code: -32000, message },
+          },
+          429,
+        ),
+      resolveIdentity: async (c, ip) => {
+        // Resolve the API key using the same multi-source logic as the MCP handlers.
+        const headers = c.req.raw.headers;
+        const fromHeaders = await authenticateApiKey(headers);
+        if (fromHeaders) {
+          return {
+            identifier: `apikey:${fromHeaders.keyId}`,
+            hasSession: true,
+          };
+        }
+        const qp =
+          c.req.query("api_key") ||
+          c.req.query("token") ||
+          c.req.query("apiKey");
+        if (qp) {
+          const fromQp = await authenticateApiKey(
+            new Headers({ "x-api-key": qp }),
+          );
+          if (fromQp) {
+            return { identifier: `apikey:${fromQp.keyId}`, hasSession: true };
+          }
+        }
+        // No valid key — fall back to IP; the route handler will 401.
+        return { identifier: `ip:${ip}`, hasSession: false };
+      },
+    }),
+  );
+
   // ---------------------------------------------------------------------------
+
   // MCP Endpoint — supports both transports:
   //   • GET  /api/mcp  → SSE (legacy transport, for clients that use EventSource)
   //   • POST /api/mcp  → Streamable HTTP (current MCP spec, 2025-03-26)
