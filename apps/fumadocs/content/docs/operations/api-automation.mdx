@@ -23,6 +23,8 @@ Keep the SCIM endpoint private to the IdP integration, rotate provisioning token
 
 UpGal exposes `/api/mcp` for JSON-RPC MCP clients. The supported protocol operations include `initialize`, `tools/list`, and `tools/call`. Authenticate with an organization API key that has MCP permissions. The server reuses organization and capability authorization; read tools can return results, while mutating operations return an approval-required result that must be completed in the dashboard.
 
+For step-by-step editor and client configuration guides (VS Code, Claude Desktop, Claude Code, Cursor, Codex, Windsurf), see the [MCP Server Setup & Editor Integration guide](/docs/operations/mcp-server).
+
 ## Rate limits and retries
 
 Public and authenticated API paths are rate-limited. Treat `429` responses as back-pressure: retry with exponential delay and jitter, keep requests idempotent where possible, and do not create duplicate deployments or schedules while an earlier request is still pending. Use the request/observation pages and audit log as the source of truth for asynchronous work.
