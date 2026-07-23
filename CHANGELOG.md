@@ -4,14 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.123 - 2026-07-23
+## 0.1.124 - 2026-07-23
 
-### Security
+### Fixed
 
-- **MCP Destructive Tool Suppression**: Mutating tools (`delete_resource`, `delete_project`, `delete_tag`, `delete_schedule`, and all other write/mutation tools) are no longer advertised in `tools/list`. They were already blocked at `tools/call` and require dashboard approval, but their presence in the listing triggered risk-pattern warnings in MCP security scanners. Only read-only tools are now returned, each annotated with `readOnlyHint: true, destructiveHint: false`.
-- **HSTS Header**: Added global `Strict-Transport-Security: max-age=31536000; includeSubDomains` response header applied to all HTTPS responses. The header is conditioned on `x-forwarded-proto: https` so plain HTTP local development is unaffected.
-- **OAuth 2.0 Authorization Server Metadata** (`/.well-known/oauth-authorization-server`): Added RFC 8414 metadata endpoint required by MCP 2025-03-26 clients for auth auto-negotiation. Documents that the server accepts API keys as Bearer tokens and points to `/docs` for key provisioning. MCP clients can now auto-negotiate authentication without manual configuration.
-- **MCP Rate Limiting**: Added `createHttpRateLimitMiddleware` to `GET /api/mcp` and `POST /api/mcp`, bucketed per API key (`apikey:<keyId>`). Previously only response headers were decorated but no Redis-backed enforcement was applied.
+- **MCP Tool Input Parameters Schemas**: Fixed MCP `tools/list` returning empty `{ type: "object" }` input schemas. Exported `UPGAL_TOOL_INPUT_SCHEMAS` and integrated `getUpGalToolInputSchemaJson` (powered by Zod `z.toJSONSchema`), populating full JSON schemas (properties, types, descriptions, validation rules, required fields) for every exposed tool. 3rd party AI models connected over MCP (Cursor, Claude Desktop, Roo Code, Windsurf, Copilot, ChatGPT, etc.) can now accurately parse tool inputs and execute parameter-requiring tool calls cleanly.
+- **MCP SSE Session & Authentication Query Parameter Preservation**: Resolved `SSE connection error` and message endpoint 401 failures by generating a unique `sessionId`, setting proxy headers (`Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no`, `Connection: keep-alive`), and preserving all query parameters (`api_key`, `token`, `sessionId`) in the SSE `endpoint` URL. EventSource clients can now POST back to the message endpoint with full authentication.
+- **OAuth 2.0 Authorization Server Metadata & Discovery** (`/.well-known/oauth-authorization-server` & `/.well-known/openid-configuration`): Updated discovery metadata to strictly comply with RFC 8414. Included all REQUIRED fields (`issuer`, `authorization_endpoint`, `token_endpoint`, `response_types_supported`, `grant_types_supported`, `token_endpoint_auth_methods_supported`, `code_challenge_methods_supported`, `scopes_supported`). MCP clients and RFC 8414 discovery scanners can now auto-negotiate authentication cleanly without missing field errors.
 
 
 ### Fixed

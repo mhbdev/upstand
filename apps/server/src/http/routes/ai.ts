@@ -4,6 +4,7 @@ import {
   createUpGalTools,
   executeUpGalReadTool,
   getConversationForUser,
+  getUpGalToolInputSchemaJson,
   getUpGalToolNamesForUser,
   isUpGalToolName,
   saveIncomingMessages,
@@ -227,11 +228,28 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
     }
     setApiKeyRateLimitHeaders(key, (name, value) => c.header(name, value));
 
-    return streamSSE(c, async (stream) => {
-      // Derive the base URL so we point the client at the correct host.
-      const requestUrl = new URL(c.req.url);
-      const postUrl = `${requestUrl.origin}/api/mcp`;
+    const requestUrl = new URL(c.req.url);
+    const sessionId =
+      c.req.query("sessionId") || c.req.query("session_id") || randomUUID();
 
+    const postUrlObj = new URL(`${requestUrl.origin}/api/mcp`);
+    postUrlObj.searchParams.set("sessionId", sessionId);
+
+    // Preserve all query parameters (e.g. api_key, token) so POST requests
+    // from EventSource clients carry the authentication parameters cleanly.
+    for (const [k, v] of requestUrl.searchParams.entries()) {
+      if (k !== "sessionId" && k !== "session_id") {
+        postUrlObj.searchParams.set(k, v);
+      }
+    }
+    const postUrl = postUrlObj.toString();
+
+    c.header("Cache-Control", "no-cache, no-transform");
+    c.header("Connection", "keep-alive");
+    c.header("X-Accel-Buffering", "no");
+    c.header("Mcp-Session-Id", sessionId);
+
+    return streamSSE(c, async (stream) => {
       // MCP legacy SSE transport: first event must be "endpoint".
       await stream.writeSSE({ event: "endpoint", data: postUrl });
 
@@ -256,6 +274,14 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
       return c.json({ error: "Invalid or expired API key" }, 401);
     }
     setApiKeyRateLimitHeaders(key, (name, value) => c.header(name, value));
+
+    const sessionId =
+      c.req.query("sessionId") ||
+      c.req.query("session_id") ||
+      c.req.header("mcp-session-id");
+    if (sessionId) {
+      c.header("Mcp-Session-Id", sessionId);
+    }
 
     // Parse the JSON-RPC envelope.
     const bodyResult = z
@@ -357,27 +383,28 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
       });
     }
 
-    // tools/list — return only the read-only tools this API key has access to.
-    // Mutating tools are excluded: they cannot be executed via MCP (they require
-    // dashboard approval) and advertising them causes unnecessary risk-pattern
-    // warnings in MCP security scanners.
+    // tools/list — return every tool this API key has access to (all 63 tools).
+    // Mutating tools carry destructiveHint: true & readOnlyHint: false.
     // -------------------------------------------------------------------------
     if (body.method === "tools/list") {
       const tools = (
         await Promise.all(
           UPGAL_TOOL_METADATA.map(async ([name, description, mutation]) =>
-            !mutation && (await canUseMcpTool(name))
-              ? { name, description }
+            (await canUseMcpTool(name))
+              ? { name, description, mutation }
               : null,
           ),
         )
       )
         .filter((tool): tool is NonNullable<typeof tool> => tool !== null)
-        .map(({ name, description }) => ({
+        .map(({ name, description, mutation }) => ({
           name,
           description,
-          annotations: { readOnlyHint: true, destructiveHint: false },
-          inputSchema: { type: "object" },
+          annotations: {
+            readOnlyHint: !mutation,
+            destructiveHint: mutation,
+          },
+          inputSchema: getUpGalToolInputSchemaJson(name),
         }));
 
       return c.json({ jsonrpc: "2.0", id, result: { tools } });

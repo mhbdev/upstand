@@ -755,6 +755,85 @@ const projectOutputSchema = z
 const projectsOutputSchema = z
   .array(projectOutputSchema)
   .describe("Project records.");
+
+export const UPGAL_TOOL_INPUT_SCHEMAS: Record<UpGalToolName, z.ZodType> = {
+  get_account_status: emptySchema,
+  list_templates: listTemplatesSchema,
+  get_template: templateLookupSchema,
+  list_projects: emptySchema,
+  list_environments: projectIdSchema,
+  list_resources: environmentIdSchema,
+  get_resource_logs: resourceLogsSchema,
+  get_resource_stats: idSchema,
+  get_resource_config: idSchema,
+  list_servers: emptySchema,
+  get_monitoring_status: serverIdSchema,
+  get_monitoring_metrics: monitoringMetricsSchema,
+  list_deployments: emptySchema,
+  get_audit_logs: auditLogsSchema,
+  get_docker_info: dockerTargetSchema,
+  list_docker_containers: dockerTargetSchema,
+  list_docker_images: dockerTargetSchema,
+  list_docker_volumes: dockerTargetSchema,
+  list_docker_networks: dockerTargetSchema,
+  list_docker_services: dockerTargetSchema,
+  get_docker_logs: dockerLogsSchema,
+  get_project: idSchema,
+  get_environment: idSchema,
+  get_resource: idSchema,
+  get_resource_containers: idSchema,
+  get_resource_previews: idSchema,
+  get_resource_routing_targets: idSchema,
+  list_resource_backup_schedules: idSchema,
+  list_resource_backup_runs: backupRunsSchema,
+  list_backup_volumes: idSchema,
+  list_git_providers: emptySchema,
+  list_docker_registries: emptySchema,
+  search_upstand: searchSchema,
+  get_swarm_info: emptySchema,
+  get_swarm_nodes: emptySchema,
+  get_swarm_containers: emptySchema,
+  get_web_server_logs: webServerLogsSchema,
+  get_update_status: emptySchema,
+  list_tags: emptySchema,
+  get_resource_tags: resourceTagSchema.pick({ resourceId: true }),
+  search_web: webSearchSchema,
+  guide_upstand: guideUpstandSchema,
+  create_project: createProjectSchema,
+  create_template: templateLookupSchema,
+  create_environment: createEnvironmentSchema,
+  deploy_resource: idSchema,
+  control_resource: controlResourceSchema,
+  delete_resource: idSchema,
+  delete_project: idSchema,
+  prune_docker_resources: pruneDockerSchema,
+  exec_container_command: execContainerCommandSchema,
+  exec_server_terminal_command: execServerTerminalCommandSchema,
+  create_tag: resourceTagSchema,
+  update_tag: resourceTagSchema,
+  delete_tag: resourceTagSchema,
+  assign_resource_tag: resourceTagSchema,
+  detach_resource_tag: resourceTagSchema,
+  deploy_template: idSchema,
+  list_schedules: listSchedulesSchema,
+  create_schedule: createScheduleSchema,
+  update_schedule: updateScheduleSchema,
+  delete_schedule: deleteScheduleSchema,
+  trigger_schedule: triggerScheduleSchema,
+};
+
+export function getUpGalToolInputSchemaJson(
+  name: UpGalToolName,
+): Record<string, unknown> {
+  const schema = UPGAL_TOOL_INPUT_SCHEMAS[name];
+  if (!schema) {
+    return { type: "object" };
+  }
+  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+  const { $schema, ...cleanSchema } = jsonSchema;
+  return cleanSchema;
+}
+
 const environmentOutputSchema = z
   .object({
     id: z.string().describe("Stable environment ID."),
