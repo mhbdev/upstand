@@ -6,6 +6,39 @@ import type {
   DockerInspectionTarget,
   DockerInventoryReaderPort,
 } from "../ports/docker";
+import {
+  containerBelongsToResource,
+  shellQuote,
+} from "../server/container-resolution.helper";
+
+export function normalizeContainerPath(rawPath: string): string {
+  if (!rawPath || !rawPath.trim()) return "/";
+  const parts = rawPath.replace(/\\/g, "/").split("/").filter(Boolean);
+  const stack: string[] = [];
+  for (const part of parts) {
+    if (part === ".") continue;
+    if (part === "..") {
+      if (stack.length > 0) stack.pop();
+    } else {
+      stack.push(part);
+    }
+  }
+  return stack.length === 0 ? "/" : `/${stack.join("/")}`;
+}
+
+const DANGEROUS_SYSTEM_PATHS = new Set([
+  "/",
+  "/bin",
+  "/boot",
+  "/dev",
+  "/etc",
+  "/lib",
+  "/lib64",
+  "/proc",
+  "/sys",
+  "/usr",
+  "/var",
+]);
 
 export const FileExplorerItemSchema = z.object({
   name: z.string(),
@@ -38,6 +71,7 @@ export const WriteContainerFileInputSchema = z.object({
   containerId: z.string().optional(),
   path: z.string().min(1),
   content: z.string(),
+  isBase64: z.boolean().optional(),
 });
 
 export const CreateContainerItemInputSchema = z.object({
@@ -47,6 +81,14 @@ export const CreateContainerItemInputSchema = z.object({
   parentPath: z.string().default("/"),
   name: z.string().min(1),
   type: z.enum(["file", "directory"]),
+});
+
+export const RenameContainerItemInputSchema = z.object({
+  organizationId: z.string().min(1),
+  resourceId: z.string().min(1),
+  containerId: z.string().optional(),
+  oldPath: z.string().min(1),
+  newPath: z.string().min(1),
 });
 
 export const DeleteContainerItemInputSchema = z.object({
@@ -63,11 +105,6 @@ export const SearchContainerFilesInputSchema = z.object({
   path: z.string().default("/"),
   query: z.string().min(1),
 });
-
-import {
-  containerBelongsToResource,
-  shellQuote,
-} from "../server/container-resolution.helper";
 
 export class ContainerFileManagerUseCase {
   constructor(
@@ -151,8 +188,9 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const safePath = shellQuote(input.path);
-    const command = `cd ${safePath} 2>/dev/null && for f in ./* ./.* ; do [ -e "$f" ] || [ -L "$f" ] || continue; [ "$f" = "./." ] || [ "$f" = "./.." ] && continue; name=\${f#./}; if [ -d "$f" ]; then type="directory"; elif [ -L "$f" ]; then type="symlink"; else type="file"; fi; stat_out=$(stat -c '%s|%a|%y' "$f" 2>/dev/null || echo "0|644|1970-01-01"); echo "$name|$type|$stat_out"; done`;
+    const normalizedPath = normalizeContainerPath(input.path);
+    const safePath = shellQuote(normalizedPath);
+    const command = `cd ${safePath} 2>/dev/null && for f in ./* ./.* ; do [ -e "$f" ] || [ -L "$f" ] || continue; [ "$f" = "./." ] || [ "$f" = "./.." ] && continue; name=\${f#./}; if [ -d "$f" ]; then type="directory"; elif [ -L "$f" ]; then type="symlink"; else type="file"; fi; stat_out=$(stat -c '%s|%a|%Y' "$f" 2>/dev/null || echo "0|644|0"); echo "$type|$stat_out|$name"; done`;
 
     const result = await this.docker.execContainerCommand(
       target,
@@ -168,20 +206,27 @@ export class ContainerFileManagerUseCase {
     for (const line of lines) {
       const parts = line.split("|");
       if (parts.length >= 5) {
-        const rawName = parts[0]?.replace(/^\.\//, "") || "";
-        const fileTypeRaw = parts[1]?.toLowerCase() || "";
-        const sizeBytes = Number.parseInt(parts[2] || "0", 10);
-        const permissions = parts[3] || "755";
-        const updatedAt = parts[4]?.split(".")[0] || new Date().toISOString();
+        const fileTypeRaw = parts[0]?.toLowerCase() || "";
+        const sizeBytes = Number.parseInt(parts[1] || "0", 10);
+        const permissions = parts[2] || "755";
+        const timestampSec = Number.parseInt(parts[3] || "0", 10);
+        const rawName = parts.slice(4).join("|").replace(/^\.\//, "") || "";
+
+        if (!rawName) continue;
 
         let type: FileExplorerItem["type"] = "file";
         if (fileTypeRaw.includes("directory")) type = "directory";
-        else if (fileTypeRaw.includes("symbolic link")) type = "symlink";
+        else if (fileTypeRaw.includes("symlink") || fileTypeRaw.includes("symbolic link")) type = "symlink";
 
         const itemPath =
-          input.path === "/"
+          normalizedPath === "/"
             ? `/${rawName}`
-            : `${input.path.replace(/\/$/, "")}/${rawName}`;
+            : `${normalizedPath.replace(/\/$/, "")}/${rawName}`;
+
+        const updatedAt =
+          timestampSec > 0
+            ? new Date(timestampSec * 1000).toISOString()
+            : new Date().toISOString();
 
         items.push({
           name: rawName,
@@ -210,7 +255,8 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const command = `cat -- ${shellQuote(input.path)}`;
+    const normalizedPath = normalizeContainerPath(input.path);
+    const command = `cat -- ${shellQuote(normalizedPath)}`;
 
     const result = await this.docker.execContainerCommand(
       target,
@@ -218,7 +264,7 @@ export class ContainerFileManagerUseCase {
       command,
     );
 
-    return { content: result.output || "", path: input.path };
+    return { content: result.output || "", path: normalizedPath };
   }
 
   async writeFile(
@@ -230,8 +276,17 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const base64Content = Buffer.from(input.content, "utf8").toString("base64");
-    const command = `echo ${shellQuote(base64Content)} | base64 -d > ${shellQuote(input.path)}`;
+    const normalizedPath = normalizeContainerPath(input.path);
+    const base64Content = input.isBase64
+      ? input.content
+      : Buffer.from(input.content, "utf8").toString("base64");
+
+    const safePath = shellQuote(normalizedPath);
+    const dirPath = shellQuote(
+      normalizedPath.substring(0, normalizedPath.lastIndexOf("/")) || "/",
+    );
+
+    const command = `mkdir -p -- ${dirPath} && printf '%s' ${shellQuote(base64Content)} | base64 -d > ${safePath}`;
 
     await this.docker.execContainerCommand(target, containerId, command);
 
@@ -247,15 +302,48 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
+    const parent = normalizeContainerPath(input.parentPath);
     const targetPath =
-      input.parentPath === "/"
-        ? `/${input.name}`
-        : `${input.parentPath.replace(/\/$/, "")}/${input.name}`;
+      parent === "/"
+        ? `/${input.name.replace(/^\//, "")}`
+        : `${parent.replace(/\/$/, "")}/${input.name.replace(/^\//, "")}`;
+
+    const safeTarget = shellQuote(targetPath);
+    const dirPath = shellQuote(
+      targetPath.substring(0, targetPath.lastIndexOf("/")) || "/",
+    );
 
     const command =
       input.type === "directory"
-        ? `mkdir -p -- ${shellQuote(targetPath)}`
-        : `touch -- ${shellQuote(targetPath)}`;
+        ? `mkdir -p -- ${safeTarget}`
+        : `mkdir -p -- ${dirPath} && touch -- ${safeTarget}`;
+
+    await this.docker.execContainerCommand(target, containerId, command);
+
+    return { success: true };
+  }
+
+  async renameItem(
+    input: z.infer<typeof RenameContainerItemInputSchema>,
+  ): Promise<{ success: boolean }> {
+    const { target, containerId } = await this.resolveTargetContainer(
+      input.organizationId,
+      input.resourceId,
+      input.containerId,
+    );
+
+    const oldNormalized = normalizeContainerPath(input.oldPath);
+    const newNormalized = normalizeContainerPath(input.newPath);
+
+    if (DANGEROUS_SYSTEM_PATHS.has(oldNormalized) || oldNormalized === "/") {
+      throw new Error("Renaming system root or system directory is forbidden for security.");
+    }
+
+    const newDir = shellQuote(
+      newNormalized.substring(0, newNormalized.lastIndexOf("/")) || "/",
+    );
+
+    const command = `mkdir -p -- ${newDir} && mv -f -- ${shellQuote(oldNormalized)} ${shellQuote(newNormalized)}`;
 
     await this.docker.execContainerCommand(target, containerId, command);
 
@@ -271,7 +359,12 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const command = `rm -rf -- ${shellQuote(input.path)}`;
+    const normalizedPath = normalizeContainerPath(input.path);
+    if (DANGEROUS_SYSTEM_PATHS.has(normalizedPath) || normalizedPath === "/") {
+      throw new Error("Deletion of system root or system directory is forbidden for security.");
+    }
+
+    const command = `rm -rf -- ${shellQuote(normalizedPath)}`;
 
     await this.docker.execContainerCommand(target, containerId, command);
 
@@ -287,8 +380,9 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
+    const normalizedPath = normalizeContainerPath(input.path);
     const safePattern = shellQuote(`*${input.query.replace(/[*?]/g, "")}*`);
-    const command = `find ${shellQuote(input.path)} -name ${safePattern} -maxdepth 4 2>/dev/null | head -n 50`;
+    const command = `find ${shellQuote(normalizedPath)} -name ${safePattern} -maxdepth 4 2>/dev/null | head -n 50`;
 
     const result = await this.docker.execContainerCommand(
       target,
@@ -345,3 +439,4 @@ export class ContainerFileManagerUseCase {
     };
   }
 }
+

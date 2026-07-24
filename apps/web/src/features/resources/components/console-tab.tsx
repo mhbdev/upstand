@@ -23,6 +23,7 @@ import { Spinner } from "@upstand/ui/components/spinner";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
+import { cleanDockerLogs } from "@/utils/clean-logs";
 import { TerminalEmulator } from "@/components/shared/terminal-emulator";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
@@ -65,7 +66,7 @@ export function ConsoleTab({
 
   const realLogs = useMemo(() => {
     if (!logsQuery.data) return [];
-    return logsQuery.data.trim().split("\n");
+    return cleanDockerLogs(logsQuery.data).trim().split("\n");
   }, [logsQuery.data]);
 
   const [selectedContainerId, setSelectedContainerId] = useState<string>("");

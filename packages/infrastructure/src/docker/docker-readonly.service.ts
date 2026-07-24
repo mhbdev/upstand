@@ -19,7 +19,7 @@ import type {
   DockerServiceSummary,
   DockerVolume,
 } from "@upstand/usecases/ports/docker";
-import { filterDockerLogs } from "@upstand/usecases/resource/docker-log-filter";
+import { cleanDockerLogs, filterDockerLogs } from "@upstand/usecases/resource/docker-log-filter";
 import type Docker from "dockerode";
 import { Client } from "ssh2";
 import { DockerCleanupService } from "./docker-cleanup.service";
@@ -501,10 +501,8 @@ export class DockerReadOnlyService implements DockerExecPort {
         : await this.docker
             .getService(request.serviceName as string)
             .logs(options);
-      const logs = Buffer.isBuffer(buffer)
-        ? buffer.toString("utf8")
-        : String(buffer);
-      return filterDockerLogs(logs, request);
+      const cleaned = cleanDockerLogs(buffer as Buffer | string);
+      return filterDockerLogs(cleaned, request);
     }
     const safeTail = Math.max(1, Math.min(10000, Number(request.tail) || 100));
     const safeSince = request.since
@@ -516,7 +514,8 @@ export class DockerReadOnlyService implements DockerExecPort {
     const command = request.containerId
       ? `docker logs --tail ${safeTail} --timestamps${safeSince} ${safeTarget}`
       : `docker service logs --tail ${safeTail} --timestamps${safeSince} ${safeTarget}`;
-    return filterDockerLogs(await this.executeRemote(target, command), request);
+    const remoteLogs = await this.executeRemote(target, command);
+    return filterDockerLogs(cleanDockerLogs(remoteLogs), request);
   }
 
   async getContainerStats(

@@ -28,6 +28,7 @@ import {
   applyComposeResourceConfig,
 } from "@upstand/usecases/resource/docker-compose-config";
 import {
+  cleanDockerLogs,
   type DockerLogLevel,
   filterDockerLogs,
 } from "@upstand/usecases/resource/docker-log-filter";
@@ -2389,23 +2390,8 @@ export class DockerService {
     }
   }
 
-  private cleanDockerLogs(buffer: Buffer): string {
-    let result = "";
-    let offset = 0;
-    while (offset < buffer.length) {
-      if (offset + 8 > buffer.length) break;
-      const size = buffer.readUInt32BE(offset + 4);
-      offset += 8;
-
-      if (offset + size > buffer.length) {
-        result += buffer.toString("utf8", offset);
-        break;
-      }
-
-      result += buffer.toString("utf8", offset, offset + size);
-      offset += size;
-    }
-    return result || buffer.toString("utf8");
+  private cleanDockerLogs(buffer: Buffer | string): string {
+    return cleanDockerLogs(buffer);
   }
 
   private async upsertService(

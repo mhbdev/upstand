@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { filterDockerLogs, getDockerLogLevel } from "./docker-log-filter";
+import { cleanDockerLogs, filterDockerLogs, getDockerLogLevel } from "./docker-log-filter";
 
 describe("Docker log filters", () => {
   test("classifies the dashboard log levels", () => {
@@ -20,4 +20,17 @@ describe("Docker log filters", () => {
       filterDockerLogs(logs, { search: "database", levels: ["error"] }),
     ).toBe("2026-01-01T00:00:01Z [error] database failed");
   });
+
+  test("cleans raw Docker multiplex headers and control character prefixes", () => {
+    const dirtyLogs = [
+      "!2026-07-23T20:39:02.479608351Z \t",
+      "\uFFFD2026-07-23T20:39:04.500683922Z 2026-07-23 20:39:04.500 UTC [309808] ERROR:  column \"description\" of relation \"project\" already exists",
+    ].join("\n");
+
+    const cleaned = cleanDockerLogs(dirtyLogs);
+    expect(cleaned).toContain("2026-07-23T20:39:02.479608351Z");
+    expect(cleaned).not.toContain("!");
+    expect(cleaned).not.toContain("\uFFFD");
+  });
 });
+
