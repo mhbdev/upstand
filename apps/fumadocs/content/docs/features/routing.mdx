@@ -73,18 +73,43 @@ The global Web Server settings page exposes a CodeMirror editor for:
 
 ---
 
-## 6. Atomic Validation & Safety
+## 6. Dynamic SSL & Caddy Ingress Architecture
 
-To prevent outages, Upstand validates all configurations before reloading Caddy:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Browser Client
+    participant Caddy as Caddy Reverse Proxy
+    participant ACME as Let's Encrypt / ACME CA
+    participant Swarm as Docker Swarm Overlay Network
+    participant App as Target Service Container
 
-<Mermaid 
-    chart="
+    Client->>Caddy: HTTPS Request (api.example.com)
+    alt Certificate Exists & Valid
+        Caddy->>Caddy: Terminate TLS (AES-GCM / ChaCha20)
+    else Certificate Missing / Expired
+        Caddy->>ACME: HTTP-01 / TLS-ALPN-01 ACME Challenge
+        ACME-->>Caddy: Issued Valid TLS Certificate
+        Caddy->>Caddy: Cache Cert in /etc/caddy/data
+    end
+    Caddy->>Swarm: Forward HTTP Request to Overlay Network (port 3000)
+    Swarm->>App: Deliver Request to Target Replica Container
+    App-->>Client: Stream Response Headers & Body
+```
+
+---
+
+## 7. Atomic Validation & Reload Safety
+
+To prevent web server downtime, Upstand validates all compiled Caddy configurations before applying them:
+
+```mermaid
 flowchart TD
-    User[Update Route] --> Compile[Compile Caddyfile]
+    User[Update Route / Domain Mapping] --> Compile[Compile Caddyfile Config]
     Compile --> Validate[Format & Dry-Run Validate Caddyfile]
-    Validate -->|Pass| Reload[Zero-Downtime Reload Caddy]
+    Validate -->|Pass| Reload[Zero-Downtime Reload Caddy Proxy]
     Validate -->|Fail| Restore[Restore Previous Working Caddyfile]
-    Restore --> Error[Report Validation Error to User]"
-/>
+    Restore --> Error[Report Validation Error to User]
+```
 
-If Caddy rejects the formatted configuration, the reload is aborted, the previous working file remains active, and the database mutation is rejected.
+If Caddy rejects the formatted configuration, the reload is aborted, the previous working configuration remains active, and the operation is safely rolled back.

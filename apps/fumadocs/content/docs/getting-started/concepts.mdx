@@ -3,71 +3,108 @@ title: Upstand concepts
 description: Understand the boundaries between organizations, projects, environments, resources, servers, and integrations.
 ---
 
-Upstand is an organization-scoped control plane for deploying and operating containerized workloads. The most reliable way to use it is to understand where each piece of configuration lives.
+Upstand is an organization-scoped control plane for deploying and operating containerized workloads. The most reliable way to use it is to understand where each piece of configuration lives and how system entities interact.
 
-## The resource hierarchy
+## The Resource Hierarchy
 
-```text
-Organization
-└── Project
-    └── Environment
-        ├── Application
-        ├── Docker Compose / Stack resource
-        └── Database
+```mermaid
+graph TD
+    Org["Organization Scope (Ownership & Security Boundary)"]
+    Proj1["Project: E-Commerce"]
+    Proj2["Project: Analytics Engine"]
+    EnvProd["Environment: Production (Protected)"]
+    EnvStag["Environment: Staging"]
+    App1["Application: Web Frontend (Next.js / Node)"]
+    App2["Application: API Gateway (Hono)"]
+    Db1["Database: PostgreSQL Cluster"]
+    Stack1["Compose Stack: Redis + Worker Queue"]
+
+    Org --> Proj1
+    Org --> Proj2
+    Proj1 --> EnvProd
+    Proj1 --> EnvStag
+    EnvProd --> App1
+    EnvProd --> App2
+    EnvProd --> Db1
+    EnvStag --> Stack1
 ```
 
 ### Organization
-
-An organization is the authorization and ownership boundary. Servers, projects, environments, resources, domains, certificates, credentials, Git providers, registries, storage destinations, tags, notification channels, and audit records are resolved through the active organization. Switching organizations changes the scope of the dashboard and API requests.
+An organization is the top-level authorization and security boundary. All infrastructure servers, projects, environments, resources, domains, SSL certificates, credentials, Git providers, container registries, storage destinations (S3), tags, notification channels, and audit records belong to an active organization. Switching organizations in the dashboard or API updates the scope of all operations.
 
 ### Project
-
-A project groups related delivery targets. It has a name and owns environments. Projects can be duplicated or deleted from **Workloads → Projects**; deletion is a destructive operation for the environments and resources below it.
+A project groups related delivery targets (e.g. `Main Product`, `Customer Portal`). It owns one or more environments. Projects can be created, updated, duplicated, or deleted from **Workloads → Projects**. Deleting a project is a destructive operation that cascades to all environments and resources within it.
 
 ### Environment
-
-An environment is a deployable stage within a project, such as `production`, `staging`, or `preview`. Environments have a slug, optional description, default/protected flags, optional parent environment, and optional shared variables. An environment can inherit variables from its parent when inheritance is enabled.
+An environment is a deployable stage within a project, such as `production`, `staging`, or `preview-pr-42`. 
+- **Properties**: Slugs, descriptions, protected status flags, parent environment links, and shared environment variables.
+- **Inheritance**: Environments can inherit environment variables from a parent environment when inheritance is toggled on, allowing global configuration (like API endpoint URLs) to propagate down.
 
 ### Resource
+Resources are the containerized workloads Upstand deploys and operates. The control plane manages three core resource types:
 
-Resources are the units Upstand deploys and operates. The dashboard currently creates three kinds:
+| Type | Purpose | Git Build | Custom Domains | Cron Tasks | Backups |
+| --- | --- | --- | --- | --- | --- |
+| **Application** | Standalone web service or worker container | Yes (Docker / Nixpacks / Compose) | Yes | Yes | N/A |
+| **Compose / Stack** | Multi-service Compose definitions | Optional | Yes | Yes | N/A |
+| **Database** | Managed database engine (PostgreSQL, MySQL, Redis, MongoDB, MariaDB) | No (Pre-built images) | No | No | Automated S3 / Local |
 
-| Type | Purpose | Git build | Domains | Cron tab |
-| --- | --- | --- | --- | --- |
-| Application | Build an application from Git or deploy an image | Yes | Yes | Yes |
-| Compose / Stack | Run a multi-service Compose definition | Optional | Yes | Yes |
-| Database | Run a supported database image with persistent storage | No | No | No |
+Every resource exposes runtime state, live metrics, container inspection, deployment history, streaming logs, environment variable secrets, and tag management.
 
-Every resource has environment variables, runtime state, deployments or operations, logs, container inspection, monitoring, backups where applicable, and tags. Applications and Compose resources also expose advanced runtime settings, domains, and schedules.
+---
 
-## Servers and placement
+## Server Roles & Workload Placement
 
-Servers are registered at organization scope and are assigned a role during setup:
+Upstand separates control plane management from compute workload execution across registered servers:
 
-- **Deploy server** runs Swarm workloads, Caddy ingress, and monitoring.
-- **Build server** runs Docker builds and monitoring. It is not a deployment target.
-- **Database server** runs database resources and monitoring. It cannot host application or Compose resources and cannot be used as an application build server.
+```mermaid
+graph LR
+    subgraph ControlPlane["Upstand Control Plane Node"]
+        API["Hono Server API"]
+        DB["PostgreSQL Meta DB"]
+        RedisQueue["Redis Task Queue"]
+        Workers["Background Workers"]
+    end
 
-An application may use a dedicated build server. Only application resources can use that dedicated build-server assignment.
+    subgraph BuildNodes["Dedicated Build Cluster"]
+        BuildServer["Build Server (Docker BuildKit Engine)"]
+    end
 
-## Configuration ownership
+    subgraph DeployNodes["Swarm Compute Cluster"]
+        DeployServer1["Manager Node (Caddy Ingress + Swarm)"]
+        DeployServer2["Worker Node (Application & Stack Workloads)"]
+    end
 
-Use the narrowest scope that matches the intent:
+    subgraph DbNodes["Dedicated Database Cluster"]
+        DbServer["Database Server (Isolated Volumes)"]
+    end
 
-- Organization settings: members, custom roles, API keys, provider integrations, certificates, notifications, and shared infrastructure.
-- Environment settings: shared variables and environment inheritance.
-- Resource settings: build configuration, runtime configuration, secrets, domains, deployment behavior, and schedules.
-- Repository configuration: optional `upstand.json` declarations for build, runtime, and cron settings.
+    API --> BuildServer
+    API --> DeployServer1
+    DeployServer1 <--> DeployServer2
+    API --> DbServer
+```
 
-Secrets are not treated as ordinary display data. API responses redact configured provider credentials and resource secrets; the UpGal model receives redacted configuration rather than raw secret values.
+Servers are registered at organization scope and assigned specialized operational roles:
 
-## A production workflow
+1. **Deploy Server**: Runs Docker Swarm workloads, Caddy reverse proxy ingress, overlay networking, and health metrics collection.
+2. **Build Server**: Offloads heavy Docker image compilations (BuildKit) away from production deployment nodes.
+3. **Database Server**: Dedicated compute node isolated for database engines with high I/O persistent disk volume mounts. Cannot host application or Compose stack resources.
 
-1. Create or select an organization.
-2. Add an SSH key and connect a server with the appropriate role.
-3. Create a project and environment; mark production as protected when it should receive extra review.
-4. Add Git, registry, and S3 integrations as needed.
-5. Create a resource, configure its build/runtime settings, environment variables, domains, and health checks.
-6. Deploy, inspect logs and metrics, configure backups and notifications, and verify the audit trail.
+---
 
-The rest of this documentation follows this same workflow.
+## Step-by-Step Production Setup Workflow
+
+Follow this step-by-step workflow to structure a production environment:
+
+1. **Create Organization**: Navigate to **Organization Settings** and verify your active organization.
+2. **Connect Infrastructure**: Navigate to **Servers → Add Server**. Generate an SSH key pair or attach an existing SSH credential, enter the server IP, and assign the `Deploy` role.
+3. **Configure Integrations**: Attach Git providers (GitHub, GitLab, Bitbucket, Gitea) and container registries under **Organization → Integrations**.
+4. **Build Project & Environment Hierarchy**:
+   - Go to **Workloads → Projects → Create Project**.
+   - Add environments (`production`, `staging`). Mark `production` as **Protected** to require explicit confirmation for destructive actions.
+5. **Deploy Resources**:
+   - Add an **Application** resource, select the Git repository, branch, and build method.
+   - Configure Environment Variables (using `${{env.VAR}}` references or direct keys).
+   - Assign custom domains, configure health checks, and click **Deploy**.
+6. **Verify Runtime**: Monitor deployment logs, inspect live container metrics, and configure backup schedules for databases.

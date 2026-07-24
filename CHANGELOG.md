@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.134 - 2026-07-24
+
+### Documentation & Architecture
+
+- **Comprehensive Fumadocs Overhaul & Mermaid Architecture Diagrams**: Completely revised, updated, and expanded all 34+ MDX documentation guides under `apps/fumadocs/content/docs`. Added Mermaid architectural diagrams for Docker Swarm node topology, dual-overlay network isolation (`upstand-network` shared ingress + `upstand-resource-<id>` isolated overlay), control-plane subsystem communication, zero-downtime deployment & rollback pipelines, database backup & restoration workflows, secret provider sync, and MCP / UpGal AI integration flows.
+- **Accurate Runtime Port Mappings**: Corrected self-hosting ingress architecture diagram port labels to match real runtime defaults (Server API: 3000, Web UI: 3001, Fumadocs: 4000).
+
 ## 0.1.133 - 2026-07-24
 
 ### Fixed

@@ -44,22 +44,27 @@ UpGal executes on the server using Vercel AI SDK's `ToolLoopAgent` and streams r
 - **Auto-run (Read-only)**: Inspection tools (e.g. listing resources, viewing container statistics, tailing logs) run automatically after verifying tenant permission.
 - **Approval Gates (Mutations)**: Destructive or mutative actions (creating projects/templates/tags, assigning tags, deploying apps/templates, stopping services, deleting resources, or pruning Docker state) require explicit user approval.
 
-<Mermaid 
-    chart="
+```mermaid
 sequenceDiagram
-    participant User as Administrator
-    participant UI as Dashboard Chat
-    participant Agent as UpGal Agent
-    participant UseCase as Domain Use Case
-    
-    User->>UI: 'Deploy my app'
-    UI->>Agent: Send message (authenticated context)
-    Agent->>UI: Requesting Approval to deploy 'app-123'
-    User->>UI: Clicks 'Approve' button
-    UI->>Agent: Approve token response
-    Agent->>UseCase: Call deploy()
-    UseCase->>UI: Stream success response"
-/>
+    autonumber
+    actor User as Administrator
+    participant UI as Dashboard Chat UI
+    participant Agent as UpGal AI Agent Loop
+    participant Auth as Capability Authorization
+    participant DB as Upstand System DB
+
+    User->>UI: "Deploy my app and clean unused Docker images"
+    UI->>Agent: Send Message (User Session & Org Scope)
+    Agent->>Auth: Evaluate User Capabilities (resource:update, docker:clean)
+    Auth-->>Agent: Capabilities Authorized
+
+    Agent->>UI: Stream Step: Requesting Approval to deploy 'app-123'
+    User->>UI: Clicks "Approve Action" Button
+    UI->>Agent: Send Signed Approval Response Token
+    Agent->>DB: Execute Mutation (Deploy App & Prune Images)
+    DB-->>Agent: Action Succeeded (Deployment Queued)
+    Agent-->>UI: Stream Final Response & Action Status
+```
 
 ---
 

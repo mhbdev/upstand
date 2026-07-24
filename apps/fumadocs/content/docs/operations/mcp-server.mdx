@@ -25,21 +25,33 @@ To connect an external MCP client to Upstand, you need:
 
 ---
 
-## 2. Model Context Protocol Endpoint Specifications
+Upstand's MCP server endpoint accepts standard JSON-RPC 2.0 requests over HTTP / SSE:
 
-Upstand's MCP server endpoint accepts standard JSON-RPC 2.0 requests over HTTP:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as External MCP Client (Cursor / Claude / Copilot)
+    participant Server as Hono API (/api/mcp)
+    participant Auth as API Key Authenticator
+    participant UpGal as UpGal Tool Handler
+    participant DB as Dashboard Approval Engine
 
-- **Endpoint**: `/api/mcp` (e.g. `https://upstand.your-domain.com/api/mcp`)
-- **Transport**: HTTP JSON-RPC 2.0 / Server-Sent Events (SSE)
-- **Headers**:
-  ```http
-  Authorization: Bearer <YOUR_UPSTAND_API_KEY>
-  Content-Type: application/json
-  ```
-- **Supported Protocol Methods**:
-  - `initialize`: Handshakes and returns server info (`upstand-upgal`).
-  - `tools/list`: Discovers available tools for querying infrastructure, projects, containers, servers, and deployments.
-  - `tools/call`: Executes the requested tool with validated arguments. Read operations run immediately; mutative operations generate an approval task in the Upstand dashboard.
+    Client->>Server: HTTP POST /api/mcp (jsonrpc: 2.0, method: initialize)
+    Server->>Auth: Verify Bearer / X-Api-Key Header
+    Auth-->>Server: Authenticated (Organization Scope)
+    Server-->>Client: Protocol Manifest (Version 2025-03-26)
+
+    Client->>Server: HTTP POST /api/mcp (method: tools/call, name: list_projects)
+    Server->>UpGal: Dispatch Tool Execution (list_projects)
+    alt Read-Only Tool Operation
+        UpGal-->>Server: JSON Tool Result
+        Server-->>Client: JSON-RPC Response (result.content)
+    else Mutating Tool Operation (Create / Delete / Deploy)
+        UpGal->>DB: Create Mutating Approval Task
+        UpGal-->>Server: Approval Required Response
+        Server-->>Client: "Mutating MCP tools must be approved through the UpGal dashboard."
+    end
+```
 
 ---
 

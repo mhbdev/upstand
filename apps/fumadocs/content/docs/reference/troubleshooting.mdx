@@ -7,6 +7,30 @@ Use these reference charts and commands to diagnose and recover from common Upst
 
 ---
 
+## Diagnostic & Troubleshooting Decision Tree
+
+```mermaid
+flowchart TD
+    Issue[Encountered Issue / Incident] --> Category{Identify Incident Category}
+
+    Category -->|Sign In / Cookie Issues| AuthTree[1. Login Redirect Loops]
+    AuthTree --> CookieFix[Verify Sibling Subdomains & BETTER_AUTH_URL]
+
+    Category -->|Container Startup Failure| ServiceTree[2. Service Startup Failures]
+    ServiceTree --> LogCheck[Run: docker service ps upstand_server]
+
+    Category -->|SSL / HTTPS Certificate Error| CertTree[3. Caddy Certificate Failures]
+    CertTree --> PortCheck[Check Ports 80 & 443 with ss -ltnp]
+
+    Category -->|Build Job Pending / Stuck| QueueTree[4. Stuck Build Queues]
+    QueueTree --> QueueCheck[Inspect Redis Queue & docker node ls]
+
+    Category -->|Lost Admin 2FA Token| TwoFATree[6. Reset 2FA CLI]
+    TwoFATree --> ResetCLI[Run CLI: docker exec ... reset-2fa]
+```
+
+---
+
 ## 1. Login Redirect Loops
 
 **Symptom**: Signing in successfully redirects you back to the sign-in page immediately, or session cookies are rejected.

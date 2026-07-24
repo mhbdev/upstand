@@ -7,33 +7,54 @@ Upstand distinguishes between two deployment topologies: **Remote Servers** (iso
 
 ---
 
-## 1. Remote Server Architecture
+## 1. Remote Server & Cluster Topology
 
-Remote servers are independent Docker engines. Upstand communicates with them entirely over secure SSH connections:
-
-- **Socket Isolation**: Remote servers do not join the control-plane Swarm cluster. This prevents network overlaps, Raft database replication lag, and application container scheduling issues.
-- **SSH Transport**: The Docker CLI on the control plane uses ephemeral SSH configurations (`ssh://user@ip`) to deploy services and inspect states.
-- **No Password Storage**: Upstand relies exclusively on SSH private key authentication. Root passwords are never stored.
-
-<Mermaid 
-    chart="
-flowchart LR
-    Control[Upstand Manager] -->|SSH Transport| Server1[Remote Server 1]
-    Control -->|SSH Transport| Server2[Remote Server 2]
-    Control -->|Raft / Swarm overlay| Node1[Cluster Worker Node]
-    
-    subgraph Isolated Workloads
-    Server1
-    Server2
+```mermaid
+flowchart TD
+    subgraph ControlPlane["Upstand Control Plane Cluster"]
+        Manager1["Swarm Leader (Manager 1)"]
+        Manager2["Swarm Manager 2"]
+        Raft[("Raft Consensus State")]
+        Manager1 <-->|2377 / Raft| Manager2
+        Manager1 <--> Raft
     end
-    
-    subgraph Clustered Workloads
-    Control
-    Node1
-    end"
-/>
+
+    subgraph SwarmWorkers["Managed Swarm Workers"]
+        Worker1["Swarm Worker Node A"]
+        Worker2["Swarm Worker Node B"]
+        Manager1 -->|Swarm Task Scheduling| Worker1
+        Manager1 -->|Swarm Task Scheduling| Worker2
+    end
+
+    subgraph RemoteHosts["Isolated Remote Docker Servers"]
+        Remote1["Remote Host 1 (Production US)"]
+        Remote2["Remote Host 2 (Staging EU)"]
+        Manager1 -->|Ephemeral SSH / ssh://| Remote1
+        Manager1 -->|Ephemeral SSH / ssh://| Remote2
+    end
+```
 
 ---
+
+## 2. Server Network Interaction Architecture
+
+```mermaid
+graph LR
+    subgraph Ingress["Caddy Reverse Proxy Ingress"]
+        CaddyProxy["Caddy Ingress Container"]
+    end
+
+    subgraph OverlayNet["upstand-overlay Network (Encrypted VXLAN)"]
+        AppSvc1["Application Service Replica 1"]
+        AppSvc2["Application Service Replica 2"]
+        DbSvc["Database Service (Postgres/Redis)"]
+    end
+
+    CaddyProxy -->|HTTP Routing| AppSvc1
+    CaddyProxy -->|HTTP Routing| AppSvc2
+    AppSvc1 -->|Internal TCP| DbSvc
+    AppSvc2 -->|Internal TCP| DbSvc
+```
 
 ## 2. Remote Server Setup Tutorial
 

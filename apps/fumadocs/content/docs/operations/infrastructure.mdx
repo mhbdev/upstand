@@ -3,13 +3,59 @@ title: Infrastructure operations
 description: Provision hosts, manage Docker Swarm, inspect Docker inventory, operate Caddy, and maintain the control plane safely.
 ---
 
-## Remote server lifecycle
+Upstand provides operational management for compute hosts, Docker Swarm clusters, Caddy reverse proxy ingress, and background monitoring workers.
+
+---
+
+## Subsystem Control-Plane Architecture
+
+```mermaid
+flowchart TD
+    subgraph ControlPlane["Upstand Control Plane (Hono + Next.js)"]
+        UI["Web Dashboard & tRPC Routes"]
+        APIServer["Hono API Engine"]
+        Orchestration["Resource Orchestrator & RBAC Guard"]
+        UI --> APIServer
+        APIServer --> Orchestration
+    end
+
+    subgraph DataStore["Persistence & Messaging"]
+        Postgres[(PostgreSQL Meta DB)]
+        Redis[(Redis BullMQ Queues)]
+        Orchestration --> Postgres
+        Orchestration --> Redis
+    end
+
+    subgraph WorkerPool["Background Worker Subsystems"]
+        DeployWorker["Deployment Worker (Docker API / SSH)"]
+        BackupWorker["Backup Worker (S3 Streaming Vault)"]
+        CronWorker["Cron Job & Rotation Worker"]
+        NotificationWorker["Notification & Audit Dispatcher"]
+        Redis --> DeployWorker
+        Redis --> BackupWorker
+        Redis --> CronWorker
+        Redis --> NotificationWorker
+    end
+
+    subgraph TargetHosts["Infrastructure Compute Hosts"]
+        Host1["Manager Node (Caddy Ingress + Swarm)"]
+        Host2["Worker Node (Container Workloads)"]
+        Host3["Remote Server (SSH Isolated Host)"]
+        DeployWorker -->|Docker Socket| Host1
+        DeployWorker -->|Docker Overlay| Host2
+        DeployWorker -->|SSH Connection| Host3
+    end
+```
+
+---
+
+## Remote Server Lifecycle
 
 Use **Infrastructure → Remote Servers** to add a host with a name, SSH address/port, username, and organization SSH key. Choose a role before provisioning:
 
-- Deploy: Swarm, Caddy ingress, and monitoring.
-- Build: Docker build capacity and monitoring.
-- Database: Swarm database capacity and monitoring.
+- **Deploy**: Swarm, Caddy ingress, and monitoring.
+- **Build**: Docker build capacity and monitoring.
+- **Database**: Swarm database capacity and monitoring.
 
 The wizard saves connection details, runs setup, and reports status. Removing a server registration does not delete workloads already present on the host; it removes the server from Upstand's organization inventory.
 

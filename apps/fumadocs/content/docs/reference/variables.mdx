@@ -5,7 +5,31 @@ description: Variables validated by the Upstand server, web console, documentati
 
 The server validates its environment with `packages/env/src/server.ts`; the web console validates its public variables with `packages/env/src/web.ts`. Optional values have defaults or enable specific integrations. A variable mentioned in a deployment file is not necessarily read by the application, so use this page together with the installer and compose files for your deployment mode.
 
-## Server runtime
+---
+
+## Variable Resolution & Inheritance Hierarchy
+
+Upstand resolves environment variables across multiple scope levels, where lower levels override upper levels:
+
+```mermaid
+graph TD
+    OrgScope["1. Organization Shared Secrets / Integrations"]
+    EnvScope["2. Environment Shared Variables (e.g. Production / Staging)"]
+    ResourceScope["3. Resource Specific Variables & Secrets"]
+    UpstandJson["4. Repository Declarations (upstand.json)"]
+    RuntimeProcess["5. Container Runtime Environment Injection"]
+
+    OrgScope --> EnvScope
+    EnvScope --> ResourceScope
+    ResourceScope --> UpstandJson
+    UpstandJson --> RuntimeProcess
+```
+
+The expansion engine supports dynamic references like `${{env.API_URL}}` or `${{project.SECRET_KEY}}`, allowing resources within the same environment to share endpoints dynamically.
+
+---
+
+## Server Runtime Variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |

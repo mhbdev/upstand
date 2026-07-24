@@ -7,6 +7,31 @@ Upstand provides multiple options to apply updates, from automated background up
 
 ---
 
+## Update & Migration Lifecycle Pipeline
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Admin as Admin / Auto-Update Worker
+    participant API as Upstand Control Plane
+    participant GH as GitHub Release Registry
+    participant DB as PostgreSQL Database
+    participant Swarm as Docker Swarm Cluster
+
+    Admin->>API: Trigger Update Check / Polling Job
+    API->>GH: Query Latest Image Digests & Release Tags
+    GH-->>API: Return Release Manifest (v0.1.133)
+    API->>DB: Execute Drizzle Migration Check (runDatabaseMigrations)
+    DB-->>API: Migrations Applied (Idempotent Schema Check)
+    API->>Swarm: Trigger Rolling Stack Update (docker stack deploy)
+    Swarm->>Swarm: Spin up New Container Replicas
+    Swarm->>Swarm: Health Check Passes (/health/ready)
+    Swarm->>Swarm: Terminate Legacy Containers (Zero Downtime)
+    API-->>Admin: Update Completed Successfully
+```
+
+---
+
 ## Update Channels
 
 Upstand has two main distribution channels:

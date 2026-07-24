@@ -7,11 +7,56 @@ This guide outlines the production installation process, environment variable op
 
 ---
 
+## Infrastructure Architecture
+
+Upstand's production self-hosting architecture separates the control plane services, ingress proxy, persistent volumes, and compute nodes into an isolated Docker Swarm network:
+
+```mermaid
+graph TD
+    subgraph Internet["Public Network"]
+        Client["Browser Client / UpGal AI / MCP Tool"]
+        DNS["DNS Records: app.example.com & api.example.com"]
+    end
+
+    subgraph Host["Production Host / Virtual Machine"]
+        subgraph IngressLayer["Ingress Proxy (Port 80 / 443)"]
+            Caddy["Caddy Reverse Proxy (Automatic TLS / ACME)"]
+        end
+
+        subgraph SwarmCluster["Docker Swarm Stack: upstand"]
+            WebUI["upstand-web (Next.js Dashboard)"]
+            ServerAPI["upstand-server (Hono API & Workers)"]
+            Fumadocs["upstand-docs (Fumadocs Engine)"]
+            DB[(PostgreSQL 16 Engine)]
+            Cache[(Redis 7 Cache & Task Queue)]
+        end
+
+        subgraph StorageLayer["Persistent Host Volumes"]
+            VolData["/etc/upstand/data (App Data)"]
+            VolSecrets["/etc/upstand/secrets (0600 File Vault)"]
+            VolCaddy["caddy_data (TLS Certs)"]
+        end
+    end
+
+    Client --> DNS
+    DNS --> Caddy
+    Caddy -->|Proxy Server API (port 3000)| ServerAPI
+    Caddy -->|Proxy Web Dashboard (port 3001)| WebUI
+    Caddy -->|Proxy Fumadocs (port 4000)| Fumadocs
+    ServerAPI --> DB
+    ServerAPI --> Cache
+    DB --> VolData
+    ServerAPI --> VolSecrets
+    Caddy --> VolCaddy
+```
+
+---
+
 ## Server Prerequisites
 
 Prepare a fresh Linux Virtual Machine matching these requirements:
 
-1. **Host OS**: Ubuntu 22.04 LTS or Debian 12 (Bookworm) is recommended.
+1. **Host OS**: Ubuntu 24.04 LTS, Ubuntu 22.04 LTS, or Debian 12 (Bookworm) is recommended.
 2. **Hardware**: At least 2 vCPUs, 4 GB of RAM, and 30 GB of SSD storage.
 3. **DNS Configuration**: Configure two A records pointing to your server's public IP:
    - `app.example.com` (for the dashboard UI)
@@ -25,10 +70,10 @@ Prepare a fresh Linux Virtual Machine matching these requirements:
 
 ## Installation Modes
 
-The Upstand installer support two compilation strategies:
+The Upstand installer supports two compilation strategies:
 
 - **Release Images (Recommended)**: Pulls immutable pre-built images from the GitHub Container Registry (`ghcr.io`). Highly recommended for production stability and repeatability.
-- **GitHub Source Build**: Clones the public `@upstand` repository directly onto your manager and builds the Docker images locally. Best for evaluation or testing local patches.
+- **GitHub Source Build**: Clones the public `@upstand` repository directly onto your manager node and builds the Docker images locally. Best for evaluation or testing local patches.
 
 ---
 

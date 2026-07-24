@@ -13,28 +13,26 @@ Applications build from Git repositories (GitHub, GitLab, Bitbucket, Gitea, or g
 
 ### Build & Deployment Pipeline
 
-<Mermaid 
-    chart="
+```mermaid
 sequenceDiagram
     autonumber
     actor User as User / Webhook
-    participant API as Hono API
+    participant API as Hono API Controller
     participant Queue as Redis Queue (BullMQ)
-    participant Worker as Deployment Worker
+    participant Worker as Deployment Worker Queue
     participant Swarm as Docker Swarm Engine
-    participant Caddy as Caddy Proxy
+    participant Caddy as Caddy Reverse Proxy
 
-    User->>API: Trigger Build (Git Push / Dashboard)
-    API->>Queue: Enqueue Job (deployments-queue-<nodeId>)
+    User->>API: Trigger Build (Git Push / Webhook / Dashboard)
+    API->>Queue: Enqueue Build Job (deployments-queue-<nodeId>)
     Queue->>Worker: Pick Job & Acquire Resource Lock
     Worker->>Worker: Clone Git Repo & Execute Builder (Dockerfile / Nixpacks)
     Worker->>Swarm: Push Image & Perform Rolling Service Update
-    Worker->>Caddy: Compile & Dry-Run Validate Caddyfile
+    Worker->>Caddy: Compile & Dry-Run Validate Caddyfile Configuration
     Caddy-->>Worker: Dry-Run Passed -> Apply Atomic Reload
     Worker->>Queue: Release Resource Lock & Mark Deployment Complete
-    Worker->>User: Notify Status (WebSocket / Webhook)
-"
-/>
+    Worker->>User: Notify Deployment Status (WebSocket / Webhook)
+```
 
 ### Serialization & Concurrency
 - **Build Queues**: Each server node hosts an isolated build queue (`deployments-queue-<nodeId>`).
