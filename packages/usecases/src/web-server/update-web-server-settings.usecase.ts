@@ -28,6 +28,7 @@ export const AccessLogCleanupCronSchema = z
 
 export const UpdateWebServerSettingsInputSchema = z.object({
   letsEncryptEmail: z.email().nullable().optional(),
+  cloudflareApiToken: z.string().nullable().optional(),
   httpPort: z.number().int().min(1).max(65535).optional(),
   httpsPort: z.number().int().min(1).max(65535).optional(),
   enableHttp3: z.boolean().optional(),
@@ -63,6 +64,8 @@ export class UpdateWebServerSettingsUseCase {
     const patch: Partial<WebServerSettings> = {};
     if (input.letsEncryptEmail !== undefined)
       patch.letsEncryptEmail = input.letsEncryptEmail;
+    if (input.cloudflareApiToken !== undefined)
+      patch.cloudflareApiToken = input.cloudflareApiToken;
     if (input.httpPort !== undefined) patch.httpPort = input.httpPort;
     if (input.httpsPort !== undefined) patch.httpsPort = input.httpsPort;
     if (input.enableHttp3 !== undefined) patch.enableHttp3 = input.enableHttp3;

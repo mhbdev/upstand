@@ -96,6 +96,7 @@ export default function WebServerDashboard(_props: {
   const organizationId = organizationState.organizationId as string;
   // Database Web Server settings
   const [email, setEmail] = useState("");
+  const [cloudflareApiToken, setCloudflareApiToken] = useState("");
   const [httpPort, setHttpPort] = useState(80);
   const [httpsPort, setHttpsPort] = useState(443);
   const [enableHttp3, setEnableHttp3] = useState(true);
@@ -216,6 +217,7 @@ export default function WebServerDashboard(_props: {
   useEffect(() => {
     if (info?.settings && !editingSettings) {
       setEmail(info.settings.letsEncryptEmail || "");
+      setCloudflareApiToken(info.settings.cloudflareApiToken || "");
       setHttpPort(info.settings.httpPort);
       setHttpsPort(info.settings.httpsPort);
       setEnableHttp3(info.settings.enableHttp3);
@@ -513,6 +515,7 @@ export default function WebServerDashboard(_props: {
     e.preventDefault();
     updateSettingsMutation.mutate({
       letsEncryptEmail: email.trim() || null,
+      cloudflareApiToken: cloudflareApiToken.trim() || null,
       httpPort,
       httpsPort,
       enableHttp3,
@@ -1253,8 +1256,26 @@ export default function WebServerDashboard(_props: {
                         placeholder="e.g. ssl-admin@yourdomain.com"
                       />
                       <p className="text-[11px] text-muted-foreground">
-                        Let's Encrypt will notify this email address about
+                        Let&apos;s Encrypt will notify this email address about
                         certificate renewals or issues.
+                      </p>
+                    </div>
+
+                    {/* Cloudflare API Token */}
+                    <div className="space-y-2">
+                      <Label htmlFor="cloudflare-api-token" className="text-xs">
+                        Cloudflare API Token (for Wildcard DNS-01 SSL)
+                      </Label>
+                      <Input
+                        id="cloudflare-api-token"
+                        type="password"
+                        value={cloudflareApiToken}
+                        onChange={(e) => setCloudflareApiToken(e.target.value)}
+                        placeholder="e.g. your-cloudflare-api-token"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Used by Caddy to perform DNS-01 ACME challenges for
+                        wildcard domains (*.example.com).
                       </p>
                     </div>
 

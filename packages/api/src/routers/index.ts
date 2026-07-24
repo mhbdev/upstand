@@ -7,6 +7,7 @@ import { authRouter } from "./auth.router";
 import { backupRouter } from "./backup.router";
 import { certificateRouter } from "./certificate.router";
 import { composeRouter } from "./compose.router";
+import { containerFileManagerRouter } from "./container-file-manager.router";
 import { customRoleRouter } from "./custom-role.router";
 import { databaseRouter } from "./database.router";
 import { deploymentRouter } from "./deployment.router";
@@ -70,6 +71,7 @@ export const appRouter = router({
   scim: scimRouter,
   schedule: scheduleRouter,
   sso: ssoRouter,
+  containerFileManager: containerFileManagerRouter,
   secret: secretRouter,
 });
 

@@ -148,6 +148,20 @@ export const ResourceAdvancedConfigSchema = z.object({
       steps: [],
       automaticRollback: true,
     }),
+  preDeployHook: z
+    .object({
+      command: z.string().trim().max(1024).optional(),
+      enabled: z.boolean().default(false),
+      timeoutSeconds: z.number().int().min(10).max(1800).default(300),
+    })
+    .default({ enabled: false, timeoutSeconds: 300 }),
+  postDeployHook: z
+    .object({
+      command: z.string().trim().max(1024).optional(),
+      enabled: z.boolean().default(false),
+      timeoutSeconds: z.number().int().min(10).max(1800).default(300),
+    })
+    .default({ enabled: false, timeoutSeconds: 300 }),
   databaseReplication: z
     .object({
       enabled: z.boolean().default(false),

@@ -151,12 +151,12 @@ export function extractAndParametrizeEnvVars(composeFile: string): {
  * the container. Unresolvable references evaluate to an empty string.
  */
 
-/** Regex that matches ${{project.VAR_NAME}} with optional surrounding spaces. */
+/** Regex that matches ${{project.VAR_NAME}} or ${{env.VAR_NAME}} with optional surrounding spaces. */
 const PROJECT_VAR_PATTERN =
-  /\$\{\{\s*project\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+  /\$\{\{\s*(?:project|env)\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
 
 /**
- * Substitutes all `${{project.VAR_NAME}}` placeholders found in the *values*
+ * Substitutes all `${{project.VAR_NAME}}` or `${{env.VAR_NAME}}` placeholders found in the *values*
  * of `resourceEnvVars` with the corresponding value from `projectEnvVars`.
  * Placeholders that have no matching project variable resolve to an empty string.
  *

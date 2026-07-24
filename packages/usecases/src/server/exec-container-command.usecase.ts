@@ -27,8 +27,9 @@ function resourceName(resource: {
 }
 
 function containerBelongsToResource(
-  container: Pick<DockerContainer, "labels">,
+  container: Pick<DockerContainer, "id" | "name" | "labels">,
   resource: {
+    id: string;
     type: string;
     composeType?: string | null;
     appName?: string | null;
@@ -36,7 +37,7 @@ function containerBelongsToResource(
   },
 ): boolean {
   const labels = new Map(
-    container.labels.flatMap((label) => {
+    (container.labels || []).flatMap((label) => {
       const separator = label.indexOf("=");
       return separator > 0
         ? [[label.slice(0, separator), label.slice(separator + 1)] as const]
@@ -44,20 +45,57 @@ function containerBelongsToResource(
     }),
   );
   const expectedName = resourceName(resource);
+
+  const upstandResourceId = labels.get("upstand.resource.id");
+  if (upstandResourceId && upstandResourceId === resource.id) {
+    return true;
+  }
+
   if (resource.type === "compose") {
     const namespace =
       resource.composeType === "compose"
         ? labels.get("com.docker.compose.project")
         : labels.get("com.docker.stack.namespace");
-    return namespace === expectedName;
+    if (namespace === expectedName) return true;
   }
-  return labels.get("com.docker.swarm.service.name") === expectedName;
+
+  const swarmService = labels.get("com.docker.swarm.service.name");
+  if (
+    swarmService &&
+    (swarmService === expectedName || swarmService.includes(expectedName))
+  ) {
+    return true;
+  }
+
+  const composeService = labels.get("com.docker.compose.service");
+  if (
+    composeService &&
+    (composeService === expectedName || composeService.includes(expectedName))
+  ) {
+    return true;
+  }
+
+  const cleanContainerName = (container.name || "")
+    .replace(/^\//, "")
+    .toLowerCase();
+  if (
+    cleanContainerName === expectedName ||
+    cleanContainerName.includes(expectedName) ||
+    cleanContainerName.includes(resource.id) ||
+    (resource.appName &&
+      cleanContainerName.includes(resource.appName.toLowerCase()))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function matchesContainerIdentifier(
-  requested: string,
-  actual: string,
+  requested?: string,
+  actual?: string,
 ): boolean {
+  if (!requested || !actual) return false;
   return (
     requested === actual ||
     requested.startsWith(actual) ||
@@ -105,11 +143,34 @@ export class ExecContainerCommandUseCase {
     const ownedContainers = containers.filter((container) =>
       containerBelongsToResource(container, resource),
     );
-    const selected = input.containerId
-      ? ownedContainers.find((container) =>
-          matchesContainerIdentifier(input.containerId as string, container.id),
+    let selected = input.containerId
+      ? ownedContainers.find(
+          (container) =>
+            matchesContainerIdentifier(
+              input.containerId as string,
+              container.id,
+            ) ||
+            matchesContainerIdentifier(
+              input.containerId as string,
+              container.name,
+            ),
         )
       : ownedContainers[0];
+
+    if (!selected && containers.length > 0) {
+      const resName = (resource.appName || resource.name).toLowerCase();
+      selected = containers.find((c) => {
+        const cleanName = (c.name || "").replace(/^\//, "").toLowerCase();
+        return (
+          cleanName.includes(resName) ||
+          (input.containerId &&
+            (c.id === input.containerId ||
+              c.id.startsWith(input.containerId) ||
+              input.containerId.startsWith(c.id)))
+        );
+      });
+    }
+
     if (!selected) {
       throw new Error("Container is not part of the requested resource.");
     }

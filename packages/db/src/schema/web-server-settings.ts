@@ -9,6 +9,7 @@ import {
 export const webServerSettings = pgTable("web_server_settings", {
   id: text("id").primaryKey(), // always 'global'
   letsEncryptEmail: text("lets_encrypt_email"),
+  cloudflareApiToken: text("cloudflare_api_token"),
   httpPort: integer("http_port").default(80).notNull(),
   httpsPort: integer("https_port").default(443).notNull(),
   enableHttp3: boolean("enable_http3").default(true).notNull(),

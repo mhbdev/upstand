@@ -15,7 +15,6 @@ import {
 import {
   GetDockerInventoryUseCaseToken,
   UnitOfWorkToken,
-  UpdateResourceUseCaseToken,
 } from "@upstand/usecases/tokens";
 import type { Hono } from "hono";
 import { z } from "zod";
@@ -161,11 +160,12 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
     const filename = file.name.toLowerCase();
     if (
       !filename.endsWith(".zip") &&
+      !filename.endsWith(".tar") &&
       !filename.endsWith(".tar.gz") &&
       !filename.endsWith(".tgz")
     ) {
       return c.json(
-        { error: "Only .zip, .tar.gz, and .tgz archives are supported" },
+        { error: "Only .zip, .tar, .tar.gz, and .tgz archives are supported" },
         400,
       );
     }
@@ -194,6 +194,8 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
     } catch (error) {
       const status =
         error instanceof ApplicationArchiveValidationError ? 400 : 500;
+      const errorMessage =
+        error instanceof Error ? error.message : "Extraction failed";
       logRequestError(requestLog, error, {
         message: "Application archive extraction failed",
         resourceId,
@@ -201,10 +203,7 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
       });
       return c.json(
         {
-          error:
-            status === 400
-              ? "Invalid application archive"
-              : "Extraction failed",
+          error: errorMessage,
         },
         status,
       );
@@ -212,8 +211,7 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
       fs.rmSync(archivePath, { force: true });
     }
 
-    await scope.resolve(UpdateResourceUseCaseToken).execute({
-      id: resourceId,
+    await uow.resourceRepository.updateById(resourceId, {
       provider: "drop",
     });
 

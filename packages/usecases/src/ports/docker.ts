@@ -141,6 +141,11 @@ export interface DockerServicePort {
     resource: Resource,
     serviceNameOverride?: string,
   ): Promise<boolean>;
+  execContainerCommand?(
+    target: any,
+    serviceName: string,
+    command: string,
+  ): Promise<{ output?: string; stderr?: string; exitCode?: number }>;
   controlContainer(
     resource: Resource,
     containerId: string,
@@ -183,6 +188,7 @@ export type DockerDeploymentPort = Pick<
   | "transferImage"
   | "configureDatabaseReplication"
   | "serviceExists"
+  | "execContainerCommand"
 >;
 export type DockerResourceReadPort = Pick<
   DockerServicePort,

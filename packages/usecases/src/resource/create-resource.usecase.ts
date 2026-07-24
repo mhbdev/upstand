@@ -179,6 +179,22 @@ export class CreateResourceUseCase {
         }
       }
 
+      if (env.IS_CLOUD) {
+        if (!input.serverId || ["local", "manager"].includes(input.serverId)) {
+          throw new ValidationError(
+            "Local server deployments are disabled in Cloud mode. Please select a valid remote server.",
+          );
+        }
+        if (
+          input.buildServerId &&
+          ["local", "manager"].includes(input.buildServerId)
+        ) {
+          throw new ValidationError(
+            "Local build server operations are disabled in Cloud mode. Please select a valid remote server.",
+          );
+        }
+      }
+
       if (input.buildServerId) {
         assertResourceCanUseBuildServer(input.type);
       }

@@ -199,6 +199,24 @@ export function HealthcheckDeploymentCard({
       ...config.databaseReplication,
       ...partial,
     });
+  const updatePreDeployHook = (
+    partial: Partial<NonNullable<ResourceAdvancedConfig["preDeployHook"]>>,
+  ) =>
+    onChange("preDeployHook", {
+      enabled: config.preDeployHook?.enabled ?? false,
+      command: config.preDeployHook?.command ?? "",
+      timeoutSeconds: config.preDeployHook?.timeoutSeconds ?? 300,
+      ...partial,
+    });
+  const updatePostDeployHook = (
+    partial: Partial<NonNullable<ResourceAdvancedConfig["postDeployHook"]>>,
+  ) =>
+    onChange("postDeployHook", {
+      enabled: config.postDeployHook?.enabled ?? false,
+      command: config.postDeployHook?.command ?? "",
+      timeoutSeconds: config.postDeployHook?.timeoutSeconds ?? 300,
+      ...partial,
+    });
 
   return (
     <Card>
@@ -472,6 +490,74 @@ export function HealthcheckDeploymentCard({
               </div>
             )}
           </Field>
+        )}
+
+        {resourceType !== "database" && (
+          <>
+            <Field className="border-t pt-4">
+              <FieldLabel>Pre-Deploy Hook Command</FieldLabel>
+              <FieldDescription>
+                Command executed inside the container before switching live
+                traffic. A non-zero exit code aborts the deployment and triggers
+                an automatic rollback (e.g. <code>npx prisma db push</code> or{" "}
+                <code>rails db:migrate</code>).
+              </FieldDescription>
+              <div className="mb-2 flex items-center gap-3">
+                <Switch
+                  checked={config.preDeployHook?.enabled ?? false}
+                  onCheckedChange={(enabled) =>
+                    updatePreDeployHook({
+                      enabled,
+                    })
+                  }
+                />
+                <span className="text-sm">Enable Pre-Deploy Hook</span>
+              </div>
+              {config.preDeployHook?.enabled && (
+                <Input
+                  placeholder="e.g. npx prisma db push"
+                  value={config.preDeployHook?.command ?? ""}
+                  onChange={(e) =>
+                    updatePreDeployHook({
+                      command: e.target.value,
+                      enabled: true,
+                    })
+                  }
+                />
+              )}
+            </Field>
+
+            <Field className="border-t pt-4">
+              <FieldLabel>Post-Deploy Hook Command</FieldLabel>
+              <FieldDescription>
+                Command executed inside the container after healthchecks pass
+                and live traffic is active (e.g. <code>npm run seed</code>).
+              </FieldDescription>
+              <div className="mb-2 flex items-center gap-3">
+                <Switch
+                  checked={config.postDeployHook?.enabled ?? false}
+                  onCheckedChange={(enabled) =>
+                    updatePostDeployHook({
+                      enabled,
+                    })
+                  }
+                />
+                <span className="text-sm">Enable Post-Deploy Hook</span>
+              </div>
+              {config.postDeployHook?.enabled && (
+                <Input
+                  placeholder="e.g. npm run seed"
+                  value={config.postDeployHook?.command ?? ""}
+                  onChange={(e) =>
+                    updatePostDeployHook({
+                      command: e.target.value,
+                      enabled: true,
+                    })
+                  }
+                />
+              )}
+            </Field>
+          </>
         )}
       </CardContent>
     </Card>

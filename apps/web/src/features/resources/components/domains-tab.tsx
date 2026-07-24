@@ -70,7 +70,7 @@ type DomainMapping = {
   port: number;
   serviceName?: string;
   https: boolean;
-  certificateType: "letsencrypt" | "internal" | "custom";
+  certificateType: "letsencrypt" | "internal" | "custom" | "cloudflare";
   certificateId?: string;
   middlewares: string[];
   redirectTo?: string;
@@ -186,7 +186,9 @@ const parseDomainMappings = (
               ? "internal"
               : mapping.certificateType === "custom"
                 ? "custom"
-                : "letsencrypt",
+                : mapping.certificateType === "cloudflare"
+                  ? "cloudflare"
+                  : "letsencrypt",
           certificateId:
             typeof mapping.certificateId === "string"
               ? mapping.certificateId
@@ -442,7 +444,12 @@ export function DomainsTab({
           .startsWith("/", "Internal path must start with '/'"),
         stripPath: z.boolean(),
         https: z.boolean(),
-        certificateType: z.enum(["letsencrypt", "internal", "custom"]),
+        certificateType: z.enum([
+          "letsencrypt",
+          "internal",
+          "custom",
+          "cloudflare",
+        ]),
         certificateId: z.string().optional(),
         middlewares: z.array(z.string()),
         redirectTo: z
@@ -681,7 +688,11 @@ export function DomainsTab({
                           {item.https
                             ? item.certificateType === "internal"
                               ? "HTTPS / Internal CA"
-                              : "HTTPS / Let’s Encrypt"
+                              : item.certificateType === "cloudflare"
+                                ? "HTTPS / Cloudflare DNS-01"
+                                : item.certificateType === "custom"
+                                  ? "HTTPS / Custom SSL"
+                                  : "HTTPS / Let’s Encrypt"
                             : "HTTP only"}
                         </Badge>
                       </TableCell>
@@ -994,6 +1005,10 @@ export function DomainsTab({
                                   label: "Let's Encrypt Public Certificate",
                                 },
                                 {
+                                  value: "cloudflare",
+                                  label: "Cloudflare DNS-01 Wildcard SSL",
+                                },
+                                {
                                   value: "internal",
                                   label: "Internal CA Self-Signed Certificate",
                                 },
@@ -1008,7 +1023,8 @@ export function DomainsTab({
                                   (val || "letsencrypt") as
                                     | "letsencrypt"
                                     | "internal"
-                                    | "custom",
+                                    | "custom"
+                                    | "cloudflare",
                                 )
                               }
                             >
@@ -1018,6 +1034,9 @@ export function DomainsTab({
                               <SelectContent>
                                 <SelectItem value="letsencrypt">
                                   Let's Encrypt Public Certificate
+                                </SelectItem>
+                                <SelectItem value="cloudflare">
+                                  Cloudflare DNS-01 Wildcard SSL
                                 </SelectItem>
                                 <SelectItem value="internal">
                                   Internal CA Self-Signed Certificate

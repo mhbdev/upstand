@@ -66,6 +66,7 @@ const STARTUP_TOKENS: readonly Token[] = [
   dependencies.S3DestinationRepositoryToken,
   dependencies.ControlContainerUseCaseToken,
   dependencies.DuplicateProjectUseCaseToken,
+  dependencies.ContainerFileManagerUseCaseToken,
   dependencies.ExecuteBackupRunUseCaseToken,
   dependencies.GetAccountStatusUseCaseToken,
   dependencies.GetResourceStatsUseCaseToken,

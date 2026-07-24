@@ -1079,6 +1079,57 @@ export class DeploymentWorker {
           );
         }
 
+        const advancedConfig =
+          typeof deployedResource.advancedConfig === "string"
+            ? JSON.parse(deployedResource.advancedConfig)
+            : deployedResource.advancedConfig || {};
+
+        if (
+          advancedConfig.preDeployHook?.enabled &&
+          advancedConfig.preDeployHook.command
+        ) {
+          appendLog(
+            `Executing Pre-Deploy Hook command: '${advancedConfig.preDeployHook.command}'...\n`,
+          );
+          try {
+            const hookTargetService = revisionServiceName || baseServiceName;
+            if (typeof dockerService.execContainerCommand === "function") {
+              const hookResult = await dockerService.execContainerCommand(
+                { kind: "local", name: "Target" },
+                hookTargetService,
+                advancedConfig.preDeployHook.command,
+              );
+              if (hookResult.exitCode && hookResult.exitCode !== 0) {
+                throw new Error(
+                  hookResult.stderr ||
+                    `Command exited with code ${hookResult.exitCode}`,
+                );
+              }
+            }
+            appendLog("Pre-Deploy Hook completed successfully! ✅\n");
+          } catch (hookErr: any) {
+            appendLog(
+              `❌ Pre-Deploy Hook failed: ${hookErr.message || hookErr}\n`,
+            );
+            appendLog("Triggering automatic deployment rollback...\n");
+            try {
+              if (stagedDelivery && revisionServiceName) {
+                await dockerService.removeServiceRevision(
+                  deployedResource,
+                  revisionServiceName,
+                );
+              } else {
+                await dockerService.rollbackService(deployedResource);
+              }
+            } catch (rollbackErr: any) {
+              appendLog(`Warning: Rollback issue: ${rollbackErr.message}\n`);
+            }
+            throw new Error(
+              `Pre-Deploy Hook execution failed: ${hookErr.message}`,
+            );
+          }
+        }
+
         if (stagedDelivery && revisionServiceName) {
           const originalAdvancedConfig = deployedResource.advancedConfig;
           let revisionPromoted = false;
@@ -1205,6 +1256,35 @@ export class DeploymentWorker {
           previewDeploymentId,
         );
         appendLog("Caddy routing reloaded successfully.\n");
+      }
+
+      if (
+        advancedConfig.postDeployHook?.enabled &&
+        advancedConfig.postDeployHook.command
+      ) {
+        appendLog(
+          `Executing Post-Deploy Hook command: '${advancedConfig.postDeployHook.command}'...\n`,
+        );
+        try {
+          if (typeof dockerService.execContainerCommand === "function") {
+            const hookResult = await dockerService.execContainerCommand(
+              { kind: "local", name: "Target" },
+              baseServiceName,
+              advancedConfig.postDeployHook.command,
+            );
+            if (hookResult.exitCode && hookResult.exitCode !== 0) {
+              appendLog(
+                `⚠️ Post-Deploy Hook exited with code ${hookResult.exitCode}: ${hookResult.stderr || ""}\n`,
+              );
+            } else {
+              appendLog("Post-Deploy Hook completed successfully! ✅\n");
+            }
+          }
+        } catch (postHookErr: any) {
+          appendLog(
+            `⚠️ Post-Deploy Hook failed: ${postHookErr.message || postHookErr}\n`,
+          );
+        }
       }
 
       appendLog("Pipeline completed successfully! ✅\n");
@@ -1397,7 +1477,11 @@ async function resolveGitSource(
   let cloneUrl = "";
   let sshKeyPath: string | undefined;
 
-  if (["github", "gitlab", "bitbucket", "gitea"].includes(resource.provider)) {
+  if (
+    ["github", "gitlab", "bitbucket", "gitea", "generic"].includes(
+      resource.provider,
+    )
+  ) {
     const gitProviderId = credentials.githubAccount;
     if (!gitProviderId) {
       throw new Error(
@@ -1430,6 +1514,36 @@ async function resolveGitSource(
       appendLog("Connecting to Gitea using OAuth access token...\n");
       const giteaHost = (config.giteaUrl || "").replace(/https?:\/\//, "");
       cloneUrl = `https://oauth2:${config.accessToken}@${giteaHost}/${credentials.repository}.git`;
+    } else if (resource.provider === "generic") {
+      appendLog(
+        "Connecting to generic Git repository (Forgejo/Sourcehut/Bare Git)...\n",
+      );
+      cloneUrl = credentials.repositoryUrl || config.gitUrl || "";
+      if (!cloneUrl)
+        throw new Error("Repository URL is empty in generic Git configuration");
+      const sshKeyId = credentials.sshKeyId || config.sshKeyId;
+      if (sshKeyId) {
+        const sshKey = await uow.transaction((tx) =>
+          tx.sshKeyRepository.findById(sshKeyId),
+        );
+        if (!sshKey)
+          throw new Error(
+            "Configured SSH key for generic Git provider was not found",
+          );
+        const privateKey = decryptSecret({
+          ciphertext: sshKey.privateKeyCiphertext,
+          iv: sshKey.privateKeyIv,
+          authTag: sshKey.privateKeyAuthTag,
+          keyVersion: sshKey.privateKeyVersion,
+        });
+        const buildDir = path.join(process.cwd(), ".builds");
+        fs.mkdirSync(buildDir, { recursive: true });
+        sshKeyPath = path.join(buildDir, `ssh-key-${resource.id}`);
+        fs.writeFileSync(sshKeyPath, `${privateKey.trim()}\n`, { mode: 0o600 });
+      } else if (config.accessToken) {
+        const cleanRepo = cloneUrl.replace(/^https?:\/\//, "");
+        cloneUrl = `https://oauth2:${config.accessToken}@${cleanRepo}`;
+      }
     } else {
       appendLog("Connecting to Bitbucket using app password...\n");
       cloneUrl = `https://${config.bitbucketUsername}:${config.appPassword}@bitbucket.org/${credentials.repository}.git`;

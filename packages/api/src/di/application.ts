@@ -519,6 +519,15 @@ export function registerApplicationFeatures(services: ServiceCollection) {
       ),
   );
   services.addTransient(
+    dependencies.ContainerFileManagerUseCaseToken,
+    (c) =>
+      new dependencies.ContainerFileManagerUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+        c.resolve(dependencies.DockerExecToken),
+        c.resolve(dependencies.DockerInventoryReaderToken),
+      ),
+  );
+  services.addTransient(
     dependencies.ExecServerTerminalCommandUseCaseToken,
     (c) =>
       new dependencies.ExecServerTerminalCommandUseCase(

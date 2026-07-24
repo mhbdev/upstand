@@ -3,6 +3,7 @@ import { z } from "zod";
 export const WebServerSettingsSchema = z.object({
   id: z.string(),
   letsEncryptEmail: z.email().nullable().optional(),
+  cloudflareApiToken: z.string().nullable().optional(),
   httpPort: z.number().int().min(1).max(65535),
   httpsPort: z.number().int().min(1).max(65535),
   enableHttp3: z.boolean(),
@@ -24,6 +25,7 @@ export type WebServerSettings = z.infer<typeof WebServerSettingsSchema>;
 
 export interface UpdateWebServerSettingsDTO {
   letsEncryptEmail?: string | null;
+  cloudflareApiToken?: string | null;
   httpPort?: number;
   httpsPort?: number;
   enableHttp3?: boolean;

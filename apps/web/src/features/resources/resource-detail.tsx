@@ -33,6 +33,7 @@ import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { EditableEntityIcon } from "@/components/editable-entity-icon";
+import { ContainerFileExplorer } from "@/components/file-explorer/container-file-explorer";
 import {
   Activity,
   Clock,
@@ -77,6 +78,7 @@ const RESOURCE_TABS = new Set([
   "domains",
   "deployments",
   "containers",
+  "files",
   "backups",
   "logs",
   "console",
@@ -260,6 +262,9 @@ export default function ResourceDetail({
             <HugeiconsIcon icon={ServerStack01Icon} className="size-4" />{" "}
             Containers
           </TabsTrigger>
+          <TabsTrigger value="files" className="shrink-0 gap-2">
+            <HardDrive className="size-4" /> Files
+          </TabsTrigger>
           <TabsTrigger value="backups" className="shrink-0 gap-2">
             <HardDrive className="size-4" /> Backups
           </TabsTrigger>
@@ -371,6 +376,10 @@ export default function ResourceDetail({
             setContainerModalOpen={setContainerModalOpen}
             setSelectedContainerId={setSelectedContainerId}
           />
+        </TabsContent>
+
+        <TabsContent value="files" className="min-w-0 space-y-6 outline-none">
+          <ContainerFileExplorer resourceId={resource.id} />
         </TabsContent>
 
         <TabsContent value="backups" className="min-w-0 space-y-6 outline-none">

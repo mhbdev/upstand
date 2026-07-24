@@ -454,4 +454,30 @@ describe("Caddy domain configuration", () => {
     expect(enabled).toContain("format json");
     expect(enabled).toContain("output file /var/log/caddy/access.log");
   });
+
+  test("renders tls block with Cloudflare DNS-01 challenge for wildcard hostnames", () => {
+    const caddyfile = generateCaddyfileContent(
+      { cloudflareApiToken: "cf-token-secret-123" },
+      [
+        {
+          id: "cf-wildcard",
+          name: "Wildcard App",
+          type: "application",
+          appName: "wildcard-app",
+          domains: JSON.stringify([
+            {
+              host: "*.example.com",
+              port: 3000,
+              https: true,
+              certificateType: "cloudflare",
+            },
+          ]),
+        },
+      ],
+    );
+
+    expect(caddyfile).toContain("*.example.com {");
+    expect(caddyfile).toContain("tls {");
+    expect(caddyfile).toContain("dns cloudflare cf-token-secret-123");
+  });
 });

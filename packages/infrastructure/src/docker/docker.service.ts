@@ -1441,20 +1441,17 @@ export class DockerService {
     const nginxConfigPath = path.join(staticContext, "nginx.conf");
     const dockerfile = [
       "FROM nginx:1.29-alpine",
+      "RUN rm -rf /usr/share/nginx/html/*",
       "WORKDIR /usr/share/nginx/html",
-      ...(spa
-        ? [
-            'COPY [".upstand-static.nginx.conf", "/etc/nginx/conf.d/default.conf"]',
-          ]
-        : []),
-      'COPY ["site/", "."]',
+      'COPY ["nginx.conf", "/etc/nginx/conf.d/default.conf"]',
+      'COPY ["site/", "/usr/share/nginx/html/"]',
     ].join("\n");
     const nginxConfig = [
       "server {",
       "  listen 80;",
       "  server_name _;",
       "  root /usr/share/nginx/html;",
-      "  index index.html;",
+      "  index index.html index.htm;",
       spa
         ? "  location / { try_files $uri $uri/ /index.html; }"
         : "  location / { try_files $uri $uri/ =404; }",
@@ -1470,9 +1467,7 @@ export class DockerService {
       },
     });
     fs.writeFileSync(dockerfilePath, dockerfile, "utf8");
-    if (spa) {
-      fs.writeFileSync(nginxConfigPath, nginxConfig, "utf8");
-    }
+    fs.writeFileSync(nginxConfigPath, nginxConfig, "utf8");
     try {
       onLog(`Building ${spa ? "SPA" : "static"} image ${imageName}...\n`);
       await this.runCommandAsync(
@@ -2897,13 +2892,13 @@ export class DockerService {
     });
 
     const stream = await exec.start({ Detach: false });
+    const chunks: Buffer[] = [];
     return new Promise<string>((resolve, reject) => {
-      let output = "";
-      stream.on("data", (chunk) => {
-        output += chunk.toString("utf8");
+      stream.on("data", (chunk: Buffer | string) => {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
       });
       stream.on("end", () => {
-        resolve(output);
+        resolve(this.cleanDockerLogs(Buffer.concat(chunks)).trim());
       });
       stream.on("error", (err) => {
         reject(err);

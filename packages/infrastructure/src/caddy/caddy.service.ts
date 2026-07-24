@@ -55,6 +55,7 @@ function sanitizeServiceName(name: string): string {
 function caddySettingsWithDefaults(settings: CaddySettings = {}) {
   const effectiveSettings = {
     letsEncryptEmail: settings.letsEncryptEmail ?? null,
+    cloudflareApiToken: settings.cloudflareApiToken ?? null,
     httpPort: settings.httpPort ?? 80,
     httpsPort: settings.httpsPort ?? 443,
     enableHttp3: settings.enableHttp3 ?? true,
@@ -469,6 +470,13 @@ export function generateCaddyfileContent(
     const certificateType = routesForHost[0]?.certificateType;
     if (protocol === "https" && certificateType === "internal") {
       sites.push("\ttls internal");
+    } else if (protocol === "https" && certificateType === "cloudflare") {
+      const token = effectiveSettings.cloudflareApiToken
+        ? effectiveSettings.cloudflareApiToken
+        : "{env.CLOUDFLARE_API_TOKEN}";
+      sites.push("\ttls {");
+      sites.push(`\t\tdns cloudflare ${token}`);
+      sites.push("\t}");
     } else if (protocol === "https" && certificateType === "custom") {
       const certificate = routesForHost[0]?.customCertificate;
       if (!certificate) {

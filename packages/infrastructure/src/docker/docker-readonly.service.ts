@@ -203,15 +203,14 @@ export class DockerReadOnlyService implements DockerExecPort {
         AttachStderr: true,
       });
       const stream = await exec.start({ Detach: false });
-      const output = await new Promise<string>((resolve, reject) => {
-        let text = "";
-        stream.on("data", (chunk: Buffer | string) => {
-          text += chunk.toString("utf8");
-        });
-        stream.on("end", () => resolve(text));
+      const chunks: Buffer[] = [];
+      await new Promise<void>((resolve, reject) => {
+        stream.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+        stream.on("end", resolve);
         stream.on("error", reject);
       });
-      return { output };
+      const cleanOutput = this.cleanDockerLogs(Buffer.concat(chunks));
+      return { output: cleanOutput };
     }
     const safeContainer = shellQuote(containerId);
     const safeCommand = shellQuote(command);
@@ -887,5 +886,24 @@ export class DockerReadOnlyService implements DockerExecPort {
           readyTimeout: 20_000,
         });
     });
+  }
+
+  private cleanDockerLogs(buffer: Buffer): string {
+    let result = "";
+    let offset = 0;
+    while (offset < buffer.length) {
+      if (offset + 8 > buffer.length) break;
+      const size = buffer.readUInt32BE(offset + 4);
+      offset += 8;
+
+      if (offset + size > buffer.length) {
+        result += buffer.toString("utf8", offset);
+        break;
+      }
+
+      result += buffer.toString("utf8", offset, offset + size);
+      offset += size;
+    }
+    return result || buffer.toString("utf8");
   }
 }

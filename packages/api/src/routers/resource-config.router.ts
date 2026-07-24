@@ -69,16 +69,15 @@ export const portRouter = router({
     .mutation(async ({ ctx, input }) => {
       const resource = await authorize(ctx, input.id, "update");
       const config = parseResourceAdvancedConfig(resource.advancedConfig);
-      const duplicate = config.ports.some(
+      const conflict = config.ports.some(
         (port) =>
           port.publishedPort === input.port.publishedPort &&
-          port.targetPort === input.port.targetPort &&
           port.protocol === input.port.protocol,
       );
-      if (duplicate)
+      if (conflict)
         throw new TRPCError({
           code: "CONFLICT",
-          message: "This port mapping already exists",
+          message: `Host published port ${input.port.publishedPort}/${input.port.protocol} is already allocated in this resource`,
         });
       config.ports = [...config.ports, input.port];
       return updateConfig(ctx, resource, config).then(
@@ -94,6 +93,17 @@ export const portRouter = router({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Port mapping not found",
+        });
+      const conflict = config.ports.some(
+        (port, idx) =>
+          idx !== input.index &&
+          port.publishedPort === input.port.publishedPort &&
+          port.protocol === input.port.protocol,
+      );
+      if (conflict)
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Host published port ${input.port.publishedPort}/${input.port.protocol} is already allocated in this resource`,
         });
       config.ports[input.index] = input.port;
       return updateConfig(ctx, resource, config).then(

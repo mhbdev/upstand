@@ -184,6 +184,10 @@ export const InspectComposeUseCaseToken =
   createToken<UseCases.InspectComposeUseCase>("InspectComposeUseCase");
 export const ValidateDomainUseCaseToken =
   createToken<UseCases.ValidateDomainUseCase>("ValidateDomainUseCase");
+export const ContainerFileManagerUseCaseToken =
+  createToken<UseCases.ContainerFileManagerUseCase>(
+    "ContainerFileManagerUseCase",
+  );
 export const ControlContainerUseCaseToken =
   createToken<UseCases.ControlContainerUseCase>("ControlContainerUseCase");
 export const GetResourceContainersUseCaseToken =

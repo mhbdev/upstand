@@ -51,10 +51,10 @@ export function getDockerLogLevel(message: string): DockerLogLevel {
 
 export function filterDockerLogs(
   logs: string,
-  filter: DockerLogFilter,
+  filter?: DockerLogFilter | null,
 ): string {
-  const search = filter.search?.trim().toLowerCase();
-  const levels = new Set(filter.levels ?? []);
+  const search = filter?.search?.trim().toLowerCase();
+  const levels = new Set(filter?.levels ?? []);
   if (!search && levels.size === 0) return logs;
   return logs
     .split(/\r?\n/)

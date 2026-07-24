@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type ApplicationBuildConfig,
   ApplicationBuildConfigSchema,
@@ -47,7 +47,7 @@ import { Switch } from "@upstand/ui/components/switch";
 import { cn } from "@upstand/ui/lib/utils";
 import type { Route } from "next";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
 import { DangerZoneCard } from "@/components/dashboard/danger-zone-card";
@@ -120,6 +120,7 @@ export function GeneralTab({
   deleteResource,
   isDeletingResource,
 }: GeneralTabProps) {
+  const queryClient = useQueryClient();
   const organizationState = useRequiredActiveOrganization();
   const activeOrganization =
     organizationState.status === "ready"
@@ -269,6 +270,7 @@ export function GeneralTab({
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   void isUploading;
+  const archiveFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUploadDropFile = async (file: File) => {
     const fileError = validateArchiveFile(file, {
@@ -292,7 +294,14 @@ export function GeneralTab({
       toast.success("Archive uploaded and deployment triggered!", {
         id: toastId,
       });
-      window.location.reload();
+      void queryClient.invalidateQueries({
+        queryKey: trpc.resource.get.queryKey({ id: resource.id }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.deployment.getByResource.queryKey({
+          resourceId: resource.id,
+        }),
+      });
     } catch (err: unknown) {
       toast.error(
         `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}`,
@@ -2141,7 +2150,26 @@ export function GeneralTab({
               {providerType === "drop" && (
                 <div className="flex flex-col gap-3 pt-2">
                   <Label>Source Archive (ZIP or Tarball)</Label>
-                  <Label
+                  <input
+                    type="file"
+                    ref={archiveFileInputRef}
+                    accept=".zip,.tar,.gz,.tgz"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file) void handleUploadDropFile(file);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => archiveFileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        archiveFileInputRef.current?.click();
+                      }
+                    }}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2156,24 +2184,14 @@ export function GeneralTab({
                     }}
                     className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-border/40 border-dashed bg-muted/20 p-8 text-center transition-colors hover:border-primary/50 hover:bg-muted/30"
                   >
-                    <input
-                      type="file"
-                      accept=".zip,.tar,.gz,.tgz"
-                      className="sr-only"
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0];
-                        if (file) void handleUploadDropFile(file);
-                        event.currentTarget.value = "";
-                      }}
-                    />
-                    <Upload className="mb-2 size-8 animate-pulse text-muted-foreground" />
+                    <Upload className="mb-2 size-8 text-muted-foreground" />
                     <p className="font-medium text-foreground text-sm">
                       Drag & drop your archive file here, or click to select
                     </p>
                     <p className="mt-1 text-muted-foreground text-xs">
-                      Supports .zip, .tar.gz, .tgz (Max 50MB)
+                      Supports .zip, .tar, .tar.gz, .tgz (Max 50MB)
                     </p>
-                  </Label>
+                  </div>
                 </div>
               )}
 

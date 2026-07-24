@@ -2,6 +2,7 @@ import type { Certificate, Resource } from "@upstand/domain";
 
 export type CaddySettings = {
   letsEncryptEmail?: string | null;
+  cloudflareApiToken?: string | null;
   httpPort?: number;
   httpsPort?: number;
   enableHttp3?: boolean;

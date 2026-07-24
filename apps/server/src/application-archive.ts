@@ -57,7 +57,10 @@ function parseEntrySize(line: string): number {
   const bsd = line.match(
     /^\S{10}\s+\d+\s+\d+\s+\d+\s+(\d+)\s+[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}/,
   );
-  const size = Number(gnu?.[1] ?? bsd?.[1]);
+  const flexible = line.match(
+    /\s+(\d+)\s+(?:[A-Za-z]{3}\s+\d+|\d{4}-\d{2}-\d{2})/,
+  );
+  const size = Number(gnu?.[1] ?? bsd?.[1] ?? flexible?.[1]);
   if (!Number.isSafeInteger(size) || size < 0) {
     throw new ApplicationArchiveValidationError(
       "Archive metadata uses an unsupported tar listing format",

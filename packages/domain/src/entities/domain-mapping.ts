@@ -3,7 +3,7 @@ import { z } from "zod";
 const SERVICE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
 const MIDDLEWARE_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 const HOSTNAME_PATTERN =
-  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+  /^(?=.{1,253}$)(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 const SAFE_PATH_PATTERN = /^\/[A-Za-z0-9._~!$&'()+,;=:@%/-]*$/;
 const SAFE_REDIRECT_TARGET_PATTERN = /^(?:https?:\/\/[^\r\n\s]+|\/[^\r\n]*)$/i;
 
@@ -12,26 +12,31 @@ export function normalizeDomainHost(value: string): string {
 
   if (
     !suppliedHost ||
-    /[/:?#@[\]\\\s]/.test(suppliedHost) ||
+    /[/:?#@[\]\\\s]/.test(suppliedHost.replace(/^\*\./, "")) ||
     suppliedHost.includes("..")
   ) {
     throw new Error("Enter a valid public hostname without a protocol or port");
   }
 
+  const isWildcard = suppliedHost.startsWith("*.");
+  const hostToTest = isWildcard ? suppliedHost.slice(2) : suppliedHost;
+
   let hostname: string;
   try {
-    hostname = new URL(`https://${suppliedHost}`).hostname.toLowerCase();
+    hostname = new URL(`https://${hostToTest}`).hostname.toLowerCase();
   } catch {
     throw new Error("Enter a valid public hostname");
   }
 
-  if (!HOSTNAME_PATTERN.test(hostname)) {
+  const finalHost = isWildcard ? `*.${hostname}` : hostname;
+
+  if (!HOSTNAME_PATTERN.test(finalHost)) {
     throw new Error(
-      "Domains must be fully-qualified hostnames; IP addresses, localhost, and wildcard domains are not supported",
+      "Domains must be fully-qualified hostnames or valid wildcard hostnames (*.example.com)",
     );
   }
 
-  return hostname;
+  return finalHost;
 }
 
 export function normalizeDomainPath(value: string): string {
@@ -65,7 +70,7 @@ const DomainMappingInputSchema = z.object({
   https: z.boolean().optional().default(true),
   /** Certificate strategy used by the edge proxy for HTTPS routes. */
   certificateType: z
-    .enum(["letsencrypt", "internal", "custom"])
+    .enum(["letsencrypt", "internal", "custom", "cloudflare"])
     .optional()
     .default("letsencrypt"),
   certificateId: z.string().min(1).optional(),
@@ -201,7 +206,7 @@ export type DomainMapping = {
   port: number;
   serviceName?: string;
   https: boolean;
-  certificateType: "letsencrypt" | "internal" | "custom";
+  certificateType: "letsencrypt" | "internal" | "custom" | "cloudflare";
   certificateId?: string;
   middlewares: string[];
   redirectTo?: string;

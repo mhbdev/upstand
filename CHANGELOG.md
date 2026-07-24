@@ -4,7 +4,31 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.131 - 2026-07-24
+## 0.1.132 - 2026-07-24
+
+### Security
+
+- **Container Ownership Authorization Fix**: Replaced dangerous substring `includes()` checks in `containerBelongsToResource()` with exact-match and anchored-prefix guards. The previous implementation allowed a container named `"my-evil-api"` to pass authorization for a resource named `"api"` — a privilege escalation vulnerability that would let any container be targeted via `docker exec` through the resource terminal. Authorization now follows a strict precedence chain: Upstand resource-id label (strongest) → exact Compose/Swarm namespace → exact Swarm service name (or `<name>.<slot>` pattern) → exact Compose service → exact container name (or `<name>_N`/`<name>-N` replica suffix).
+
+### Added
+
+- **Generic Git Provider Support**: The deployment pipeline (`deployment-worker.ts`) now resolves repositories for the `generic` provider (Forgejo, Sourcehut, bare Git) via configurable SSH key or OAuth access token authentication, enabling self-hosted Git deployments beyond the built-in GitHub/GitLab/Bitbucket/Gitea providers.
+- **Pre/Post Deploy Hooks**: `DeploymentWorker` now runs optional `preDeployHook` and `postDeployHook` commands stored in a resource's advanced config. A pre-deploy hook failure automatically triggers rollback (for staged delivery) or service rollback. Post-deploy hook failures are logged as warnings without affecting deployment status.
+- **Credential-Aware Database Health Commands**: `DatabaseCommandUseCase` now embeds per-resource database credentials into health-check commands (`pg_isready -U <user> -d <db>`, `redis-cli -a <pass> ping`, `mongosh -u <user> -p <pass>`, `mysqladmin ping -p<pass>`) instead of using credential-free defaults, preventing false positives in auth-protected databases.
+- **Env Var Alias `${{env.VAR}}`**: The `${{project.VAR}}` substitution pattern now also accepts `${{env.VAR}}` as an alias, making environment variable references more intuitive.
+- **`filterDockerLogs` Accepts Optional Filter**: The `filterDockerLogs` function now accepts `null` or `undefined` as a filter argument, returning logs unfiltered instead of throwing.
+
+### Fixed
+
+- **`containerBelongsToResource` type signature**: Made `labels` optional (`string[] | undefined`) on the container parameter and added `name?: string` so callers that don't have both fields are not forced to provide stubs.
+
+### Tests
+
+- **Container Ownership Security Tests** (`container-ownership.test.ts`): Added explicit security boundary tests confirming substring-matching containers are rejected, replica suffix patterns (`<name>_1`, `<name>.1`) are accepted, and the `upstand.resource.id` label takes precedence over all other checks.
+- **Database Command Credential Tests** (`database-command.usecase.test.ts`): Added parameterized coverage for all six engines (health + version), plus dedicated credential-forwarding tests for Postgres user/db flags, MySQL/MariaDB root password, Redis auth, and MongoDB `--authenticationDatabase` flags.
+- **Resource Edge Case Type Fixes** (`resource-actions-edge-cases.test.ts`): Fixed type errors (`provider` field removal, `DeleteResourceUseCase` requires 3 args, `RebuildDatabaseUseCase` requires `confirm: true`, `UpdateResourceUseCase` requires 2 args).
+- **Integration Test Schema Fix** (`resource-integration.test.ts`): Removed non-existent `type` column from `environment` table inserts; fixed import ordering to satisfy Biome.
+
 
 ### Changed
 
