@@ -4,6 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.139 - 2026-07-24
+
+### Fixed
+
+- **Fumadocs Mermaid Code Block Interception & Rendering**: Fixed Fumadocs MDX code blocks where ` ```mermaid ` blocks were rendering as raw text instead of actual SVG graphs and diagrams. Overrode `pre` in `mdx.tsx` to automatically intercept `mermaid` language blocks and pass extracted chart content to a client-side `<Mermaid />` renderer.
+- **Robust Client-Side Mermaid Renderer**: Rewrote `mermaid.tsx` component to use robust client-side `useEffect` dynamic import and sanitized HTML IDs (`mermaid-${useId}`), eliminating SSR hydration mismatches and handling dark/light theme switches seamlessly.
+- **Linter & Code Quality**: Resolved Biome lint warning for unused variables (`noUnusedVariables`). Verified with `bun run check` (1000 files clean) and `bun run check-types` (15/15 packages successful).
+
 ## 0.1.138 - 2026-07-24
 
 ### Added & Improved
