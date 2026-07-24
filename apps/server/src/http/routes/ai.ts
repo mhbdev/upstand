@@ -241,6 +241,7 @@ export function registerAiRoutes(app: Hono<AppEnv>): void {
     }
     const postUrl = postUrlObj.toString();
 
+    c.header("Content-Type", "text/event-stream");
     c.header("Cache-Control", "no-cache, no-transform");
     c.header("Connection", "keep-alive");
     c.header("X-Accel-Buffering", "no");

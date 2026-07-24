@@ -63,6 +63,7 @@ export function registerHttpMiddleware(
           c.req.path.startsWith("/api/mcp") ||
           c.req.path.startsWith("/.well-known")
         ) {
+          c.header("Access-Control-Allow-Credentials", "false");
           return origin;
         }
         if (origin === env.CORS_ORIGIN) return origin;

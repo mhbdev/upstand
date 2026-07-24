@@ -111,6 +111,22 @@ export function classifyUpGalError(error: unknown): UpGalErrorInfo {
     return infoForCode("timeout");
   }
 
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    ((error as { name?: string }).name === "ZodError" ||
+      "issues" in (error as Record<string, unknown>))
+  ) {
+    const message =
+      error instanceof Error ? error.message : "Invalid tool parameters";
+    return {
+      code: "validation",
+      status: 400,
+      retryable: false,
+      userMessage: `Invalid tool parameters: ${message}`,
+    };
+  }
+
   const status = providerStatus(error);
   if (status === 401) return infoForCode("authentication");
   if (status === 403) return infoForCode("permission");

@@ -4,6 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.133 - 2026-07-24
+
+### Fixed
+
+- **CORS Credentials Security on MCP Routes**: Set `Access-Control-Allow-Credentials: false` explicitly for `/api/mcp*` routes. Prevents browsers from passing ambient session cookies on reflected origin MCP requests.
+- **Explicit Content-Type for MCP SSE Connections**: Added explicit `Content-Type: text/event-stream` header in `handleMcpGet` for `/api/mcp/sse` endpoints to ensure proxy and EventSource client compatibility.
+- **MCP Tool Parameter Validation Error Formatting**: Hardened `classifyUpGalError` to catch `ZodError` validation failures from tool input parsing and surface descriptive validation messages (`Invalid tool parameters: ...`) to MCP clients instead of generic provider fallback messages.
+
 ## 0.1.132 - 2026-07-24
 
 ### Security
