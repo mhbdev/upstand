@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.141 - 2026-07-24
+
+### Fixed
+
+- **Fumadocs Native AST Mermaid Transformation**: Configured `remarkMermaid` AST plugin in `source.config.ts` using `unist-util-visit`. Automatically transforms Markdown code blocks (`type: "code"`, `lang: "mermaid"`) into native `<Mermaid chart="..." />` MDX JSX flow element nodes BEFORE Shiki syntax highlighting code-block conversion. Completely resolves raw code block text rendering in production documentation builds, forcing all Mermaid diagrams to render as dynamic SVG graphs.
+
 ## 0.1.140 - 2026-07-24
 
 ### Fixed
