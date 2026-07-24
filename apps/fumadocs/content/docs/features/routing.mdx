@@ -53,7 +53,7 @@ Configure advanced proxy settings directly inside the domain mapping card:
 
 Operators can define reusable Caddy configuration snippets under **Web Server → Caddy Snippets** to enforce ingress WAF protection:
 
-```caddy
+```nginx
 # Definition: rate_limit_suite (Saved under Web Server Snippets)
 (rate_limit_suite) {
     rate_limit {

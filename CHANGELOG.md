@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.140 - 2026-07-24
+
+### Fixed
+
+- **Fumadocs Shiki Code Block Language Resolution**: Replaced unsupported `caddy` code block language identifier in `routing.mdx` with `nginx` syntax highlighting tag. Resolves Shiki highlighter build failures during Next.js production image builds (`docker buildx build`). Verified with `bun run --filter fumadocs build` (100/100 static pages compiled successfully).
+
 ## 0.1.139 - 2026-07-24
 
 ### Fixed
