@@ -95,7 +95,7 @@ func main() {
 		var metrics []monitoring.SystemMetrics
 		if hasRange {
 			limitNum := parseLimit(limit)
-			dbMetrics, rangeErr := db.GetMetricsInRangeLimit(start, end, limitNum)
+			dbMetrics, rangeErr := db.GetMetricsByTimeRange(start, end, limitNum)
 			if rangeErr != nil {
 				return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch metrics"})
 			}
@@ -103,7 +103,7 @@ func main() {
 				metrics = append(metrics, monitoring.ConvertToSystemMetrics(m))
 			}
 		} else if limit == "all" {
-			dbMetrics, err := db.GetAllMetrics()
+			dbMetrics, err := db.GetLastNMetrics(0)
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{
 					"error": "Failed to fetch metrics",
@@ -165,7 +165,7 @@ func main() {
 
 	collectServerMetrics := func() {
 		metrics := monitoring.GetServerMetrics()
-		if err := db.SaveMetric(metrics); err != nil {
+		if err := db.SaveServerMetric(metrics); err != nil {
 			monitoring.RecordCollection(err)
 			log.Printf("Error saving metrics: %v", err)
 			return

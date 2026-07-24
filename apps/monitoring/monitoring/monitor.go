@@ -203,24 +203,24 @@ func GetServerMetrics() database.ServerMetric {
 	}
 
 	return database.ServerMetric{
-		Timestamp:        time.Now().UTC().Format(time.RFC3339Nano),
+		Timestamp:        time.Now().UTC(),
 		CPU:              cpuPercent,
 		CPUModel:         cpuModel,
-		CPUCores:         int32(runtime.NumCPU()),
-		CPUPhysicalCores: physicalCores,
+		CPUCores:         runtime.NumCPU(),
+		CPUPhysicalCores: int(physicalCores),
 		CPUSpeed:         cpuSpeed,
 		OS:               getRealOS(),
 		Distro:           distro,
 		Kernel:           kernel,
 		Arch:             arch,
-		MemUsed:          memUsedPercent,
+		MemUsed:          uint64(memUsedPercent),
 		MemUsedGB:        memUsedGB,
-		MemTotal:         memTotalGB,
+		MemTotal:         uint64(memTotalGB),
 		Uptime:           uptime,
-		DiskUsed:         diskUsed,
-		TotalDisk:        totalDisk,
-		NetworkIn:        networkIn,
-		NetworkOut:       networkOut,
+		DiskUsed:         uint64(diskUsed),
+		TotalDisk:        uint64(totalDisk),
+		NetworkIn:        uint64(networkIn),
+		NetworkOut:       uint64(networkOut),
 	}
 }
 
@@ -228,22 +228,22 @@ func ConvertToSystemMetrics(metric database.ServerMetric) SystemMetrics {
 	return SystemMetrics{
 		CPU:              fmt.Sprintf("%.2f", metric.CPU),
 		CPUModel:         metric.CPUModel,
-		CPUCores:         metric.CPUCores,
-		CPUPhysicalCores: metric.CPUPhysicalCores,
+		CPUCores:         int32(metric.CPUCores),
+		CPUPhysicalCores: int32(metric.CPUPhysicalCores),
 		CPUSpeed:         metric.CPUSpeed,
 		OS:               metric.OS,
 		Distro:           metric.Distro,
 		Kernel:           metric.Kernel,
 		Arch:             metric.Arch,
-		MemUsed:          fmt.Sprintf("%.2f", metric.MemUsed),
+		MemUsed:          fmt.Sprintf("%d", metric.MemUsed),
 		MemUsedGB:        fmt.Sprintf("%.2f", metric.MemUsedGB),
-		MemTotal:         fmt.Sprintf("%.2f", metric.MemTotal),
+		MemTotal:         fmt.Sprintf("%d", metric.MemTotal),
 		Uptime:           metric.Uptime,
-		DiskUsed:         fmt.Sprintf("%.2f", metric.DiskUsed),
-		TotalDisk:        fmt.Sprintf("%.2f", metric.TotalDisk),
-		NetworkIn:        fmt.Sprintf("%.2f", metric.NetworkIn),
-		NetworkOut:       fmt.Sprintf("%.2f", metric.NetworkOut),
-		Timestamp:        metric.Timestamp,
+		DiskUsed:         fmt.Sprintf("%d", metric.DiskUsed),
+		TotalDisk:        fmt.Sprintf("%d", metric.TotalDisk),
+		NetworkIn:        fmt.Sprintf("%d", metric.NetworkIn),
+		NetworkOut:       fmt.Sprintf("%d", metric.NetworkOut),
+		Timestamp:        metric.Timestamp.Format(time.RFC3339Nano),
 	}
 }
 
@@ -273,7 +273,7 @@ func CheckThresholds(metrics database.ServerMetric) error {
 			Value:      metrics.CPU,
 			Threshold:  cpuThreshold,
 			Message:    fmt.Sprintf("CPU usage (%.2f%%) exceeded threshold (%.2f%%)", metrics.CPU, cpuThreshold),
-			Timestamp:  metrics.Timestamp,
+			Timestamp:  metrics.Timestamp.Format(time.RFC3339Nano),
 			Nonce:      newAlertNonce(),
 		}
 		alert.Signature = signAlert(alert, metricsToken)
@@ -282,15 +282,15 @@ func CheckThresholds(metrics database.ServerMetric) error {
 		}
 	}
 
-	if memThreshold > 0 && metrics.MemUsed > memThreshold {
+	if memThreshold > 0 && float64(metrics.MemUsed) > memThreshold {
 		alert := AlertPayload{
 			ServerID:   cfg.Server.ServerID,
 			ServerType: cfg.Server.ServerType,
 			Type:       "Memory",
-			Value:      metrics.MemUsed,
+			Value:      float64(metrics.MemUsed),
 			Threshold:  memThreshold,
-			Message:    fmt.Sprintf("Memory usage (%.2f%%) exceeded threshold (%.2f%%)", metrics.MemUsed, memThreshold),
-			Timestamp:  metrics.Timestamp,
+			Message:    fmt.Sprintf("Memory usage (%.2f%%) exceeded threshold (%.2f%%)", float64(metrics.MemUsed), memThreshold),
+			Timestamp:  metrics.Timestamp.Format(time.RFC3339Nano),
 			Nonce:      newAlertNonce(),
 		}
 		alert.Signature = signAlert(alert, metricsToken)
