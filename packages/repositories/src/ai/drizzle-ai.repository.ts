@@ -5,6 +5,7 @@ import {
   aiMessage,
   aiProviderConfig,
   aiRun,
+  aiTavilySettings,
 } from "@upstand/db";
 import type {
   AIConversationRecord,
@@ -12,11 +13,13 @@ import type {
   AIFeatureAssignmentRecord,
   AIMessageRecord,
   AIProviderConfigRecord,
+  AITavilySettingsRecord,
   CreateAIConversation,
   CreateAIProviderConfig,
   CreateAIRun,
   IAIRepository,
   JsonValue,
+  SaveAITavilySettings,
   UpdateAIProviderConfig,
 } from "@upstand/domain";
 import { and, asc, desc, eq } from "drizzle-orm";
@@ -225,6 +228,112 @@ export class DrizzleAIRepository implements IAIRepository {
           eq(aiFeatureAssignment.feature, feature),
         ),
       );
+  }
+
+  // ── Tavily Settings ───────────────────────────────────────────────────────
+
+  async getTavilySettings(
+    organizationId: string,
+  ): Promise<AITavilySettingsRecord | null> {
+    const row = await this.executor
+      .select()
+      .from(aiTavilySettings)
+      .where(eq(aiTavilySettings.organizationId, organizationId))
+      .limit(1)
+      .then((rows) => rows[0]);
+
+    if (!row) return null;
+    return {
+      organizationId: row.organizationId,
+      enabled: row.enabled === 1,
+      apiKeyCiphertext: row.apiKeyCiphertext,
+      apiKeyIv: row.apiKeyIv,
+      apiKeyAuthTag: row.apiKeyAuthTag,
+      apiKeyVersion: row.apiKeyVersion,
+      searchDepth: (row.searchDepth as "basic" | "advanced") || "basic",
+      includeAnswer: row.includeAnswer === 1,
+      maxResults: row.maxResults ?? 5,
+      enableSearch: row.enableSearch === 1,
+      enableExtract: row.enableExtract === 1,
+      enableCrawl: row.enableCrawl === 1,
+      enableMap: row.enableMap === 1,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  async saveTavilySettings(
+    organizationId: string,
+    input: SaveAITavilySettings,
+  ): Promise<AITavilySettingsRecord> {
+    const setValues: Record<string, unknown> = {
+      enabled: input.enabled ? 1 : 0,
+      searchDepth: input.searchDepth,
+      includeAnswer: input.includeAnswer ? 1 : 0,
+      maxResults: input.maxResults,
+      enableSearch: input.enableSearch ? 1 : 0,
+      enableExtract: input.enableExtract ? 1 : 0,
+      enableCrawl: input.enableCrawl ? 1 : 0,
+      enableMap: input.enableMap ? 1 : 0,
+      updatedAt: new Date(),
+    };
+
+    if (input.secret !== undefined) {
+      if (input.secret === null) {
+        setValues.apiKeyCiphertext = null;
+        setValues.apiKeyIv = null;
+        setValues.apiKeyAuthTag = null;
+        setValues.apiKeyVersion = null;
+      } else {
+        setValues.apiKeyCiphertext = input.secret.ciphertext;
+        setValues.apiKeyIv = input.secret.iv;
+        setValues.apiKeyAuthTag = input.secret.authTag;
+        setValues.apiKeyVersion = input.secret.keyVersion;
+      }
+    }
+
+    const [row] = await this.executor
+      .insert(aiTavilySettings)
+      .values({
+        organizationId,
+        enabled: input.enabled ? 1 : 0,
+        apiKeyCiphertext: input.secret?.ciphertext ?? null,
+        apiKeyIv: input.secret?.iv ?? null,
+        apiKeyAuthTag: input.secret?.authTag ?? null,
+        apiKeyVersion: input.secret?.keyVersion ?? null,
+        searchDepth: input.searchDepth,
+        includeAnswer: input.includeAnswer ? 1 : 0,
+        maxResults: input.maxResults,
+        enableSearch: input.enableSearch ? 1 : 0,
+        enableExtract: input.enableExtract ? 1 : 0,
+        enableCrawl: input.enableCrawl ? 1 : 0,
+        enableMap: input.enableMap ? 1 : 0,
+      })
+      .onConflictDoUpdate({
+        target: aiTavilySettings.organizationId,
+        set: setValues,
+      })
+      .returning();
+
+    if (!row) throw new Error("AI Tavily settings save returned no row.");
+
+    return {
+      organizationId: row.organizationId,
+      enabled: row.enabled === 1,
+      apiKeyCiphertext: row.apiKeyCiphertext,
+      apiKeyIv: row.apiKeyIv,
+      apiKeyAuthTag: row.apiKeyAuthTag,
+      apiKeyVersion: row.apiKeyVersion,
+      searchDepth: (row.searchDepth as "basic" | "advanced") || "basic",
+      includeAnswer: row.includeAnswer === 1,
+      maxResults: row.maxResults ?? 5,
+      enableSearch: row.enableSearch === 1,
+      enableExtract: row.enableExtract === 1,
+      enableCrawl: row.enableCrawl === 1,
+      enableMap: row.enableMap === 1,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
   }
 
   // ── Conversations ─────────────────────────────────────────────────────────

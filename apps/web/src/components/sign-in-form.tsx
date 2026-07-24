@@ -1,12 +1,11 @@
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@upstand/ui/components/button";
-import { Input } from "@upstand/ui/components/input";
-import { Label } from "@upstand/ui/components/label";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
+import { AuthFormField } from "./auth/auth-form-field";
 
 export default function SignInForm({
   onSwitchToSignUp,
@@ -76,29 +75,13 @@ export default function SignInForm({
         <div>
           <form.Field name="email">
             {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  required
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p
-                    key={error?.message}
-                    className="text-destructive text-xs"
-                    role="alert"
-                  >
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
+              <AuthFormField
+                field={field}
+                label="Email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+              />
             )}
           </form.Field>
         </div>
@@ -106,29 +89,13 @@ export default function SignInForm({
         <div>
           <form.Field name="password">
             {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Password</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  required
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p
-                    key={error?.message}
-                    className="text-destructive text-xs"
-                    role="alert"
-                  >
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
+              <AuthFormField
+                field={field}
+                label="Password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Enter your password"
+              />
             )}
           </form.Field>
         </div>

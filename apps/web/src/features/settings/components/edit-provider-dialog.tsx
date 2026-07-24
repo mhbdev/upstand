@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import type { AIProvider } from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import {
   Dialog,
@@ -11,15 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 import type { ProviderView } from "./provider-card";
 import {
+  DEFAULT_PROVIDER_FORM_VALUES,
   ProviderFormFields,
-  type ProviderFormValues,
 } from "./provider-form-fields";
+import { useProviderForm } from "./use-provider-form";
 
 type Props = {
   organizationId: string;
@@ -36,24 +36,14 @@ export function EditProviderDialog({
   onOpenChange,
   onUpdated,
 }: Props) {
-  const [values, setValues] = useState<ProviderFormValues>({
-    name: "",
-    provider: "openai",
-    model: "",
-    apiKey: "",
-    baseUrl: "",
-    temperature: 0.5,
-    reasoningEnabled: false,
-    maxOutputTokens: null,
-  });
-  const [modelSuggestions, setModelSuggestions] = useState<
-    Array<{
-      id: string;
-      name: string;
-      reasoning?: boolean;
-      contextLength?: number;
-    }>
-  >([]);
+  const {
+    values,
+    setValues,
+    modelSuggestions,
+    setModelSuggestions,
+    test,
+    handleChange,
+  } = useProviderForm(organizationId, DEFAULT_PROVIDER_FORM_VALUES);
 
   // Sync form when the provider being edited changes
   useEffect(() => {
@@ -69,7 +59,7 @@ export function EditProviderDialog({
       maxOutputTokens: provider.maxOutputTokens,
     });
     setModelSuggestions([]);
-  }, [provider]);
+  }, [provider, setValues, setModelSuggestions]);
 
   const update = useMutation({
     ...trpc.ai.updateProvider.mutationOptions(),
@@ -82,33 +72,6 @@ export function EditProviderDialog({
       toast.error(err.message || "Failed to update provider");
     },
   });
-
-  const test = useMutation({
-    ...trpc.ai.testProvider.mutationOptions(),
-    onSuccess: (data) => toast.success(`Connection works · ${data.model}`),
-    onError: (err) => toast.error(err.message || "Connection test failed"),
-  });
-
-  const listModels = useMutation({
-    ...trpc.ai.listModels.mutationOptions(),
-    onSuccess: (models) => setModelSuggestions(models),
-    onError: () => {
-      // Model catalog is an enhancement; failure is non-blocking
-    },
-  });
-
-  function handleChange(next: Partial<ProviderFormValues>) {
-    setValues((prev) => {
-      const updated = { ...prev, ...next };
-      if (next.provider && next.provider !== prev.provider) {
-        listModels.mutate({
-          organizationId,
-          provider: next.provider as AIProvider,
-        });
-      }
-      return updated;
-    });
-  }
 
   function handleSave() {
     if (!provider) return;

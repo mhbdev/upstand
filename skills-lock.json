@@ -18,6 +18,12 @@
       "skillPath": "better-auth/best-practices/SKILL.md",
       "computedHash": "9ab075b5061be2a5f299c10505667345cc1ec76e8de4120901cfd586643e776f"
     },
+    "dry-refactoring": {
+      "source": "kucherenko/jscpd",
+      "sourceType": "github",
+      "skillPath": "skills/dry-refactoring/SKILL.md",
+      "computedHash": "0ccb5181aee5f7af4bf712ea0b746c14c27ad796e09e22900d7aa5e02073369a"
+    },
     "hono": {
       "source": "yusukebe/hono-skill",
       "sourceType": "github",

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import type { AIProvider } from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import {
   Dialog,
@@ -11,14 +10,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@upstand/ui/components/dialog";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 import {
+  DEFAULT_PROVIDER_FORM_VALUES,
   ProviderFormFields,
-  type ProviderFormValues,
 } from "./provider-form-fields";
+import { useProviderForm } from "./use-provider-form";
 
 type Props = {
   organizationId: string;
@@ -27,38 +26,26 @@ type Props = {
   onCreated: () => void;
 };
 
-const DEFAULT_VALUES: ProviderFormValues = {
-  name: "",
-  provider: "openai",
-  model: "gpt-4o-mini",
-  apiKey: "",
-  baseUrl: "",
-  temperature: 0.5,
-  reasoningEnabled: false,
-  maxOutputTokens: null,
-};
-
 export function AddProviderDialog({
   organizationId,
   open,
   onOpenChange,
   onCreated,
 }: Props) {
-  const [values, setValues] = useState<ProviderFormValues>(DEFAULT_VALUES);
-  const [modelSuggestions, setModelSuggestions] = useState<
-    Array<{
-      id: string;
-      name: string;
-      reasoning?: boolean;
-      contextLength?: number;
-    }>
-  >([]);
+  const {
+    values,
+    setValues,
+    modelSuggestions,
+    setModelSuggestions,
+    test,
+    handleChange,
+  } = useProviderForm(organizationId, DEFAULT_PROVIDER_FORM_VALUES);
 
   const add = useMutation({
     ...trpc.ai.addProvider.mutationOptions(),
     onSuccess: () => {
       toast.success("Provider added");
-      setValues(DEFAULT_VALUES);
+      setValues(DEFAULT_PROVIDER_FORM_VALUES);
       setModelSuggestions([]);
       onOpenChange(false);
       onCreated();
@@ -67,34 +54,6 @@ export function AddProviderDialog({
       toast.error(err.message || "Failed to add provider");
     },
   });
-
-  const test = useMutation({
-    ...trpc.ai.testProvider.mutationOptions(),
-    onSuccess: (data) => toast.success(`Connection works · ${data.model}`),
-    onError: (err) => toast.error(err.message || "Connection test failed"),
-  });
-
-  const listModels = useMutation({
-    ...trpc.ai.listModels.mutationOptions(),
-    onSuccess: (models) => setModelSuggestions(models),
-    onError: () => {
-      // Model catalog is an enhancement; failure is non-blocking
-    },
-  });
-
-  function handleChange(next: Partial<ProviderFormValues>) {
-    setValues((prev) => {
-      const updated = { ...prev, ...next };
-      // Refresh model suggestions when provider changes
-      if (next.provider && next.provider !== prev.provider) {
-        listModels.mutate({
-          organizationId,
-          provider: next.provider as AIProvider,
-        });
-      }
-      return updated;
-    });
-  }
 
   function handleSave() {
     if (!values.name.trim()) {

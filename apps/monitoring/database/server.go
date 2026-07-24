@@ -1,52 +1,65 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type ServerMetric struct {
-	Timestamp        string  `json:"timestamp"`
-	CPU              float64 `json:"cpu"`
-	CPUModel         string  `json:"cpuModel"`
-	CPUCores         int32   `json:"cpuCores"`
-	CPUPhysicalCores int32   `json:"cpuPhysicalCores"`
-	CPUSpeed         float64 `json:"cpuSpeed"`
-	OS               string  `json:"os"`
-	Distro           string  `json:"distro"`
-	Kernel           string  `json:"kernel"`
-	Arch             string  `json:"arch"`
-	MemUsed          float64 `json:"memUsed"`
-	MemUsedGB        float64 `json:"memUsedGB"`
-	MemTotal         float64 `json:"memTotal"`
-	Uptime           uint64  `json:"uptime"`
-	DiskUsed         float64 `json:"diskUsed"`
-	TotalDisk        float64 `json:"totalDisk"`
-	NetworkIn        float64 `json:"networkIn"`
-	NetworkOut       float64 `json:"networkOut"`
+	Timestamp        time.Time `json:"timestamp"`
+	CPU              float64   `json:"cpu"`
+	CPUModel         string    `json:"cpuModel"`
+	CPUCores         int       `json:"cpuCores"`
+	CPUPhysicalCores int       `json:"cpuPhysicalCores"`
+	CPUSpeed         float64   `json:"cpuSpeed"`
+	OS               string    `json:"os"`
+	Distro           string    `json:"distro"`
+	Kernel           string    `json:"kernel"`
+	Arch             string    `json:"arch"`
+	MemUsed          uint64    `json:"memUsed"`
+	MemUsedGB        float64   `json:"memUsedGB"`
+	MemTotal         uint64    `json:"memTotal"`
+	Uptime           uint64    `json:"uptime"`
+	DiskUsed         uint64    `json:"diskUsed"`
+	TotalDisk        uint64    `json:"totalDisk"`
+	NetworkIn        uint64    `json:"networkIn"`
+	NetworkOut       uint64    `json:"networkOut"`
 }
 
-func (db *DB) SaveMetric(metric ServerMetric) error {
-	if metric.Timestamp == "" {
-		metric.Timestamp = time.Now().UTC().Format(time.RFC3339Nano)
+func scanServerMetrics(rows *sql.Rows) ([]ServerMetric, error) {
+	var metrics []ServerMetric
+	for rows.Next() {
+		var m ServerMetric
+		err := rows.Scan(
+			&m.Timestamp, &m.CPU, &m.CPUModel, &m.CPUCores, &m.CPUPhysicalCores,
+			&m.CPUSpeed, &m.OS, &m.Distro, &m.Kernel, &m.Arch,
+			&m.MemUsed, &m.MemUsedGB, &m.MemTotal, &m.Uptime,
+			&m.DiskUsed, &m.TotalDisk, &m.NetworkIn, &m.NetworkOut,
+		)
+		if err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, m)
 	}
+	return metrics, nil
+}
 
+func (db *DB) SaveServerMetric(m ServerMetric) error {
 	_, err := db.Exec(`
-		INSERT INTO server_metrics (timestamp, cpu, cpu_model, cpu_cores, cpu_physical_cores, cpu_speed, os, distro, kernel, arch, mem_used, mem_used_gb, mem_total, uptime, disk_used, total_disk, network_in, network_out)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, metric.Timestamp, metric.CPU, metric.CPUModel, metric.CPUCores, metric.CPUPhysicalCores, metric.CPUSpeed, metric.OS, metric.Distro, metric.Kernel, metric.Arch, metric.MemUsed, metric.MemUsedGB, metric.MemTotal, metric.Uptime, metric.DiskUsed, metric.TotalDisk, metric.NetworkIn, metric.NetworkOut)
+		INSERT INTO server_metrics (
+			timestamp, cpu, cpu_model, cpu_cores, cpu_physical_cores, cpu_speed, os, distro, kernel, arch, mem_used, mem_used_gb, mem_total, uptime, disk_used, total_disk, network_in, network_out
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, m.Timestamp, m.CPU, m.CPUModel, m.CPUCores, m.CPUPhysicalCores, m.CPUSpeed, m.OS, m.Distro, m.Kernel, m.Arch, m.MemUsed, m.MemUsedGB, m.MemTotal, m.Uptime, m.DiskUsed, m.TotalDisk, m.NetworkIn, m.NetworkOut)
 	return err
 }
 
-func (db *DB) GetMetricsInRange(start, end time.Time) ([]ServerMetric, error) {
-	return db.GetMetricsInRangeLimit(start, end, 0)
-}
+func (db *DB) GetMetricsByTimeRange(start, end time.Time, limit int) ([]ServerMetric, error) {
+	var orderClause string
+	var limitClause string
+	args := []interface{}{start, end}
 
-func (db *DB) GetMetricsInRangeLimit(start, end time.Time, limit int) ([]ServerMetric, error) {
-	limitClause := ""
-	orderClause := "ORDER BY timestamp ASC"
-	args := []interface{}{start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano)}
 	if limit > 0 {
 		orderClause = "ORDER BY timestamp DESC"
 		limitClause = " LIMIT ?"
@@ -63,15 +76,11 @@ func (db *DB) GetMetricsInRangeLimit(start, end time.Time, limit int) ([]ServerM
 	}
 	defer rows.Close()
 
-	var metrics []ServerMetric
-	for rows.Next() {
-		var m ServerMetric
-		err := rows.Scan(&m.Timestamp, &m.CPU, &m.CPUModel, &m.CPUCores, &m.CPUPhysicalCores, &m.CPUSpeed, &m.OS, &m.Distro, &m.Kernel, &m.Arch, &m.MemUsed, &m.MemUsedGB, &m.MemTotal, &m.Uptime, &m.DiskUsed, &m.TotalDisk, &m.NetworkIn, &m.NetworkOut)
-		if err != nil {
-			return nil, err
-		}
-		metrics = append(metrics, m)
+	metrics, err := scanServerMetrics(rows)
+	if err != nil {
+		return nil, err
 	}
+
 	if limit > 0 {
 		for left, right := 0, len(metrics)-1; left < right; left, right = left+1, right-1 {
 			metrics[left], metrics[right] = metrics[right], metrics[left]
@@ -96,16 +105,7 @@ func (db *DB) GetLastNMetrics(n int) ([]ServerMetric, error) {
 	}
 	defer rows.Close()
 
-	var metrics []ServerMetric
-	for rows.Next() {
-		var m ServerMetric
-		err := rows.Scan(&m.Timestamp, &m.CPU, &m.CPUModel, &m.CPUCores, &m.CPUPhysicalCores, &m.CPUSpeed, &m.OS, &m.Distro, &m.Kernel, &m.Arch, &m.MemUsed, &m.MemUsedGB, &m.MemTotal, &m.Uptime, &m.DiskUsed, &m.TotalDisk, &m.NetworkIn, &m.NetworkOut)
-		if err != nil {
-			return nil, err
-		}
-		metrics = append(metrics, m)
-	}
-	return metrics, nil
+	return scanServerMetrics(rows)
 }
 
 func (db *DB) GetAllMetrics() ([]ServerMetric, error) {
@@ -119,14 +119,5 @@ func (db *DB) GetAllMetrics() ([]ServerMetric, error) {
 	}
 	defer rows.Close()
 
-	var metrics []ServerMetric
-	for rows.Next() {
-		var m ServerMetric
-		err := rows.Scan(&m.Timestamp, &m.CPU, &m.CPUModel, &m.CPUCores, &m.CPUPhysicalCores, &m.CPUSpeed, &m.OS, &m.Distro, &m.Kernel, &m.Arch, &m.MemUsed, &m.MemUsedGB, &m.MemTotal, &m.Uptime, &m.DiskUsed, &m.TotalDisk, &m.NetworkIn, &m.NetworkOut)
-		if err != nil {
-			return nil, err
-		}
-		metrics = append(metrics, m)
-	}
-	return metrics, nil
+	return scanServerMetrics(rows)
 }

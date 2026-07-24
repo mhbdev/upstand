@@ -4,6 +4,7 @@ import type {
   GetDeploymentsUseCase,
 } from "./get-deployments.usecase";
 import type { GetQueueUseCase, QueueJobResult } from "./get-queue.usecase";
+import { findOrganizationResourceIds } from "./organization-resources.helper";
 
 export class GetRequestsUseCase {
   constructor(
@@ -17,22 +18,10 @@ export class GetRequestsUseCase {
     queue: QueueJobResult[];
     generatedAt: Date;
   }> {
-    const projects =
-      await this.uow.projectRepository.findByOrganizationId(organizationId);
-    const projectIds = new Set(projects.map((project) => project.id));
-    const environments = [];
-    for (const projectId of projectIds) {
-      const envs =
-        await this.uow.environmentRepository.findByProjectId(projectId);
-      environments.push(...envs);
-    }
-    const environmentIds = new Set(environments.map((env) => env.id));
-    const resources = [];
-    for (const envId of environmentIds) {
-      const res = await this.uow.resourceRepository.findByEnvironmentId(envId);
-      resources.push(...res);
-    }
-    const resourceIds = resources.map((resource) => resource.id);
+    const resourceIds = await findOrganizationResourceIds(
+      this.uow,
+      organizationId,
+    );
     const [deployments, queue] = await Promise.all([
       this.getDeployments.execute(resourceIds),
       this.getQueue.execute(resourceIds),

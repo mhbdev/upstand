@@ -26,53 +26,51 @@ import {
 import { validateLibsqlSettings } from "./libsql-settings";
 import { serializeResourceCredentials } from "./resource-credentials";
 import { serializeResourceEnvironmentVariables } from "./resource-environment";
+import { ResourcePreviewFieldsSchema } from "./resource-preview-fields.schema";
 import { generateWebhookToken } from "./webhook-token";
 
-export const CreateResourceInputSchema = z.object({
-  environmentId: z.string().min(1, "Environment ID is required"),
-  name: z.string().min(1, "Resource name is required"),
-  type: z.enum(["application", "database", "compose"]),
-  appName: z.string().min(1, "App Name is required"),
-  description: z.string().optional(),
-  dbType: z.string().optional(),
-  composeType: ResourceComposeTypeSchema.optional(),
-  dockerImage: z.string().optional(),
-  buildRegistryId: z.string().nullable().optional(),
-  rollbackActive: z.boolean().optional(),
-  rollbackRegistryId: z.string().nullable().optional(),
-  allowCustomImage: z.boolean().optional(),
-  externalPort: z.coerce.number().int().min(1).max(65535).optional(),
-  libsqlGrpcPort: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(65535)
-    .nullable()
-    .optional(),
-  libsqlAdminPort: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(65535)
-    .nullable()
-    .optional(),
-  credentials: z.string().optional(),
-  triggerType: z.enum(["push", "tag"]).optional(),
-  tagPattern: z.string().trim().max(512).nullable().optional(),
-  watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
-  buildConfig: ApplicationBuildConfigSchema.optional(),
-  buildSecrets: z.string().optional(),
-  isPreviewDeploymentsActive: z.boolean().optional(),
-  previewLimit: z.coerce.number().int().min(1).max(100).optional(),
-  previewWildcard: z.string().trim().min(1).max(253).nullable().optional(),
-  previewHttps: z.boolean().optional(),
-  previewPort: z.coerce.number().int().min(1).max(65535).optional(),
-  serverId: z.string().optional(),
-  buildServerId: z.string().nullable().optional(),
-  advancedConfig: ResourceAdvancedConfigSchema.optional(),
-  envVars: z.record(z.string(), z.string()).optional(),
-  domains: z.array(DomainMappingSchema).optional(),
-});
+export const CreateResourceInputSchema = z
+  .object({
+    environmentId: z.string().min(1, "Environment ID is required"),
+    name: z.string().min(1, "Resource name is required"),
+    type: z.enum(["application", "database", "compose"]),
+    appName: z.string().min(1, "App Name is required"),
+    description: z.string().optional(),
+    dbType: z.string().optional(),
+    composeType: ResourceComposeTypeSchema.optional(),
+    dockerImage: z.string().optional(),
+    buildRegistryId: z.string().nullable().optional(),
+    rollbackActive: z.boolean().optional(),
+    rollbackRegistryId: z.string().nullable().optional(),
+    allowCustomImage: z.boolean().optional(),
+    externalPort: z.coerce.number().int().min(1).max(65535).optional(),
+    libsqlGrpcPort: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(65535)
+      .nullable()
+      .optional(),
+    libsqlAdminPort: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(65535)
+      .nullable()
+      .optional(),
+    credentials: z.string().optional(),
+    triggerType: z.enum(["push", "tag"]).optional(),
+    tagPattern: z.string().trim().max(512).nullable().optional(),
+    watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
+    buildConfig: ApplicationBuildConfigSchema.optional(),
+    buildSecrets: z.string().optional(),
+    serverId: z.string().optional(),
+    buildServerId: z.string().nullable().optional(),
+    advancedConfig: ResourceAdvancedConfigSchema.optional(),
+    envVars: z.record(z.string(), z.string()).optional(),
+    domains: z.array(DomainMappingSchema).optional(),
+  })
+  .extend(ResourcePreviewFieldsSchema.shape);
 
 export type CreateResourceInput = z.infer<typeof CreateResourceInputSchema>;
 

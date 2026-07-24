@@ -291,6 +291,69 @@ export const aiRouter = router({
       return { removed: true };
     }),
 
+  // ── Tavily Settings ──────────────────────────────────────────────────────
+
+  getTavilySettings: protectedProcedure
+    .input(organizationInput)
+    .query(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:view",
+      );
+      const row = await ctx.scope
+        .resolve(AIRepositoryToken)
+        .getTavilySettings(input.organizationId);
+      return {
+        enabled: row?.enabled ?? false,
+        configured: Boolean(row?.apiKeyCiphertext),
+        searchDepth: row?.searchDepth ?? "basic",
+        includeAnswer: row?.includeAnswer ?? false,
+        maxResults: row?.maxResults ?? 5,
+        enableSearch: row?.enableSearch ?? true,
+        enableExtract: row?.enableExtract ?? false,
+        enableCrawl: row?.enableCrawl ?? false,
+        enableMap: row?.enableMap ?? false,
+      };
+    }),
+
+  saveTavilySettings: twoFactorVerifiedProcedure
+    .input(
+      organizationInput.extend({
+        enabled: z.boolean(),
+        apiKey: z.string().optional(),
+        searchDepth: z.enum(["basic", "advanced"]).default("basic"),
+        includeAnswer: z.boolean().default(false),
+        maxResults: z.number().int().min(1).max(20).default(5),
+        enableSearch: z.boolean().default(true),
+        enableExtract: z.boolean().default(false),
+        enableCrawl: z.boolean().default(false),
+        enableMap: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkPermission(
+        ctx.session.user.id,
+        input.organizationId,
+        "ai:manage",
+      );
+      const secret = input.apiKey ? encryptSecret(input.apiKey) : undefined;
+      await ctx.scope
+        .resolve(AIRepositoryToken)
+        .saveTavilySettings(input.organizationId, {
+          enabled: input.enabled,
+          searchDepth: input.searchDepth,
+          includeAnswer: input.includeAnswer,
+          maxResults: input.maxResults,
+          enableSearch: input.enableSearch,
+          enableExtract: input.enableExtract,
+          enableCrawl: input.enableCrawl,
+          enableMap: input.enableMap,
+          secret,
+        });
+      return { saved: true };
+    }),
+
   // ── Conversations ────────────────────────────────────────────────────────
 
   conversations: protectedProcedure

@@ -84,6 +84,7 @@ import { checkPermission } from "../permissions";
 import { connectUpGalMCPApps } from "./mcp-apps";
 import { listUpGalModelCatalog } from "./model-catalog";
 import { getUpGalProvider, type UpGalProviderOverrides } from "./provider";
+import { createTavilyToolsForOrg } from "./tavily-tools";
 import {
   mutationTool,
   readTool,
@@ -303,6 +304,10 @@ export const UPGAL_TOOL_METADATA = [
   ["list_tags", "Read all tags in the active organization.", false],
   ["get_resource_tags", "Read tags currently assigned to a resource.", false],
   ["search_web", "Search the public web and return cited result links.", false],
+  ["tavilySearch", "Search the public web using Tavily search.", false],
+  ["tavilyExtract", "Extract web page content using Tavily extract.", false],
+  ["tavilyCrawl", "Crawl website pages using Tavily crawl.", false],
+  ["tavilyMap", "Map website structure and links using Tavily map.", false],
   [
     "guide_upstand",
     "Return a bounded, ordered Upstand UI walkthrough using internal navigation and registered page targets.",
@@ -798,6 +803,10 @@ export const UPGAL_TOOL_INPUT_SCHEMAS: Record<UpGalToolName, z.ZodType> = {
   list_tags: emptySchema,
   get_resource_tags: resourceTagSchema.pick({ resourceId: true }),
   search_web: webSearchSchema,
+  tavilySearch: z.any(),
+  tavilyExtract: z.any(),
+  tavilyCrawl: z.any(),
+  tavilyMap: z.any(),
   guide_upstand: guideUpstandSchema,
   create_project: createProjectSchema,
   create_template: templateLookupSchema,
@@ -2088,9 +2097,15 @@ export async function createUpGalResponse(
     }
   };
 
+  const tavily = await createTavilyToolsForOrg(
+    context.organizationId,
+    repository(context),
+  );
+
   const agentTools = {
     ...createUpGalTools(context),
     ...mcpApps.tools,
+    ...(tavily.enabled ? tavily.tools : {}),
   };
   const toolsContext = Object.fromEntries(
     Object.keys(agentTools).map((name) => [

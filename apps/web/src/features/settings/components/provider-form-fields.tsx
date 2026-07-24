@@ -23,6 +23,17 @@ export type ProviderFormValues = {
   maxOutputTokens: number | null;
 };
 
+export const DEFAULT_PROVIDER_FORM_VALUES: ProviderFormValues = {
+  name: "",
+  provider: "openai",
+  model: "gpt-4o-mini",
+  apiKey: "",
+  baseUrl: "",
+  temperature: 0.5,
+  reasoningEnabled: false,
+  maxOutputTokens: null,
+};
+
 type Props = {
   values: ProviderFormValues;
   onChange: (next: Partial<ProviderFormValues>) => void;

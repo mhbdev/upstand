@@ -114,7 +114,9 @@ export const swarmRouter = router({
     }),
 
   updateNode: twoFactorVerifiedProcedure
-    .input(SwarmOrganizationInputSchema.merge(UpdateSwarmNodeInputSchema))
+    .input(
+      SwarmOrganizationInputSchema.extend(UpdateSwarmNodeInputSchema.shape),
+    )
     .mutation(async ({ ctx, input }) => {
       await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(UpdateSwarmNodeUseCaseToken);
@@ -145,7 +147,7 @@ export const swarmRouter = router({
     }),
 
   initSwarm: twoFactorVerifiedProcedure
-    .input(SwarmOrganizationInputSchema.merge(InitSwarmInputSchema))
+    .input(SwarmOrganizationInputSchema.extend(InitSwarmInputSchema.shape))
     .mutation(async ({ ctx, input }) => {
       await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(InitSwarmUseCaseToken);
@@ -176,7 +178,9 @@ export const swarmRouter = router({
     }),
 
   removeNode: twoFactorVerifiedProcedure
-    .input(SwarmOrganizationInputSchema.merge(RemoveSwarmNodeInputSchema))
+    .input(
+      SwarmOrganizationInputSchema.extend(RemoveSwarmNodeInputSchema.shape),
+    )
     .mutation(async ({ ctx, input }) => {
       await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(RemoveSwarmNodeUseCaseToken);
@@ -249,7 +253,11 @@ export const swarmRouter = router({
     }),
 
   rotateJoinToken: twoFactorVerifiedProcedure
-    .input(SwarmOrganizationInputSchema.merge(RotateSwarmJoinTokenInputSchema))
+    .input(
+      SwarmOrganizationInputSchema.extend(
+        RotateSwarmJoinTokenInputSchema.shape,
+      ),
+    )
     .mutation(async ({ ctx, input }) => {
       await requireClusterOwner(ctx, input.organizationId);
       const useCase = ctx.scope.resolve(RotateSwarmJoinTokenUseCaseToken);

@@ -93,6 +93,7 @@ import {
   MinusSignIcon as MinusSignIconFreeIcon,
   Monitor as MonitorFreeIcon,
   Moon as MoonFreeIcon,
+  MoreVertical,
   MusicNote01Icon as MusicNote01IconFreeIcon,
   Network as NetworkFreeIcon,
   PackageIcon as PackageIconFreeIcon,
@@ -291,6 +292,7 @@ const iconMap: Record<string, IconSvgElement> = {
   XCircle: XCircleFreeIcon,
   XCircleIcon: CancelCircleIconFreeIcon,
   XIcon: Cancel01IconFreeIcon,
+  MoreVertical: MoreVertical,
 };
 
 function createHugeIcon(icon: IconSvgElement): HugeIcon {
@@ -438,6 +440,7 @@ export const WrenchIcon = createHugeIcon(iconMap.WrenchIcon);
 export const X = createHugeIcon(iconMap.X);
 export const XCircle = createHugeIcon(iconMap.XCircle);
 export const XCircleIcon = createHugeIcon(iconMap.XCircleIcon);
+export const MoreVerticalIcon = createHugeIcon(iconMap.MoreVertical);
 export const XIcon = createHugeIcon(iconMap.XIcon);
 export const AnalyticsUpIcon = LineChart;
 export const Rocket01Icon = Rocket;

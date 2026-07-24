@@ -29,55 +29,59 @@ import { createRemoteServices } from "./docker-client";
 import { validateLibsqlSettings } from "./libsql-settings";
 import { serializeResourceCredentials } from "./resource-credentials";
 import { serializeResourceEnvironmentVariables } from "./resource-environment";
+import { ResourcePreviewFieldsSchema } from "./resource-preview-fields.schema";
 
-export const UpdateResourceInputSchema = z.object({
-  id: z.string().min(1, "Resource ID is required"),
-  name: z.string().optional(),
-  status: z.enum(["running", "stopped"]).optional(),
-  appName: z.string().optional(),
-  description: z.string().optional(),
-  provider: z.string().optional(),
-  dbType: z.string().optional(),
-  dockerImage: z.string().optional(),
-  buildRegistryId: z.string().nullable().optional(),
-  rollbackActive: z.boolean().optional(),
-  rollbackRegistryId: z.string().nullable().optional(),
-  allowCustomImage: z.boolean().optional(),
-  externalPort: z.coerce.number().int().min(1).max(65535).nullable().optional(),
-  libsqlGrpcPort: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(65535)
-    .nullable()
-    .optional(),
-  libsqlAdminPort: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(65535)
-    .nullable()
-    .optional(),
-  composeType: ResourceComposeTypeSchema.optional(),
-  credentials: z.string().optional(),
-  triggerType: z.enum(["push", "tag"]).optional(),
-  tagPattern: z.string().trim().max(512).nullable().optional(),
-  watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
-  buildConfig: ApplicationBuildConfigSchema.optional(),
-  buildSecrets: z.string().optional(),
-  isPreviewDeploymentsActive: z.boolean().optional(),
-  previewLimit: z.coerce.number().int().min(1).max(100).optional(),
-  previewWildcard: z.string().trim().min(1).max(253).nullable().optional(),
-  previewHttps: z.boolean().optional(),
-  previewPort: z.coerce.number().int().min(1).max(65535).optional(),
-  advancedConfig: z.string().optional(),
-  envVars: z.string().optional(),
-  domains: z.string().optional(),
-  serverId: z.string().nullable().optional(),
-  buildServerId: z.string().nullable().optional(),
-  cronJobsEnabled: z.boolean().optional(),
-  icon: EntityIconSchema,
-});
+export const UpdateResourceInputSchema = z
+  .object({
+    id: z.string().min(1, "Resource ID is required"),
+    name: z.string().optional(),
+    status: z.enum(["running", "stopped"]).optional(),
+    appName: z.string().optional(),
+    description: z.string().optional(),
+    provider: z.string().optional(),
+    dbType: z.string().optional(),
+    dockerImage: z.string().optional(),
+    buildRegistryId: z.string().nullable().optional(),
+    rollbackActive: z.boolean().optional(),
+    rollbackRegistryId: z.string().nullable().optional(),
+    allowCustomImage: z.boolean().optional(),
+    externalPort: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(65535)
+      .nullable()
+      .optional(),
+    libsqlGrpcPort: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(65535)
+      .nullable()
+      .optional(),
+    libsqlAdminPort: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(65535)
+      .nullable()
+      .optional(),
+    composeType: ResourceComposeTypeSchema.optional(),
+    credentials: z.string().optional(),
+    triggerType: z.enum(["push", "tag"]).optional(),
+    tagPattern: z.string().trim().max(512).nullable().optional(),
+    watchPaths: z.array(z.string().trim().min(1).max(512)).max(64).optional(),
+    buildConfig: ApplicationBuildConfigSchema.optional(),
+    buildSecrets: z.string().optional(),
+    advancedConfig: z.string().optional(),
+    envVars: z.string().optional(),
+    domains: z.string().optional(),
+    serverId: z.string().nullable().optional(),
+    buildServerId: z.string().nullable().optional(),
+    cronJobsEnabled: z.boolean().optional(),
+    icon: EntityIconSchema,
+  })
+  .extend(ResourcePreviewFieldsSchema.shape);
 
 export type UpdateResourceInput = z.infer<typeof UpdateResourceInputSchema>;
 

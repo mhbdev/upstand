@@ -9,16 +9,9 @@ import {
 } from "@upstand/ui/components/input-group";
 import { cn } from "@upstand/ui/lib/utils";
 import type { ComponentProps } from "react";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useContext, useMemo } from "react";
 import { CheckIcon, CopyIcon } from "@/components/huge-icons";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 interface SnippetContextType {
   code: string;
@@ -96,37 +89,12 @@ export const SnippetCopyButton = ({
   className,
   ...props
 }: SnippetCopyButtonProps) => {
-  const [isCopied, setIsCopied] = useState(false);
-  const timeoutRef = useRef<number>(0);
   const { code } = useContext(SnippetContext);
-
-  const copyToClipboard = useCallback(async () => {
-    if (typeof window === "undefined" || !navigator?.clipboard?.writeText) {
-      onError?.(new Error("Clipboard API not available"));
-      return;
-    }
-
-    try {
-      if (!isCopied) {
-        await navigator.clipboard.writeText(code);
-        setIsCopied(true);
-        onCopy?.();
-        timeoutRef.current = window.setTimeout(
-          () => setIsCopied(false),
-          timeout,
-        );
-      }
-    } catch (error) {
-      onError?.(error as Error);
-    }
-  }, [code, onCopy, onError, timeout, isCopied]);
-
-  useEffect(
-    () => () => {
-      window.clearTimeout(timeoutRef.current);
-    },
-    [],
-  );
+  const { isCopied, copyToClipboard } = useCopyToClipboard(code, {
+    timeout,
+    onCopy,
+    onError,
+  });
 
   const Icon = isCopied ? CheckIcon : CopyIcon;
 

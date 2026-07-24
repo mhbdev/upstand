@@ -46,6 +46,35 @@ async function assertResourcePermission(
   return authorizeResource(ctx, resourceId, { action: permission });
 }
 
+async function resolveResourceBackupScheduleAndCheckPermission(
+  ctx: AuthenticatedContext,
+  scheduleId: string,
+  permission: PermissionAction,
+) {
+  const uow = ctx.scope.resolve(UnitOfWorkToken);
+  const schedule = await uow.backupScheduleRepository.findById(scheduleId);
+  if (!schedule) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Backup schedule not found",
+    });
+  }
+  if (schedule.kind === "web-server") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Use the web-server backup schedule endpoint",
+    });
+  }
+  if (!schedule.resourceId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Backup schedule has no resource",
+    });
+  }
+  await assertResourcePermission(ctx, schedule.resourceId, permission);
+  return schedule;
+}
+
 async function assertOrganizationPermission(
   ctx: AuthenticatedContext,
   _organizationId: string,
@@ -322,27 +351,11 @@ export const backupRouter = router({
   updateSchedule: twoFactorVerifiedProcedure
     .input(UpdateBackupScheduleInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken);
-      const schedule = await uow.backupScheduleRepository.findById(input.id);
-      if (!schedule) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Backup schedule not found",
-        });
-      }
-      if (schedule.kind === "web-server") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Use the web-server backup schedule endpoint",
-        });
-      }
-      if (!schedule.resourceId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Backup schedule has no resource",
-        });
-      }
-      await assertResourcePermission(ctx, schedule.resourceId, "backup:manage");
+      await resolveResourceBackupScheduleAndCheckPermission(
+        ctx,
+        input.id,
+        "backup:manage",
+      );
       try {
         const result = await ctx.scope
           .resolve(UpdateBackupScheduleUseCaseToken)
@@ -357,27 +370,11 @@ export const backupRouter = router({
   deleteSchedule: twoFactorVerifiedProcedure
     .input(DeleteBackupScheduleInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken);
-      const schedule = await uow.backupScheduleRepository.findById(input.id);
-      if (!schedule) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Backup schedule not found",
-        });
-      }
-      if (schedule.kind === "web-server") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Use the web-server backup schedule endpoint",
-        });
-      }
-      if (!schedule.resourceId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Backup schedule has no resource",
-        });
-      }
-      await assertResourcePermission(ctx, schedule.resourceId, "backup:manage");
+      await resolveResourceBackupScheduleAndCheckPermission(
+        ctx,
+        input.id,
+        "backup:manage",
+      );
       try {
         const result = await ctx.scope
           .resolve(DeleteBackupScheduleUseCaseToken)
@@ -392,29 +389,11 @@ export const backupRouter = router({
   runNow: twoFactorVerifiedProcedure
     .input(TriggerBackupRunInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const uow = ctx.scope.resolve(UnitOfWorkToken);
-      const schedule = await uow.backupScheduleRepository.findById(
+      await resolveResourceBackupScheduleAndCheckPermission(
+        ctx,
         input.scheduleId,
+        "backup:manage",
       );
-      if (!schedule) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Backup schedule not found",
-        });
-      }
-      if (schedule.kind === "web-server") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Use the web-server backup endpoint",
-        });
-      }
-      if (!schedule.resourceId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Backup schedule has no resource",
-        });
-      }
-      await assertResourcePermission(ctx, schedule.resourceId, "backup:manage");
       try {
         return await ctx.scope
           .resolve(TriggerBackupRunUseCaseToken)

@@ -2,6 +2,7 @@ import type { IUnitOfWork } from "@upstand/domain";
 import { redis } from "@upstand/redis";
 import { Queue } from "bullmq";
 import { getDeploymentQueueName } from "./deployment-queue-name";
+import { findOrganizationResourceIds } from "./organization-resources.helper";
 
 export interface QueueJobResult {
   id: string;
@@ -24,22 +25,11 @@ export class GetQueueUseCase {
   async executeForOrganization(
     organizationId: string,
   ): Promise<QueueJobResult[]> {
-    const projects =
-      await this.uow.projectRepository.findByOrganizationId(organizationId);
-    const projectIds = new Set(projects.map((project) => project.id));
-    const environments = [];
-    for (const projectId of projectIds) {
-      const envs =
-        await this.uow.environmentRepository.findByProjectId(projectId);
-      environments.push(...envs);
-    }
-    const environmentIds = new Set(environments.map((env) => env.id));
-    const resources = [];
-    for (const envId of environmentIds) {
-      const res = await this.uow.resourceRepository.findByEnvironmentId(envId);
-      resources.push(...res);
-    }
-    return this.execute(resources.map((resource) => resource.id));
+    const resourceIds = await findOrganizationResourceIds(
+      this.uow,
+      organizationId,
+    );
+    return this.execute(resourceIds);
   }
 
   async execute(resourceIds?: readonly string[]): Promise<QueueJobResult[]> {

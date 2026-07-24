@@ -1,10 +1,8 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
 import { getBitbucketBranches } from "./bitbucket-client";
-import {
-  getOrRefreshGitProviderToken,
-  parseGitProviderConfig,
-} from "./git-provider-config";
+import { getOrRefreshGitProviderToken } from "./git-provider-config";
+import { resolveGitProviderAndConfig } from "./git-provider-resolution.helper";
 import { getGiteaBranches } from "./gitea-client";
 import { getBranches } from "./github-client";
 import { getGitlabBranches } from "./gitlab-client";
@@ -22,25 +20,12 @@ export class ListGitBranchesUseCase {
 
   async execute(input: ListGitBranchesInput) {
     return this.uow.transaction(async (tx) => {
-      const provider = await tx.gitProviderRepository.findById(
+      const { provider, config } = await resolveGitProviderAndConfig(
+        tx,
         input.gitProviderId,
       );
-      if (!provider) {
-        throw new Error("Git Provider not found");
-      }
-
-      const config = parseGitProviderConfig(provider);
 
       if (provider.provider === "github") {
-        if (
-          !config.githubAppId ||
-          !config.githubPrivateKey ||
-          !config.githubInstallationId
-        ) {
-          throw new Error(
-            "GitHub App is not fully configured (missing installation)",
-          );
-        }
         return await getBranches(
           String(config.githubAppId),
           config.githubPrivateKey,

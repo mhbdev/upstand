@@ -25,6 +25,47 @@ import {
 import { logRequestError } from "../error-logging";
 import type { AppEnv } from "../types";
 
+async function validateSafeTarArchive(
+  buffer: Buffer,
+  uploadTypeName: string,
+): Promise<string | null> {
+  const tempArchive = path.join(
+    process.cwd(),
+    ".builds",
+    `${uploadTypeName}-upload-${randomUUID()}.tar`,
+  );
+  fs.mkdirSync(path.dirname(tempArchive), { recursive: true });
+  fs.writeFileSync(tempArchive, buffer);
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFileAsync = promisify(execFile);
+    const listing = await execFileAsync("tar", ["-tf", tempArchive]);
+    const detailedListing = await execFileAsync("tar", ["-tvf", tempArchive]);
+    if (
+      detailedListing.stdout
+        .split(/\r?\n/)
+        .some((entry) => /^[lh]/i.test(entry))
+    ) {
+      return `Symbolic and hard links are not allowed in ${uploadTypeName} uploads`;
+    }
+    const unsafeEntry = listing.stdout
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .find((entry) => {
+        if (!entry || path.isAbsolute(entry)) return Boolean(entry);
+        const normalized = path.posix.normalize(entry.replaceAll("\\", "/"));
+        return normalized === ".." || normalized.startsWith("../");
+      });
+    if (unsafeEntry) {
+      return `Archive entry escapes the destination: ${unsafeEntry}`;
+    }
+    return null;
+  } finally {
+    fs.rmSync(tempArchive, { force: true });
+  }
+}
+
 const DeploymentWebhookPayloadSchema = z
   .object({
     ref: z.string().optional(),
@@ -241,7 +282,6 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
   });
 
   app.post("/api/docker/volumes/:volumeName/upload", async (c) => {
-    const requestLog = c.get("log");
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: "Authentication required" }, 401);
 
@@ -278,200 +318,87 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
       return c.json({ error: "Volume archives must not exceed 50 MB" }, 413);
     }
 
-    const tempArchive = path.join(
-      process.cwd(),
-      ".builds",
-      `volume-upload-${randomUUID()}.tar`,
-    );
-    fs.mkdirSync(path.dirname(tempArchive), { recursive: true });
-    fs.writeFileSync(tempArchive, buffer);
-    try {
-      const { execFile } = await import("node:child_process");
-      const { promisify } = await import("node:util");
-      const execFileAsync = promisify(execFile);
-      const listing = await execFileAsync("tar", ["-tf", tempArchive]);
-      const detailedListing = await execFileAsync("tar", ["-tvf", tempArchive]);
-      if (
-        detailedListing.stdout
-          .split(/\r?\n/)
-          .some((entry) => /^[lh]/i.test(entry))
-      ) {
-        return c.json(
-          {
-            error: "Symbolic and hard links are not allowed in volume uploads",
-          },
-          400,
-        );
-      }
-      const unsafeEntry = listing.stdout
-        .split(/\r?\n/)
-        .map((entry) => entry.trim())
-        .find((entry) => {
-          if (!entry || path.isAbsolute(entry)) return Boolean(entry);
-          const normalized = path.posix.normalize(entry.replaceAll("\\", "/"));
-          return normalized === ".." || normalized.startsWith("../");
-        });
-      if (unsafeEntry) {
-        return c.json(
-          { error: `Archive entry escapes the destination: ${unsafeEntry}` },
-          400,
-        );
-      }
+    const archiveError = await validateSafeTarArchive(buffer, "volume");
+    if (archiveError) return c.json({ error: archiveError }, 400);
 
-      const parsed = UploadDockerVolumeInputSchema.parse({
-        organizationId,
-        serverId: c.req.query("serverId") || undefined,
-        volumeName: c.req.param("volumeName"),
-        destination: c.req.query("destination") || "/",
-      });
-      const result = await c
-        .get("scope")
-        .resolve(GetDockerInventoryUseCaseToken)
-        .uploadVolume(parsed, buffer);
-      return c.json(result, 201);
-    } catch (error) {
-      logRequestError(requestLog, error, {
-        message: "Docker volume archive upload failed",
-        organizationId,
-        volumeName: c.req.param("volumeName"),
-      });
-      return c.json({ error: "Unable to upload Docker volume archive" }, 400);
-    } finally {
-      fs.rmSync(tempArchive, { force: true });
-    }
-  });
-
-  app.post("/api/docker/containers/:containerId/upload", async (c) => {
-    const requestLog = c.get("log");
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: "Authentication required" }, 401);
-
-    const organizationId = c.req.query("organizationId");
-    const resourceId = c.req.query("resourceId");
-    if (!organizationId) {
-      return c.json({ error: "organizationId is required" }, 400);
-    }
-    try {
-      await checkPermission(session.user.id, organizationId, "server:update");
-    } catch {
-      return c.json({ error: "Docker container upload is not permitted" }, 403);
-    }
-    if (session.user.twoFactorEnabled) {
-      const verified = await redis.get(`2fa-verified:${session.session.id}`);
-      if (!verified) {
-        return c.json({ error: "2FA verification required" }, 403);
-      }
-    }
-
-    const uow = c.get("scope").resolve(UnitOfWorkToken);
-    if (!resourceId) {
-      return c.json(
-        { error: "resourceId is required for container uploads" },
-        400,
-      );
-    }
-    const resource = await uow.resourceRepository.findById(resourceId);
-    const environment = resource
-      ? await uow.environmentRepository.findById(resource.environmentId)
-      : null;
-    const project = environment
-      ? await uow.projectRepository.findById(environment.projectId)
-      : null;
-    if (!resource || !project || project.organizationId !== organizationId) {
-      return c.json(
-        { error: "Resource is not part of this organization" },
-        403,
-      );
-    }
-    const requestedServerId = c.req.query("serverId") || "local";
-    const resourceServerId = resource.serverId || "local";
-    if (
-      (resourceServerId === "manager" ? "local" : resourceServerId) !==
-      (requestedServerId === "manager" ? "local" : requestedServerId)
-    ) {
-      return c.json(
-        { error: "Container target does not match its resource" },
-        403,
-      );
-    }
-    const liveContainers = await c
+    const parsed = UploadDockerVolumeInputSchema.parse({
+      organizationId,
+      serverId: c.req.query("serverId") || undefined,
+      volumeName: c.req.param("volumeName"),
+      destination: c.req.query("destination") || "/",
+    });
+    const result = await c
       .get("scope")
       .resolve(GetDockerInventoryUseCaseToken)
-      .execute({
-        organizationId,
-        serverId: requestedServerId,
-        kind: "containers",
-        tail: 150,
-      });
-    if (
-      !Array.isArray(liveContainers) ||
-      !liveContainers.some(
-        (container) =>
-          typeof container === "object" &&
-          container !== null &&
-          (container as { id?: string }).id === c.req.param("containerId"),
-      )
-    ) {
-      return c.json({ error: "Container is not owned by this resource" }, 404);
-    }
+      .uploadVolume(parsed, buffer);
+    return c.json(result, 201);
+  });
 
-    const body = await c.req.parseBody();
-    const file = body.file;
-    if (!file || typeof file === "string") {
-      return c.json({ error: "Upload payload ('file') is required" }, 400);
-    }
-    if (!file.name.toLowerCase().endsWith(".tar")) {
-      return c.json(
-        { error: "Only uncompressed .tar archives are supported" },
-        400,
+  app.post(
+    "/api/resources/:resourceId/containers/:containerId/upload",
+    async (c) => {
+      const session = await auth.api.getSession({ headers: c.req.raw.headers });
+      if (!session) return c.json({ error: "Authentication required" }, 401);
+
+      const organizationId = c.req.query("organizationId");
+      if (!organizationId) {
+        return c.json({ error: "Organization ID is required" }, 400);
+      }
+      const resourceId = c.req.param("resourceId");
+
+      const scope = c.get("scope");
+      const uow = scope.resolve(UnitOfWorkToken);
+      const resource = await uow.resourceRepository.findById(resourceId);
+      if (!resource) return c.json({ error: "Resource not found" }, 404);
+      const environment = await uow.environmentRepository.findById(
+        resource.environmentId,
       );
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    if (buffer.byteLength > 50 * 1024 * 1024) {
-      return c.json({ error: "Container archives must not exceed 50 MB" }, 413);
-    }
-
-    const tempArchive = path.join(
-      process.cwd(),
-      ".builds",
-      `container-upload-${randomUUID()}.tar`,
-    );
-    fs.mkdirSync(path.dirname(tempArchive), { recursive: true });
-    fs.writeFileSync(tempArchive, buffer);
-    try {
-      const { execFile } = await import("node:child_process");
-      const { promisify } = await import("node:util");
-      const execFileAsync = promisify(execFile);
-      const listing = await execFileAsync("tar", ["-tf", tempArchive]);
-      const detailedListing = await execFileAsync("tar", ["-tvf", tempArchive]);
-      if (
-        detailedListing.stdout
-          .split(/\r?\n/)
-          .some((entry) => /^[lh]/i.test(entry))
-      ) {
+      const project = environment
+        ? await uow.projectRepository.findById(environment.projectId)
+        : null;
+      if (!project || project.organizationId !== organizationId) {
         return c.json(
-          {
-            error:
-              "Symbolic and hard links are not allowed in container uploads",
-          },
+          { error: "Resource is not part of this organization" },
+          403,
+        );
+      }
+
+      try {
+        await checkPermission(
+          session.user.id,
+          organizationId,
+          "resource:update",
+        );
+      } catch {
+        return c.json({ error: "Resource update permission is required" }, 403);
+      }
+
+      const formData = await c.req.formData().catch(() => null);
+      const file = formData?.get("file");
+      if (!(file instanceof File)) {
+        return c.json({ error: "Archive file is required" }, 400);
+      }
+      if (!file.name.endsWith(".tar")) {
+        return c.json(
+          { error: "Only uncompressed .tar archives are supported" },
           400,
         );
       }
-      const unsafeEntry = listing.stdout
-        .split(/\r?\n/)
-        .map((entry) => entry.trim())
-        .find((entry) => {
-          if (!entry || path.isAbsolute(entry)) return Boolean(entry);
-          const normalized = path.posix.normalize(entry.replaceAll("\\", "/"));
-          return normalized === ".." || normalized.startsWith("../");
-        });
-      if (unsafeEntry) {
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      if (buffer.byteLength > 50 * 1024 * 1024) {
         return c.json(
-          { error: `Archive entry escapes the destination: ${unsafeEntry}` },
-          400,
+          { error: "Container archives must not exceed 50 MB" },
+          413,
         );
       }
+
+      const containerArchiveError = await validateSafeTarArchive(
+        buffer,
+        "container",
+      );
+      if (containerArchiveError)
+        return c.json({ error: containerArchiveError }, 400);
 
       const parsed = UploadDockerContainerInputSchema.parse({
         organizationId,
@@ -485,19 +412,6 @@ export function registerDeploymentRoutes(app: Hono<AppEnv>): void {
         .resolve(GetDockerInventoryUseCaseToken)
         .uploadContainer(parsed, buffer);
       return c.json(result, 201);
-    } catch (error) {
-      logRequestError(requestLog, error, {
-        message: "Docker container archive upload failed",
-        organizationId,
-        resourceId,
-        containerId: c.req.param("containerId"),
-      });
-      return c.json(
-        { error: "Unable to upload Docker container archive" },
-        400,
-      );
-    } finally {
-      fs.rmSync(tempArchive, { force: true });
-    }
-  });
+    },
+  );
 }

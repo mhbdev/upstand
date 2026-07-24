@@ -11,7 +11,7 @@ import {
   CreateGitProviderUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import type { AppEnv } from "../types";
 
 function getDashboardUrl(path: string): string {
@@ -175,6 +175,55 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
     return c.redirect(getDashboardUrl("/git-providers"), 307);
   });
 
+  async function verifyOAuthStateAndGetProvider(
+    c: Context<AppEnv>,
+    state: string,
+  ) {
+    const parsedState = parseGitProviderOAuthState(state);
+    if (parsedState?.purpose !== "provider-oauth") {
+      return {
+        response: c.json({ error: "Invalid or expired OAuth state" }, 400),
+      };
+    }
+    const storedProviderId = await redis.eval(
+      "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value",
+      1,
+      gitProviderOAuthStateKey(state),
+    );
+    if (storedProviderId !== parsedState.providerId) {
+      return {
+        response: c.json(
+          { error: "OAuth state was already used or is invalid" },
+          400,
+        ),
+      };
+    }
+    const scope = c.get("scope");
+    const uow = scope.resolve(UnitOfWorkToken);
+    const provider = await uow.gitProviderRepository.findById(
+      parsedState.providerId,
+    );
+    if (!provider) {
+      return { response: c.text("Git Provider not found", 404) };
+    }
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (
+      provider.organizationId !== parsedState.organizationId ||
+      !session ||
+      session.user.id !== parsedState.userId
+    ) {
+      return { response: c.text("OAuth state actor is no longer valid", 403) };
+    }
+    await checkPermission(
+      session.user.id,
+      provider.organizationId,
+      "git_provider:create",
+    );
+    return { provider, uow };
+  }
+
   app.get("/api/providers/gitlab/setup", async (c) => {
     const code = c.req.query("code");
     const state = c.req.query("state");
@@ -183,42 +232,10 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
       return c.json({ error: "Missing code or state parameter" }, 400);
     }
 
-    const scope = c.get("scope");
     try {
-      const parsedState = parseGitProviderOAuthState(state);
-      if (parsedState?.purpose !== "provider-oauth") {
-        return c.json({ error: "Invalid or expired OAuth state" }, 400);
-      }
-      const storedProviderId = await redis.eval(
-        "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value",
-        1,
-        gitProviderOAuthStateKey(state),
-      );
-      if (storedProviderId !== parsedState.providerId) {
-        return c.json(
-          { error: "OAuth state was already used or is invalid" },
-          400,
-        );
-      }
-      const uow = scope.resolve(UnitOfWorkToken);
-      const provider = await uow.gitProviderRepository.findById(
-        parsedState.providerId,
-      );
-      if (!provider) {
-        return c.text("Git Provider not found", 404);
-      }
-      if (
-        provider.organizationId !== parsedState.organizationId ||
-        parsedState.userId !==
-          (await auth.api.getSession({ headers: c.req.raw.headers }))?.user.id
-      ) {
-        return c.text("OAuth state actor is no longer valid", 403);
-      }
-      await checkPermission(
-        parsedState.userId,
-        provider.organizationId,
-        "git_provider:create",
-      );
+      const verified = await verifyOAuthStateAndGetProvider(c, state);
+      if (verified.response) return verified.response;
+      const { provider, uow } = verified;
 
       const configObj = JSON.parse(provider.config);
       const gitlabUrl = assertSafeProviderUrl(configObj.gitlabUrl);
@@ -283,44 +300,10 @@ export function registerProviderRoutes(app: Hono<AppEnv>): void {
       return c.json({ error: "Missing code or state parameter" }, 400);
     }
 
-    const scope = c.get("scope");
     try {
-      const parsedState = parseGitProviderOAuthState(state);
-      if (parsedState?.purpose !== "provider-oauth") {
-        return c.json({ error: "Invalid or expired OAuth state" }, 400);
-      }
-      const storedProviderId = await redis.eval(
-        "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value",
-        1,
-        gitProviderOAuthStateKey(state),
-      );
-      if (storedProviderId !== parsedState.providerId) {
-        return c.json(
-          { error: "OAuth state was already used or is invalid" },
-          400,
-        );
-      }
-      const uow = scope.resolve(UnitOfWorkToken);
-      const provider = await uow.gitProviderRepository.findById(
-        parsedState.providerId,
-      );
-      if (!provider) {
-        return c.text("Git Provider not found", 404);
-      }
-      if (provider.organizationId !== parsedState.organizationId) {
-        return c.text("OAuth state organization mismatch", 403);
-      }
-      const currentSession = await auth.api.getSession({
-        headers: c.req.raw.headers,
-      });
-      if (!currentSession || currentSession.user.id !== parsedState.userId) {
-        return c.text("OAuth state actor is no longer valid", 403);
-      }
-      await checkPermission(
-        currentSession.user.id,
-        provider.organizationId,
-        "git_provider:create",
-      );
+      const verified = await verifyOAuthStateAndGetProvider(c, state);
+      if (verified.response) return verified.response;
+      const { provider, uow } = verified;
 
       const configObj = JSON.parse(provider.config);
       const giteaUrl = assertSafeProviderUrl(configObj.giteaUrl);

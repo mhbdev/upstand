@@ -1,4 +1,5 @@
 import type { Environment, IUnitOfWork, Project } from "@upstand/domain";
+import { findOrganizationResourceIds } from "./organization-resources.helper";
 
 export interface DeploymentHistoryResult {
   id: string;
@@ -21,22 +22,11 @@ export class GetDeploymentsUseCase {
   async executeForOrganization(
     organizationId: string,
   ): Promise<DeploymentHistoryResult[]> {
-    const projects =
-      await this.uow.projectRepository.findByOrganizationId(organizationId);
-    const projectIds = new Set(projects.map((project) => project.id));
-    const environments = [];
-    for (const projectId of projectIds) {
-      const envs =
-        await this.uow.environmentRepository.findByProjectId(projectId);
-      environments.push(...envs);
-    }
-    const environmentIds = new Set(environments.map((env) => env.id));
-    const resources = [];
-    for (const envId of environmentIds) {
-      const res = await this.uow.resourceRepository.findByEnvironmentId(envId);
-      resources.push(...res);
-    }
-    return this.execute(resources.map((resource) => resource.id));
+    const resourceIds = await findOrganizationResourceIds(
+      this.uow,
+      organizationId,
+    );
+    return this.execute(resourceIds);
   }
 
   async execute(

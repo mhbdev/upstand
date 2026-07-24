@@ -741,6 +741,8 @@ export const API_KEY_ROUTE_CAPABILITIES = {
   "ai.testProvider": "ai:manage",
   "ai.saveFeatureAssignment": "ai:manage",
   "ai.removeFeatureAssignment": "ai:manage",
+  "ai.getTavilySettings": "ai:view",
+  "ai.saveTavilySettings": "ai:manage",
   "ai.deleteConversation": "ai:manage",
   "ai.generateTemplate": "ai:manage",
   "project.duplicate": "project:create",
@@ -837,6 +839,10 @@ export const MCP_TOOL_CAPABILITIES = {
   delete_schedule: "resource:update",
   trigger_schedule: "resource:update",
   search_web: "ai:view",
+  tavilySearch: "ai:view",
+  tavilyExtract: "ai:view",
+  tavilyCrawl: "ai:view",
+  tavilyMap: "ai:view",
   guide_upstand: "ai:view",
 } as const satisfies Record<string, Capability>;
 
@@ -883,5 +889,9 @@ export const MCP_READ_ONLY_TOOL_NAMES = [
   "get_resource_tags",
   "list_schedules",
   "search_web",
+  "tavilySearch",
+  "tavilyExtract",
+  "tavilyCrawl",
+  "tavilyMap",
   "guide_upstand",
 ] as const satisfies readonly (keyof typeof MCP_TOOL_CAPABILITIES)[];

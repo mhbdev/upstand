@@ -36,16 +36,13 @@ import { z } from "zod";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
+import { authorizeServerAccess } from "../trpc/server-authorization.helper";
 
 export const serverRouter = router({
   count: twoFactorVerifiedProcedure
     .input(GetServerCountInputSchema)
     .query(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:view",
-      );
+      await authorizeServerAccess(ctx, input.organizationId, "server:view");
       try {
         return await ctx.scope
           .resolve(GetServerCountUseCaseToken)
@@ -58,11 +55,7 @@ export const serverRouter = router({
   one: twoFactorVerifiedProcedure
     .input(GetServerInputSchema)
     .query(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:view",
-      );
+      await authorizeServerAccess(ctx, input.organizationId, "server:view");
       try {
         return await ctx.scope.resolve(GetServerUseCaseToken).execute(input);
       } catch (error) {
@@ -73,11 +66,7 @@ export const serverRouter = router({
   controlContainer: twoFactorVerifiedProcedure
     .input(ControlDockerContainerInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:update",
-      );
+      await authorizeServerAccess(ctx, input.organizationId, "server:update");
       const useCase = ctx.scope.resolve(GetDockerInventoryUseCaseToken);
       try {
         return await useCase.controlContainer(input);
@@ -89,11 +78,7 @@ export const serverRouter = router({
   controlResource: twoFactorVerifiedProcedure
     .input(ControlDockerResourceInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await checkPermission(
-        ctx.session.user.id,
-        input.organizationId,
-        "server:update",
-      );
+      await authorizeServerAccess(ctx, input.organizationId, "server:update");
       const useCase = ctx.scope.resolve(GetDockerInventoryUseCaseToken);
       try {
         return await useCase.controlResource(input);

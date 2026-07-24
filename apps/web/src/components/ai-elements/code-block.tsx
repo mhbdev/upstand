@@ -28,6 +28,7 @@ import type {
 } from "shiki";
 import { createHighlighter } from "shiki";
 import { CheckIcon, CopyIcon, DownloadIcon } from "@/components/huge-icons";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { downloadText } from "@/lib/browser";
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
@@ -465,37 +466,12 @@ export const CodeBlockCopyButton = ({
   className,
   ...props
 }: CodeBlockCopyButtonProps) => {
-  const [isCopied, setIsCopied] = useState(false);
-  const timeoutRef = useRef<number>(0);
   const { code } = useContext(CodeBlockContext);
-
-  const copyToClipboard = useCallback(async () => {
-    if (typeof window === "undefined" || !navigator?.clipboard?.writeText) {
-      onError?.(new Error("Clipboard API not available"));
-      return;
-    }
-
-    try {
-      if (!isCopied) {
-        await navigator.clipboard.writeText(code);
-        setIsCopied(true);
-        onCopy?.();
-        timeoutRef.current = window.setTimeout(
-          () => setIsCopied(false),
-          timeout,
-        );
-      }
-    } catch (error) {
-      onError?.(error as Error);
-    }
-  }, [code, onCopy, onError, timeout, isCopied]);
-
-  useEffect(
-    () => () => {
-      window.clearTimeout(timeoutRef.current);
-    },
-    [],
-  );
+  const { isCopied, copyToClipboard } = useCopyToClipboard(code, {
+    timeout,
+    onCopy,
+    onError,
+  });
 
   const Icon = isCopied ? CheckIcon : CopyIcon;
 

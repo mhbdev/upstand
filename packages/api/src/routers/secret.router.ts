@@ -15,7 +15,6 @@ import {
   CreateSecretRotationScheduleUseCaseToken,
   DeleteSecretProviderUseCaseToken,
   DeleteSecretRotationScheduleUseCaseToken,
-  GetProjectUseCaseToken,
   ListSecretProvidersUseCaseToken,
   ListSecretRotationSchedulesUseCaseToken,
   ListSecretVersionsUseCaseToken,
@@ -30,51 +29,16 @@ import {
 import { z } from "zod";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
-
-async function organizationForScope(
-  ctx: any,
-  scopeType: "environment" | "resource",
-  scopeId: string,
-): Promise<string> {
-  const uow = ctx.scope.resolve(UnitOfWorkToken);
-  const environment =
-    scopeType === "environment"
-      ? await uow.environmentRepository.findById(scopeId)
-      : (() => Promise.resolve(null))();
-  const resource =
-    scopeType === "resource"
-      ? await uow.resourceRepository.findById(scopeId)
-      : null;
-  const resolvedEnvironment =
-    environment ??
-    (resource
-      ? await uow.environmentRepository.findById(resource.environmentId)
-      : null);
-  if (!resolvedEnvironment)
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Secret scope not found",
-    });
-  const project = await ctx.scope
-    .resolve(GetProjectUseCaseToken)
-    .execute({ id: resolvedEnvironment.projectId });
-  if (!project)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-  return project.organizationId;
-}
+import { resolveSecretScopeAndCheckPermission } from "../trpc/secret-authorization.helper";
 
 export const secretRouter = router({
   versions: twoFactorVerifiedProcedure
     .input(ListSecretVersionsInputSchema)
     .query(async ({ ctx, input }) => {
-      const organizationId = await organizationForScope(
+      await resolveSecretScopeAndCheckPermission(
         ctx,
         input.scopeType,
         input.scopeId,
-      );
-      await checkPermission(
-        ctx.session.user.id,
-        organizationId,
         "resource:view",
       );
       return ctx.scope.resolve(ListSecretVersionsUseCaseToken).execute(input);
@@ -82,14 +46,10 @@ export const secretRouter = router({
   restore: twoFactorVerifiedProcedure
     .input(RestoreSecretVersionInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await organizationForScope(
+      await resolveSecretScopeAndCheckPermission(
         ctx,
         input.scopeType,
         input.scopeId,
-      );
-      await checkPermission(
-        ctx.session.user.id,
-        organizationId,
         "resource:update",
       );
       await ctx.scope.resolve(RestoreSecretVersionUseCaseToken).execute(input);
@@ -167,14 +127,10 @@ export const secretRouter = router({
   sync: twoFactorVerifiedProcedure
     .input(SyncSecretProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await organizationForScope(
+      await resolveSecretScopeAndCheckPermission(
         ctx,
         input.scopeType,
         input.scopeId,
-      );
-      await checkPermission(
-        ctx.session.user.id,
-        organizationId,
         "resource:update",
       );
       return ctx.scope.resolve(SyncSecretProviderUseCaseToken).execute(input);
@@ -182,14 +138,10 @@ export const secretRouter = router({
   rotate: twoFactorVerifiedProcedure
     .input(RotateSecretsInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await organizationForScope(
+      await resolveSecretScopeAndCheckPermission(
         ctx,
         input.scopeType,
         input.scopeId,
-      );
-      await checkPermission(
-        ctx.session.user.id,
-        organizationId,
         "resource:update",
       );
       return ctx.scope.resolve(RotateSecretsUseCaseToken).execute(input);
@@ -197,14 +149,10 @@ export const secretRouter = router({
   rotationSchedules: twoFactorVerifiedProcedure
     .input(ListSecretVersionsInputSchema)
     .query(async ({ ctx, input }) => {
-      const organizationId = await organizationForScope(
+      await resolveSecretScopeAndCheckPermission(
         ctx,
         input.scopeType,
         input.scopeId,
-      );
-      await checkPermission(
-        ctx.session.user.id,
-        organizationId,
         "resource:view",
       );
       return ctx.scope
@@ -214,21 +162,17 @@ export const secretRouter = router({
   createRotationSchedule: twoFactorVerifiedProcedure
     .input(CreateSecretRotationScheduleInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await organizationForScope(
+      const organizationId = await resolveSecretScopeAndCheckPermission(
         ctx,
         input.scopeType,
         input.scopeId,
+        "resource:update",
       );
       if (organizationId !== input.organizationId)
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Secret scope belongs to another organization",
         });
-      await checkPermission(
-        ctx.session.user.id,
-        organizationId,
-        "resource:update",
-      );
       return ctx.scope
         .resolve(CreateSecretRotationScheduleUseCaseToken)
         .execute(input);

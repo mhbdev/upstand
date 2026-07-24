@@ -6,7 +6,7 @@ import {
   GetDockerInventoryUseCaseToken,
   UnitOfWorkToken,
 } from "@upstand/usecases/tokens";
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import { upgradeWebSocket } from "hono/bun";
 import {
   containerBelongsToResource,
@@ -143,6 +143,44 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
     return c.json({ token, expiresIn: 60 });
   });
 
+  async function verifyResourceTerminalAccess(
+    c: Context<AppEnv>,
+    userId: string,
+    organizationId: string,
+    resourceId: string,
+  ) {
+    const scope = c.get("scope");
+    const uow = scope.resolve(UnitOfWorkToken);
+    const resource = await uow.resourceRepository.findById(resourceId);
+    if (!resource)
+      return { error: c.json({ error: "Resource not found" }, 404) };
+    const environment = await uow.environmentRepository.findById(
+      resource.environmentId,
+    );
+    const project = environment
+      ? await uow.projectRepository.findById(environment.projectId)
+      : null;
+    if (!project || project.organizationId !== organizationId) {
+      return {
+        error: c.json(
+          { error: "Resource is not part of this organization" },
+          403,
+        ),
+      };
+    }
+    try {
+      await checkPermission(userId, organizationId, "resource:update");
+    } catch {
+      return {
+        error: c.json(
+          { error: "Resource terminal permission is required" },
+          403,
+        ),
+      };
+    }
+    return { resource, scope, uow };
+  }
+
   app.post("/api/container-terminal/session", async (c) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: "Authentication required" }, 401);
@@ -169,31 +207,14 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
       return c.json({ error: "Invalid container identifier" }, 400);
     }
 
-    const scope = c.get("scope");
-    const uow = scope.resolve(UnitOfWorkToken);
-    const resource = await uow.resourceRepository.findById(body.resourceId);
-    if (!resource) return c.json({ error: "Resource not found" }, 404);
-    const environment = await uow.environmentRepository.findById(
-      resource.environmentId,
+    const verified = await verifyResourceTerminalAccess(
+      c,
+      session.user.id,
+      body.organizationId,
+      body.resourceId,
     );
-    const project = environment
-      ? await uow.projectRepository.findById(environment.projectId)
-      : null;
-    if (!project || project.organizationId !== body.organizationId) {
-      return c.json(
-        { error: "Resource is not part of this organization" },
-        403,
-      );
-    }
-    try {
-      await checkPermission(
-        session.user.id,
-        body.organizationId,
-        "resource:update",
-      );
-    } catch {
-      return c.json({ error: "Resource terminal permission is required" }, 403);
-    }
+    if (verified.error) return verified.error;
+    const { resource, scope, uow } = verified;
     const targetServerId =
       resource.serverId && !["local", "manager"].includes(resource.serverId)
         ? resource.serverId
@@ -350,31 +371,14 @@ export function registerTerminalRoutes(app: Hono<AppEnv>): void {
     }
     const containerId = body.containerId;
 
-    const scope = c.get("scope");
-    const uow = scope.resolve(UnitOfWorkToken);
-    const resource = await uow.resourceRepository.findById(body.resourceId);
-    if (!resource) return c.json({ error: "Resource not found" }, 404);
-    const environment = await uow.environmentRepository.findById(
-      resource.environmentId,
+    const verified = await verifyResourceTerminalAccess(
+      c,
+      session.user.id,
+      body.organizationId,
+      body.resourceId,
     );
-    const project = environment
-      ? await uow.projectRepository.findById(environment.projectId)
-      : null;
-    if (!project || project.organizationId !== body.organizationId) {
-      return c.json(
-        { error: "Resource is not part of this organization" },
-        403,
-      );
-    }
-    try {
-      await checkPermission(
-        session.user.id,
-        body.organizationId,
-        "resource:update",
-      );
-    } catch {
-      return c.json({ error: "Resource terminal permission is required" }, 403);
-    }
+    if (verified.error) return verified.error;
+    const { resource, scope, uow } = verified;
     const targetServerId =
       resource.serverId && !["local", "manager"].includes(resource.serverId)
         ? resource.serverId

@@ -104,6 +104,7 @@ export * from "./resource/randomize-compose.usecase";
 export * from "./resource/rebuild-database.usecase";
 export * from "./resource/resource-credentials";
 export * from "./resource/resource-environment";
+export * from "./resource/resource-preview-fields.schema";
 export * from "./resource/rollback-resource.usecase";
 export * from "./resource/rotate-resource-webhook-token.usecase";
 export * from "./resource/update-resource.usecase";

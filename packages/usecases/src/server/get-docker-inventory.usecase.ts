@@ -1,15 +1,14 @@
 import type { IUnitOfWork } from "@upstand/domain";
-import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 import type {
   DockerArchiveTransferPort,
   DockerContainerCommand,
   DockerContainerControllerPort,
-  DockerInspectionTarget,
   DockerInventoryReaderPort,
   DockerResourceControllerPort,
 } from "../ports/docker";
 import { dockerLogLevels } from "../resource/docker-log-filter";
+import { resolveDockerInspectionTarget } from "./docker-inspection-target.helper";
 
 export const DockerInventoryKindSchema = z.enum([
   "info",
@@ -88,7 +87,7 @@ export class GetDockerInventoryUseCase {
   ) {}
 
   async execute(input: GetDockerInventoryInput) {
-    const target = await this.getTarget(input);
+    const target = await resolveDockerInspectionTarget(this.uow, input);
     switch (input.kind) {
       case "info":
         return this.inventory.getInfo(target);
@@ -125,7 +124,7 @@ export class GetDockerInventoryUseCase {
   async controlContainer(
     input: z.infer<typeof ControlDockerContainerInputSchema>,
   ) {
-    const target = await this.getTarget(input);
+    const target = await resolveDockerInspectionTarget(this.uow, input);
     return this.containerController.controlContainer(
       target,
       input.containerId,
@@ -136,7 +135,7 @@ export class GetDockerInventoryUseCase {
   async controlResource(
     input: z.infer<typeof ControlDockerResourceInputSchema>,
   ) {
-    const target = await this.getTarget(input);
+    const target = await resolveDockerInspectionTarget(this.uow, input);
     return this.resourceController.controlResource(
       target,
       input.resourceId,
@@ -145,7 +144,7 @@ export class GetDockerInventoryUseCase {
   }
 
   async getHostTime(input: { organizationId: string; serverId?: string }) {
-    const target = await this.getTarget(input);
+    const target = await resolveDockerInspectionTarget(this.uow, input);
     return this.inventory.getHostTime(target);
   }
 
@@ -153,7 +152,7 @@ export class GetDockerInventoryUseCase {
     input: z.infer<typeof UploadDockerVolumeInputSchema>,
     archive: Buffer,
   ) {
-    const target = await this.getTarget(input);
+    const target = await resolveDockerInspectionTarget(this.uow, input);
     return this.archiveTransfer.uploadArchiveToVolume(
       target,
       input.volumeName,
@@ -166,41 +165,12 @@ export class GetDockerInventoryUseCase {
     input: z.infer<typeof UploadDockerContainerInputSchema>,
     archive: Buffer,
   ) {
-    const target = await this.getTarget(input);
+    const target = await resolveDockerInspectionTarget(this.uow, input);
     return this.archiveTransfer.uploadArchiveToContainer(
       target,
       input.containerId,
       archive,
       input.destination,
     );
-  }
-
-  private async getTarget(input: {
-    organizationId: string;
-    serverId?: string;
-  }): Promise<DockerInspectionTarget> {
-    if (!input.serverId || input.serverId === "local") {
-      return { kind: "local", name: "Local Docker" };
-    }
-    const server = await this.uow.serverRepository.findById(input.serverId);
-    if (!server || server.organizationId !== input.organizationId) {
-      throw new Error("Server is not part of the active organization.");
-    }
-    if (!server.sshKeyId) throw new Error("Server has no SSH key configured.");
-    const key = await this.uow.sshKeyRepository.findById(server.sshKeyId);
-    if (!key) throw new Error("Configured server SSH key was not found.");
-    return {
-      kind: "remote",
-      name: server.name,
-      host: server.ipAddress,
-      port: server.port,
-      username: server.username,
-      privateKey: decryptSecret({
-        ciphertext: key.privateKeyCiphertext,
-        iv: key.privateKeyIv,
-        authTag: key.privateKeyAuthTag,
-        keyVersion: key.privateKeyVersion,
-      }),
-    };
   }
 }

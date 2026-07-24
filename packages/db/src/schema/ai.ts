@@ -192,3 +192,23 @@ export const aiFeatureAssignmentRelations = relations(
     }),
   }),
 );
+
+export const aiTavilySettings = pgTable("ai_tavily_settings", {
+  organizationId: text("organization_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  enabled: integer("enabled").notNull().default(0),
+  apiKeyCiphertext: text("api_key_ciphertext"),
+  apiKeyIv: text("api_key_iv"),
+  apiKeyAuthTag: text("api_key_auth_tag"),
+  apiKeyVersion: integer("api_key_version"),
+  searchDepth: text("search_depth").notNull().default("basic"),
+  includeAnswer: integer("include_answer").notNull().default(0),
+  maxResults: integer("max_results").notNull().default(5),
+  enableSearch: integer("enable_search").notNull().default(1),
+  enableExtract: integer("enable_extract").notNull().default(0),
+  enableCrawl: integer("enable_crawl").notNull().default(0),
+  enableMap: integer("enable_map").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});

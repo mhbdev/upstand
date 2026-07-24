@@ -20,6 +20,7 @@ import { AddProviderDialog } from "./add-provider-dialog";
 import { EditProviderDialog } from "./edit-provider-dialog";
 import { FeatureAssignmentsSection } from "./feature-assignments-section";
 import { ProviderCard, type ProviderView } from "./provider-card";
+import { TavilySettingsSection } from "./tavily-settings-section";
 
 type UpGalSettingsPanelProps = {
   embedded?: boolean;
@@ -107,10 +108,13 @@ export function UpGalSettingsPanel(_props: UpGalSettingsPanelProps) {
       </Card>
 
       {!providersQuery.isPending && (
-        <FeatureAssignmentsSection
-          organizationId={organizationId}
-          providers={providers}
-        />
+        <>
+          <FeatureAssignmentsSection
+            organizationId={organizationId}
+            providers={providers}
+          />
+          <TavilySettingsSection organizationId={organizationId} />
+        </>
       )}
 
       <div className="flex items-start gap-2 px-1 text-muted-foreground text-xs">

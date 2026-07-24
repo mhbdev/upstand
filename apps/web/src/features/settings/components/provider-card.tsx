@@ -5,11 +5,17 @@ import type { AIProvider } from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import { Card } from "@upstand/ui/components/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@upstand/ui/components/dropdown-menu";
 import { Spinner } from "@upstand/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
-import { Edit2, Play, Trash2 } from "@/components/huge-icons";
+import { Edit2, MoreVerticalIcon, Play, Trash2 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
 
 export type ProviderView = {
@@ -56,76 +62,69 @@ export function ProviderCard({
     onError: (err) => toast.error(err.message || "Failed to delete provider"),
   });
 
+  const busy = test.isPending || remove.isPending;
+
   return (
     <>
-      <Card className="flex flex-col justify-between p-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-semibold text-base">{provider.name}</h3>
-            <Badge variant={provider.enabled ? "default" : "secondary"}>
-              {provider.enabled ? "Active" : "Disabled"}
-            </Badge>
-          </div>
-          <div className="space-y-1 font-mono text-muted-foreground text-xs">
-            <p>Provider: {provider.provider}</p>
-            <p>Model: {provider.model}</p>
-            {provider.baseUrl ? (
-              <p className="truncate">Base URL: {provider.baseUrl}</p>
-            ) : null}
-            <p>
-              Temperature:{" "}
-              {provider.temperature !== null ? provider.temperature : "Default"}
-            </p>
-            <p>
-              Reasoning: {provider.reasoningEnabled ? "Enabled" : "Disabled"}
-            </p>
-            <p>
-              Max Output Tokens:{" "}
-              {provider.maxOutputTokens !== null
-                ? provider.maxOutputTokens
-                : "Default"}
+      <Card className="px-4 py-2.5">
+        <div className="flex w-full items-center justify-between gap-3 text-left">
+          <div className="min-w-0 flex-1 space-y-0.5 text-left">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate font-semibold text-sm leading-tight">
+                {provider.name}
+              </h3>
+              <Badge
+                variant={provider.enabled ? "default" : "secondary"}
+                className="h-4 shrink-0 rounded px-1.5 text-[10px] leading-none"
+              >
+                {provider.enabled ? "Active" : "Disabled"}
+              </Badge>
+            </div>
+            <p className="truncate font-mono text-muted-foreground text-xs leading-tight">
+              {provider.provider} · {provider.model}
             </p>
           </div>
-        </div>
 
-        <div className="mt-4 flex items-center justify-end gap-2 border-t pt-3">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => test.mutate({ organizationId, id: provider.id })}
-            disabled={test.isPending || remove.isPending}
-          >
-            {test.isPending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <Play data-icon="inline-start" />
-            )}
-            Test Connection
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onEdit}
-            disabled={test.isPending || remove.isPending}
-          >
-            <Edit2 data-icon="inline-start" />
-            Edit
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            aria-label={`Delete ${provider.name}`}
-            onClick={() => setDeleteDialogOpen(true)}
-            disabled={test.isPending || remove.isPending}
-          >
-            {remove.isPending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <Trash2 data-icon="inline-start" />
-            )}
-            Delete
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7 shrink-0"
+                  disabled={busy}
+                  aria-label={`Actions for ${provider.name}`}
+                >
+                  {busy ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <MoreVerticalIcon data-icon="inline-start" />
+                  )}
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => test.mutate({ organizationId, id: provider.id })}
+                disabled={busy}
+              >
+                <Play data-icon="inline-start" />
+                Test connection
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit} disabled={busy}>
+                <Edit2 data-icon="inline-start" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={busy}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 data-icon="inline-start" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </Card>
 

@@ -4,6 +4,19 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.144 - 2026-07-24
+
+### Refactored & Improved
+
+- **Monorepo Clean Architecture Deduplication**:
+  - Extracted core application helpers across `@upstand/usecases` including `container-resolution.helper.ts`, `docker-inspection-target.helper.ts`, `organization-resources.helper.ts`, `git-provider-resolution.helper.ts`, `resource-preview-fields.schema.ts`, and abstract `BaseCronScheduler`.
+  - Extracted composition & permission helpers across `@upstand/api` including `resource-authorization.helper.ts`, `environment-authorization.helper.ts`, `secret-authorization.helper.ts`, `server-authorization.helper.ts`, and `backup-authorization` helpers.
+  - Converted all 12 procedures in `resource.router.ts` (`control`, `rollback`, `rebuildDatabase`, `databaseCommand`, `randomizeCompose`, `rotateWebhookToken`, `controlContainer`, `getContainers`, `getRoutingTargets`, `getLogs`, `getPreviews`, `getStats`) to unified capability authorization helpers, eliminating hundreds of lines of duplicate boilerplate.
+  - Created `useCopyToClipboard`, `useProviderForm`, and `AuthFormField` components across `apps/web`.
+  - Extracted `validateSafeTarArchive` path traversal and safety checks in `apps/server/src/http/routes/deployments.ts`.
+- **Zod Schema Deprecation Fixes**: Converted all Zod schema composition occurrences from deprecated `.merge()` to standard `.extend(Schema.shape)` across use cases and tRPC routers.
+- **Code Quality & Linter Compliance**: Ran Biome linter pass (`bun check`) fixing all unused imports across Next.js components and tRPC routers. Verified with 100% passing Clean Architecture boundary tests (`architecture.test.ts`), 15/15 package type checks (`bun check-types`), and 474 unit tests (`bun test`).
+
 ## 0.1.143 - 2026-07-24
 
 ### Fixed

@@ -136,6 +136,53 @@ export type CreateAIRun = {
   model: string;
 };
 
+export type AITavilySettingsRecord = {
+  organizationId: string;
+  enabled: boolean;
+  apiKeyCiphertext: string | null;
+  apiKeyIv: string | null;
+  apiKeyAuthTag: string | null;
+  apiKeyVersion: number | null;
+  searchDepth: "basic" | "advanced";
+  includeAnswer: boolean;
+  maxResults: number;
+  enableSearch: boolean;
+  enableExtract: boolean;
+  enableCrawl: boolean;
+  enableMap: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type AITavilySettingsView = {
+  enabled: boolean;
+  configured: boolean;
+  searchDepth: "basic" | "advanced";
+  includeAnswer: boolean;
+  maxResults: number;
+  enableSearch: boolean;
+  enableExtract: boolean;
+  enableCrawl: boolean;
+  enableMap: boolean;
+};
+
+export type SaveAITavilySettings = {
+  enabled: boolean;
+  searchDepth: "basic" | "advanced";
+  includeAnswer: boolean;
+  maxResults: number;
+  enableSearch: boolean;
+  enableExtract: boolean;
+  enableCrawl: boolean;
+  enableMap: boolean;
+  secret?: {
+    ciphertext: string;
+    iv: string;
+    authTag: string;
+    keyVersion: number;
+  } | null;
+};
+
 export interface IAIRepository {
   // ── Provider configs ──────────────────────────────────────────────────────
   listProviderConfigs(
@@ -175,6 +222,15 @@ export interface IAIRepository {
     organizationId: string,
     feature: AIFeature,
   ): Promise<void>;
+
+  // ── Tavily Settings ───────────────────────────────────────────────────────
+  getTavilySettings(
+    organizationId: string,
+  ): Promise<AITavilySettingsRecord | null>;
+  saveTavilySettings(
+    organizationId: string,
+    input: SaveAITavilySettings,
+  ): Promise<AITavilySettingsRecord>;
 
   // ── Conversations ─────────────────────────────────────────────────────────
   createConversation(
