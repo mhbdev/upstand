@@ -11,9 +11,9 @@ Upstand provides operational management for compute hosts, Docker Swarm clusters
 
 ```mermaid
 flowchart TD
-    subgraph ControlPlane["Upstand Control Plane (Hono + Next.js)"]
+    subgraph ControlPlane["Upstand Control Plane (Hono API Server)"]
         UI["Web Dashboard & tRPC Routes"]
-        APIServer["Hono API Engine"]
+        APIServer["Hono Control Plane API"]
         Orchestration["Resource Orchestrator & RBAC Guard"]
         UI --> APIServer
         APIServer --> Orchestration
@@ -26,11 +26,11 @@ flowchart TD
         Orchestration --> Redis
     end
 
-    subgraph WorkerPool["Background Worker Subsystems"]
+    subgraph WorkerPool["Standalone Schedules Service (apps/schedules)"]
         DeployWorker["Deployment Worker (Docker API / SSH)"]
         BackupWorker["Backup Worker (S3 Streaming Vault)"]
         CronWorker["Cron Job & Rotation Worker"]
-        NotificationWorker["Notification & Audit Dispatcher"]
+        NotificationWorker["Notification Dispatcher"]
         Redis --> DeployWorker
         Redis --> BackupWorker
         Redis --> CronWorker
@@ -46,6 +46,8 @@ flowchart TD
         DeployWorker -->|SSH Connection| Host3
     end
 ```
+
+For detailed queue worker specifications and job conventions, see [Schedules, Workers & Queue Architecture](/docs/operations/schedules-workers).
 
 ---
 
@@ -79,4 +81,4 @@ Monitoring is installed according to server role. The dashboard can read current
 
 ## Control-plane maintenance
 
-The server runtime includes database migrations, scheduled jobs, outbox publishing, notification delivery, backups, deployment workers, autoscaling, and optional auto-update runtime. Keep PostgreSQL, Redis, and Docker volumes intact during diagnosis. Use the release update flow for upgrades and the audit/observation pages to verify completion.
+The server control plane handles API requests, database migrations, and outbox event creation. Background jobs, outbox publishing, notification delivery, backup executions, deployment builds, and autoscaling are executed exclusively by the standalone `schedules` service. Keep PostgreSQL, Redis, and Docker volumes intact during diagnosis.

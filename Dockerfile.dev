@@ -30,6 +30,7 @@ RUN case "$TARGETARCH" in \
 COPY package.json bun.lock tsconfig.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/server/package.json ./apps/server/
+COPY apps/schedules/package.json ./apps/schedules/
 COPY apps/fumadocs/package.json ./apps/fumadocs/
 COPY packages/db/package.json ./packages/db/
 COPY packages/env/package.json ./packages/env/

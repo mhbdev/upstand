@@ -87,12 +87,14 @@ build_source_images() {
   revision="$(git -C "$SOURCE_DIR" rev-parse --verify HEAD)"
 
   UPSTAND_SERVER_IMAGE="upstand-server:source-${revision}"
+  UPSTAND_SCHEDULES_IMAGE="upstand-schedules:source-${revision}"
   UPSTAND_WEB_IMAGE="upstand-web:source-${revision}"
   UPSTAND_DOCS_IMAGE="upstand-docs:source-${revision}"
   UPSTAND_MONITORING_IMAGE="upstand-monitoring:source-${revision}"
 
   NEXT_PUBLIC_IS_CLOUD="${NEXT_PUBLIC_IS_CLOUD:-$IS_CLOUD}"
   docker build --file "$SOURCE_DIR/apps/server/Dockerfile" --tag "$UPSTAND_SERVER_IMAGE" "$SOURCE_DIR"
+  docker build --file "$SOURCE_DIR/apps/schedules/Dockerfile" --tag "$UPSTAND_SCHEDULES_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --build-arg "NEXT_PUBLIC_IS_CLOUD=$NEXT_PUBLIC_IS_CLOUD" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/fumadocs/Dockerfile" --tag "$UPSTAND_DOCS_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/monitoring/Dockerfile" --tag "$UPSTAND_MONITORING_IMAGE" "$SOURCE_DIR/apps/monitoring"
@@ -177,6 +179,7 @@ write_environment() {
   local requested_server_url="${NEXT_PUBLIC_SERVER_URL:-}"
   local requested_trusted_proxy_cidrs="${TRUSTED_PROXY_CIDRS:-}"
   local requested_server_image="${UPSTAND_SERVER_IMAGE:-}"
+  local requested_schedules_image="${UPSTAND_SCHEDULES_IMAGE:-}"
   local requested_web_image="${UPSTAND_WEB_IMAGE:-}"
   local requested_web_cloud_image="${UPSTAND_WEB_CLOUD_IMAGE:-}"
   local requested_docs_image="${UPSTAND_DOCS_IMAGE:-}"
@@ -240,6 +243,7 @@ write_environment() {
   fi
   [[ -n "$TRUSTED_PROXY_CIDRS" ]] || fail "could not determine the trusted proxy CIDR for '$NETWORK_NAME'"
   UPSTAND_SERVER_IMAGE="${requested_server_image:-${UPSTAND_SERVER_IMAGE:-}}"
+  UPSTAND_SCHEDULES_IMAGE="${requested_schedules_image:-${UPSTAND_SCHEDULES_IMAGE:-}}"
   UPSTAND_WEB_IMAGE="${requested_web_image:-${UPSTAND_WEB_IMAGE:-}}"
   UPSTAND_WEB_CLOUD_IMAGE="${requested_web_cloud_image:-${UPSTAND_WEB_CLOUD_IMAGE:-}}"
   UPSTAND_DOCS_IMAGE="${requested_docs_image:-${UPSTAND_DOCS_IMAGE:-}}"
@@ -277,7 +281,7 @@ write_environment() {
 
   [[ "$UPSTAND_DASHBOARD_HOST" != */* && "$UPSTAND_API_HOST" != */* ]] || fail "dashboard and API origins must not include a path"
 
-  if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE$UPSTAND_MONITORING_IMAGE" ]]; then
+  if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_SCHEDULES_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE$UPSTAND_MONITORING_IMAGE" ]]; then
     build_source_images
   fi
   if [[ "$IS_CLOUD" == true && "${SOURCE_BUILD:-false}" != true && -z "$UPSTAND_WEB_CLOUD_IMAGE" ]]; then
@@ -285,6 +289,7 @@ write_environment() {
   fi
   if [[ "${SOURCE_BUILD:-false}" != true ]]; then
     require_digest_image UPSTAND_SERVER_IMAGE
+    require_digest_image UPSTAND_SCHEDULES_IMAGE
     require_digest_image UPSTAND_WEB_IMAGE
     require_digest_image UPSTAND_DOCS_IMAGE
     require_digest_image UPSTAND_MONITORING_IMAGE
@@ -300,6 +305,7 @@ UPSTAND_DASHBOARD_HOST=$UPSTAND_DASHBOARD_HOST
 UPSTAND_API_HOST=$UPSTAND_API_HOST
 UPSTAND_DOCS_HOST=${UPSTAND_DOCS_HOST:-docs.$UPSTAND_API_HOST}
 UPSTAND_SERVER_IMAGE=$UPSTAND_SERVER_IMAGE
+UPSTAND_SCHEDULES_IMAGE=$UPSTAND_SCHEDULES_IMAGE
 UPSTAND_WEB_IMAGE=$UPSTAND_WEB_IMAGE
 UPSTAND_WEB_CLOUD_IMAGE=$UPSTAND_WEB_CLOUD_IMAGE
 UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE

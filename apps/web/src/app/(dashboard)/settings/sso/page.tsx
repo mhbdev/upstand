@@ -353,7 +353,7 @@ function ProviderDialog({
             void saveProvider();
           }}
         >
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+          <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
               <Label htmlFor="saml-mode">Use SAML instead of OIDC</Label>
 

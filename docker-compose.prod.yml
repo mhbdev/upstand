@@ -212,6 +212,85 @@ services:
         max-size: "50m"
         max-file: "5"
 
+  schedules:
+    image: ${UPSTAND_SCHEDULES_IMAGE:-${UPSTAND_SERVER_IMAGE:?UPSTAND_SERVER_IMAGE is required}}
+    init: true
+    stop_grace_period: 2m
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_NAME: upstand
+      DATABASE_USER: upstand
+      REDIS_HOST: redis
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
+      SSH_KEY_ENCRYPTION_KEY_V1_FILE: /run/secrets/ssh_key_encryption_key
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DOCKER_NETWORK: upstand-network
+      SCHEDULES_PORT: 3002
+    secrets:
+      - postgres_password
+      - redis_password
+      - better_auth_secret
+      - ssh_key_encryption_key
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      upstand-network:
+        aliases:
+          - schedules
+          - upstand_schedules
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:3002/health/ready >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+          - node.labels.upstand.control-plane == true
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+        monitor: 45s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        failure_action: pause
+        monitor: 45s
+      resources:
+        reservations:
+          cpus: "0.15"
+          memory: 256M
+        limits:
+          cpus: "1.0"
+          memory: 1G
+    ports:
+      - target: 3002
+        published: ${UPSTAND_SCHEDULES_PORT:-3002}
+        protocol: tcp
+        mode: host
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+
   web:
     image: ${UPSTAND_WEB_IMAGE:?UPSTAND_WEB_IMAGE is required}
     environment:

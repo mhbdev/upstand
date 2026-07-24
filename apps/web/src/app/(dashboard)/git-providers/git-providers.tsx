@@ -558,7 +558,7 @@ export default function GitProviders({
                   className="hidden"
                 />
 
-                <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-4">
+                <div className="flex items-center justify-between rounded-lg">
                   <div className="space-y-0.5">
                     <Label htmlFor="is-org" className="font-medium text-sm">
                       Organization App

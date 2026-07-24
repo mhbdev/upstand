@@ -30,6 +30,10 @@ jobs:
             file: apps/server/Dockerfile
             scope: upstand-server
             build_args: ""
+          - name: schedules
+            file: apps/schedules/Dockerfile
+            scope: upstand-schedules
+            build_args: ""
           - name: web
             file: apps/web/Dockerfile
             scope: upstand-web

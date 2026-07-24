@@ -4,7 +4,23 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.145 - 2026-07-24
+## 0.1.146 - 2026-07-25
+
+### Added & Refactored
+
+- **Standalone Schedules Microservice (`apps/schedules`)**:
+  - Created a dedicated, lightweight, standalone scheduler service in `apps/schedules` next to `fumadocs`, `web`, `server`, and `monitoring`.
+  - Moved all background cron schedulers (`BackupScheduler`, `GeneralScheduler`, `AccessLogCleanupScheduler`, `ScheduledDockerCleanup`), interval loops (`AutoscalingRuntime`, secret rotation reconciliation), and BullMQ queue workers (`BackupRunWorker`, `NotificationDeliveryWorker`, `DeploymentRuntime`, `OutboxRuntime`) to `apps/schedules`.
+  - Added a dedicated Hono HTTP health & status API server on port `3002` (`/health/live`, `/health/ready`, `/status`).
+  - Added multi-stage `Dockerfile`, entrypoint script, and monorepo configurations (`package.json` `"dev:schedules"`, `docker-compose.local.yml`, `docker-compose.prod.yml`).
+- **Cleaned Control Plane API (`apps/server`)**:
+  - Completely removed all background scheduler and worker initializations from `apps/server`, establishing a pure API control plane with zero background worker CPU/memory overhead.
+- **Installer & Release Workflows**:
+  - Updated `install.sh` to build, validate, and write `UPSTAND_SCHEDULES_IMAGE`.
+  - Updated `.github/workflows/release.yml` and `.github/workflows/canary.yml` matrices to build, verify, and publish `ghcr.io/...-schedules` images and release manifests.
+- **Fumadocs Documentation**:
+  - Added [Schedules, Workers & Queue Architecture](/docs/operations/schedules-workers) page with system sequence diagram and official BullMQ job ID rules (queue scoping, hyphen/underscore separators, numeric string constraints).
+
 
 ### Fixed
 

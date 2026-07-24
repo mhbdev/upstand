@@ -9,10 +9,6 @@ import type { Context, Hono } from "hono";
 import type { AppEnv } from "../types";
 
 export type SystemRouteDependencies = {
-  deploymentRuntime: { isReady(): boolean };
-  notificationWorker: { isReady(): boolean };
-  backupWorker: { isReady(): boolean };
-  backupScheduler: { isReady(): boolean };
   isShuttingDown(): boolean;
   isCaddyReady(): boolean;
 };
@@ -36,11 +32,6 @@ export function registerSystemRoutes(
   app.get("/health/live", (c) => c.json({ status: "alive" }));
 
   app.get("/health/ready", async (c) => {
-    const workersReady =
-      dependencies.deploymentRuntime.isReady() &&
-      dependencies.notificationWorker.isReady() &&
-      dependencies.backupWorker.isReady() &&
-      dependencies.backupScheduler.isReady();
     const redisReady = await pingRedis(redis);
     const rateLimiterHealth = getRateLimiterHealth();
     let databaseReady = false;
@@ -57,7 +48,6 @@ export function registerSystemRoutes(
     const ready =
       !dependencies.isShuttingDown() &&
       dependencies.isCaddyReady() &&
-      workersReady &&
       redisReady &&
       databaseReady;
     return c.json(
@@ -68,7 +58,6 @@ export function registerSystemRoutes(
           caddy: dependencies.isCaddyReady(),
           redis: redisReady,
           rateLimiter: rateLimiterHealth,
-          workers: workersReady,
         },
       },
       ready ? 200 : 503,

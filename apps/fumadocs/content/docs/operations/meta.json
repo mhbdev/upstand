@@ -7,6 +7,7 @@
     "security-auth",
     "organization-admin",
     "infrastructure",
+    "schedules-workers",
     "api-automation",
     "backups-cleanup",
     "audit-logs"

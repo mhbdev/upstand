@@ -124,6 +124,7 @@ const packageRoles: Record<string, ArchitectureRole> = {
   "@upstand/ui": "interface",
   "@upstand/usecases": "application",
   fumadocs: "host",
+  schedules: "host",
   server: "host",
   web: "host",
 };

@@ -60,6 +60,44 @@ services:
       retries: 12
       start_period: 30s
 
+  schedules:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: upstand-schedules-local
+    command: bun run dev:schedules
+    ports:
+      - "3002:3002"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/server/node_modules
+      - /app/apps/schedules/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/fumadocs/node_modules
+      - /app/packages/repositories/node_modules
+      - /app/packages/domain/node_modules
+      - /app/packages/usecases/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-upstand-local-password}@postgres:5432/upstand
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-upstand-local-development-secret-that-is-at-least-32-characters}
+      REDIS_URL: redis://redis:6379
+      SCHEDULES_PORT: 3002
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:3002/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+
   web:
     build:
       context: .

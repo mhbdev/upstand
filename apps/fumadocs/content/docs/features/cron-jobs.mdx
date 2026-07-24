@@ -88,3 +88,18 @@ export async function GET(request) {
 - **Run Now**: Instantly trigger an execution on demand at any time to verify function or command behavior.
 - **Execution Logs**: Click the terminal icon next to any schedule to inspect execution status (`success`/`failed`), duration in milliseconds, HTTP status code or command output, and timestamp history.
 - **Global Dashboard**: View all configured crons, performance metrics, and logs across your organization under **Observation → Cron Jobs**.
+
+---
+
+## 6. Standalone Scheduler Architecture & BullMQ Queues
+
+Upstand offloads all cron executions and scheduled tasks to the standalone `apps/schedules` microservice:
+
+- **Isolated Background Engine**: `GeneralScheduler` and `BackupScheduler` run exclusively inside `apps/schedules`, keeping the primary API server responsive.
+- **BullMQ Job Conventions**:
+  - Uniqueness is scoped per queue (e.g. `upstand-backup-run`, `upstand-notification-delivery`).
+  - Completed or removed jobs do not block future executions with the same job ID.
+  - Job IDs must use `-` or `_` instead of `:` (colon), and must not be integer-only strings.
+
+For complete infrastructure specifications, see [Schedules, Workers & Queue Architecture](/docs/operations/schedules-workers).
+

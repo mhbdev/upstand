@@ -767,7 +767,7 @@ export default function Projects(_props: {
       {loadingProjects ? (
         <CardGridSkeleton count={3} />
       ) : filteredProjects.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {filteredProjects.map((proj) => (
             <ProjectCard
               key={proj.id}

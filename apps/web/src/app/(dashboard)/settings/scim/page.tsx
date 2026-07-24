@@ -181,7 +181,7 @@ export default function ScimSettingsPage() {
           )}
         </CardContent>
       </Card>
-      <div>
+      <div className="flex flex-col gap-2">
         {providersQuery.isPending
           ? Array.from({ length: 2 }).map((_, i) => (
               <div
@@ -198,7 +198,7 @@ export default function ScimSettingsPage() {
         {(providersQuery.data ?? []).map((provider) => (
           <div
             key={provider.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+            className="flex flex-wrap items-center justify-between gap-3 border-b p-3"
           >
             <div>
               <div className="font-medium">{provider.providerId}</div>

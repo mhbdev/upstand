@@ -55,6 +55,33 @@
         "vite": "^8.1.5",
       },
     },
+    "apps/schedules": {
+      "name": "schedules",
+      "dependencies": {
+        "@circulo-ai/di": "catalog:",
+        "@upstand/api": "workspace:*",
+        "@upstand/auth": "workspace:*",
+        "@upstand/db": "workspace:*",
+        "@upstand/domain": "workspace:*",
+        "@upstand/env": "workspace:*",
+        "@upstand/infrastructure": "workspace:*",
+        "@upstand/platform": "workspace:*",
+        "@upstand/redis": "workspace:*",
+        "@upstand/repositories": "workspace:*",
+        "@upstand/usecases": "workspace:*",
+        "bullmq": "catalog:",
+        "drizzle-orm": "catalog:",
+        "evlog": "catalog:",
+        "hono": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@upstand/config": "workspace:*",
+        "tsdown": "^0.22.9",
+        "typescript": "catalog:",
+      },
+    },
     "apps/server": {
       "name": "server",
       "dependencies": {
@@ -2737,6 +2764,8 @@
     "samlify": ["samlify@2.13.1", "", { "dependencies": { "@authenio/xml-encryption": "^2.0.2", "@xmldom/xmldom": "^0.8.11", "node-rsa": "^1.1.1", "xml": "^1.0.1", "xml-crypto": "^6.1.2", "xml-escape": "^1.1.0", "xpath": "^0.0.34" } }, "sha512-vdYr/zohDGBbfWNU4miEzc1jmWOtkLySPViapC6nfGkv9KxzLq4UlGkKyryzwLw4jVlZk88Rw93HaCRVpe+t+g=="],
 
     "scheduler": ["scheduler@0.27.0", "", {}, "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q=="],
+
+    "schedules": ["schedules@workspace:apps/schedules"],
 
     "scroll-into-view-if-needed": ["scroll-into-view-if-needed@3.1.0", "", { "dependencies": { "compute-scroll-into-view": "^3.0.2" } }, "sha512-49oNpRjWRvnU8NyGVmUaYG4jtTkNonFZI86MmGRDqBphEK2EXT9gdEUoQPZhuBM8yWHxCWbobltqYO5M4XrUvQ=="],
 

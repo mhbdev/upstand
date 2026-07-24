@@ -1,6 +1,6 @@
 {
   "name": "upstand",
-  "version": "0.1.145",
+  "version": "0.1.146",
   "private": true,
   "workspaces": {
     "packages": [
@@ -64,6 +64,7 @@
     "format": "biome format --write .",
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",
+    "dev:schedules": "turbo run dev -F schedules",
     "db:push": "turbo run db:push -F @upstand/db",
     "db:check": "turbo run db:check -F @upstand/db",
     "db:studio": "turbo run db:studio -F @upstand/db",
