@@ -4,6 +4,28 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.137 - 2026-07-24
+
+### Documentation
+
+- **Monorepo Package & Application README Suite**: Authored and updated tailored `README.md` documentation files across all 16 applications and workspace packages in the monorepo:
+  - `apps/server`: Hono REST/tRPC API, MCP JSON-RPC Server, UpGal AI engine, SCIM 2.0 endpoints, background workers, and administrative CLI.
+  - `apps/web`: Next.js 16 Web Dashboard UI, visual Swarm cluster topology map, UpGal chat drawer, CodeMirror editor, and RBAC controls.
+  - `apps/fumadocs`: Next.js 16 Fumadocs documentation engine, embedded Mermaid rendering, flexsearch, and AI doc assistant.
+  - `apps/monitoring`: Swarm node & container telemetry agent.
+  - `packages/api`: tRPC router definitions, MCP protocol handlers, UpGal tool definitions, and API key authentication.
+  - `packages/auth`: Better Auth integration, session management, organization memberships, SSO (SAML/OIDC), and SCIM 2.0 provisioning.
+  - `packages/config`: Shared TypeScript compiler targets, Biome linter rules, and TailwindCSS presets.
+  - `packages/db`: Drizzle ORM PostgreSQL schema, migration runner (`runDatabaseMigrations`), and connection management.
+  - `packages/domain`: Domain entities, value objects, API key capability route maps, and domain errors.
+  - `packages/env`: Zod-validated server (`server.ts`) and client (`web.ts`) environment definitions.
+  - `packages/infrastructure`: Docker Swarm engine integration, SSH transport, Caddy compiler, S3 backup client, and rate limiters.
+  - `packages/platform`: Platform orchestration, auto-update runner, autoscaler, and Docker cleanup routines.
+  - `packages/redis`: Redis client factory, BullMQ job queues, and distributed resource locks.
+  - `packages/repositories`: Repository pattern implementations for data access abstraction.
+  - `packages/ui`: Shared React 19 component library with shadcn/ui primitives, Radix UI, and CodeMirror editor.
+  - `packages/usecases`: Business workflow use cases (deployments, backups, server provisioning, 2FA resets, secret rotation).
+
 ## 0.1.136 - 2026-07-24
 
 ### Added

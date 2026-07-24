@@ -1,45 +1,36 @@
-# fumadocs
+# @upstand/fumadocs (`apps/fumadocs`)
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+The **Upstand Documentation Site** is built with Next.js 16, [Fumadocs UI](https://fumadocs.dev), `fumadocs-mdx`, and TailwindCSS v4. It contains comprehensive technical guides, architecture diagrams, API specs, and operational playbooks for the Upstand platform.
 
-Run development server:
+## Content Structure
 
-```bash
-npm run dev
-# or
-pnpm dev
-# or
-yarn dev
+```text
+content/docs/
+├── getting-started/        # Quickstart, concepts, self-hosting, updates
+├── features/               # Servers, deployments, routing, backups, upstand.json, etc.
+├── operations/             # Infrastructure, SCIM, SSO, MCP server, UpGal, CLI tools
+└── reference/              # Environment variables reference & troubleshooting
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+## Features
 
-## Explore
+- **Embedded Mermaid Diagrams**: Visual architectural diagrams rendered dynamically via `mermaid`.
+- **Full-Text Search**: Instant client-side and server-side search index built with `flexsearch`.
+- **Documentation AI Assistant**: Built-in `/api/chat` route powered by Vercel AI SDK and OpenRouter for interactive docs Q&A.
+- **Dynamic Open Graph Images**: Automatic social card generation for all documentation routes (`/og/docs/[...slug]`).
 
-In the project, you can see:
+## Commands
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+```bash
+# Start Fumadocs dev server on port 4000
+bun run dev
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+# Generate MDX content types
+bun run generate
 
-### Fumadocs MDX
+# Check TypeScript types
+bun run check-types
 
-A `source.config.ts` config file has been included, you can customise different options like frontmatter schema.
-
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
-
-## Learn More
-
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+# Build production bundle
+bun run build
+```
