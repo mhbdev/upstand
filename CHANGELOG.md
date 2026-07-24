@@ -4,7 +4,7 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.148 - 2026-07-25
+## 0.1.149 - 2026-07-25
 
 ### Fixed & Enhanced
 
