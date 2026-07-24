@@ -44,22 +44,28 @@ Backups are also a supported Cron Job target. A Cron Job can trigger an existing
 
 ---
 
-## Step-by-Step Restoration Workflow
+## Automated Backup Integrity Verification Routine
 
-Restoring a database or container volume is a critical operation. Follow this step-by-step restoration protocol:
+To guarantee data recovery readiness, Upstand provides automated headless backup verification:
 
 ```mermaid
-flowchart TD
-    Step1[1. Select Backup Run in Dashboard] --> Step2[2. Verify Archive ETag & SHA256 Integrity]
-    Step2 --> Step3[3. Confirm Target Resource & Pause Deployment Queues]
-    Step3 --> Step4[4. Enter 2FA Verification Code]
-    Step4 --> Step5[5. BackupWorker Downloads & Decrypts Stream]
-    Step5 --> Step6[6. Terminate Active Container Connections]
-    Step6 --> Step7[7. Stream Restore to Database Engine]
-    Step7 --> Step8[8. Perform Diagnostic Health Check]
+sequenceDiagram
+    autonumber
+    participant Scheduler as BullMQ Backup Scheduler
+    participant Worker as BackupWorker Queue
+    participant S3 as S3 Storage Bucket
+    participant Container as Isolated Verification Sandbox
+
+    Scheduler->>Worker: Enqueue Scheduled Verification Routine
+    Worker->>S3: Fetch S3 Object Headers & Compute SHA-256 Checksum
+    S3-->>Worker: Stream Archive Head Bytes
+    Worker->>Container: Spawn Ephemeral Headless Verification Container
+    Worker->>Container: Stream & Decrypt AES-256 Archive
+    Container->>Container: Validate Engine Headers (Postgres/MySQL Magic Bytes)
+    Container-->>Worker: Verification Passed (Status: Healthy Archive)
+    Worker->>Scheduler: Record Verified Run Timestamp in Audit Trail
 ```
 
-1. **Identify Backup Archive**: Go to your resource's **Backups** tab and click **Verify** on the desired backup run to validate archive availability and checksums.
-2. **Pause Concurrent Tasks**: Ensure no deployments, migrations, or active cron tasks are currently modifying the database.
-3. **Trigger Restoration**: Click **Restore Run**. Confirm the destructive alert modal by entering your 2FA verification code.
-4. **Inspect Recovery**: Review the streaming restoration log in the dashboard to confirm database tables and records are fully restored and healthy.
+- **Checksum & ETag Audit**: Queries S3 object headers to confirm remote file size and ETag hash integrity.
+- **Headless Sandbox Testing**: Spawns an isolated ephemeral container to decrypt stream headers and verify database engine signature magic bytes (`PGDMP` for PostgreSQL, SQL dump headers for MySQL, RDB headers for Redis).
+- **Failure Notification**: If an archive fails validation or encounters corruption, the `BackupWorker` immediately marks the run as corrupted and dispatches a high-priority alert via configured notification channels.

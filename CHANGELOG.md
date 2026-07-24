@@ -4,6 +4,22 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.136 - 2026-07-24
+
+### Added
+
+- **Enterprise Feature & Architecture Documentation Suite**: Expanded documentation across 10 core product areas:
+  1. **IPsec ESP Encrypted Overlay Networks**: Added Swarm `--opt encrypted` VXLAN tunnel architecture diagram & guide (`projects-resources.mdx`).
+  2. **Granular RBAC Capability Reference Matrix**: Added 13-column permission capability matrix table (`multi-tenancy.mdx`).
+  3. **Database High-Availability & PgBouncer Connection Pooling**: Added PgBouncer and Read Replica topology diagram (`deployments.mdx`).
+  4. **Progressive Blue-Green & Rollback Strategies**: Added Blue-Green traffic cutover & auto-rollback sequence diagram (`deployments.mdx`).
+  5. **Git Webhook HMAC Signature Verification**: Added HMAC SHA-256 webhook validation sequence diagram (`integrations.mdx`).
+  6. **Distributed Docker BuildKit Remote Caching**: Added BuildKit `--cache-from` / `--cache-to` registry & S3 caching sequence diagram (`builds-and-previews.mdx`).
+  7. **Web Application Firewall (WAF) & Rate Limiting Snippets**: Added Caddy WAF security snippets & Geo-IP rate-limiting guide (`routing.mdx`).
+  8. **Automated Headless Backup Integrity Verification Routine**: Added S3 ETag & checksum validation sandbox sequence diagram (`backups.mdx`).
+  9. **Custom MCP Tool Extensions & AI Workflow Automation**: Added custom MCP JSON-RPC tool extension diagram (`mcp-server.mdx`).
+  10. **Updated Architecture & Navigation Guides**: Synchronized all technical specifications across Fumadocs.
+
 ## 0.1.135 - 2026-07-24
 
 ### Added

@@ -49,7 +49,35 @@ Configure advanced proxy settings directly inside the domain mapping card:
 
 ---
 
-## 4. Authentication Middleware
+## 4. Web Application Firewall (WAF) & Rate-Limiting Snippets
+
+Operators can define reusable Caddy configuration snippets under **Web Server → Caddy Snippets** to enforce ingress WAF protection:
+
+```caddy
+# Definition: rate_limit_suite (Saved under Web Server Snippets)
+(rate_limit_suite) {
+    rate_limit {
+        zone dynamic_ip {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+}
+```
+
+- **IP Allowlisting & Geo-Blocking**: Block or restrict route access based on client IP CIDR ranges or Cloudflare country headers (`{http.request.header.CF-IPCountry}`).
+- **Snippet Import**: Import any defined snippet directly on domain mapping cards by selecting it from the **Caddy Snippets** dropdown menu.
+
+---
+
+## 5. Authentication Middleware
 
 Secure public routes before they hit your applications using Caddy-native authentication filters:
 

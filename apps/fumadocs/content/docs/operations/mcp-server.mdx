@@ -55,6 +55,31 @@ sequenceDiagram
 
 ---
 
+## Custom MCP Tool Extensions & AI Workflow Automation
+
+Organizations can register custom MCP tool extensions in `packages/api/src/ai/upgal.ts` or via `UPGAL_MCP_SERVERS`:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor IDE as Cursor / Claude / Windsurf
+    participant MCP as Upstand MCP Server (/api/mcp)
+    participant CustomTool as Custom Org Tool Handler
+    participant ExtAPI as External Internal API / Service
+
+    IDE->>MCP: tools/call (name: "custom_deploy_pipeline", args: {...})
+    MCP->>CustomTool: Validate Schema & Permissions
+    CustomTool->>ExtAPI: Dispatch Custom Pipeline Automation
+    ExtAPI-->>CustomTool: Pipeline Result Payload
+    CustomTool-->>MCP: Formatted Tool Result Content
+    MCP-->>IDE: Return JSON-RPC Result
+```
+
+- **Tool Definition**: Custom tools declare a unique tool name, markdown description, mutation status annotation (`readOnlyHint` / `destructiveHint`), and Zod input schema (`z.object({...})`).
+- **Authorization Scopes**: Custom tools inherit organization authorization checks, ensuring users cannot execute operations on infrastructure they do not own.
+
+---
+
 ## 3. Editor & Client Configuration Tutorials
 
 ### VS Code (Cline, Roo Code, Copilot, & MCP Extensions)

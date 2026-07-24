@@ -25,6 +25,27 @@ Git providers allow Upstand to browse repositories, list branches, auto-detect b
 3. **Allowed Host Policy**: Self-hosted GitLab or Gitea URLs must use HTTPS with valid hostnames. Operators can enforce allowed domain boundaries via `UPSTAND_GIT_PROVIDER_ALLOWED_HOSTS`.
 4. **Webhook Setup**: Enable push/tag auto-deployments on any Application resource by copying the generated Webhook URL and Webhook Secret into your Git repository settings.
 
+### Git Webhook HMAC Verification Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Git as Git Provider (GitHub / GitLab / Gitea)
+    participant Hono as Hono Webhook Route (/api/webhooks)
+    participant Crypto as HMAC SHA-256 Verifier
+    participant Queue as Redis Deployment Queue
+
+    Git->>Hono: HTTP POST /api/webhooks/git (Header: X-Hub-Signature-256)
+    Hono->>Crypto: Compute HMAC SHA-256 (Secret + Raw Payload Body)
+    Crypto-->>Hono: Signature Match Verified
+    alt Signature Valid
+        Hono->>Queue: Enqueue Build Job for Commit SHA
+        Hono-->>Git: HTTP 202 Accepted (Build Enqueued)
+    else Signature Invalid
+        Hono-->>Git: HTTP 401 Unauthorized (Invalid Webhook Signature)
+    end
+```
+
 ---
 
 ## 2. S3-Compatible Storage Destinations

@@ -20,6 +20,32 @@ Paths are relative to the source checkout. Keep the build path, Docker context, 
 
 Build secrets are distinct from ordinary build arguments. Use a secret when a value must be available during a build without becoming ordinary runtime configuration or a final image layer.
 
+---
+
+### Distributed BuildKit Remote Caching (`--cache-from` / `--cache-to`)
+
+To accelerate compilation times on dedicated build servers, Upstand supports distributed BuildKit cache backends:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Worker as Build Worker
+    participant BuildKit as Docker BuildKit Engine
+    participant Registry as Container Registry / S3 Cache
+
+    Worker->>BuildKit: Start Build (Flag: --cache-from=type=registry,ref=org/app:buildcache)
+    BuildKit->>Registry: Pull Cached Layers Manifest
+    Registry-->>BuildKit: Return Unchanged Layers (90% Layer Reuse)
+    BuildKit->>BuildKit: Compile Only Modified Source Layers
+    Worker->>BuildKit: Export Cache (Flag: --cache-to=type=registry,ref=org/app:buildcache,mode=max)
+    BuildKit->>Registry: Push Updated Build Cache Manifest
+```
+
+- **Inline & Registry Cache**: Stores intermediate build layers in your private container registry (`type=registry`) for multi-worker build reuse.
+- **S3 Cache Backend**: Caches BuildKit layer blobs directly into S3 buckets (`type=s3`), reducing registry storage consumption.
+
+---
+
 ## Source triggers
 
 Applications and Git-backed Compose resources can react to provider webhooks. Configure whether the trigger is a branch push or a tag, an optional tag pattern, and watched paths. A webhook records the source commit and queues a deployment for the resource. The deployment history is the authoritative record of the commit that was built.

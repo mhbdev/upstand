@@ -20,17 +20,33 @@ Users are members of one or more organizations and can seamlessly switch between
 
 ---
 
-## Role-Based Access Control (RBAC)
+---
+
+## Role-Based Access Control (RBAC) Capability Matrix
 
 Access within an organization is governed by memberships and permissions. Upstand supports standard roles and custom permission models:
 
 - **Owner**: Full administrative access over the organization, billing, and member lists. Can delete the organization.
 - **Admin**: Can manage servers, deploy resources, invite members, and modify routing rules. Cannot delete the organization or modify other administrators.
 - **Member**: Read-only dashboard access with deployment permissions constrained by specific project/environment scopes.
-- **Custom Roles**: Organizations can define fine-grained custom roles targeting specific features (for example, a `Database Operator` or `Build Engineer`) by combining individual permissions:
-  - `server:create`, `server:update`, `server:view`
-  - `resource:deploy`, `resource:delete`, `resource:view`
-  - `billing:manage`
+
+### Granular Capability Reference Table
+
+| Capability String | Description | Owner | Admin | Member | Custom Role Target |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| `server:create` | Provision and register new compute nodes | Yes | Yes | No | Infrastructure Engineer |
+| `server:update` | Modify server roles, SSH keys, or drain status | Yes | Yes | No | Infrastructure Engineer |
+| `server:view` | Inspect server status, node IPs, and Docker info | Yes | Yes | Yes | All Operators |
+| `resource:create` | Create new applications, Compose stacks, or databases | Yes | Yes | No | Developer / DevOps |
+| `resource:deploy` | Trigger builds, deployments, and restarts | Yes | Yes | Yes | Developer / DevOps |
+| `resource:update` | Edit environment variables, domains, or replicas | Yes | Yes | No | Lead Developer |
+| `resource:delete` | Delete resources, persistent volumes, or stacks | Yes | Yes | No | Organization Admin |
+| `backup:create` | Trigger manual S3 backup dumps | Yes | Yes | Yes | Database Operator |
+| `backup:restore` | Restore database dumps (Requires 2FA) | Yes | Yes | No | Lead DBA |
+| `terminal:connect` | Open interactive SSH/Docker exec shells (Requires 2FA) | Yes | No | No | Owner Only |
+| `audit_log:view` | Search and export organization audit trails | Yes | Yes | No | Security Compliance |
+| `mcp:tools` | Execute MCP JSON-RPC protocol tools | Yes | Yes | Yes | AI Automation |
+| `billing:manage` | Manage subscription tiers and billing | Yes | No | No | Owner Only |
 
 ---
 

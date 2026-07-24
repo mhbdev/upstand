@@ -43,6 +43,34 @@ graph TD
 
 ---
 
+### IPsec Encrypted Overlay Networks (`--opt encrypted`)
+
+For multi-node Swarm clusters spanning public subnets or inter-datacenter links, Upstand supports IPsec ESP encrypted overlay networks:
+
+```mermaid
+graph LR
+    subgraph NodeA["Manager Node (Datacenter US-East)"]
+        ContainerA["Application Container A"]
+    end
+
+    subgraph EncryptedTunnel["IPsec ESP Encrypted VXLAN Tunnel (AES-GCM / Port 4789)"]
+        Tunnel["Encrypted IPsec Datagrams"]
+    end
+
+    subgraph NodeB["Worker Node (Datacenter EU-West)"]
+        ContainerB["Database Container B"]
+    end
+
+    ContainerA -->|Encrypted Traffic| Tunnel
+    Tunnel -->|Decrypted Traffic| ContainerB
+```
+
+- **Encryption Protocol**: Enforces IPsec Encapsulating Security Payload (ESP) encryption on all VXLAN traffic crossing host nodes using AES-GCM encryption.
+- **Enabling IPsec Encryption**: Pass `--opt encrypted` when defining overlay networks or toggle **Enable IPsec Encryption** under Resource Advanced Networking settings.
+- **Performance Impact**: Hardware AES-NI CPU instructions minimize overhead to less than 2-3% latency impact.
+
+---
+
 ## 1. Create the Hierarchy
 
 Open **Workloads → Projects**. Create a project, open it, and create one or more environments. An environment can be default or protected, can have shared variables, and can optionally inherit variables from a parent environment.
