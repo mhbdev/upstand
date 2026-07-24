@@ -347,15 +347,19 @@ export class DeploymentWorker {
       if (!project) return;
 
       const succeeded = status === "success";
+      const titlePrefix = succeeded
+        ? "🚀 Deployment Succeeded"
+        : "❌ Deployment Failed";
       await publisher.execute({
         organizationId: project.organizationId,
         event: succeeded ? "deployment_succeeded" : "deployment_failed",
         idempotencyKey: `deployment:${deploymentId}:${status}`,
-        title: `${resource.name} deployment ${succeeded ? "succeeded" : "failed"}`,
+        title: `${titlePrefix}: ${resource.name}`,
         message: succeeded
-          ? `The deployment for ${resource.name} completed successfully.`
-          : `The deployment for ${resource.name} failed. Review the deployment logs for details.`,
+          ? `Deployment #${deploymentId.slice(0, 8)} for ${resource.name} completed successfully in ${environment.name} (${project.name}).`
+          : `Deployment #${deploymentId.slice(0, 8)} for ${resource.name} failed in ${environment.name} (${project.name}). Review deployment logs for details.`,
         metadata: {
+          event: succeeded ? "deployment_succeeded" : "deployment_failed",
           resourceId,
           resourceName: resource.name,
           deploymentId,

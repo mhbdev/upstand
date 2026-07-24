@@ -221,20 +221,32 @@ export class ExecuteBackupRunUseCase {
         : input.run.kind === "web-server"
           ? "web_server_backup_completed"
           : "volume_backup_completed";
+    const backupEmoji =
+      input.run.kind === "database"
+        ? "💾"
+        : input.run.kind === "web-server"
+          ? "🌐"
+          : "📁";
+    const titlePrefix = input.succeeded
+      ? `${backupEmoji} Backup Completed`
+      : "⚠️ Backup Failed";
     await this.publisher
       .execute({
         organizationId: input.organizationId,
         event,
         idempotencyKey: `backup:${input.run.id}:${input.run.status}`,
-        title: `${label} backup ${input.succeeded ? "completed" : "failed"}`,
+        title: `${titlePrefix}: ${input.resourceName}`,
         message: input.succeeded
           ? `${label} backup for ${input.resourceName} completed successfully.`
           : `${label} backup for ${input.resourceName} failed: ${input.run.error ?? "unknown error"}`,
         metadata: {
+          event,
           backupRunId: input.run.id,
           resourceId: input.run.resourceId,
+          resourceName: input.resourceName,
           fileKey: input.run.fileKey,
           status: input.run.status,
+          error: input.succeeded ? undefined : (input.run.error ?? undefined),
         },
       })
       .catch((error) => {

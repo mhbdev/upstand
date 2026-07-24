@@ -45,9 +45,14 @@ export class ScheduledDockerCleanup {
           .execute({
             event: "docker_cleanup_completed",
             idempotencyKey: `docker-cleanup:local:${date}`,
-            title: "Daily Docker cleanup completed",
+            title: "🧹 Docker Cleanup Completed",
             message:
-              "Upstand completed the scheduled cleanup of unused local Docker resources.",
+              "Upstand successfully executed the scheduled daily cleanup of unused Docker images, stopped containers, and dangling build caches.",
+            metadata: {
+              event: "docker_cleanup_completed",
+              date,
+              scope: "local",
+            },
           })
           .catch((notificationError) => {
             log.error({

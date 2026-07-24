@@ -91,7 +91,7 @@ export function ContainerFileExplorer({
         (c: { id: string; name: string }) =>
           c.id === selectedContainer ||
           c.id.startsWith(selectedContainer || "___") ||
-          (selectedContainer && selectedContainer.startsWith(c.id)) ||
+          selectedContainer?.startsWith(c.id) ||
           c.name === selectedContainer,
       );
       if (!exists && containersData[0]) {

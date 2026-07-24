@@ -4,7 +4,22 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.137 - 2026-07-24
+## 0.1.138 - 2026-07-24
+
+### Added & Improved
+
+- **Multi-Channel Notification Formatting & Contextual Emojis**:
+  - Added dedicated event emoji prefixes (🚀 ❌ 💾 📁 🌐 ⚡ 🧹 🐝 🔄 🗑️ 🔑 🚨) and color coding (Success `#22C55E`, Danger `#EF4444`, Warning `#F59E0B`, Info `#3B82F6`) across all 12 notification event types in `NotificationTransportRegistry`.
+  - Enriched `formatNotificationText` with structured section headers, emoji metadata bullet points (Resource, Scope, Server, Usage, Commit, Backup File, Version, Error), and clean tail log block formatting.
+  - Tailored Slack, Discord, Telegram, Teams, Email, Resend, Gotify, Ntfy, Mattermost, Pushover, and Custom Webhook payload formatting with rich embeds, action button links, and adaptive card templates.
+  - Attached full event metadata context and emoji titles to notification publishers in `deployment-worker.ts`, `execute-backup-run.usecase.ts`, `docker-cleanup-scheduler.ts`, `monitoring.ts`, `swarm.router.ts`, and `trigger-update.usecase.ts`.
+  - Added comprehensive unit tests in `notification-transport.test.ts`.
+
+- **Infrastructure Topology Map S3 Destination Linking**:
+  - Connected S3 storage destination nodes (`s3:${s3.id}`) to host servers and resource nodes when referenced in backup settings or advanced resource configurations.
+  - Verified end-to-end topology map features: Dagre & ELK.js layout engines, d3-force node collision avoidance, live status pulse indicators, interactive drawer tabs (Overview, Live Logs, Live Metrics), container action dialogs (Start/Stop/Restart), and cluster subgraphs.
+
+
 
 ### Documentation
 

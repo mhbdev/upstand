@@ -8,31 +8,35 @@ import {
 } from "./resource-environment";
 
 describe("Environment Variable & Secret Resolution Edge Cases", () => {
-  test("resolves both ${{project.VAR}} and ${{env.VAR}} references", () => {
-    const resourceVars = {
-      DATABASE_URL: "${{project.DB_HOST}}:${{project.DB_PORT}}/mydb",
-      API_KEY: "${{env.GLOBAL_API_KEY}}",
-      STATIC_VAL: "constant",
-    };
+  test(
+    "resolves both $" + "{{project.VAR}} and $" + "{{env.VAR}} references",
+    () => {
+      const resourceVars = {
+        DATABASE_URL:
+          "$" + "{{project.DB_HOST}}:$" + "{{project.DB_PORT}}/mydb",
+        API_KEY: "$" + "{{env.GLOBAL_API_KEY}}",
+        STATIC_VAL: "constant",
+      };
 
-    const projectVars = {
-      DB_HOST: "postgres.internal",
-      DB_PORT: "5432",
-      GLOBAL_API_KEY: "secret-key-123",
-    };
+      const projectVars = {
+        DB_HOST: "postgres.internal",
+        DB_PORT: "5432",
+        GLOBAL_API_KEY: "secret-key-123",
+      };
 
-    const resolved = substituteProjectEnvVars(resourceVars, projectVars);
+      const resolved = substituteProjectEnvVars(resourceVars, projectVars);
 
-    expect(resolved).toEqual({
-      DATABASE_URL: "postgres.internal:5432/mydb",
-      API_KEY: "secret-key-123",
-      STATIC_VAL: "constant",
-    });
-  });
+      expect(resolved).toEqual({
+        DATABASE_URL: "postgres.internal:5432/mydb",
+        API_KEY: "secret-key-123",
+        STATIC_VAL: "constant",
+      });
+    },
+  );
 
   test("handles missing project keys by replacing with empty string", () => {
     const resourceVars = {
-      MISSING_VAR: "prefix_${{project.NON_EXISTENT}}_suffix",
+      MISSING_VAR: "prefix_$" + "{{project.NON_EXISTENT}}_suffix",
     };
     const resolved = substituteProjectEnvVars(resourceVars, {});
     expect(resolved.MISSING_VAR).toBe("prefix__suffix");
@@ -41,7 +45,7 @@ describe("Environment Variable & Secret Resolution Edge Cases", () => {
   test("preserves special characters like $, \\, and bcrypt hashes in secret values", () => {
     const secretHash = "$2a$12$e86..9.a./.1234567890abcdefghijk";
     const resourceVars = {
-      PASS_HASH: "${{project.HASH_KEY}}",
+      PASS_HASH: "$" + "{{project.HASH_KEY}}",
     };
     const projectVars = {
       HASH_KEY: secretHash,
@@ -65,7 +69,7 @@ describe("Environment Variable & Secret Resolution Edge Cases", () => {
   test("end-to-end resolution with raw encrypted strings", () => {
     const encryptedResource = serializeResourceEnvironmentVariables({
       PORT: "8080",
-      URL: "https://${{project.HOST}}/app",
+      URL: "https://$" + "{{project.HOST}}/app",
     });
     const encryptedProject = serializeResourceEnvironmentVariables({
       HOST: "example.com",
@@ -107,7 +111,7 @@ services:
       DB_PORT: "5432",
     });
 
-    expect(composeFile).toContain("${PORT}");
-    expect(composeFile).toContain("${DB_HOST}");
+    expect(composeFile).toContain("$" + "{PORT}");
+    expect(composeFile).toContain("$" + "{DB_HOST}");
   });
 });

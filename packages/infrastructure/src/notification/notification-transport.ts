@@ -109,6 +109,63 @@ function escapeHtml(value: string): string {
   });
 }
 
+function getEventEmoji(event?: string): string {
+  if (!event) return "🔔";
+  switch (event) {
+    case "deployment_succeeded":
+      return "🚀";
+    case "deployment_failed":
+      return "❌";
+    case "database_backup_completed":
+      return "💾";
+    case "volume_backup_completed":
+      return "📁";
+    case "web_server_backup_completed":
+      return "🌐";
+    case "platform_restart":
+      return "⚡";
+    case "docker_cleanup_completed":
+      return "🧹";
+    case "cluster_initialized":
+      return "🐝";
+    case "cluster_node_updated":
+      return "🔄";
+    case "cluster_node_removed":
+      return "🗑️";
+    case "cluster_token_rotated":
+      return "🔑";
+    case "server_threshold_alert":
+      return "🚨";
+    default:
+      return "🔔";
+  }
+}
+
+function getEventColor(
+  event?: string,
+  isFailed?: boolean,
+): { hex: string; decimal: number } {
+  if (
+    isFailed ||
+    event === "deployment_failed" ||
+    event === "server_threshold_alert" ||
+    event === "cluster_node_removed"
+  ) {
+    return { hex: "#EF4444", decimal: 0xef4444 };
+  }
+  if (
+    event === "deployment_succeeded" ||
+    event?.includes("backup_completed") ||
+    event === "docker_cleanup_completed"
+  ) {
+    return { hex: "#22C55E", decimal: 0x22c55e };
+  }
+  if (event === "platform_restart" || event === "cluster_token_rotated") {
+    return { hex: "#F59E0B", decimal: 0xf59e0b };
+  }
+  return { hex: "#3B82F6", decimal: 0x3b82f6 };
+}
+
 function resolveNotificationActions(
   message: NotificationMessage,
 ): NotificationAction[] {
@@ -133,7 +190,7 @@ function resolveNotificationActions(
     typeof meta.actionUrl === "string" &&
     !actions.some((a) => a.url === meta.actionUrl)
   ) {
-    actions.push({ label: "Open Link", url: meta.actionUrl });
+    actions.push({ label: "🔗 Open Link", url: meta.actionUrl });
   }
 
   if (
@@ -143,7 +200,7 @@ function resolveNotificationActions(
   ) {
     const cleanBase = trimTrailingSlash(baseUrl);
     actions.push({
-      label: "View Resource",
+      label: "📦 View Resource",
       url: `${cleanBase}/resources/${meta.resourceId}`,
     });
   }
@@ -177,21 +234,53 @@ function resolveNotificationActions(
 
 function formatNotificationText(message: NotificationMessage): string {
   const meta = message.metadata;
-  if (!meta || typeof meta !== "object") return message.message;
+  const event = meta?.event as string | undefined;
+  const emoji = getEventEmoji(event);
   const lines: string[] = [message.message];
 
+  if (!meta || typeof meta !== "object") return `${emoji} ${message.message}`;
+
   const metaFields: string[] = [];
-  if (meta.resourceName) metaFields.push(`Resource: ${meta.resourceName}`);
-  if (meta.projectName) metaFields.push(`Project: ${meta.projectName}`);
-  if (meta.environmentName)
-    metaFields.push(`Environment: ${meta.environmentName}`);
-  if (meta.resourceType) metaFields.push(`Type: ${meta.resourceType}`);
-  if (meta.commitSha)
-    metaFields.push(`Commit: ${String(meta.commitSha).slice(0, 7)}`);
-  if (meta.error) metaFields.push(`Error: ${meta.error}`);
+  if (meta.resourceName) {
+    metaFields.push(
+      `📦 Resource: ${meta.resourceName}${meta.resourceType ? ` (${meta.resourceType})` : ""}`,
+    );
+  }
+  if (meta.projectName || meta.environmentName) {
+    const projEnv = [meta.projectName, meta.environmentName]
+      .filter(Boolean)
+      .join(" / ");
+    metaFields.push(`📁 Scope: ${projEnv}`);
+  }
+  if (meta.serverName || meta.serverId) {
+    metaFields.push(
+      `🖥️ Server: ${meta.serverName || meta.serverId}${meta.alertType ? ` (${meta.alertType})` : ""}`,
+    );
+  }
+  if (meta.value !== undefined && meta.threshold !== undefined) {
+    metaFields.push(
+      `📊 Metric: ${meta.value}% (Threshold: ${meta.threshold}%)`,
+    );
+  }
+  if (meta.commitSha) {
+    metaFields.push(`🔀 Commit: ${String(meta.commitSha).slice(0, 7)}`);
+  }
+  if (meta.fileKey) {
+    metaFields.push(`📄 Backup File: ${meta.fileKey}`);
+  }
+  if (meta.version) {
+    metaFields.push(`⚡ Version: ${meta.version}`);
+  }
+  if (meta.error) {
+    metaFields.push(`🚨 Error: ${meta.error}`);
+  }
 
   if (metaFields.length > 0) {
-    lines.push("", ...metaFields.map((field) => `• ${field}`));
+    lines.push(
+      "",
+      "📌 Context & Details:",
+      ...metaFields.map((field) => `• ${field}`),
+    );
   }
 
   const logs = meta.logs ?? meta.logTail ?? meta.logsSnippet;
@@ -243,10 +332,16 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
+
     const blocks: any[] = [
       {
         type: "header",
-        text: { type: "plain_text", text: message.title, emoji: true },
+        text: { type: "plain_text", text: formattedTitle, emoji: true },
       },
       {
         type: "section",
@@ -261,6 +356,9 @@ export class NotificationTransportRegistry implements NotificationTransport {
           type: "button",
           text: { type: "plain_text", text: action.label, emoji: true },
           url: action.url,
+          ...(action.label.includes("View") || action.label.includes("Open")
+            ? { style: "primary" }
+            : {}),
         })),
       });
     }
@@ -269,7 +367,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `${message.title}\n${bodyText}`,
+        text: `${formattedTitle}\n${bodyText}`,
         ...(configuration.channel ? { channel: configuration.channel } : {}),
         blocks,
       }),
@@ -283,6 +381,11 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
 
     const replyMarkup =
       actions.length > 0
@@ -303,7 +406,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: configuration.chatId,
-          text: `<b>${escapeHtml(message.title)}</b>\n\n${escapeHtml(bodyText)}`,
+          text: `<b>${escapeHtml(formattedTitle)}</b>\n\n${escapeHtml(bodyText)}`,
           parse_mode: "HTML",
           disable_web_page_preview: true,
           ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
@@ -322,29 +425,59 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const meta = message.metadata ?? {};
+    const event = meta.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
     const isFailed = meta.status === "failed" || !!meta.error;
+    const color = getEventColor(event, isFailed).decimal;
 
     const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
-    if (meta.resourceName)
+    if (meta.resourceName) {
       fields.push({
-        name: "Resource",
-        value: String(meta.resourceName),
+        name: "📦 Resource",
+        value: `${meta.resourceName}${meta.resourceType ? ` (${meta.resourceType})` : ""}`,
         inline: true,
       });
-    if (meta.projectName)
+    }
+    if (meta.projectName || meta.environmentName) {
       fields.push({
-        name: "Project",
-        value: String(meta.projectName),
+        name: "📁 Scope",
+        value: [meta.projectName, meta.environmentName]
+          .filter(Boolean)
+          .join(" / "),
         inline: true,
       });
-    if (meta.environmentName)
+    }
+    if (meta.serverName || meta.serverId) {
       fields.push({
-        name: "Environment",
-        value: String(meta.environmentName),
+        name: "🖥️ Server",
+        value: `${meta.serverName || meta.serverId}`,
         inline: true,
       });
-    if (meta.error)
-      fields.push({ name: "Error", value: String(meta.error), inline: false });
+    }
+    if (meta.value !== undefined && meta.threshold !== undefined) {
+      fields.push({
+        name: "📊 Usage",
+        value: `${meta.value}% (Threshold: ${meta.threshold}%)`,
+        inline: true,
+      });
+    }
+    if (meta.commitSha) {
+      fields.push({
+        name: "🔀 Commit",
+        value: String(meta.commitSha).slice(0, 7),
+        inline: true,
+      });
+    }
+    if (meta.error) {
+      fields.push({
+        name: "🚨 Error",
+        value: String(meta.error).slice(0, 1000),
+        inline: false,
+      });
+    }
 
     const primaryUrl = actions[0]?.url;
 
@@ -354,11 +487,12 @@ export class NotificationTransportRegistry implements NotificationTransport {
       body: JSON.stringify({
         embeds: [
           {
-            title: message.title,
+            title: formattedTitle,
             description: message.message,
             url: primaryUrl,
-            color: isFailed ? 0xef4444 : 0x22c55e,
+            color,
             ...(fields.length > 0 ? { fields } : {}),
+            footer: { text: "Upstand Delivery Engine" },
             timestamp: new Date().toISOString(),
           },
         ],
@@ -372,12 +506,18 @@ export class NotificationTransportRegistry implements NotificationTransport {
     message: NotificationMessage,
   ): Promise<void> {
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
+
     const response = await fetchWithTimeout(configuration.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         msg_type: "text",
-        content: { text: `${message.title}\n${bodyText}` },
+        content: { text: `${formattedTitle}\n\n${bodyText}` },
       }),
     });
     await ensureSuccess(response, "Lark");
@@ -389,6 +529,12 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
+
     const cardActions = actions.map((action) => ({
       type: "Action.OpenUrl",
       title: action.label,
@@ -410,7 +556,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
               body: [
                 {
                   type: "TextBlock",
-                  text: message.title,
+                  text: formattedTitle,
                   size: "Medium",
                   weight: "Bolder",
                   wrap: true,
@@ -432,6 +578,13 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
+    const colorHex = getEventColor(event, Boolean(message.metadata?.error)).hex;
+
     const transport = nodemailer.createTransport({
       host: configuration.smtpHost,
       port: configuration.smtpPort,
@@ -442,7 +595,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
     const actionButtonsHtml = actions
       .map(
         (a) =>
-          `<a href="${escapeHtml(a.url)}" style="display:inline-block;padding:10px 16px;margin-right:8px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">${escapeHtml(a.label)}</a>`,
+          `<a href="${escapeHtml(a.url)}" style="display:inline-block;padding:10px 18px;margin-right:8px;background-color:${colorHex};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:13px;">${escapeHtml(a.label)}</a>`,
       )
       .join(" ");
 
@@ -450,9 +603,9 @@ export class NotificationTransportRegistry implements NotificationTransport {
       await transport.sendMail({
         from: configuration.fromAddress,
         to: configuration.toAddresses.join(", "),
-        subject: message.title,
+        subject: formattedTitle,
         text: `${bodyText}\n\n${actions.map((a) => `${a.label}: ${a.url}`).join("\n")}`,
-        html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(bodyText).replace(/\n/g, "<br />")}</p>${actionButtonsHtml ? `<div style="margin-top:16px;">${actionButtonsHtml}</div>` : ""}`,
+        html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;border-radius:8px;border:1px solid #e2e8f0;background-color:#ffffff;"><div style="border-left:4px solid ${colorHex};padding-left:12px;margin-bottom:16px;"><h2 style="margin:0;color:#0f172a;font-size:18px;">${escapeHtml(formattedTitle)}</h2></div><p style="color:#334155;line-height:1.6;font-size:14px;white-space:pre-wrap;">${escapeHtml(bodyText)}</p>${actionButtonsHtml ? `<div style="margin-top:20px;">${actionButtonsHtml}</div>` : ""}<hr style="margin-top:24px;border:none;border-top:1px solid #f1f5f9;" /><p style="color:#94a3b8;font-size:11px;margin:8px 0 0 0;">Upstand Automated System Notification</p></div>`,
       });
     } finally {
       transport.close();
@@ -465,11 +618,17 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
+    const colorHex = getEventColor(event, Boolean(message.metadata?.error)).hex;
 
     const actionButtonsHtml = actions
       .map(
         (a) =>
-          `<a href="${escapeHtml(a.url)}" style="display:inline-block;padding:10px 16px;margin-right:8px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">${escapeHtml(a.label)}</a>`,
+          `<a href="${escapeHtml(a.url)}" style="display:inline-block;padding:10px 18px;margin-right:8px;background-color:${colorHex};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:13px;">${escapeHtml(a.label)}</a>`,
       )
       .join(" ");
 
@@ -482,9 +641,9 @@ export class NotificationTransportRegistry implements NotificationTransport {
       body: JSON.stringify({
         from: configuration.fromAddress,
         to: configuration.toAddresses,
-        subject: message.title,
+        subject: formattedTitle,
         text: `${bodyText}\n\n${actions.map((a) => `${a.label}: ${a.url}`).join("\n")}`,
-        html: `<h2>${escapeHtml(message.title)}</h2><p>${escapeHtml(bodyText).replace(/\n/g, "<br />")}</p>${actionButtonsHtml ? `<div style="margin-top:16px;">${actionButtonsHtml}</div>` : ""}`,
+        html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;border-radius:8px;border:1px solid #e2e8f0;background-color:#ffffff;"><div style="border-left:4px solid ${colorHex};padding-left:12px;margin-bottom:16px;"><h2 style="margin:0;color:#0f172a;font-size:18px;">${escapeHtml(formattedTitle)}</h2></div><p style="color:#334155;line-height:1.6;font-size:14px;white-space:pre-wrap;">${escapeHtml(bodyText)}</p>${actionButtonsHtml ? `<div style="margin-top:20px;">${actionButtonsHtml}</div>` : ""}<hr style="margin-top:24px;border:none;border-top:1px solid #f1f5f9;" /><p style="color:#94a3b8;font-size:11px;margin:8px 0 0 0;">Upstand Automated System Notification</p></div>`,
       }),
     });
     await ensureSuccess(response, "Resend");
@@ -496,6 +655,11 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
     const clickUrl = actions[0]?.url;
 
     const response = await fetchWithTimeout(
@@ -507,7 +671,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
           "X-Gotify-Key": configuration.appToken,
         },
         body: JSON.stringify({
-          title: message.title,
+          title: formattedTitle,
           message: bodyText,
           priority: configuration.priority,
           ...(clickUrl
@@ -529,6 +693,11 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
     const actionsHeader = actions
       .map((a) => `action=view, label=${a.label}, url=${a.url}`)
       .join("; ");
@@ -538,7 +707,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
       {
         method: "POST",
         headers: {
-          "X-Title": message.title,
+          "X-Title": formattedTitle,
           "X-Priority": String(configuration.priority),
           ...(actionsHeader ? { "X-Actions": actionsHeader } : {}),
           ...(configuration.accessToken
@@ -557,6 +726,11 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
     const actionLinksText = actions
       .map((a) => `[${a.label}](${a.url})`)
       .join(" • ");
@@ -565,7 +739,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `**${message.title}**\n${bodyText}${actionLinksText ? `\n\n${actionLinksText}` : ""}`,
+        text: `### ${formattedTitle}\n${bodyText}${actionLinksText ? `\n\n${actionLinksText}` : ""}`,
         ...(configuration.channel
           ? { channel: `#${configuration.channel.replace(/^#/, "")}` }
           : {}),
@@ -581,10 +755,16 @@ export class NotificationTransportRegistry implements NotificationTransport {
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
     const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
+
     const form = new URLSearchParams({
       token: configuration.apiToken,
       user: configuration.userKey,
-      title: message.title,
+      title: formattedTitle,
       message: bodyText,
       priority: String(configuration.priority),
     });
@@ -613,6 +793,13 @@ export class NotificationTransportRegistry implements NotificationTransport {
     message: NotificationMessage,
   ): Promise<void> {
     const actions = resolveNotificationActions(message);
+    const bodyText = formatNotificationText(message);
+    const event = message.metadata?.event as string | undefined;
+    const emoji = getEventEmoji(event);
+    const formattedTitle = message.title.startsWith(emoji)
+      ? message.title
+      : `${emoji} ${message.title}`;
+
     const response = await fetchWithTimeout(configuration.endpoint, {
       method: "POST",
       headers: {
@@ -620,8 +807,11 @@ export class NotificationTransportRegistry implements NotificationTransport {
         ...configuration.headers,
       },
       body: JSON.stringify({
-        title: message.title,
+        event: event ?? "notification",
+        emoji,
+        title: formattedTitle,
         message: message.message,
+        formattedText: bodyText,
         actions,
         timestamp: new Date().toISOString(),
         metadata: message.metadata ?? {},

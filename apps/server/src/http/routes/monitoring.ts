@@ -149,11 +149,12 @@ export function registerMonitoringRoutes(app: Hono<AppEnv>): void {
           ? { organizationId: serverRecord.organizationId }
           : {}),
         idempotencyKey: `alert:${settings.serverId}:${type}:${new Date().toISOString().slice(0, 13)}`,
-        title: `[Alert] Server ${serverName} - High ${type} Usage`,
+        title: `🚨 Server Alert: ${serverName} (${type.toUpperCase()})`,
         message:
           message ||
-          `The ${type} usage on server '${serverName}' is currently ${value}%, exceeding the set threshold of ${threshold}%.`,
+          `Server '${serverName}' resource usage for ${type} has reached ${value}%, exceeding the configured alert threshold of ${threshold}%.`,
         metadata: {
+          event: "server_threshold_alert",
           serverId: settings.serverId,
           serverName,
           alertType: type,

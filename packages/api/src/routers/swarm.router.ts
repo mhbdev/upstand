@@ -74,6 +74,10 @@ async function notifyClusterOperation(
     .execute({
       ...input,
       idempotencyKey: `cluster:${input.event}:${input.organizationId}:${JSON.stringify(input.metadata ?? {})}`,
+      metadata: {
+        event: input.event,
+        ...(input.metadata ?? {}),
+      },
     })
     .catch((error) => {
       logger.error(error instanceof Error ? error : String(error), {

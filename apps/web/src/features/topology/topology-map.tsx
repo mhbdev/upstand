@@ -1736,6 +1736,28 @@ export function TopologyMap() {
             ).y,
           ),
         );
+        addEdge(
+          inspectionServerNodeId,
+          `s3:${s3.id}`,
+          `s3-server:${s3.id}`,
+          true,
+        );
+      }
+    });
+
+    scopedResources.forEach((resource) => {
+      const advConfig = safeJson<{
+        s3DestinationId?: string;
+        backupS3DestinationId?: string;
+      }>(resource.advancedConfig, {});
+      const targetS3Id =
+        advConfig.s3DestinationId || advConfig.backupS3DestinationId;
+      if (targetS3Id) {
+        addEdge(
+          `resource:${resource.id}`,
+          `s3:${targetS3Id}`,
+          `s3-resource:${resource.id}:${targetS3Id}`,
+        );
       }
     });
 
