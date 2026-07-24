@@ -4,6 +4,13 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.143 - 2026-07-24
+
+### Fixed
+
+- **Fumadocs Official Mermaid AST Pipeline**: Integrated official Fumadocs Mermaid renderer guidelines (`https://www.fumadocs.dev/docs/markdown/mermaid`) using `source.config.ts` AST remark plugin (`remarkMermaid`) and client component (`mermaid.tsx`). Automatically converts MDX ` ```mermaid ` code blocks into `<Mermaid chart="..." />` JSX flow elements.
+- **Strict Mermaid Syntax Compliance**: Fixed unquoted edge labels containing parentheses (e.g., `(port 3000)`) and unquoted node labels with node connector characters (`&`) across `self-hosting.mdx`, `projects-resources.mdx`, `secrets-and-scaling.mdx`, and `index.mdx` that previously caused Mermaid parser lexer exceptions.
+
 ## 0.1.142 - 2026-07-24
 
 ### Fixed
