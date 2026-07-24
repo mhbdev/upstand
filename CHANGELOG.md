@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.135 - 2026-07-24
+
+### Added
+
+- **Administrative CLI Documentation Guide (`cli.mdx`)**: Added dedicated documentation covering Upstand's control-plane administrative CLI (`bun apps/server/dist/cli.mjs`), emergency 2FA reset procedures (`reset-2fa`), and container maintenance workflows.
+
 ## 0.1.134 - 2026-07-24
 
 ### Documentation & Architecture

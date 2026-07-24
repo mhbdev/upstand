@@ -3,6 +3,7 @@
   "pages": [
     "upgal",
     "mcp-server",
+    "cli",
     "security-auth",
     "organization-admin",
     "infrastructure",
