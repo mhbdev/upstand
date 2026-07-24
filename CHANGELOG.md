@@ -4,6 +4,15 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.145 - 2026-07-24
+
+### Fixed
+
+- **Go Monitoring Service Build Fix**:
+  - Resolved Go struct field type mismatches in `apps/monitoring/monitoring/monitor.go` where `ServerMetric` fields were expecting `time.Time`, `int`, and `uint64`.
+  - Updated `database/server.go` and `monitoring/monitor.go` invocation methods in `apps/monitoring/main.go` (`GetServerMetrics()`, `GetMetricsByTimeRange()`, `SaveServerMetric()`).
+  - Successfully verified with `go build -v ./...` inside `apps/monitoring` for Docker buildx image packaging.
+
 ## 0.1.144 - 2026-07-24
 
 ### Refactored & Improved
