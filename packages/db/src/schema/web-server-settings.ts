@@ -8,6 +8,11 @@ import {
 
 export const webServerSettings = pgTable("web_server_settings", {
   id: text("id").primaryKey(), // always 'global'
+  serverDomain: text("server_domain"),
+  httpsEnabled: boolean("https_enabled").default(true).notNull(),
+  certificateProvider: text("certificate_provider")
+    .default("letsencrypt")
+    .notNull(),
   letsEncryptEmail: text("lets_encrypt_email"),
   cloudflareApiToken: text("cloudflare_api_token"),
   httpPort: integer("http_port").default(80).notNull(),

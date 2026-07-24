@@ -63,6 +63,10 @@ import {
   validateKeyValuePairs,
 } from "@/components/shared/key-value-editor";
 import { WebServerTerminalDialog } from "@/components/web-server-terminal-dialog";
+import {
+  type CertificateProvider,
+  ServerDomainCard,
+} from "@/features/web-server/components/server-domain-card";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import type { authClient } from "@/lib/auth-client";
 import { copyText } from "@/lib/browser";
@@ -95,6 +99,10 @@ export default function WebServerDashboard(_props: {
       : null;
   const organizationId = organizationState.organizationId as string;
   // Database Web Server settings
+  const [serverDomain, setServerDomain] = useState("");
+  const [httpsEnabled, setHttpsEnabled] = useState(true);
+  const [certificateProvider, setCertificateProvider] =
+    useState<CertificateProvider>("letsencrypt");
   const [email, setEmail] = useState("");
   const [cloudflareApiToken, setCloudflareApiToken] = useState("");
   const [httpPort, setHttpPort] = useState(80);
@@ -216,6 +224,12 @@ export default function WebServerDashboard(_props: {
   // Sync state with fetched settings
   useEffect(() => {
     if (info?.settings && !editingSettings) {
+      setServerDomain(info.settings.serverDomain || "");
+      setHttpsEnabled(info.settings.httpsEnabled ?? true);
+      setCertificateProvider(
+        (info.settings.certificateProvider as CertificateProvider) ||
+          "letsencrypt",
+      );
       setEmail(info.settings.letsEncryptEmail || "");
       setCloudflareApiToken(info.settings.cloudflareApiToken || "");
       setHttpPort(info.settings.httpPort);
@@ -511,10 +525,25 @@ export default function WebServerDashboard(_props: {
     onError: (error) => toast.error(error.message),
   });
 
+  const handleSaveServerDomain = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditingSettings(true);
+    updateSettingsMutation.mutate({
+      serverDomain: serverDomain.trim() || null,
+      letsEncryptEmail: email.trim() || null,
+      httpsEnabled,
+      certificateProvider,
+    });
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    setEditingSettings(true);
     updateSettingsMutation.mutate({
+      serverDomain: serverDomain.trim() || null,
       letsEncryptEmail: email.trim() || null,
+      httpsEnabled,
+      certificateProvider,
       cloudflareApiToken: cloudflareApiToken.trim() || null,
       httpPort,
       httpsPort,
@@ -639,6 +668,18 @@ export default function WebServerDashboard(_props: {
         <PageSkeleton />
       ) : (
         <div className="space-y-6">
+          <ServerDomainCard
+            serverDomain={serverDomain}
+            setServerDomain={setServerDomain}
+            email={email}
+            setEmail={setEmail}
+            httpsEnabled={httpsEnabled}
+            setHttpsEnabled={setHttpsEnabled}
+            certificateProvider={certificateProvider}
+            setCertificateProvider={setCertificateProvider}
+            onSave={handleSaveServerDomain}
+            isSaving={updateSettingsMutation.isPending}
+          />
           {/* <Card className="border border-border/40 bg-card/20 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center justify-between font-semibold text-lg">

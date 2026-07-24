@@ -169,5 +169,6 @@ export * from "./web-server/get-update-status.usecase";
 export * from "./web-server/get-web-server-logs.usecase";
 export * from "./web-server/get-web-server-settings.usecase";
 export * from "./web-server/reload-web-server.usecase";
+export * from "./web-server/server-domain-caddy.helper";
 export * from "./web-server/trigger-update.usecase";
 export * from "./web-server/update-web-server-settings.usecase";

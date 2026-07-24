@@ -69,4 +69,35 @@ describe("Caddy access log parsing", () => {
     expect(stats).toHaveLength(3);
     expect(stats.reduce((sum, point) => sum + point.count, 0)).toBe(2);
   });
+
+  test("resolves Caddy status 0 handled request to 200", () => {
+    const sample = JSON.stringify({
+      level: "info",
+      ts: 1784762630.950613,
+      logger: "http.log.access.log0",
+      msg: "handled request",
+      request: {
+        remote_ip: "188.212.135.241",
+        remote_port: "56061",
+        client_ip: "188.212.135.241",
+        proto: "HTTP/1.1",
+        method: "GET",
+        host: "codex-gh-app-07230009.65.109.183.214.nip.io",
+        uri: "/",
+      },
+      duration: 10.124758993,
+      size: 0,
+      status: 0,
+    });
+
+    const entries = parseAccessLogEntries(sample);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      host: "codex-gh-app-07230009.65.109.183.214.nip.io",
+      method: "GET",
+      status: 200,
+      remoteIp: "188.212.135.241",
+      durationMs: 10124.76,
+    });
+  });
 });

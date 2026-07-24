@@ -4,7 +4,19 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
-## 0.1.146 - 2026-07-25
+## 0.1.147 - 2026-07-25
+
+### Added & Fixed
+
+- **Server Domain Card UI & Caddy Integration**:
+  - Added a dedicated, intuitive **Server Domain** card to the Web Server dashboard page matching production design specifications.
+  - Allows operators to configure custom server domains, Let's Encrypt email address, HTTPS toggle switch, and Certificate Provider select (`Let's Encrypt`, `ZeroSSL`, `Self-Signed`, `None`).
+  - Added `server-domain-caddy.helper.ts` in `@upstand/usecases` to automatically build, sync, and reload Caddy control plane routes for custom server domains while preserving user-authored raw Caddyfile snippets.
+- **Incoming Requests Status Code Observability**:
+  - Updated `caddy-access-logs.ts` to inspect `raw.status`, `raw.status_code`, and `raw.response.status`.
+  - Resolved Caddy access log entries with `"msg": "handled request"` and `"status": 0` to HTTP `200` (OK) in log normalizers and request status group filters.
+  - Added unit test `resolves Caddy status 0 handled request to 200` to `caddy-access-logs.test.ts`.
+
 
 ### Added & Refactored
 

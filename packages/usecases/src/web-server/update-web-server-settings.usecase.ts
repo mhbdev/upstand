@@ -7,6 +7,7 @@ import {
 import { Cron } from "croner";
 import { z } from "zod";
 import type { CaddyService } from "./caddy.service";
+import { syncServerDomainInCaddySnippets } from "./server-domain-caddy.helper";
 
 export const AccessLogCleanupCronSchema = z
   .string()
@@ -27,7 +28,12 @@ export const AccessLogCleanupCronSchema = z
   });
 
 export const UpdateWebServerSettingsInputSchema = z.object({
-  letsEncryptEmail: z.email().nullable().optional(),
+  serverDomain: z.string().nullable().optional(),
+  httpsEnabled: z.boolean().optional(),
+  certificateProvider: z
+    .enum(["letsencrypt", "zerossl", "self-signed", "none"])
+    .optional(),
+  letsEncryptEmail: z.string().nullable().optional(),
   cloudflareApiToken: z.string().nullable().optional(),
   httpPort: z.number().int().min(1).max(65535).optional(),
   httpsPort: z.number().int().min(1).max(65535).optional(),
@@ -62,6 +68,12 @@ export class UpdateWebServerSettingsUseCase {
     }
 
     const patch: Partial<WebServerSettings> = {};
+    if (input.serverDomain !== undefined)
+      patch.serverDomain = input.serverDomain;
+    if (input.httpsEnabled !== undefined)
+      patch.httpsEnabled = input.httpsEnabled;
+    if (input.certificateProvider !== undefined)
+      patch.certificateProvider = input.certificateProvider;
     if (input.letsEncryptEmail !== undefined)
       patch.letsEncryptEmail = input.letsEncryptEmail;
     if (input.cloudflareApiToken !== undefined)
@@ -87,6 +99,12 @@ export class UpdateWebServerSettingsUseCase {
       patch.accessLogsEnabled = input.accessLogsEnabled;
     if (input.accessLogCleanupCron !== undefined)
       patch.accessLogCleanupCron = input.accessLogCleanupCron;
+
+    const baseSnippets = patch.caddySnippets ?? settings.caddySnippets;
+    patch.caddySnippets = syncServerDomainInCaddySnippets(baseSnippets, {
+      ...settings,
+      ...patch,
+    });
 
     const candidate = { ...settings, ...patch };
     const needsRecreate =

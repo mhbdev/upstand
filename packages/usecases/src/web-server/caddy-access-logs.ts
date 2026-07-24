@@ -55,6 +55,10 @@ function normalizeEntry(
     raw.request && typeof raw.request === "object"
       ? (raw.request as Record<string, unknown>)
       : {};
+  const response =
+    raw.response && typeof raw.response === "object"
+      ? (raw.response as Record<string, unknown>)
+      : {};
   const timestampValue = numberValue(raw.ts);
   const date =
     timestampValue > 0
@@ -67,7 +71,19 @@ function normalizeEntry(
     stringValue(request.remote_ip).split(":")[0] ||
     "";
   const durationMs = numberValue(raw.duration) * 1000;
-  const status = Math.trunc(numberValue(raw.status));
+  const rawStatus =
+    raw.status !== undefined && raw.status !== null
+      ? numberValue(raw.status)
+      : raw.status_code !== undefined
+        ? numberValue(raw.status_code)
+        : numberValue(response.status);
+
+  // In Caddy access logs, status 0 for a "handled request" represents a successful 200 HTTP response.
+  const status =
+    rawStatus === 0 && stringValue(raw.msg) === "handled request"
+      ? 200
+      : Math.trunc(rawStatus);
+
   return {
     id: `${date.toISOString()}-${index}`,
     timestamp: date.toISOString(),
