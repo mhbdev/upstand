@@ -4,6 +4,7 @@ import {
   DeleteContainerItemInputSchema,
   ListContainerFilesInputSchema,
   ReadContainerFileInputSchema,
+  RenameContainerItemInputSchema,
   SearchContainerFilesInputSchema,
   WriteContainerFileInputSchema,
 } from "@upstand/usecases";
@@ -121,6 +122,29 @@ export const containerFileManagerRouter = router({
         );
         const useCase = ctx.scope.resolve(ContainerFileManagerUseCaseToken);
         return await useCase.createItem({
+          ...input,
+          organizationId,
+        });
+      } catch (error) {
+        handleUseCaseError(error);
+      }
+    }),
+
+  renameItem: twoFactorVerifiedProcedure
+    .input(RenameContainerItemInputSchema.omit({ organizationId: true }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const organizationId = await resolveResourceOrgId(
+          ctx,
+          input.resourceId,
+        );
+        await checkPermission(
+          ctx.session.user.id,
+          organizationId,
+          "resource:update",
+        );
+        const useCase = ctx.scope.resolve(ContainerFileManagerUseCaseToken);
+        return await useCase.renameItem({
           ...input,
           organizationId,
         });

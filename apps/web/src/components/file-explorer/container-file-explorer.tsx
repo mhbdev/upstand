@@ -75,8 +75,23 @@ export function ContainerFileExplorer({
   );
   const [newItemParentPath, setNewItemParentPath] = useState<string>("/");
   const [newItemName, setNewItemName] = useState("");
-  const [targetUploadPath, setTargetUploadPath] = useState<string | null>(null);
 
+  const [renameModalItem, setRenameModalItem] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [newRenamePath, setNewRenamePath] = useState("");
+
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+
+  const [unsavedGuardAction, setUnsavedGuardAction] = useState<
+    (() => void) | null
+  >(null);
+
+  const [targetUploadPath, setTargetUploadPath] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch list of containers for resource filter
@@ -147,7 +162,7 @@ export function ContainerFileExplorer({
   const writeFileMutation = useMutation({
     ...trpc.containerFileManager.writeFile.mutationOptions(),
     onSuccess: () => {
-      toast.success("File saved successfully ✅");
+      toast.success("File saved successfully");
       setHasUnsavedChanges(false);
       refetch();
     },
@@ -171,19 +186,45 @@ export function ContainerFileExplorer({
     },
   });
 
+  const renameItemMutation = useMutation({
+    ...trpc.containerFileManager.renameItem.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Item renamed successfully");
+      setRenameModalItem(null);
+      setNewRenamePath("");
+      refetch();
+    },
+    onError: (err) => {
+      toast.error(`Rename failed: ${err.message}`);
+    },
+  });
+
   const deleteItemMutation = useMutation({
     ...trpc.containerFileManager.deleteItem.mutationOptions(),
     onSuccess: () => {
       toast.success("Item deleted");
-      if (selectedFilePath) {
+      if (
+        selectedFilePath &&
+        deleteConfirmItem &&
+        selectedFilePath === deleteConfirmItem.path
+      ) {
         setSelectedFilePath(null);
       }
+      setDeleteConfirmItem(null);
       refetch();
     },
     onError: (err) => {
       toast.error(`Deletion failed: ${err.message}`);
     },
   });
+
+  const checkUnsavedAndRun = (action: () => void) => {
+    if (hasUnsavedChanges) {
+      setUnsavedGuardAction(() => action);
+    } else {
+      action();
+    }
+  };
 
   const handleSaveFile = useCallback(() => {
     if (!selectedFilePath) return;
@@ -226,7 +267,7 @@ export function ContainerFileExplorer({
         }),
       );
       const blob = new Blob([result.content], {
-        type: "text/plain;charset=utf-8",
+        type: "application/octet-stream",
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -258,12 +299,21 @@ export function ContainerFileExplorer({
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
+      const arrayBuffer = event.target?.result as ArrayBuffer;
+      if (!arrayBuffer) return;
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Content = btoa(binary);
       writeFileMutation.mutate(
         {
           resourceId,
           path: destPath,
-          content: content || "",
+          content: base64Content,
+          isBase64: true,
           containerId: selectedContainer,
         },
         {
@@ -274,15 +324,27 @@ export function ContainerFileExplorer({
         },
       );
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = "";
   };
 
   const pathParts = currentPath.split("/").filter(Boolean);
   const displayItems = searchQuery.trim().length > 1 ? searchResults : files;
 
+  const navigateUp = () => {
+    if (currentPath === "/") return;
+    const lastSlash = currentPath.lastIndexOf("/");
+    const parentPath = currentPath.substring(0, lastSlash) || "/";
+    checkUnsavedAndRun(() => setCurrentPath(parentPath));
+  };
+
+  const lineCount = editingFileContent
+    ? editingFileContent.split("\n").length
+    : 0;
+  const charCount = editingFileContent ? editingFileContent.length : 0;
+
   return (
-    <div className="flex h-[750px] w-full flex-col overflow-hidden rounded-xl border border-border/80 bg-background shadow-xl">
+    <div className="flex h-[750px] w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg">
       {/* Hidden File Input for Container Upload */}
       <input
         type="file"
@@ -290,14 +352,15 @@ export function ContainerFileExplorer({
         onChange={handleFileChange}
         className="hidden"
       />
-      {/* VSCode Explorer Header & Control Toolbar */}
+
+      {/* Explorer Header & Control Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-border/70 border-b bg-muted/40 px-4 py-2.5">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <HugeiconsIcon icon={FolderOpenIcon} className="h-4 w-4" />
             </span>
-            <span className="font-semibold text-sm tracking-tight">
+            <span className="font-semibold text-foreground text-sm tracking-tight">
               Container Volume Explorer
             </span>
           </div>
@@ -314,14 +377,16 @@ export function ContainerFileExplorer({
               ]}
               value={selectedContainer || "all"}
               onValueChange={(val) =>
-                setSelectedContainer(
-                  val === "all" ? undefined : (val as string),
+                checkUnsavedAndRun(() =>
+                  setSelectedContainer(
+                    val === "all" ? undefined : (val as string),
+                  ),
                 )
               }
             >
               <SelectTrigger
                 size="sm"
-                className="h-8 border-input bg-background font-medium text-xs"
+                className="h-8 border-input bg-background font-medium text-foreground text-xs"
               >
                 <SelectValue placeholder="All Containers / Default Volume" />
               </SelectTrigger>
@@ -379,7 +444,7 @@ export function ContainerFileExplorer({
             variant="ghost"
             onClick={() => refetch()}
             disabled={isRefetching}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
             title="Refresh Directory"
           >
             <HugeiconsIcon
@@ -389,10 +454,11 @@ export function ContainerFileExplorer({
           </Button>
         </div>
       </div>
-      {/* Main VSCode Split Layout */}
+
+      {/* Split Layout */}
       <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-12">
         {/* Left Sidebar: File Tree & Navigation */}
-        <div className="flex flex-col border-border/70 border-r bg-card/30 md:col-span-4 lg:col-span-4">
+        <div className="flex flex-col border-border/70 border-r bg-card/40 md:col-span-4 lg:col-span-4">
           {/* Breadcrumb Path & Search */}
           <div className="space-y-2 border-border/50 border-b bg-muted/20 p-3">
             {/* Breadcrumb */}
@@ -400,11 +466,11 @@ export function ContainerFileExplorer({
               <div className="flex flex-wrap items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setCurrentPath("/")}
+                  onClick={() => checkUnsavedAndRun(() => setCurrentPath("/"))}
                   className={cn(
                     "rounded px-1.5 py-0.5 transition-colors hover:text-primary",
                     currentPath === "/" &&
-                      "bg-accent/50 font-semibold text-foreground",
+                      "bg-accent font-semibold text-accent-foreground",
                   )}
                 >
                   / (root)
@@ -417,11 +483,13 @@ export function ContainerFileExplorer({
                       <span>/</span>
                       <button
                         type="button"
-                        onClick={() => setCurrentPath(subPath)}
+                        onClick={() =>
+                          checkUnsavedAndRun(() => setCurrentPath(subPath))
+                        }
                         className={cn(
                           "rounded px-1.5 py-0.5 transition-colors hover:text-primary",
                           isLast &&
-                            "bg-accent/50 font-semibold text-foreground",
+                            "bg-accent font-semibold text-accent-foreground",
                         )}
                       >
                         {part}
@@ -431,13 +499,17 @@ export function ContainerFileExplorer({
                 })}
               </div>
 
-              {/* Volume Shortcuts Dropdown / Pills */}
+              {/* Volume Shortcuts */}
               <div className="flex items-center gap-1">
                 <Button
                   size="xs"
                   variant="ghost"
                   className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-                  onClick={() => setCurrentPath("/var/lib/postgresql/data")}
+                  onClick={() =>
+                    checkUnsavedAndRun(() =>
+                      setCurrentPath("/var/lib/postgresql/data"),
+                    )
+                  }
                   title="Jump to Postgres Data Volume"
                 >
                   pgdata
@@ -446,7 +518,9 @@ export function ContainerFileExplorer({
                   size="xs"
                   variant="ghost"
                   className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-                  onClick={() => setCurrentPath("/var/lib/mysql")}
+                  onClick={() =>
+                    checkUnsavedAndRun(() => setCurrentPath("/var/lib/mysql"))
+                  }
                   title="Jump to MySQL Data Volume"
                 >
                   mysql
@@ -455,7 +529,9 @@ export function ContainerFileExplorer({
                   size="xs"
                   variant="ghost"
                   className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-                  onClick={() => setCurrentPath("/data")}
+                  onClick={() =>
+                    checkUnsavedAndRun(() => setCurrentPath("/data"))
+                  }
                   title="Jump to /data Volume"
                 >
                   /data
@@ -473,7 +549,7 @@ export function ContainerFileExplorer({
                 placeholder="Search files in container..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 bg-background pl-8 font-mono text-xs"
+                className="h-8 bg-background pl-8 font-mono text-foreground text-xs"
               />
             </div>
           </div>
@@ -482,16 +558,12 @@ export function ContainerFileExplorer({
           <div className="flex-1 overflow-y-auto">
             {isLoading || isSearching ? (
               <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
-                <Spinner className="h-5 w-5" />
+                <Spinner className="h-5 w-5 text-primary" />
                 <span>Reading container file system...</span>
               </div>
             ) : error ? (
               <div className="p-4 text-destructive text-xs">
                 Error loading container files: {error.message}
-              </div>
-            ) : displayItems.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground text-xs">
-                Directory is empty.
               </div>
             ) : (
               <ContextMenu>
@@ -510,127 +582,178 @@ export function ContainerFileExplorer({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {displayItems.map((file) => (
-                        <ContextMenu key={file.path}>
-                          <ContextMenuTrigger
-                            render={
-                              <TableRow
-                                onClick={() => {
-                                  if (file.type === "directory") {
-                                    setCurrentPath(file.path);
-                                  } else {
-                                    setSelectedFilePath(file.path);
-                                  }
-                                }}
-                                className={cn(
-                                  "group cursor-pointer transition-colors hover:bg-accent/60",
-                                  selectedFilePath === file.path &&
-                                    "bg-accent font-medium text-accent-foreground",
-                                )}
-                              />
-                            }
+                      {/* Parent Directory Navigation Row */}
+                      {currentPath !== "/" && !searchQuery.trim() && (
+                        <TableRow
+                          onClick={navigateUp}
+                          className="group cursor-pointer transition-colors hover:bg-accent/60"
+                        >
+                          <TableCell className="flex items-center gap-2 truncate py-2 font-mono text-muted-foreground">
+                            <HugeiconsIcon
+                              icon={FolderOpenIcon}
+                              className="h-4 w-4 shrink-0 text-amber-500"
+                            />
+                            <span className="font-semibold">..</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              (parent directory)
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-2 text-right font-mono text-muted-foreground">
+                            --
+                          </TableCell>
+                        </TableRow>
+                      )}
+
+                      {displayItems.length === 0 && currentPath === "/" ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={2}
+                            className="p-6 text-center text-muted-foreground text-xs"
                           >
-                            <TableCell className="flex items-center gap-2 truncate py-2 font-mono">
-                              {file.type === "directory" ? (
-                                <HugeiconsIcon
-                                  icon={FolderIcon}
-                                  className="h-4 w-4 shrink-0 text-amber-500"
+                            Directory is empty.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        displayItems.map((file) => (
+                          <ContextMenu key={file.path}>
+                            <ContextMenuTrigger
+                              render={
+                                <TableRow
+                                  onClick={() => {
+                                    checkUnsavedAndRun(() => {
+                                      if (file.type === "directory") {
+                                        setCurrentPath(file.path);
+                                      } else {
+                                        setSelectedFilePath(file.path);
+                                      }
+                                    });
+                                  }}
+                                  className={cn(
+                                    "group cursor-pointer transition-colors hover:bg-accent/60",
+                                    selectedFilePath === file.path &&
+                                      "bg-accent font-medium text-accent-foreground",
+                                  )}
                                 />
-                              ) : (
-                                <HugeiconsIcon
-                                  icon={File01Icon}
-                                  className="h-4 w-4 shrink-0 text-sky-400"
-                                />
-                              )}
-                              <span className="truncate">{file.name}</span>
-                            </TableCell>
-                            <TableCell className="py-2 text-right font-mono text-muted-foreground">
-                              {file.type === "directory"
-                                ? "--"
-                                : `${Math.round(file.sizeBytes / 1024)} KB`}
-                            </TableCell>
-                          </ContextMenuTrigger>
-                          <ContextMenuContent className="w-48 font-mono text-xs">
-                            {file.type === "directory" ? (
-                              <ContextMenuItem
-                                onClick={() => setCurrentPath(file.path)}
-                              >
-                                📂 Open Directory
-                              </ContextMenuItem>
-                            ) : (
-                              <ContextMenuItem
-                                onClick={() => setSelectedFilePath(file.path)}
-                              >
-                                📄 Open / Edit File
-                              </ContextMenuItem>
-                            )}
-                            {file.type === "file" && (
-                              <ContextMenuItem
-                                onClick={() =>
-                                  handleDownloadFile(file.path, file.name)
-                                }
-                              >
-                                📥 Download File
-                              </ContextMenuItem>
-                            )}
-                            <ContextMenuSeparator />
-                            <ContextMenuItem
-                              onClick={() =>
-                                handleFileUploadSelect(
-                                  file.type === "directory"
-                                    ? file.path
-                                    : currentPath,
-                                )
                               }
                             >
-                              📤 Upload File Here
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              onClick={() => {
-                                setNewItemParentPath(
-                                  file.type === "directory"
-                                    ? file.path
-                                    : currentPath,
-                                );
-                                setNewItemModal("file");
-                              }}
-                            >
-                              📄 New File Here
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              onClick={() => {
-                                setNewItemParentPath(
-                                  file.type === "directory"
-                                    ? file.path
-                                    : currentPath,
-                                );
-                                setNewItemModal("directory");
-                              }}
-                            >
-                              📁 New Folder Here
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem
-                              onClick={() => {
-                                if (confirm(`Delete ${file.name}?`)) {
-                                  deleteItemMutation.mutate({
-                                    resourceId,
+                              <TableCell className="flex items-center gap-2 truncate py-2 font-mono text-foreground">
+                                {file.type === "directory" ? (
+                                  <HugeiconsIcon
+                                    icon={FolderIcon}
+                                    className="h-4 w-4 shrink-0 text-amber-500"
+                                  />
+                                ) : (
+                                  <HugeiconsIcon
+                                    icon={File01Icon}
+                                    className="h-4 w-4 shrink-0 text-primary"
+                                  />
+                                )}
+                                <span className="truncate">{file.name}</span>
+                              </TableCell>
+                              <TableCell className="py-2 text-right font-mono text-muted-foreground">
+                                {file.type === "directory"
+                                  ? "--"
+                                  : `${Math.round(file.sizeBytes / 1024)} KB`}
+                              </TableCell>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent className="w-52 font-mono text-xs">
+                              {file.type === "directory" ? (
+                                <ContextMenuItem
+                                  onClick={() =>
+                                    checkUnsavedAndRun(() =>
+                                      setCurrentPath(file.path),
+                                    )
+                                  }
+                                >
+                                  📂 Open Directory
+                                </ContextMenuItem>
+                              ) : (
+                                <ContextMenuItem
+                                  onClick={() =>
+                                    checkUnsavedAndRun(() =>
+                                      setSelectedFilePath(file.path),
+                                    )
+                                  }
+                                >
+                                  📄 Open / Edit File
+                                </ContextMenuItem>
+                              )}
+                              {file.type === "file" && (
+                                <ContextMenuItem
+                                  onClick={() =>
+                                    handleDownloadFile(file.path, file.name)
+                                  }
+                                >
+                                  📥 Download File
+                                </ContextMenuItem>
+                              )}
+                              <ContextMenuItem
+                                onClick={() => {
+                                  setRenameModalItem({
                                     path: file.path,
-                                    containerId: selectedContainer,
+                                    name: file.name,
                                   });
+                                  setNewRenamePath(file.path);
+                                }}
+                              >
+                                ✏️ Rename / Move
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem
+                                onClick={() =>
+                                  handleFileUploadSelect(
+                                    file.type === "directory"
+                                      ? file.path
+                                      : currentPath,
+                                  )
                                 }
-                              }}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              🗑️ Delete
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      ))}
+                              >
+                                📤 Upload File Here
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onClick={() => {
+                                  setNewItemParentPath(
+                                    file.type === "directory"
+                                      ? file.path
+                                      : currentPath,
+                                  );
+                                  setNewItemModal("file");
+                                }}
+                              >
+                                📄 New File Here
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onClick={() => {
+                                  setNewItemParentPath(
+                                    file.type === "directory"
+                                      ? file.path
+                                      : currentPath,
+                                  );
+                                  setNewItemModal("directory");
+                                }}
+                              >
+                                📁 New Folder Here
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem
+                                onClick={() =>
+                                  setDeleteConfirmItem({
+                                    path: file.path,
+                                    name: file.name,
+                                  })
+                                }
+                                className="text-destructive focus:text-destructive"
+                              >
+                                🗑️ Delete
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-48 font-mono text-xs">
+                <ContextMenuContent className="w-52 font-mono text-xs">
                   <ContextMenuItem
                     onClick={() => handleFileUploadSelect(currentPath)}
                   >
@@ -657,13 +780,14 @@ export function ContainerFileExplorer({
             )}
           </div>
         </div>
+
         {/* Right Main Editor Panel */}
-        <div className="flex flex-col border-t bg-[#0d1117] text-slate-200 md:col-span-8 md:border-t-0 lg:col-span-8">
+        <div className="flex flex-col border-border border-t bg-background text-foreground md:col-span-8 md:border-t-0 lg:col-span-8">
           {selectedFilePath ? (
             <div className="flex h-full flex-col">
               {/* Tab Header */}
-              <div className="flex items-center justify-between border-slate-800 border-b bg-[#161b22] px-4 py-2">
-                <div className="flex items-center gap-2 truncate font-mono text-sky-400 text-xs">
+              <div className="flex items-center justify-between border-border border-b bg-muted/40 px-4 py-2">
+                <div className="flex items-center gap-2 truncate font-mono text-primary text-xs">
                   <HugeiconsIcon
                     icon={File01Icon}
                     className="h-4 w-4 shrink-0"
@@ -673,7 +797,7 @@ export function ContainerFileExplorer({
                   </span>
                   {hasUnsavedChanges && (
                     <span
-                      className="h-2 w-2 rounded-full bg-amber-400"
+                      className="h-2 w-2 rounded-full bg-amber-500"
                       title="Unsaved changes"
                     />
                   )}
@@ -684,7 +808,7 @@ export function ContainerFileExplorer({
                     size="xs"
                     onClick={handleSaveFile}
                     disabled={writeFileMutation.isPending || !hasUnsavedChanges}
-                    className="h-7 bg-emerald-600 font-medium text-white text-xs hover:bg-emerald-700"
+                    className="h-7 font-medium text-xs"
                   >
                     {writeFileMutation.isPending
                       ? "Saving..."
@@ -699,7 +823,7 @@ export function ContainerFileExplorer({
                         selectedFilePath.split("/").pop() || "file",
                       )
                     }
-                    className="h-7 border-slate-700 text-slate-300 text-xs hover:bg-slate-800"
+                    className="h-7 text-xs"
                   >
                     <HugeiconsIcon
                       icon={Download01Icon}
@@ -709,8 +833,10 @@ export function ContainerFileExplorer({
                   <Button
                     size="xs"
                     variant="ghost"
-                    onClick={() => setSelectedFilePath(null)}
-                    className="h-7 w-7 p-0 text-slate-400 hover:bg-slate-800 hover:text-white"
+                    onClick={() =>
+                      checkUnsavedAndRun(() => setSelectedFilePath(null))
+                    }
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                   >
                     <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
                   </Button>
@@ -720,8 +846,8 @@ export function ContainerFileExplorer({
               {/* Code Editor Body */}
               <div className="relative flex-1 overflow-hidden">
                 {isReadingFile ? (
-                  <div className="flex h-full items-center justify-center gap-2 text-slate-400 text-xs">
-                    <Spinner className="h-5 w-5 text-sky-400" />
+                  <div className="flex h-full items-center justify-center gap-2 text-muted-foreground text-xs">
+                    <Spinner className="h-5 w-5 text-primary" />
                     <span>Loading file contents...</span>
                   </div>
                 ) : (
@@ -731,33 +857,42 @@ export function ContainerFileExplorer({
                       setEditingFileContent(e.target.value);
                       setHasUnsavedChanges(true);
                     }}
-                    className="h-full w-full resize-none border-none bg-transparent p-4 font-mono text-slate-200 text-xs leading-relaxed outline-none focus:ring-0"
+                    className="h-full w-full resize-none border-none bg-background p-4 font-mono text-foreground text-xs leading-relaxed outline-none selection:bg-primary/20 focus:ring-0"
                     placeholder="Empty file content..."
                     spellCheck={false}
                   />
                 )}
               </div>
+
+              {/* Editor Status Bar */}
+              <div className="flex items-center justify-between border-border border-t bg-muted/30 px-4 py-1.5 font-mono text-[10px] text-muted-foreground">
+                <span>
+                  Lines: {lineCount} · Chars: {charCount}
+                </span>
+                <span>UTF-8 · Container Volume</span>
+              </div>
             </div>
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-slate-500">
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
               <HugeiconsIcon
                 icon={FolderOpenIcon}
-                className="h-12 w-12 text-slate-700"
+                className="h-12 w-12 text-muted-foreground/50"
               />
               <div className="space-y-1">
-                <p className="font-semibold text-slate-400 text-sm">
+                <p className="font-semibold text-foreground text-sm">
                   No File Selected
                 </p>
                 <p className="max-w-sm text-xs">
                   Select a file from the explorer list or right-click to open,
-                  upload, or create new files inside your container volume.
+                  rename, upload, or create new files inside your container
+                  volume.
                 </p>
               </div>
             </div>
           )}
         </div>
-        ;
       </div>
+
       {/* Modal Dialog for New File / Folder */}
       <Dialog
         open={Boolean(newItemModal)}
@@ -770,7 +905,7 @@ export function ContainerFileExplorer({
             </DialogTitle>
             <DialogDescription className="text-xs">
               Path:{" "}
-              <span className="font-mono font-semibold">
+              <span className="font-mono font-semibold text-foreground">
                 {newItemParentPath}
               </span>
             </DialogDescription>
@@ -816,7 +951,148 @@ export function ContainerFileExplorer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      ;
+
+      {/* Modal Dialog for Rename / Move */}
+      <Dialog
+        open={Boolean(renameModalItem)}
+        onOpenChange={(open) => !open && setRenameModalItem(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-sm">
+              Rename / Move Item
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Original:{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {renameModalItem?.path}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="rename-path" className="font-medium text-xs">
+              New Path
+            </Label>
+            <Input
+              id="rename-path"
+              value={newRenamePath}
+              onChange={(e) => setNewRenamePath(e.target.value)}
+              className="font-mono text-xs"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRenameModalItem(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!renameModalItem || !newRenamePath.trim()) return;
+                renameItemMutation.mutate({
+                  resourceId,
+                  oldPath: renameModalItem.path,
+                  newPath: newRenamePath.trim(),
+                  containerId: selectedContainer,
+                });
+              }}
+              disabled={renameItemMutation.isPending || !newRenamePath.trim()}
+            >
+              {renameItemMutation.isPending ? "Renaming..." : "Save Path"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Dialog for Delete Confirmation */}
+      <Dialog
+        open={Boolean(deleteConfirmItem)}
+        onOpenChange={(open) => !open && setDeleteConfirmItem(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-destructive text-sm">
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Are you sure you want to delete{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {deleteConfirmItem?.name}
+              </span>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteConfirmItem(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (!deleteConfirmItem) return;
+                deleteItemMutation.mutate({
+                  resourceId,
+                  path: deleteConfirmItem.path,
+                  containerId: selectedContainer,
+                });
+              }}
+              disabled={deleteItemMutation.isPending}
+            >
+              {deleteItemMutation.isPending ? "Deleting..." : "Delete Item"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Changes Guard Dialog */}
+      <Dialog
+        open={Boolean(unsavedGuardAction)}
+        onOpenChange={(open) => !open && setUnsavedGuardAction(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-amber-500 text-sm">
+              Unsaved Changes
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              You have unsaved changes in{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {selectedFilePath}
+              </span>
+              . Discard changes and proceed?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUnsavedGuardAction(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                const action = unsavedGuardAction;
+                setHasUnsavedChanges(false);
+                setUnsavedGuardAction(null);
+                if (action) action();
+              }}
+            >
+              Discard Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

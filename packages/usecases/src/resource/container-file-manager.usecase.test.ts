@@ -56,7 +56,7 @@ describe("ContainerFileManagerUseCase", () => {
         if (command.includes("for f in")) {
           return {
             output:
-              "config.json|file|1024|644|2026-07-24 00:00:00\nsrc|directory|4096|755|2026-07-24 00:00:00",
+              "file|1024|644|1753400000|config.json\ndirectory|4096|755|1753400000|src",
           };
         }
         if (command.includes("cat --")) {
@@ -152,6 +152,55 @@ describe("ContainerFileManagerUseCase", () => {
     });
 
     expect(delRes.success).toBe(true);
+  });
+
+  test("deleteItem rejects deleting root or system directories", async () => {
+    const { useCase, mockOrgId, mockResourceId } = createMockContext();
+    expect(
+      useCase.deleteItem({
+        organizationId: mockOrgId,
+        resourceId: mockResourceId,
+        path: "/",
+      }),
+    ).rejects.toThrow(
+      "Deletion of system root or system directory is forbidden for security.",
+    );
+
+    expect(
+      useCase.deleteItem({
+        organizationId: mockOrgId,
+        resourceId: mockResourceId,
+        path: "/etc",
+      }),
+    ).rejects.toThrow(
+      "Deletion of system root or system directory is forbidden for security.",
+    );
+  });
+
+  test("renameItem renames file or directory", async () => {
+    const { useCase, mockOrgId, mockResourceId } = createMockContext();
+    const res = await useCase.renameItem({
+      organizationId: mockOrgId,
+      resourceId: mockResourceId,
+      oldPath: "/app/old-config.json",
+      newPath: "/app/new-config.json",
+    });
+
+    expect(res.success).toBe(true);
+  });
+
+  test("writeFile handles isBase64 flag directly", async () => {
+    const { useCase, mockOrgId, mockResourceId } = createMockContext();
+    const res = await useCase.writeFile({
+      organizationId: mockOrgId,
+      resourceId: mockResourceId,
+      path: "/image.png",
+      content:
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      isBase64: true,
+    });
+
+    expect(res.success).toBe(true);
   });
 
   test("searchFiles returns matching items", async () => {

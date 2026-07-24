@@ -4,6 +4,30 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.148 - 2026-07-25
+
+### Fixed & Enhanced
+
+- **Container File Manager Perfection**:
+  - **Path Normalization & Security**: Added `normalizeContainerPath` to resolve relative path segments (`.`, `..`), strip double slashes, and enforce clean paths. Added strict security safeguards (`DANGEROUS_SYSTEM_PATHS`) to reject deleting or renaming system root and system directories (`/`, `.`, `..`, `/bin`, `/boot`, `/dev`, `/etc`, `/lib`, `/proc`, `/sys`, `/usr`, `/var`).
+  - **Multi-Environment Compatibility**: Updated `listFiles` to format stat output as `%Y` (epoch seconds), ensuring 100% compatibility across Alpine Linux, BusyBox, Debian, Ubuntu, and CentOS containers.
+  - **Robust Delimiter Parsing**: Positioned `$name` as the final field (`$type|$size|$perm|$mtime|$name`) so file names containing pipe (`|`) or space characters parse cleanly without truncation.
+  - **Parent Directory Auto-Creation**: Executed `mkdir -p` on parent directories prior to file writes.
+  - **Base64 Binary Uploads**: Added `isBase64` flag support for binary file writes, allowing images, archives, and compiled binaries to upload cleanly without text encoding corruption.
+  - **Rename & Move Feature**: Added `renameItem` usecase method, `containerFileManager.renameItem` tRPC mutation procedure, procedure policy authorization registration, and interactive UI modal.
+  - **shadcn Theme Harmonization**: Refactored `ContainerFileExplorer` UI to use standard shadcn theme tokens (`bg-card`, `bg-muted`, `bg-accent`, `bg-background`, `text-foreground`, `text-primary`, `border-border`, etc.) across light and dark modes.
+  - **UI Enhancements**: Added parent directory (`..`) navigation row, custom deletion confirmation dialog, unsaved changes guard dialog, and a monospaced editor status bar (lines, characters, path, UTF-8).
+
+- **Log Stream Encoding Sanitization**:
+  - Created `cleanDockerLogs` in `@upstand/usecases/resource/docker-log-filter` and `@/utils/clean-logs`.
+  - Parses and demuxes 8-byte binary Docker multiplex frame headers (`0x01` stdout / `0x02` stderr).
+  - Strips leading non-printable control characters, `!`, UTF-8 replacement symbols (`\uFFFD`), and ANSI escape codes.
+  - Integrated across `docker-readonly.service.ts`, `docker.service.ts`, `console-tab.tsx`, and `docker-logs.tsx` (`parseLogLine`).
+
+- **Topology Map Service Health & Replicas Fix**:
+  - Updated `topology-map.tsx` to compute service health and replica counts against active desired tasks (`desiredState === "running"`), ignoring historical Docker Swarm `shutdown` task records.
+  - Resolved false `degraded` badges and corrected `replicaText` (e.g., `1/1 running`) for healthy Swarm services like `upstand_postgres`.
+
 ## 0.1.147 - 2026-07-25
 
 ### Added & Fixed

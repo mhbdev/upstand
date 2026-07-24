@@ -1278,7 +1278,9 @@ export function TopologyMap() {
               subtitle: `${node.leader ? "Leader · " : ""}${node.role}`,
               meta: `${node.ip || "No address"} · ${node.engineVersion}`,
               count: swarmTasks.filter(
-                (task) => task.nodeName === node.hostname,
+                (task) =>
+                  task.nodeName === node.hostname &&
+                  task.currentState === "running",
               ).length,
               status: node.status,
               isHealthy:
@@ -1427,21 +1429,34 @@ export function TopologyMap() {
       const tasks = swarmTasks.filter(
         (task) => task.serviceName === service.name,
       );
-      const hasFailure = tasks.some((task) =>
-        ["failed", "rejected", "shutdown"].includes(task.currentState),
+      const activeDesiredTasks = tasks.filter(
+        (task) => task.desiredState === "running",
       );
+      const hasFailure =
+        activeDesiredTasks.length === 0
+          ? tasks.some((task) =>
+              ["failed", "rejected"].includes(task.currentState),
+            )
+          : activeDesiredTasks.some(
+              (task) =>
+                ["failed", "rejected"].includes(task.currentState) ||
+                (task.currentState !== "running" &&
+                  task.currentState !== "starting"),
+            );
       const running = tasks.filter(
         (task) => task.currentState === "running",
       ).length;
-      const replicaText = tasks.length
-        ? `${running}/${tasks.length} running`
-        : service.replicas;
+      const desiredCount =
+        activeDesiredTasks.length ||
+        (typeof service.replicas === "number" ? service.replicas : 1);
+      const replicaText = `${running}/${desiredCount} running`;
+      const isHealthy = !hasFailure && running >= desiredCount;
       const data = {
         label: service.name,
         subtitle: `${service.mode} · ${replicaText}`,
         meta: service.image,
-        status: hasFailure ? "degraded" : "running",
-        isHealthy: !hasFailure,
+        status: isHealthy ? "running" : "degraded",
+        isHealthy,
       };
       if (matchesSearch({ ...data, kind: "service" }))
         add(

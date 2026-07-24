@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { TerminalEmulator } from "@/components/shared/terminal-emulator";
 import { getServerApiUrl } from "@/lib/server-url";
+import { cleanDockerLogs } from "@/utils/clean-logs";
 import { trpc } from "@/utils/trpc";
 
 interface ContainerInfo {
@@ -65,7 +66,7 @@ export function ConsoleTab({
 
   const realLogs = useMemo(() => {
     if (!logsQuery.data) return [];
-    return logsQuery.data.trim().split("\n");
+    return cleanDockerLogs(logsQuery.data).trim().split("\n");
   }, [logsQuery.data]);
 
   const [selectedContainerId, setSelectedContainerId] = useState<string>("");

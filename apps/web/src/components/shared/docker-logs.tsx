@@ -172,8 +172,19 @@ export const getLogType = (message: string): LogStyle => {
   return LOG_STYLES.info;
 };
 
+export function cleanLogLineString(line: string): string {
+  if (!line) return "";
+  return (
+    stripAnsi(line)
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: Log sanitizer intentionally matches control characters.
+      .replace(/^[\x00-\x1F\x7F-\x9F\uFFFD!]+(?=\d{4}-\d{2}-\d{2}T)/g, "")
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: Log sanitizer intentionally matches control characters.
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD]+/g, "")
+  );
+}
+
 const parseLogLine = (line: string): LogLine => {
-  const cleaned = stripAnsi(line);
+  const cleaned = cleanLogLineString(line);
   const trimmed = cleaned.trim();
   if (!trimmed) {
     return { rawTimestamp: null, timestamp: null, message: cleaned };

@@ -35,6 +35,7 @@ export const SESSION_ONLY_PROCEDURES = [
   "containerFileManager.writeFile",
   "containerFileManager.createItem",
   "containerFileManager.deleteItem",
+  "containerFileManager.renameItem",
   "containerFileManager.searchFiles",
   "customRole.create",
   "customRole.list",
