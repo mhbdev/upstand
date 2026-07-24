@@ -1,61 +1,87 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { use, useEffect, useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 export function Mermaid({ chart }: { chart: string }) {
-  const [mounted, setMounted] = useState(false);
+  const rawId = useId();
+  const cleanId = `mermaid-${rawId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const { resolvedTheme } = useTheme();
+  const [svg, setSvg] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    let isMounted = true;
 
-  if (!mounted) return;
-  return <MermaidContent chart={chart} />;
-}
+    async function renderChart() {
+      try {
+        const { default: mermaid } = await import("mermaid");
 
-const cache = new Map<string, Promise<unknown>>();
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "loose",
+          fontFamily: "inherit",
+          themeCSS: "margin: 1.5rem auto 0;",
+          theme: resolvedTheme === "dark" ? "dark" : "default",
+        });
 
-function cachePromise<T>(
-  key: string,
-  setPromise: () => Promise<T>,
-): Promise<T> {
-  const cached = cache.get(key);
-  if (cached) return cached as Promise<T>;
+        // Clean up any previously generated temporary elements with cleanId
+        const existingEl = document.getElementById(cleanId);
+        if (existingEl) {
+          existingEl.remove();
+        }
 
-  const promise = setPromise();
-  cache.set(key, promise);
-  return promise;
-}
+        const formattedChart = chart.replaceAll("\\n", "\n");
+        const { svg: renderedSvg } = await mermaid.render(
+          cleanId,
+          formattedChart,
+        );
 
-function MermaidContent({ chart }: { chart: string }) {
-  const id = useId();
-  const { resolvedTheme } = useTheme();
-  const { default: mermaid } = use(
-    cachePromise("mermaid", () => import("mermaid")),
-  );
+        if (isMounted) {
+          setSvg(renderedSvg);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.warn("Mermaid rendering fallback:", err);
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      }
+    }
 
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "strict",
-    fontFamily: "inherit",
-    themeCSS: "margin: 1.5rem auto 0;",
-    theme: resolvedTheme === "dark" ? "dark" : "default",
-  });
+    renderChart();
 
-  const { svg, bindFunctions } = use(
-    cachePromise(`${chart}-${resolvedTheme}`, () => {
-      return mermaid.render(id, chart.replaceAll("\\n", "\n"));
-    }),
-  );
+    return () => {
+      isMounted = false;
+    };
+  }, [chart, resolvedTheme, cleanId]);
+
+  if (error) {
+    return (
+      <div className="my-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 font-mono text-amber-700 text-xs dark:text-amber-300">
+        <div className="mb-2 font-sans font-semibold text-amber-800 dark:text-amber-200">
+          Diagram Code Preview
+        </div>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-amber-500/10 p-3">
+          {chart}
+        </pre>
+      </div>
+    );
+  }
+
+  if (!svg) {
+    return (
+      <div className="my-6 flex h-32 items-center justify-center rounded-lg border border-zinc-200 border-dashed bg-zinc-50/50 text-xs text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/50">
+        Loading diagram...
+      </div>
+    );
+  }
 
   return (
     <div
-      ref={(container) => {
-        if (container) bindFunctions?.(container);
-      }}
-      // Mermaid owns this generated SVG; its strict renderer prevents raw chart markup from being injected.
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: Mermaid returns the sanitized SVG that is bound to this container.
+      className="my-6 flex justify-center overflow-x-auto rounded-lg border border-zinc-200/60 bg-white/50 p-4 dark:border-zinc-800/60 dark:bg-zinc-950/50"
+      // Mermaid returns a sanitized SVG element
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: Sanitized SVG output from Mermaid
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
