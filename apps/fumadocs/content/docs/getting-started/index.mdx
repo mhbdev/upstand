@@ -24,7 +24,7 @@ flowchart TD
     Queue --> Worker[Deployment & Backup Workers]
     Worker -->|Docker API / SSH| Engine[Docker Swarm Engine]
     Worker -->|Dynamic Config Reloads| Caddy[Caddy Reverse Proxy]
-    Engine -->|Overlay Network| Containers[App & Database Containers]
+    Engine -->|Overlay Network| Containers["App & Database Containers"]
 ```
 
 ---

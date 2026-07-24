@@ -4,6 +4,12 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.142 - 2026-07-24
+
+### Fixed
+
+- **Mermaid Flowchart Label Syntax Compliance**: Corrected edge and node label quoting syntax across `self-hosting.mdx`, `projects-resources.mdx`, `secrets-and-scaling.mdx`, and `getting-started/index.mdx`. Quoted edge labels containing parentheses (e.g., `-->|"Proxy Server API (port 3000)"|`) and node connectors (`&`), resolving Mermaid parser lexer exceptions that previously triggered the yellow "Diagram Code Preview" error box. All diagrams now render as clean SVG graphs.
+
 ## 0.1.141 - 2026-07-24
 
 ### Fixed

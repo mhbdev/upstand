@@ -40,9 +40,9 @@ graph TD
 
     Client --> DNS
     DNS --> Caddy
-    Caddy -->|Proxy Server API (port 3000)| ServerAPI
-    Caddy -->|Proxy Web Dashboard (port 3001)| WebUI
-    Caddy -->|Proxy Fumadocs (port 4000)| Fumadocs
+    Caddy -->|"Proxy Server API (port 3000)"| ServerAPI
+    Caddy -->|"Proxy Web Dashboard (port 3001)"| WebUI
+    Caddy -->|"Proxy Fumadocs (port 4000)"| Fumadocs
     ServerAPI --> DB
     ServerAPI --> Cache
     DB --> VolData
