@@ -1,6 +1,5 @@
-import { closeRedis, createRedis, type Redis } from "@upstand/redis";
 import { Worker } from "bullmq";
-import { log } from "evlog";
+import { ManagedQueueWorker } from "../shared/managed-queue-worker";
 import { BACKUP_RUN_QUEUE } from "./trigger-backup-run.usecase";
 
 export interface BackupRunJob {
@@ -12,64 +11,33 @@ export interface BackupRunJob {
 export type BackupRunHandler = (job: BackupRunJob) => Promise<void>;
 
 export class BackupRunWorker {
-  private worker: Worker | null = null;
-  private workerRedis: Redis | null = null;
+  private readonly worker: ManagedQueueWorker;
 
-  constructor(private readonly handleBackupRun: BackupRunHandler) {}
-
-  async start(): Promise<void> {
-    if (this.worker) return;
-    const connection = createRedis({
-      maxRetriesPerRequest: null,
+  constructor(handleBackupRun: BackupRunHandler) {
+    this.worker = new ManagedQueueWorker({
       loggerName: "backup-worker",
-    });
-    this.workerRedis = connection;
-
-    try {
-      this.worker = new Worker(
-        BACKUP_RUN_QUEUE,
-        (job) => this.handleBackupRun(job),
-        {
+      failedMessage: "Backup run job failed",
+      connectionErrorMessage: "Backup worker connection error",
+      createWorker: (connection) =>
+        new Worker(BACKUP_RUN_QUEUE, (job) => handleBackupRun(job), {
           connection: connection as never,
           concurrency: 2,
           maxStalledCount: 1,
           stalledInterval: 30_000,
-        },
-      );
-      this.worker.on("failed", (job, error) => {
-        log.error({
-          message: "Backup run job failed",
-          runId: job?.data?.runId,
-          jobId: job?.id,
-          attemptsMade: job?.attemptsMade,
-          err: error,
-        });
-      });
-      this.worker.on("error", (error) => {
-        log.error({
-          message: "Backup worker connection error",
-          err: error,
-        });
-      });
-      await this.worker.waitUntilReady();
-    } catch (error) {
-      await this.stop();
-      throw error;
-    }
+        }),
+      getFailedJobContext: (job) => ({ runId: job?.data?.runId }),
+    });
+  }
+
+  start(): Promise<void> {
+    return this.worker.start();
   }
 
   isReady(): boolean {
-    return Boolean(this.worker?.isRunning());
+    return this.worker.isReady();
   }
 
-  async stop(): Promise<void> {
-    if (this.worker) {
-      await this.worker.close();
-      this.worker = null;
-    }
-    if (this.workerRedis) {
-      await closeRedis(this.workerRedis);
-      this.workerRedis = null;
-    }
+  stop(): Promise<void> {
+    return this.worker.stop();
   }
 }

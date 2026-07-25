@@ -36,15 +36,23 @@ export function AuthFormField({
           field.handleChange(e.target.value)
         }
       />
-      {field.state.meta.errors.map((error: any) => (
+      {field.state.meta.errors.map((error: unknown) => (
         <p
-          key={typeof error === "string" ? error : error?.message}
+          key={errorMessage(error)}
           className="text-destructive text-xs"
           role="alert"
         >
-          {typeof error === "string" ? error : error?.message}
+          {errorMessage(error)}
         </p>
       ))}
     </div>
   );
+}
+
+function errorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String(error.message);
+  }
+  return String(error);
 }

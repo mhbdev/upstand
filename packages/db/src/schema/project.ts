@@ -12,6 +12,7 @@ export const project = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     icon: text("icon"),
     description: text("description"),
+    archivedAt: timestamp("archived_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

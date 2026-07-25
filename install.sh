@@ -222,15 +222,17 @@ write_environment() {
   [[ -r "$INSTALL_DIR/secrets/postgres_password" ]] && POSTGRES_PASSWORD="$(cat "$INSTALL_DIR/secrets/postgres_password")"
   [[ -r "$INSTALL_DIR/secrets/redis_password" ]] && REDIS_PASSWORD="$(cat "$INSTALL_DIR/secrets/redis_password")"
   [[ -r "$INSTALL_DIR/secrets/better_auth_secret" ]] && BETTER_AUTH_SECRET="$(cat "$INSTALL_DIR/secrets/better_auth_secret")"
-  [[ -r "$INSTALL_DIR/secrets/ssh_key_encryption_key" ]] && SSH_KEY_ENCRYPTION_KEY_V1="$(cat "$INSTALL_DIR/secrets/ssh_key_encryption_key")"
+  [[ -r "$INSTALL_DIR/secrets/encryption_key" ]] && ENCRYPTION_KEY_V1="$(cat "$INSTALL_DIR/secrets/encryption_key")"
+  [[ -z "${ENCRYPTION_KEY_V1:-}" && -r "$INSTALL_DIR/secrets/ssh_key_encryption_key" ]] && ENCRYPTION_KEY_V1="$(cat "$INSTALL_DIR/secrets/ssh_key_encryption_key")"
   POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 32)}"
   REDIS_PASSWORD="${REDIS_PASSWORD:-$(openssl rand -hex 32)}"
   BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-$(openssl rand -hex 32)}"
-  SSH_KEY_ENCRYPTION_KEY_V1="${SSH_KEY_ENCRYPTION_KEY_V1:-$(openssl rand -base64 32 | tr -d '\n')}"
+  ENCRYPTION_KEY_V1="${ENCRYPTION_KEY_V1:-${SSH_KEY_ENCRYPTION_KEY_V1:-$(openssl rand -base64 32 | tr -d '\n')}}"
   printf '%s' "$POSTGRES_PASSWORD" >"$INSTALL_DIR/secrets/postgres_password"
   printf '%s' "$REDIS_PASSWORD" >"$INSTALL_DIR/secrets/redis_password"
   printf '%s' "$BETTER_AUTH_SECRET" >"$INSTALL_DIR/secrets/better_auth_secret"
-  printf '%s' "$SSH_KEY_ENCRYPTION_KEY_V1" >"$INSTALL_DIR/secrets/ssh_key_encryption_key"
+  printf '%s' "$ENCRYPTION_KEY_V1" >"$INSTALL_DIR/secrets/encryption_key"
+  cp -f "$INSTALL_DIR/secrets/encryption_key" "$INSTALL_DIR/secrets/ssh_key_encryption_key" 2>/dev/null || true
   chmod 0600 "$INSTALL_DIR/secrets"/*
   DOCKER_NETWORK="$NETWORK_NAME"
 

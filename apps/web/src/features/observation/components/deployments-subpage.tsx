@@ -58,6 +58,7 @@ import {
   Trash2,
 } from "@/components/huge-icons";
 import {
+  type DeploymentLog,
   DeploymentLogDialog,
   DeploymentStatusBadge,
 } from "@/components/shared/deployment-presentation";
@@ -68,7 +69,8 @@ export function DeploymentsSubpage() {
   const organizationState = useRequiredActiveOrganization();
   const organizationId = organizationState.organizationId as string;
   const [activeTab, setActiveTab] = useState("history");
-  const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
+  const [selectedDeployment, setSelectedDeployment] =
+    useState<DeploymentLog | null>(null);
   const [concurrencyInputs, setConcurrencyInputs] = useState<
     Record<string, number>
   >({});

@@ -199,6 +199,8 @@ export function useResourceDetail({
     refetchResource: resourceQuery.refetch,
     routingTargets: routingTargetsQuery.data ?? [],
     liveContainers: liveContainersQuery.data,
+    liveContainersPending: liveContainersQuery.isPending,
+    liveContainersError: liveContainersQuery.isError,
     deployments: deploymentsQuery.data ?? [],
     refetchDeployments: deploymentsQuery.refetch,
     logsData: logsQuery.data,
@@ -221,3 +223,5 @@ export function useResourceDetail({
     isDeletingResource: deleteResourceMutation.isPending,
   };
 }
+
+export type ResourceDetailState = ReturnType<typeof useResourceDetail>;

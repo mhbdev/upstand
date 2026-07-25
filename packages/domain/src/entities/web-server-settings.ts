@@ -5,8 +5,9 @@ export const WebServerSettingsSchema = z.object({
   serverDomain: z.string().nullable().optional(),
   httpsEnabled: z.boolean().default(true),
   certificateProvider: z
-    .enum(["letsencrypt", "zerossl", "self-signed", "none"])
+    .enum(["letsencrypt", "zerossl", "self-signed", "custom", "none"])
     .default("letsencrypt"),
+  certificateId: z.string().nullable().optional(),
   letsEncryptEmail: z.string().nullable().optional(),
   cloudflareApiToken: z.string().nullable().optional(),
   httpPort: z.number().int().min(1).max(65535),
@@ -31,7 +32,13 @@ export type WebServerSettings = z.infer<typeof WebServerSettingsSchema>;
 export interface UpdateWebServerSettingsDTO {
   serverDomain?: string | null;
   httpsEnabled?: boolean;
-  certificateProvider?: "letsencrypt" | "zerossl" | "self-signed" | "none";
+  certificateProvider?:
+    | "letsencrypt"
+    | "zerossl"
+    | "self-signed"
+    | "custom"
+    | "none";
+  certificateId?: string | null;
   letsEncryptEmail?: string | null;
   cloudflareApiToken?: string | null;
   httpPort?: number;

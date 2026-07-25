@@ -25,7 +25,14 @@ export type CertificateProvider =
   | "letsencrypt"
   | "zerossl"
   | "self-signed"
+  | "custom"
   | "none";
+
+export interface CertificateOption {
+  id: string;
+  name: string;
+  domainName?: string;
+}
 
 interface ServerDomainCardProps {
   serverDomain: string;
@@ -36,7 +43,10 @@ interface ServerDomainCardProps {
   setHttpsEnabled: (enabled: boolean) => void;
   certificateProvider: CertificateProvider;
   setCertificateProvider: (provider: CertificateProvider) => void;
-  onSave: (e: React.FormEvent) => void;
+  certificateId?: string | null;
+  setCertificateId?: (id: string | null) => void;
+  certificatesList?: CertificateOption[];
+  onSave: (e: React.SyntheticEvent) => void;
   isSaving: boolean;
 }
 
@@ -49,22 +59,26 @@ export function ServerDomainCard({
   setHttpsEnabled,
   certificateProvider,
   setCertificateProvider,
+  certificateId,
+  setCertificateId,
+  certificatesList = [],
   onSave,
   isSaving,
 }: ServerDomainCardProps) {
   return (
     <form onSubmit={onSave}>
       <Card className="border border-border/40 bg-card/20 shadow-sm transition-all duration-200 hover:border-border/60">
-        <CardHeader className="pb-4">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2.5 font-semibold text-lg tracking-tight">
             <GlobeIcon className="size-5 text-primary" />
             <span>Server Domain</span>
           </CardTitle>
           <CardDescription className="text-muted-foreground text-xs">
-            Add a domain to your server application.
+            Add a domain and configure certificate strategy for your server
+            application.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5 border-border/10 border-t pt-5">
+        <CardContent className="space-y-5">
           {/* Row 1: Domain & Let's Encrypt Email */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -79,8 +93,7 @@ export function ServerDomainCard({
                 type="text"
                 value={serverDomain}
                 onChange={(e) => setServerDomain(e.target.value)}
-                placeholder="e.g. dokploy.circulo-ai.com"
-                className="h-10 border-border/50 bg-background/50 text-sm placeholder:text-muted-foreground/50 focus:border-primary"
+                placeholder="e.g. upstand.dev"
               />
             </div>
             <div className="space-y-2">
@@ -88,21 +101,24 @@ export function ServerDomainCard({
                 htmlFor="server-email-input"
                 className="font-medium text-xs"
               >
-                Let's Encrypt Email
+                ACME Email (Optional for Let&apos;s Encrypt)
               </Label>
               <Input
                 id="server-email-input"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. 1839491@gmail.com"
-                className="h-10 border-border/50 bg-background/50 text-sm placeholder:text-muted-foreground/50 focus:border-primary"
+                placeholder="e.g. admin@upstand.dev (optional)"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Optional for Let&apos;s Encrypt. ZeroSSL uses this for ACME
+                registration.
+              </p>
             </div>
           </div>
 
           {/* Row 2: HTTPS Switch Row */}
-          <div className="flex items-center justify-between rounded-xl border border-border/30 bg-muted/10 p-4 transition-colors hover:bg-muted/20">
+          <div className="flex items-center justify-between transition-colors hover:bg-muted/20">
             <div className="space-y-1">
               <Label
                 htmlFor="https-toggle"
@@ -111,7 +127,7 @@ export function ServerDomainCard({
                 HTTPS
               </Label>
               <p className="text-[11px] text-muted-foreground">
-                Automatically provision SSL Certificate.
+                Automatically provision and enforce SSL/TLS encryption.
               </p>
             </div>
             <Switch
@@ -122,41 +138,74 @@ export function ServerDomainCard({
           </div>
 
           {/* Row 3: Certificate Provider Select */}
-          <div className="space-y-2">
-            <Label
-              htmlFor="cert-provider-select"
-              className="font-medium text-xs"
-            >
-              Certificate Provider
-            </Label>
-            <Select
-              value={certificateProvider}
-              onValueChange={(val) =>
-                setCertificateProvider(val as CertificateProvider)
-              }
-            >
-              <SelectTrigger
-                id="cert-provider-select"
-                className="h-10 border-border/50 bg-background/50 text-sm"
+          {httpsEnabled && (
+            <div className="space-y-2">
+              <Label
+                htmlFor="cert-provider-select"
+                className="font-medium text-xs"
               >
-                <SelectValue placeholder="Select Certificate Provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="letsencrypt">Let's Encrypt</SelectItem>
-                <SelectItem value="zerossl">ZeroSSL</SelectItem>
-                <SelectItem value="self-signed">Self-Signed</SelectItem>
-                <SelectItem value="none">None</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+                Certificate Provider
+              </Label>
+              <Select
+                value={certificateProvider}
+                onValueChange={(val) =>
+                  setCertificateProvider(val as CertificateProvider)
+                }
+              >
+                <SelectTrigger id="cert-provider-select">
+                  <SelectValue placeholder="Select Certificate Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="letsencrypt">Let's Encrypt</SelectItem>
+                  <SelectItem value="zerossl">ZeroSSL</SelectItem>
+                  <SelectItem value="self-signed">
+                    Self-Signed (Caddy CA)
+                  </SelectItem>
+                  <SelectItem value="custom">Custom Certificate</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          {/* Row 4: Save Action Footer */}
+          {/* Row 4: Custom Certificate Select (when provider === 'custom') */}
+          {certificateProvider === "custom" && httpsEnabled && (
+            <div className="space-y-2">
+              <Label
+                htmlFor="custom-cert-select"
+                className="font-medium text-xs"
+              >
+                Custom Certificate
+              </Label>
+              <Select
+                value={certificateId || ""}
+                onValueChange={(val) => setCertificateId?.(val || null)}
+              >
+                <SelectTrigger id="custom-cert-select">
+                  <SelectValue placeholder="Select an uploaded certificate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {certificatesList && certificatesList.length > 0 ? (
+                    certificatesList.map((cert) => (
+                      <SelectItem key={cert.id} value={cert.id}>
+                        📜 {cert.name}
+                        {cert.domainName ? ` (${cert.domainName})` : ""}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="_empty" disabled>
+                      No custom certificates found (Infrastructure →
+                      Certificates)
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Row 5: Save Action Footer */}
           <div className="flex justify-end pt-2">
-            <Button
-              type="submit"
-              disabled={isSaving}
-              className="h-9 min-w-24 px-5 font-semibold text-xs shadow-sm transition-all"
-            >
+            <Button type="submit" disabled={isSaving}>
               {isSaving ? (
                 <>
                   <Spinner className="mr-2 size-3.5" />

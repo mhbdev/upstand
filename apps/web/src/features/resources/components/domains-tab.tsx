@@ -4,6 +4,7 @@ import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { parseResourceAdvancedConfig } from "@upstand/domain";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -50,7 +51,7 @@ import {
   TableHeader,
   TableRow,
 } from "@upstand/ui/components/table";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { ConfirmActionDialog } from "@/components/dashboard/confirm-action-dialog";
@@ -61,8 +62,10 @@ import {
   WandSparkles,
 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
 
 type DomainMapping = {
+  enabled: boolean;
   host: string;
   path: string;
   internalPath: string;
@@ -70,7 +73,12 @@ type DomainMapping = {
   port: number;
   serviceName?: string;
   https: boolean;
-  certificateType: "letsencrypt" | "internal" | "custom" | "cloudflare";
+  certificateType:
+    | "letsencrypt"
+    | "zerossl"
+    | "internal"
+    | "custom"
+    | "cloudflare";
   certificateId?: string;
   middlewares: string[];
   redirectTo?: string;
@@ -99,8 +107,8 @@ type DomainMapping = {
 
 interface DomainsTabProps {
   organizationId: string;
-  resource: any;
-  updateResource: any;
+  resource: NonNullable<ResourceDetailState["resource"]>;
+  updateResource: ResourceDetailState["updateResource"];
   isUpdatingResource: boolean;
   routingTargets: string[];
   certificates: Array<{ id: string; name: string }>;
@@ -108,6 +116,7 @@ interface DomainsTabProps {
 }
 
 const emptyDomainMapping = (): DomainMapping => ({
+  enabled: true,
   host: "",
   path: "/",
   internalPath: "/",
@@ -167,6 +176,7 @@ const parseDomainMappings = (
       const mapping = item as Partial<DomainMapping>;
       return [
         {
+          enabled: mapping.enabled !== false,
           host: typeof mapping.host === "string" ? mapping.host : "",
           path: typeof mapping.path === "string" ? mapping.path : "/",
           internalPath:
@@ -182,13 +192,15 @@ const parseDomainMappings = (
               : undefined,
           https: typeof mapping.https === "boolean" ? mapping.https : true,
           certificateType:
-            mapping.certificateType === "internal"
-              ? "internal"
-              : mapping.certificateType === "custom"
-                ? "custom"
-                : mapping.certificateType === "cloudflare"
-                  ? "cloudflare"
-                  : "letsencrypt",
+            mapping.certificateType === "zerossl"
+              ? "zerossl"
+              : mapping.certificateType === "internal"
+                ? "internal"
+                : mapping.certificateType === "custom"
+                  ? "custom"
+                  : mapping.certificateType === "cloudflare"
+                    ? "cloudflare"
+                    : "letsencrypt",
           certificateId:
             typeof mapping.certificateId === "string"
               ? mapping.certificateId
@@ -271,6 +283,21 @@ export function DomainsTab({
     null,
   );
   const domainVersion = resource?.domains ?? "";
+
+  const suggestedPorts = useMemo(() => {
+    if (!resource?.advancedConfig) return [];
+    try {
+      const parsed = parseResourceAdvancedConfig(resource.advancedConfig);
+      const set = new Set<number>();
+      for (const p of parsed.ports) {
+        if (p.targetPort) set.add(p.targetPort);
+        if (p.publishedPort) set.add(p.publishedPort);
+      }
+      return Array.from(set);
+    } catch {
+      return [];
+    }
+  }, [resource?.advancedConfig]);
 
   interface DnsStatus {
     status: "idle" | "checking" | "verified" | "cdn" | "invalid" | "failed";
@@ -376,6 +403,7 @@ export function DomainsTab({
     defaultValues: emptyDomainMapping(),
     onSubmit: async ({ value }) => {
       const mapping: DomainMapping = {
+        enabled: value.enabled,
         host: value.host.trim().toLowerCase(),
         path: value.path.trim(),
         internalPath: value.internalPath.trim(),
@@ -427,6 +455,7 @@ export function DomainsTab({
     },
     validators: {
       onSubmit: z.object({
+        enabled: z.boolean(),
         host: z
           .string()
           .min(1, "Hostname is required")
@@ -446,6 +475,7 @@ export function DomainsTab({
         https: z.boolean(),
         certificateType: z.enum([
           "letsencrypt",
+          "zerossl",
           "internal",
           "custom",
           "cloudflare",
@@ -529,10 +559,8 @@ export function DomainsTab({
   const editDomain = (idx: number) => {
     setEditingDomainIndex(idx);
     const domain = domainList[idx];
-    form.reset();
-    Object.entries(domain).forEach(([k, v]) => {
-      form.setFieldValue(k as any, v as any);
-    });
+    if (!domain) return;
+    form.reset(domain);
     setDomainDialogOpen(true);
   };
 
@@ -545,6 +573,21 @@ export function DomainsTab({
           toast.success("Domain mapping removed");
           setPendingDeleteIndex(null);
         },
+      },
+    );
+  };
+
+  const toggleDomain = (idx: number, enabled: boolean) => {
+    const updated = domainList.map((mapping, index) =>
+      index === idx ? { ...mapping, enabled } : mapping,
+    );
+    updateResource(
+      { id: resource.id, domains: JSON.stringify(updated) },
+      {
+        onSuccess: () =>
+          toast.success(
+            enabled ? "Domain route enabled" : "Domain route disabled",
+          ),
       },
     );
   };
@@ -585,6 +628,7 @@ export function DomainsTab({
     // Keep optional Caddy middleware keys absent. Empty nested objects are not
     // valid Caddy routes and used to make generated domains fail in production.
     const mapping: DomainMapping = {
+      enabled: true,
       host,
       path: "/",
       internalPath: "/",
@@ -660,13 +704,31 @@ export function DomainsTab({
                     <TableRow key={`${item.host}:${item.path}`}>
                       <TableCell>
                         <div className="flex min-w-48 flex-col gap-1">
-                          <span className="font-medium text-primary">
-                            {item.host}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={item.enabled}
+                              disabled={isUpdatingResource}
+                              aria-label={`${item.enabled ? "Disable" : "Enable"} ${item.host}${item.path}`}
+                              onCheckedChange={(checked) =>
+                                toggleDomain(idx, checked)
+                              }
+                            />
+                            <span
+                              className={
+                                item.enabled
+                                  ? "font-medium text-primary"
+                                  : "font-medium text-muted-foreground line-through"
+                              }
+                            >
+                              {item.host}
+                            </span>
+                          </div>
                           <span className="font-normal text-muted-foreground text-xs">
-                            {item.stripPath
-                              ? "Path prefix removed"
-                              : "Path preserved"}
+                            {!item.enabled
+                              ? "Disabled · kept for later"
+                              : item.stripPath
+                                ? "Path prefix removed"
+                                : "Path preserved"}
                           </span>
                         </div>
                       </TableCell>
@@ -688,11 +750,13 @@ export function DomainsTab({
                           {item.https
                             ? item.certificateType === "internal"
                               ? "HTTPS / Internal CA"
-                              : item.certificateType === "cloudflare"
-                                ? "HTTPS / Cloudflare DNS-01"
-                                : item.certificateType === "custom"
-                                  ? "HTTPS / Custom SSL"
-                                  : "HTTPS / Let’s Encrypt"
+                              : item.certificateType === "zerossl"
+                                ? "HTTPS / ZeroSSL"
+                                : item.certificateType === "cloudflare"
+                                  ? "HTTPS / Cloudflare DNS-01"
+                                  : item.certificateType === "custom"
+                                    ? "HTTPS / Custom SSL"
+                                    : "HTTPS / Let’s Encrypt"
                             : "HTTP only"}
                         </Badge>
                       </TableCell>
@@ -890,6 +954,27 @@ export function DomainsTab({
                             field.handleChange(Number(e.target.value))
                           }
                         />
+                        {suggestedPorts.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-muted-foreground text-xs">
+                            <span>Configured ports:</span>
+                            {suggestedPorts.map((p) => (
+                              <Button
+                                key={p}
+                                type="button"
+                                variant={
+                                  field.state.value === p
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => field.handleChange(p)}
+                              >
+                                {p}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
                         <FieldError errors={field.state.meta.errors} />
                       </Field>
                     )}
@@ -1005,6 +1090,10 @@ export function DomainsTab({
                                   label: "Let's Encrypt Public Certificate",
                                 },
                                 {
+                                  value: "zerossl",
+                                  label: "ZeroSSL Public Certificate",
+                                },
+                                {
                                   value: "cloudflare",
                                   label: "Cloudflare DNS-01 Wildcard SSL",
                                 },
@@ -1022,6 +1111,7 @@ export function DomainsTab({
                                 field.handleChange(
                                   (val || "letsencrypt") as
                                     | "letsencrypt"
+                                    | "zerossl"
                                     | "internal"
                                     | "custom"
                                     | "cloudflare",
@@ -1034,6 +1124,9 @@ export function DomainsTab({
                               <SelectContent>
                                 <SelectItem value="letsencrypt">
                                   Let's Encrypt Public Certificate
+                                </SelectItem>
+                                <SelectItem value="zerossl">
+                                  ZeroSSL Public Certificate
                                 </SelectItem>
                                 <SelectItem value="cloudflare">
                                   Cloudflare DNS-01 Wildcard SSL

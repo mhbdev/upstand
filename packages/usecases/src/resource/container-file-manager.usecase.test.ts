@@ -3,56 +3,57 @@ import type { IUnitOfWork } from "@upstand/domain";
 import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { ContainerFileManagerUseCase } from "./container-file-manager.usecase";
 
-process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
-  "base64",
-);
+process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
 describe("ContainerFileManagerUseCase", () => {
   const createMockContext = () => {
-    const uow = mockUnitOfWork();
     const mockOrgId = "org-123";
     const mockProjectId = "proj-123";
     const mockEnvId = "env-123";
     const mockResourceId = "res-123";
+    let commandFailure = false;
 
-    (uow.projectRepository.findById as any) = async (id: string) => {
-      if (id === mockProjectId) {
-        return {
-          id: mockProjectId,
-          organizationId: mockOrgId,
-          name: "Test Proj",
-        };
-      }
-      return null;
-    };
-
-    (uow.environmentRepository.findById as any) = async (id: string) => {
-      if (id === mockEnvId) {
-        return { id: mockEnvId, projectId: mockProjectId, name: "Production" };
-      }
-      return null;
-    };
-
-    (uow.resourceRepository.findById as any) = async (id: string) => {
-      if (id === mockResourceId) {
-        return {
-          id: mockResourceId,
-          environmentId: mockEnvId,
-          name: "web-app",
-          appName: "web-app",
-          type: "application",
-          serverId: "local",
-        };
-      }
-      return null;
-    };
+    const uow = mockUnitOfWork({
+      projectRepository: {
+        findById: async (id: string) =>
+          id === mockProjectId
+            ? {
+                id: mockProjectId,
+                organizationId: mockOrgId,
+                name: "Test Proj",
+              }
+            : null,
+      },
+      environmentRepository: {
+        findById: async (id: string) =>
+          id === mockEnvId
+            ? { id: mockEnvId, projectId: mockProjectId, name: "Production" }
+            : null,
+      },
+      resourceRepository: {
+        findById: async (id: string) =>
+          id === mockResourceId
+            ? {
+                id: mockResourceId,
+                environmentId: mockEnvId,
+                name: "web-app",
+                appName: "web-app",
+                type: "application",
+                serverId: "local",
+              }
+            : null,
+      },
+    });
 
     const mockDockerExec = {
       execContainerCommand: async (
-        _target: any,
+        _target: unknown,
         _containerId: string,
         command: string,
       ) => {
+        if (commandFailure) {
+          return { output: "", stderr: "permission denied", exitCode: 1 };
+        }
         if (command.includes("for f in")) {
           return {
             output:
@@ -83,12 +84,19 @@ describe("ContainerFileManagerUseCase", () => {
     };
 
     const useCase = new ContainerFileManagerUseCase(
-      uow as unknown as IUnitOfWork,
-      mockDockerExec as any,
-      mockDockerInventory as any,
+      uow as IUnitOfWork,
+      mockDockerExec as never,
+      mockDockerInventory as never,
     );
 
-    return { useCase, mockOrgId, mockResourceId };
+    return {
+      useCase,
+      mockOrgId,
+      mockResourceId,
+      setCommandFailure: (value: boolean) => {
+        commandFailure = value;
+      },
+    };
   };
 
   test("listFiles returns formatted directory items", async () => {
@@ -112,6 +120,7 @@ describe("ContainerFileManagerUseCase", () => {
       organizationId: mockOrgId,
       resourceId: mockResourceId,
       path: "/config.json",
+      encoding: "text",
     });
 
     expect(file.content).toBe('{"key":"value"}');
@@ -172,9 +181,66 @@ describe("ContainerFileManagerUseCase", () => {
         resourceId: mockResourceId,
         path: "/etc",
       }),
-    ).rejects.toThrow(
-      "Deletion of system root or system directory is forbidden for security.",
-    );
+    ).rejects.toThrow("protected system path");
+  });
+
+  test("rejects a requested container that is not owned by the resource", async () => {
+    const { useCase, mockOrgId, mockResourceId } = createMockContext();
+    expect(
+      useCase.listFiles({
+        organizationId: mockOrgId,
+        resourceId: mockResourceId,
+        containerId: "another-container",
+        path: "/",
+      }),
+    ).rejects.toThrow("Requested container is not part of this resource.");
+  });
+
+  test("rejects protected writes and path-based item names", async () => {
+    const { useCase, mockOrgId, mockResourceId } = createMockContext();
+
+    expect(
+      useCase.writeFile({
+        organizationId: mockOrgId,
+        resourceId: mockResourceId,
+        path: "/etc/secret",
+        content: "nope",
+      }),
+    ).rejects.toThrow("protected system path");
+
+    expect(
+      useCase.createItem({
+        organizationId: mockOrgId,
+        resourceId: mockResourceId,
+        parentPath: "/app",
+        name: "../escape",
+        type: "file",
+      }),
+    ).rejects.toThrow("invalid path characters");
+
+    expect(
+      useCase.renameItem({
+        organizationId: mockOrgId,
+        resourceId: mockResourceId,
+        oldPath: "/app/config.json",
+        newPath: "/etc/config.json",
+      }),
+    ).rejects.toThrow("protected system path");
+  });
+
+  test("surfaces container command failures instead of reporting success", async () => {
+    const { useCase, mockOrgId, mockResourceId, setCommandFailure } =
+      createMockContext();
+    setCommandFailure(true);
+
+    expect(
+      useCase.writeFile({
+        organizationId: mockOrgId,
+        resourceId: mockResourceId,
+        path: "/app/config.json",
+        content: "updated",
+      }),
+    ).rejects.toThrow("permission denied");
   });
 
   test("renameItem renames file or directory", async () => {

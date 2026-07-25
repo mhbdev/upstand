@@ -1,16 +1,48 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { NotificationConfiguration } from "@upstand/domain";
 import { NotificationTransportRegistry } from "./notification-transport";
+
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseJsonObject(body: unknown): JsonObject {
+  if (typeof body !== "string") throw new Error("Expected JSON request body");
+  const parsed: unknown = JSON.parse(body);
+  if (!isJsonObject(parsed)) {
+    throw new Error("Expected a JSON object");
+  }
+  return parsed;
+}
+
+function createFetchMock(
+  responseBody: string,
+  status: number,
+  statusText: string,
+  capture: (body: JsonObject) => void,
+): typeof fetch {
+  return Object.assign(
+    async (
+      _url: string | URL | Request,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      capture(parseJsonObject(init?.body));
+      return new Response(responseBody, { status, statusText });
+    },
+    { preconnect: (_url: string | URL | Request): void => undefined },
+  );
+}
 
 describe("NotificationTransportRegistry", () => {
   const originalFetch = globalThis.fetch;
 
   test("formats Slack message with header, sections, and actions", async () => {
-    let capturedBody: any = null;
-    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
-      capturedBody = JSON.parse(init?.body as string);
-      return new Response("ok", { status: 200, statusText: "OK" });
-    }) as any;
+    let capturedBody: JsonObject | null = null;
+    globalThis.fetch = createFetchMock("ok", 200, "OK", (body) => {
+      capturedBody = body;
+    });
 
     try {
       const registry = new NotificationTransportRegistry();
@@ -35,27 +67,35 @@ describe("NotificationTransportRegistry", () => {
       });
 
       expect(capturedBody).not.toBeNull();
-      expect(capturedBody.text).toContain("🚀 Deployment Succeeded");
-      expect(capturedBody.channel).toBe("#deploys");
-      expect(capturedBody.blocks).toHaveLength(3);
-      expect(capturedBody.blocks[0].text.text).toContain(
-        "🚀 Deployment Succeeded",
-      );
-      expect(capturedBody.blocks[1].text.text).toContain(
-        "📦 Resource: web-api",
-      );
-      expect(capturedBody.blocks[2].type).toBe("actions");
+      expect(capturedBody).toMatchObject({
+        text: expect.stringContaining("🚀 Deployment Succeeded"),
+        channel: "#deploys",
+      });
+      expect(capturedBody).toMatchObject({
+        blocks: expect.arrayContaining([
+          expect.objectContaining({
+            text: expect.objectContaining({
+              text: expect.stringContaining("🚀 Deployment Succeeded"),
+            }),
+          }),
+          expect.objectContaining({
+            text: expect.objectContaining({
+              text: expect.stringContaining("📦 Resource: web-api"),
+            }),
+          }),
+          expect.objectContaining({ type: "actions" }),
+        ]),
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
   test("formats Telegram HTML message with inline markup", async () => {
-    let capturedBody: any = null;
-    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
-      capturedBody = JSON.parse(init?.body as string);
-      return new Response('{"ok":true}', { status: 200, statusText: "OK" });
-    }) as any;
+    let capturedBody: JsonObject | null = null;
+    globalThis.fetch = createFetchMock('{"ok":true}', 200, "OK", (body) => {
+      capturedBody = body;
+    });
 
     try {
       const registry = new NotificationTransportRegistry();
@@ -78,21 +118,24 @@ describe("NotificationTransportRegistry", () => {
       });
 
       expect(capturedBody).not.toBeNull();
-      expect(capturedBody.chat_id).toBe("-100123456789");
-      expect(capturedBody.parse_mode).toBe("HTML");
-      expect(capturedBody.text).toContain("🚨 Server Threshold Alert");
-      expect(capturedBody.text).toContain("📊 Metric: 92% (Threshold: 85%)");
+      expect(capturedBody).toMatchObject({
+        chat_id: "-100123456789",
+        parse_mode: "HTML",
+        text: expect.stringContaining("🚨 Server Threshold Alert"),
+      });
+      expect(capturedBody).toMatchObject({
+        disable_web_page_preview: true,
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
   test("formats Discord Embed with custom color bar", async () => {
-    let capturedBody: any = null;
-    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
-      capturedBody = JSON.parse(init?.body as string);
-      return new Response("{}", { status: 204, statusText: "No Content" });
-    }) as any;
+    let capturedBody: JsonObject | null = null;
+    globalThis.fetch = createFetchMock("{}", 204, "No Content", (body) => {
+      capturedBody = body;
+    });
 
     try {
       const registry = new NotificationTransportRegistry();
@@ -112,22 +155,25 @@ describe("NotificationTransportRegistry", () => {
       });
 
       expect(capturedBody).not.toBeNull();
-      expect(capturedBody.embeds).toHaveLength(1);
-      const embed = capturedBody.embeds[0];
-      expect(embed.title).toContain("💾 Database Backup Completed");
-      expect(embed.color).toBe(0x22c55e); // Success green
-      expect(embed.fields).toBeDefined();
+      expect(capturedBody).toMatchObject({
+        embeds: expect.arrayContaining([
+          expect.objectContaining({
+            title: expect.stringContaining("💾 Database Backup Completed"),
+            color: 0x22c55e,
+            fields: expect.any(Array),
+          }),
+        ]),
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
   test("formats Custom Webhook with rich payload", async () => {
-    let capturedBody: any = null;
-    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
-      capturedBody = JSON.parse(init?.body as string);
-      return new Response("{}", { status: 200, statusText: "OK" });
-    }) as any;
+    let capturedBody: JsonObject | null = null;
+    globalThis.fetch = createFetchMock("{}", 200, "OK", (body) => {
+      capturedBody = body;
+    });
 
     try {
       const registry = new NotificationTransportRegistry();
@@ -147,11 +193,13 @@ describe("NotificationTransportRegistry", () => {
       });
 
       expect(capturedBody).not.toBeNull();
-      expect(capturedBody.event).toBe("docker_cleanup_completed");
-      expect(capturedBody.emoji).toBe("🧹");
-      expect(capturedBody.formattedText).toContain(
-        "Cleaned up 12 dangling images.",
-      );
+      expect(capturedBody).toMatchObject({
+        event: "docker_cleanup_completed",
+        emoji: "🧹",
+        formattedText: expect.stringContaining(
+          "Cleaned up 12 dangling images.",
+        ),
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }

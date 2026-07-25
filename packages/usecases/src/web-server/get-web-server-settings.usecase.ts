@@ -1,5 +1,6 @@
 import type { IUnitOfWork, WebServerSettings } from "@upstand/domain";
 import { env } from "@upstand/env/server";
+import type { CaddyStatus } from "../ports/caddy";
 import type { CaddyService } from "./caddy.service";
 
 function addUpstreamRetry(snippets: string, upstream: string): string {
@@ -45,7 +46,10 @@ export class GetWebServerSettingsUseCase {
     private readonly caddyService: CaddyService,
   ) {}
 
-  async execute(): Promise<{ settings: WebServerSettings; status: any }> {
+  async execute(): Promise<{
+    settings: WebServerSettings;
+    status: CaddyStatus;
+  }> {
     let settings = await this.uow.webServerSettingsRepository.findGlobal();
     if (!settings) {
       settings = await this.uow.webServerSettingsRepository.createGlobal({

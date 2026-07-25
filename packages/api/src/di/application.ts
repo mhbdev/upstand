@@ -200,6 +200,13 @@ export function registerApplicationFeatures(services: ServiceCollection) {
       ),
   );
   services.addTransient(
+    dependencies.GetSecretVersionUseCaseToken,
+    (c) =>
+      new dependencies.GetSecretVersionUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
+  );
+  services.addTransient(
     dependencies.RestoreSecretVersionUseCaseToken,
     (c) =>
       new dependencies.RestoreSecretVersionUseCase(
@@ -674,7 +681,10 @@ export function registerApplicationFeatures(services: ServiceCollection) {
   );
   services.addTransient(
     dependencies.TestS3DestinationConnectionUseCaseToken,
-    () => new dependencies.TestS3DestinationConnectionUseCase(),
+    (c) =>
+      new dependencies.TestS3DestinationConnectionUseCase(
+        c.resolve(dependencies.UnitOfWorkToken),
+      ),
   );
   services.addTransient(
     dependencies.ListComposeServicesUseCaseToken,

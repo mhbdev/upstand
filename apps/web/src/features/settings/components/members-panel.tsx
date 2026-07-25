@@ -132,8 +132,10 @@ export function MembersPanel() {
             permissions: value.permissions,
           });
           customRoleId = newRole.id;
-        } catch (err: any) {
-          toast.error(`Failed to create custom role: ${err.message}`);
+        } catch (error: unknown) {
+          toast.error(
+            `Failed to create custom role: ${error instanceof Error ? error.message : String(error)}`,
+          );
           return;
         }
       } else if (value.role.startsWith("custom:")) {
@@ -204,7 +206,7 @@ export function MembersPanel() {
         (r) => r.id === customId,
       );
       if (selectedRole) {
-        form.setFieldValue("permissions", selectedRole.permissions as any);
+        form.setFieldValue("permissions", selectedRole.permissions);
       }
     }
   };

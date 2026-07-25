@@ -5,13 +5,17 @@ import {
   encryptSecret,
 } from "@upstand/platform/crypto/secret-box";
 
-type ResourceCredentials = Record<string, any>;
+export type ResourceCredentials = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function isEncryptedPayload(value: unknown): value is EncryptedPayload {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!isRecord(value)) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
+  const candidate: Record<string, unknown> = value;
   return (
     typeof candidate.ciphertext === "string" &&
     typeof candidate.iv === "string" &&
@@ -21,9 +25,7 @@ function isEncryptedPayload(value: unknown): value is EncryptedPayload {
 }
 
 function asCredentials(value: unknown): ResourceCredentials {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as ResourceCredentials)
-    : {};
+  return isRecord(value) ? value : {};
 }
 
 /**

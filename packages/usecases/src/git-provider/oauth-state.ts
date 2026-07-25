@@ -9,7 +9,7 @@ export type GitProviderOAuthStatePurpose =
   | "github-install";
 
 function stateSecret(): string {
-  const secret = env.BETTER_AUTH_SECRET || env.SSH_KEY_ENCRYPTION_KEY_V1;
+  const secret = env.ENCRYPTION_KEY_V1;
   if (!secret || secret.length < 32) {
     throw new Error("OAuth state signing secret is not configured");
   }

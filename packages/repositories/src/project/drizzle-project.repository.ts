@@ -4,7 +4,7 @@ import type {
   IProjectRepository,
   Project,
 } from "@upstand/domain";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { BaseRepository } from "../shared/base.repository";
 import type { Executor } from "../shared/types";
 
@@ -20,9 +20,17 @@ export class DrizzleProjectRepository
     return this.deleteByIdReturning(id);
   }
 
-  async findByOrganizationId(organizationId: string): Promise<Project[]> {
+  async findByOrganizationId(
+    organizationId: string,
+    options?: { includeArchived?: boolean },
+  ): Promise<Project[]> {
     return this.findMany({
-      where: eq(project.organizationId, organizationId),
+      where: options?.includeArchived
+        ? eq(project.organizationId, organizationId)
+        : and(
+            eq(project.organizationId, organizationId),
+            isNull(project.archivedAt),
+          ),
     });
   }
 }

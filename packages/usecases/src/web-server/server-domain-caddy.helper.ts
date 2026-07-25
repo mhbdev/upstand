@@ -38,6 +38,11 @@ export function buildServerDomainCaddySnippet(
   let tlsDirective = "";
   if (provider === "self-signed") {
     tlsDirective = "\ttls internal";
+  } else if (provider === "custom") {
+    const certId = settings?.certificateId?.trim();
+    tlsDirective = certId
+      ? `\ttls /etc/caddy/certificates/${certId}.crt /etc/caddy/certificates/${certId}.key`
+      : "\ttls internal";
   } else if (provider === "zerossl") {
     tlsDirective = email
       ? `\ttls ${email} {\n\t\tca https://acme.zerossl.com/v2/DV90\n\t}`

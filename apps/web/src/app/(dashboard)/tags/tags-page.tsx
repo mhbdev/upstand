@@ -7,9 +7,14 @@ import {
   type TagColor,
   TagColorSchema,
 } from "@upstand/domain";
-import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
-import { CardContent } from "@upstand/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@upstand/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -138,54 +143,60 @@ export default function TagsPage() {
           </div>
         ) : tags.data?.length ? (
           tags.data.map((tag) => (
-            <div
-              key={tag.id}
-              className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <Badge variant="secondary" className="max-w-40 truncate">
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: tag.color }}
-                    aria-hidden="true"
-                  />
-                  {tag.name}
-                </Badge>
-                <span className="text-muted-foreground text-xs">
-                  {tag.color}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Edit ${tag.name}`}
-                  onClick={() => {
-                    setEditingTag({
-                      id: tag.id,
-                      name: tag.name,
-                      color: tag.color,
-                    });
-                    setName(tag.name);
-                    setColor(tag.color);
-                    setOpen(true);
-                  }}
-                >
-                  <Edit2 />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Delete ${tag.name}`}
-                  onClick={() =>
-                    setDeleteTarget({ id: tag.id, name: tag.name })
-                  }
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2Icon />
-                </Button>
-              </div>
-            </div>
+            <Card key={tag.id} className="gap-3 py-4">
+              <CardHeader className="px-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className="size-8 shrink-0 rounded-full border"
+                      style={{ backgroundColor: tag.color }}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <CardTitle className="truncate text-sm">
+                        {tag.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {tag.color}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      title={`Edit ${tag.name}`}
+                      aria-label={`Edit ${tag.name}`}
+                      onClick={() => {
+                        setEditingTag({
+                          id: tag.id,
+                          name: tag.name,
+                          color: tag.color,
+                        });
+                        setName(tag.name);
+                        setColor(tag.color);
+                        setOpen(true);
+                      }}
+                    >
+                      <Edit2 className="size-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="size-8 text-destructive hover:text-destructive"
+                      title={`Delete ${tag.name}`}
+                      aria-label={`Delete ${tag.name}`}
+                      onClick={() =>
+                        setDeleteTarget({ id: tag.id, name: tag.name })
+                      }
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
           ))
         ) : (
           <div className="col-span-full">
@@ -254,15 +265,21 @@ export default function TagsPage() {
               <Field data-invalid={!colorIsValid}>
                 <FieldLabel htmlFor="tag-color">Color</FieldLabel>
                 <div className="flex items-center gap-2">
-                  <input
-                    id="tag-color-picker"
-                    type="color"
-                    value={colorIsValid ? color : DEFAULT_TAG_COLOR}
-                    onChange={(event) => setColor(event.target.value)}
-                    aria-invalid={!colorIsValid}
-                    aria-label="Choose tag color"
-                    className="size-10 cursor-pointer rounded-md border border-input bg-background p-1"
-                  />
+                  <div
+                    className={`relative size-10 shrink-0 overflow-hidden rounded-full border shadow-sm ${
+                      colorIsValid ? "border-border" : "border-destructive"
+                    }`}
+                  >
+                    <input
+                      id="tag-color-picker"
+                      type="color"
+                      value={colorIsValid ? color : DEFAULT_TAG_COLOR}
+                      onChange={(event) => setColor(event.target.value)}
+                      aria-invalid={!colorIsValid}
+                      aria-label="Choose tag color"
+                      className="absolute -top-1 -left-1 size-12 cursor-pointer appearance-none border-none bg-transparent p-0 [&::-moz-color-swatch]:border-none [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-none [&::-webkit-color-swatch]:border-none"
+                    />
+                  </div>
                   <Input
                     id="tag-color"
                     value={color}

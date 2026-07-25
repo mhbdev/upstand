@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { IProjectRepository, Project } from "@upstand/domain";
+import type {
+  CreateProjectDTO,
+  IProjectRepository,
+  Project,
+  UpdateProjectDTO,
+} from "@upstand/domain";
 import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { UpdateProjectUseCase } from "./update-project.usecase";
 
@@ -20,18 +25,23 @@ class MockProjectRepository implements IProjectRepository {
     return p ?? null;
   }
 
-  async create(data: any) {
+  async create(data: CreateProjectDTO): Promise<Project> {
+    const id = data.id ?? `project-${this.projects.size + 1}`;
     const project: Project = {
       ...data,
+      id,
       icon: data.icon ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    this.projects.set(data.id, project);
+    this.projects.set(id, project);
     return project;
   }
 
-  async updateById(id: string, patch: any) {
+  async updateById(
+    id: string,
+    patch: UpdateProjectDTO,
+  ): Promise<Project | null> {
     const existing = this.projects.get(id);
     if (!existing) return null;
     const updated: Project = {
@@ -74,5 +84,31 @@ describe("UpdateProjectUseCase", () => {
     expect(result.icon).toBe(
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
     );
+  });
+
+  test("archives and restores a project without deleting it", async () => {
+    const repo = new MockProjectRepository();
+    await repo.create({
+      id: "proj-archive",
+      name: "Keep me",
+      organizationId: "org-1",
+    });
+    const usecase = new UpdateProjectUseCase(
+      mockUnitOfWork({ projectRepository: repo }),
+    );
+
+    const archived = await usecase.execute({
+      id: "proj-archive",
+      archived: true,
+    });
+    expect(archived.archivedAt).toBeInstanceOf(Date);
+    expect(repo.projects.has("proj-archive")).toBe(true);
+
+    const restored = await usecase.execute({
+      id: "proj-archive",
+      archived: false,
+    });
+    expect(restored.archivedAt).toBeNull();
+    expect(repo.projects.has("proj-archive")).toBe(true);
   });
 });

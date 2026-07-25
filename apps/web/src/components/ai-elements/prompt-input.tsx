@@ -47,13 +47,13 @@ import type {
   ChangeEventHandler,
   ClipboardEventHandler,
   ComponentProps,
-  FormEvent,
   FormEventHandler,
   HTMLAttributes,
   KeyboardEventHandler,
   PropsWithChildren,
   ReactNode,
   RefObject,
+  SyntheticEvent,
 } from "react";
 import {
   Children,
@@ -86,6 +86,59 @@ import { inferMediaType, matchesAcceptPattern } from "@/lib/attachment-utils";
 // ============================================================================
 // Helpers
 // ============================================================================
+
+type PromptInputFileError = {
+  code: "max_files" | "max_file_size" | "accept";
+  message: string;
+};
+
+function validateIncomingFiles(
+  fileList: File[] | FileList,
+  options: {
+    accept?: string;
+    maxFileSize?: number;
+    maxFiles?: number;
+    currentCount: number;
+    onError?: (error: PromptInputFileError) => void;
+  },
+): File[] {
+  const incoming = [...fileList];
+  const accepted = incoming.filter((file) =>
+    matchesAcceptPattern(file, options.accept),
+  );
+  if (incoming.length && accepted.length === 0) {
+    options.onError?.({
+      code: "accept",
+      message: "No files match the accepted types.",
+    });
+    return [];
+  }
+
+  const sized = accepted.filter((file) =>
+    options.maxFileSize ? file.size <= options.maxFileSize : true,
+  );
+  if (accepted.length > 0 && sized.length === 0) {
+    options.onError?.({
+      code: "max_file_size",
+      message: "All files exceed the maximum size.",
+    });
+    return [];
+  }
+
+  const capacity =
+    typeof options.maxFiles === "number"
+      ? Math.max(0, options.maxFiles - options.currentCount)
+      : undefined;
+  const capped =
+    typeof capacity === "number" ? sized.slice(0, capacity) : sized;
+  if (typeof capacity === "number" && sized.length > capacity) {
+    options.onError?.({
+      code: "max_files",
+      message: "Too many files. Some were not added.",
+    });
+  }
+  return capped;
+}
 
 const convertBlobUrlToDataUrl = async (url: string): Promise<string | null> => {
   try {
@@ -422,19 +475,20 @@ export type PromptInputActionAddAttachmentsProps = ComponentProps<
 > & {
   label?: string;
 };
+type DropdownMenuItemSelectEvent = Parameters<
+  NonNullable<ComponentProps<typeof DropdownMenuItem>["onSelect"]>
+>[0];
 
 export const PromptInputActionAddAttachments = ({
   label = "Add photos or files",
   onSelect,
-  onClick,
   ...props
 }: PromptInputActionAddAttachmentsProps) => {
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    (e: any) => {
+    (e: DropdownMenuItemSelectEvent): void => {
       onSelect?.(e);
-      onClick?.(e);
       if (e.defaultPrevented) {
         return;
       }
@@ -442,7 +496,7 @@ export const PromptInputActionAddAttachments = ({
         attachments.openFileDialog();
       });
     },
-    [attachments, onClick, onSelect],
+    [attachments, onSelect],
   );
 
   return (
@@ -461,15 +515,13 @@ export type PromptInputActionAddScreenshotProps = ComponentProps<
 export const PromptInputActionAddScreenshot = ({
   label = "Take screenshot",
   onSelect,
-  onClick,
   ...props
 }: PromptInputActionAddScreenshotProps) => {
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    async (event: any) => {
+    async (event: DropdownMenuItemSelectEvent): Promise<void> => {
       onSelect?.(event);
-      onClick?.(event);
       if (event.defaultPrevented) {
         return;
       }
@@ -489,7 +541,7 @@ export const PromptInputActionAddScreenshot = ({
         throw error;
       }
     },
-    [onClick, onSelect, attachments],
+    [onSelect, attachments],
   );
 
   return (
@@ -526,7 +578,7 @@ export type PromptInputProps = Omit<
   }) => void;
   onSubmit: (
     message: PromptInputMessage,
-    event: FormEvent<HTMLFormElement>,
+    event: SyntheticEvent<HTMLFormElement>,
   ) => void | Promise<void>;
 };
 
@@ -571,46 +623,16 @@ export const PromptInput = ({
     inputRef.current?.click();
   }, []);
 
-  const matchesAccept = useCallback(
-    (f: File) => matchesAcceptPattern(f, accept),
-    [accept],
-  );
-
   const addLocal = useCallback(
     (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
-      if (incoming.length && accepted.length === 0) {
-        onError?.({
-          code: "accept",
-          message: "No files match the accepted types.",
-        });
-        return;
-      }
-      const withinSize = (f: File) =>
-        maxFileSize ? f.size <= maxFileSize : true;
-      const sized = accepted.filter(withinSize);
-      if (accepted.length > 0 && sized.length === 0) {
-        onError?.({
-          code: "max_file_size",
-          message: "All files exceed the maximum size.",
-        });
-        return;
-      }
-
       setItems((prev) => {
-        const capacity =
-          typeof maxFiles === "number"
-            ? Math.max(0, maxFiles - prev.length)
-            : undefined;
-        const capped =
-          typeof capacity === "number" ? sized.slice(0, capacity) : sized;
-        if (typeof capacity === "number" && sized.length > capacity) {
-          onError?.({
-            code: "max_files",
-            message: "Too many files. Some were not added.",
-          });
-        }
+        const capped = validateIncomingFiles(fileList, {
+          accept,
+          currentCount: prev.length,
+          maxFileSize,
+          maxFiles,
+          onError,
+        });
         const next: (FileUIPart & { id: string })[] = [];
         for (const file of capped) {
           next.push({
@@ -624,7 +646,7 @@ export const PromptInput = ({
         return [...prev, ...next];
       });
     },
-    [matchesAccept, maxFiles, maxFileSize, onError],
+    [accept, maxFiles, maxFileSize, onError],
   );
 
   const removeLocal = useCallback(
@@ -642,45 +664,18 @@ export const PromptInput = ({
   // Wrapper that validates files before calling provider's add
   const addWithProviderValidation = useCallback(
     (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
-      if (incoming.length && accepted.length === 0) {
-        onError?.({
-          code: "accept",
-          message: "No files match the accepted types.",
-        });
-        return;
-      }
-      const withinSize = (f: File) =>
-        maxFileSize ? f.size <= maxFileSize : true;
-      const sized = accepted.filter(withinSize);
-      if (accepted.length > 0 && sized.length === 0) {
-        onError?.({
-          code: "max_file_size",
-          message: "All files exceed the maximum size.",
-        });
-        return;
-      }
-
-      const currentCount = files.length;
-      const capacity =
-        typeof maxFiles === "number"
-          ? Math.max(0, maxFiles - currentCount)
-          : undefined;
-      const capped =
-        typeof capacity === "number" ? sized.slice(0, capacity) : sized;
-      if (typeof capacity === "number" && sized.length > capacity) {
-        onError?.({
-          code: "max_files",
-          message: "Too many files. Some were not added.",
-        });
-      }
-
+      const capped = validateIncomingFiles(fileList, {
+        accept,
+        currentCount: files.length,
+        maxFileSize,
+        maxFiles,
+        onError,
+      });
       if (capped.length > 0) {
         controller?.attachments.add(capped);
       }
     },
-    [matchesAccept, maxFileSize, maxFiles, onError, files.length, controller],
+    [accept, maxFileSize, maxFiles, onError, files.length, controller],
   );
 
   const clearAttachments = useCallback(
@@ -1274,7 +1269,9 @@ export const PromptInputSubmit = ({
   }
 
   const handleClick = useCallback(
-    (e: any) => {
+    (
+      e: Parameters<NonNullable<PromptInputSubmitProps["onClick"]>>[0],
+    ): void => {
       if (isGenerating && onStop) {
         e.preventDefault();
         onStop();

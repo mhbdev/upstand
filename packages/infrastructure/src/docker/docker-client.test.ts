@@ -9,7 +9,7 @@ import {
 
 const missingServerUow = {
   serverRepository: { findById: async () => null },
-} as any;
+} as never;
 
 describe("remote Docker client", () => {
   test("uses a local Unix socket instead of Dockerode's SSH URL transport", () => {
@@ -22,11 +22,15 @@ describe("remote Docker client", () => {
     });
 
     if (process.platform === "win32") {
-      expect((docker as any).modem.host).toBe("127.0.0.1");
-      expect((docker as any).modem.port).toBeDefined();
+      const modem: unknown = Reflect.get(docker, "modem");
+      expect(modem).toMatchObject({ host: "127.0.0.1" });
+      expect(Reflect.get(modem as object, "port")).toBeDefined();
     } else {
-      expect((docker as any).modem.host).toBeUndefined();
-      expect((docker as any).modem.socketPath).toContain("upstand-docker-");
+      const modem: unknown = Reflect.get(docker, "modem");
+      expect(Reflect.get(modem as object, "host")).toBeUndefined();
+      expect(Reflect.get(modem as object, "socketPath")).toContain(
+        "upstand-docker-",
+      );
     }
   });
 
@@ -54,15 +58,15 @@ describe("remote Docker client", () => {
       resolveDockerServiceForServer(
         "stale-server",
         missingServerUow,
-        {} as any,
+        {} as never,
       ),
     ).rejects.toThrow("Target deployment server was not found");
     await expect(
       resolveServicesForResource(
-        { serverId: "stale-server" } as any,
+        { serverId: "stale-server" } as never,
         missingServerUow,
-        {} as any,
-        {} as any,
+        {} as never,
+        {} as never,
       ),
     ).rejects.toThrow("Resource target server was not found");
   });

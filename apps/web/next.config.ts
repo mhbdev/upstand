@@ -5,15 +5,22 @@ import type { NextConfig } from "next";
 class SafeSha256 {
   private hash = crypto.createHash("sha256");
 
-  update(data: any, encoding?: any) {
-    if (data !== undefined) {
+  update(
+    data: string | NodeJS.ArrayBufferView<ArrayBufferLike>,
+    encoding?: BufferEncoding,
+  ): this {
+    if (typeof data === "string" && encoding !== undefined) {
       this.hash.update(data, encoding);
+    } else {
+      this.hash.update(data);
     }
     return this;
   }
 
-  digest(encoding: any) {
-    return this.hash.digest(encoding);
+  digest(encoding?: BufferEncoding): string | Buffer {
+    return encoding === undefined
+      ? this.hash.digest()
+      : this.hash.digest(encoding);
   }
 }
 

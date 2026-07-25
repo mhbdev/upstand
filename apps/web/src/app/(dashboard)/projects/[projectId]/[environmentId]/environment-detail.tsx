@@ -13,6 +13,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@upstand/api/router";
 import { DATABASE_IMAGE_OPTIONS, type DatabaseType } from "@upstand/domain";
 import { env } from "@upstand/env/web";
 import {
@@ -73,6 +75,7 @@ import {
   TooltipTrigger,
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -91,6 +94,14 @@ import {
 } from "@/components/shared/key-value-editor";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+
+type Resource = inferRouterOutputs<AppRouter>["resource"]["list"][number];
+type Server = inferRouterOutputs<AppRouter>["server"]["list"][number];
+type EnvironmentDiff = inferRouterOutputs<AppRouter>["environment"]["diff"];
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unexpected error";
+}
 
 // ─── Icons Map ────────────────────────────────────────────────────────────────
 
@@ -112,18 +123,16 @@ function ResourceCard({
   projectId,
   environmentId,
   resource,
+  serverName,
   onDelete,
 }: {
   projectId: string;
   environmentId: string;
-  resource: {
-    id: string;
-    name: string;
-    type: string;
-    status: string;
-    provider: string;
-    icon?: string | null;
-  };
+  resource: Pick<
+    Resource,
+    "id" | "name" | "type" | "status" | "provider" | "serverId" | "icon"
+  >;
+  serverName: string;
   onDelete: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -173,7 +182,7 @@ function ResourceCard({
             <CardTitle className="truncate text-base">
               <Link
                 href={
-                  `/projects/${projectId}/${environmentId}/${resource.id}` as any
+                  `/projects/${projectId}/${environmentId}/${resource.id}` as Route
                 }
                 className="hover:underline"
               >
@@ -208,6 +217,9 @@ function ResourceCard({
 
       <CardFooter className="flex items-center justify-between">
         <span className="text-muted-foreground text-xs">
+          Server:{" "}
+          <span className="font-semibold text-foreground">{serverName}</span>
+          <span className="px-1.5 text-border">·</span>
           Provider:{" "}
           <span className="font-semibold text-foreground uppercase">
             {resource.provider}
@@ -231,6 +243,117 @@ function ResourceCard({
         </Tooltip>
       </CardFooter>
     </Card>
+  );
+}
+
+function TargetServerField({
+  id,
+  serverId,
+  isCloud,
+  servers,
+  description,
+  onServerChange,
+}: {
+  id: string;
+  serverId: string;
+  isCloud: boolean;
+  servers: ReadonlyArray<Server>;
+  description: string;
+  onServerChange: (serverId: string) => void;
+}) {
+  const deployServers = servers.filter(
+    (server) => server.status === "ready" && server.serverType === "deploy",
+  );
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Target Server</Label>
+      <Select
+        items={[
+          ...(!isCloud
+            ? [{ value: "local", label: "Local Server (Leader)" }]
+            : []),
+          ...deployServers.map((server) => ({
+            value: server.id,
+            label: `${server.name} (${server.ipAddress})`,
+          })),
+        ]}
+        value={serverId}
+        onValueChange={(value) => value && onServerChange(value)}
+      >
+        <SelectTrigger
+          id={id}
+          className="border-border/40 focus:border-primary"
+        >
+          <SelectValue
+            placeholder={isCloud ? "Select Server" : "Local Server"}
+          />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {!isCloud && (
+              <SelectItem value="local">Local Server (Leader)</SelectItem>
+            )}
+            {deployServers.map((server) => (
+              <SelectItem key={server.id} value={server.id}>
+                {server.name} ({server.ipAddress})
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <p className="text-[11px] text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function ResourceNameFields({
+  nameId,
+  serviceNameId,
+  serviceLabel,
+  placeholder,
+  name,
+  appName,
+  onNameChange,
+  onAppNameChange,
+  autoFocus = false,
+}: {
+  nameId: string;
+  serviceNameId: string;
+  serviceLabel: string;
+  placeholder: string;
+  name: string;
+  appName: string;
+  onNameChange: (name: string) => void;
+  onAppNameChange: (name: string) => void;
+  autoFocus?: boolean;
+}) {
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor={nameId}>Name</Label>
+        <Input
+          id={nameId}
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          placeholder={placeholder}
+          autoComplete="off"
+          autoFocus={autoFocus}
+          className="border-border/40 focus:border-primary"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={serviceNameId}>{serviceLabel}</Label>
+        <Input
+          id={serviceNameId}
+          value={appName}
+          onChange={(event) => onAppNameChange(event.target.value)}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="border-border/40 focus:border-primary"
+        />
+      </div>
+    </>
   );
 }
 
@@ -315,80 +438,25 @@ function CreateAppDialog({
           }}
           className="space-y-4 pt-2"
         >
-          <div className="space-y-2">
-            <Label htmlFor="app-name">Name</Label>
-            <Input
-              id="app-name"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="e.g. node-api"
-              autoComplete="off"
-              autoFocus
-              className="border-border/40 focus:border-primary"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="app-service-name">Docker Swarm Service Name</Label>
-            <Input
-              id="app-service-name"
-              value={appName}
-              onChange={(e) => setAppName(e.target.value)}
-              placeholder="e.g. node-api"
-              autoComplete="off"
-              className="border-border/40 focus:border-primary"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="app-server">Target Server</Label>
-            <Select
-              items={[
-                ...(!isCloud
-                  ? [{ value: "local", label: "Local Server (Leader)" }]
-                  : []),
-                ...(servers ?? [])
-                  .filter(
-                    (srv: any) =>
-                      srv.status === "ready" && srv.serverType === "deploy",
-                  )
-                  .map((srv: any) => ({
-                    value: srv.id,
-                    label: `${srv.name} (${srv.ipAddress})`,
-                  })),
-              ]}
-              value={serverId}
-              onValueChange={(value) => value && setServerId(value)}
-            >
-              <SelectTrigger
-                id="app-server"
-                className="border-border/40 focus:border-primary"
-              >
-                <SelectValue
-                  placeholder={isCloud ? "Select Server" : "Local Server"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {!isCloud && (
-                    <SelectItem value="local">Local Server (Leader)</SelectItem>
-                  )}
-                  {servers
-                    ?.filter(
-                      (srv: any) =>
-                        srv.status === "ready" && srv.serverType === "deploy",
-                    )
-                    ?.map((srv: any) => (
-                      <SelectItem key={srv.id} value={srv.id}>
-                        {srv.name} ({srv.ipAddress})
-                      </SelectItem>
-                    ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">
-              Select which server node in your cluster to deploy this
-              application on.
-            </p>
-          </div>
+          <ResourceNameFields
+            nameId="app-name"
+            serviceNameId="app-service-name"
+            serviceLabel="Docker Swarm Service Name"
+            placeholder="e.g. node-api"
+            name={name}
+            appName={appName}
+            onNameChange={handleNameChange}
+            onAppNameChange={setAppName}
+            autoFocus
+          />
+          <TargetServerField
+            id="app-server"
+            serverId={serverId}
+            isCloud={isCloud}
+            servers={servers}
+            onServerChange={setServerId}
+            description="Select which server node in your cluster to deploy this application on."
+          />
           <div className="space-y-2">
             <Label htmlFor="app-desc">Description</Label>
             <Input
@@ -736,14 +804,14 @@ function CreateDbDialog({
                   : []),
                 ...(servers ?? [])
                   .filter(
-                    (srv: any) =>
-                      srv.status === "ready" &&
-                      (srv.serverType === "deploy" ||
-                        srv.serverType === "database"),
+                    (server) =>
+                      server.status === "ready" &&
+                      (server.serverType === "deploy" ||
+                        server.serverType === "database"),
                   )
-                  .map((srv: any) => ({
-                    value: srv.id,
-                    label: `${srv.name} (${srv.ipAddress})`,
+                  .map((server) => ({
+                    value: server.id,
+                    label: `${server.name} (${server.ipAddress})`,
                   })),
               ]}
               value={serverId}
@@ -761,14 +829,14 @@ function CreateDbDialog({
                   )}
                   {servers
                     ?.filter(
-                      (srv: any) =>
-                        srv.status === "ready" &&
-                        (srv.serverType === "deploy" ||
-                          srv.serverType === "database"),
+                      (server) =>
+                        server.status === "ready" &&
+                        (server.serverType === "deploy" ||
+                          server.serverType === "database"),
                     )
-                    ?.map((srv: any) => (
-                      <SelectItem key={srv.id} value={srv.id}>
-                        {srv.name} ({srv.ipAddress})
+                    ?.map((server) => (
+                      <SelectItem key={server.id} value={server.id}>
+                        {server.name} ({server.ipAddress})
                       </SelectItem>
                     ))}
                 </SelectGroup>
@@ -1090,78 +1158,24 @@ function CreateComposeDialog({
           }}
           className="space-y-4 pt-2"
         >
-          <div className="space-y-2">
-            <Label htmlFor="comp-name">Name</Label>
-            <Input
-              id="comp-name"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="e.g. monitoring-stack"
-              autoComplete="off"
-              className="border-border/40 focus:border-primary"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="comp-service-name">
-              Docker Swarm Stack / App Name
-            </Label>
-            <Input
-              id="comp-service-name"
-              value={appName}
-              onChange={(e) => setAppName(e.target.value)}
-              placeholder="e.g. monitoring-stack"
-              autoComplete="off"
-              className="border-border/40 focus:border-primary"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="comp-server">Target Server</Label>
-            <Select
-              items={[
-                ...(!isCloud
-                  ? [{ value: "local", label: "Local Server (Leader)" }]
-                  : []),
-                ...(servers ?? [])
-                  .filter(
-                    (srv: any) =>
-                      srv.status === "ready" && srv.serverType === "deploy",
-                  )
-                  .map((srv: any) => ({
-                    value: srv.id,
-                    label: `${srv.name} (${srv.ipAddress})`,
-                  })),
-              ]}
-              value={serverId}
-              onValueChange={(value) => value && setServerId(value)}
-            >
-              <SelectTrigger id="comp-server">
-                <SelectValue
-                  placeholder={isCloud ? "Select Server" : "Local Server"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {!isCloud && (
-                    <SelectItem value="local">Local Server (Leader)</SelectItem>
-                  )}
-                  {servers
-                    ?.filter(
-                      (srv: any) =>
-                        srv.status === "ready" && srv.serverType === "deploy",
-                    )
-                    ?.map((srv: any) => (
-                      <SelectItem key={srv.id} value={srv.id}>
-                        {srv.name} ({srv.ipAddress})
-                      </SelectItem>
-                    ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground">
-              Select which server node in your cluster to deploy this Compose
-              stack on.
-            </p>
-          </div>
+          <ResourceNameFields
+            nameId="comp-name"
+            serviceNameId="comp-service-name"
+            serviceLabel="Docker Swarm Stack / App Name"
+            placeholder="e.g. monitoring-stack"
+            name={name}
+            appName={appName}
+            onNameChange={handleNameChange}
+            onAppNameChange={setAppName}
+          />
+          <TargetServerField
+            id="comp-server"
+            serverId={serverId}
+            isCloud={isCloud}
+            servers={servers}
+            onServerChange={setServerId}
+            description="Select which server node in your cluster to deploy this Compose stack on."
+          />
 
           <div className="space-y-2">
             <Label htmlFor="comp-type">Compose Format</Label>
@@ -1171,7 +1185,11 @@ function CreateComposeDialog({
                 { value: "stack", label: "Docker Swarm Stack" },
               ]}
               value={composeType}
-              onValueChange={(val: any) => setComposeType(val)}
+              onValueChange={(value) => {
+                if (value === "stack" || value === "compose") {
+                  setComposeType(value);
+                }
+              }}
             >
               <SelectTrigger id="comp-type">
                 <SelectValue placeholder="Select type" />
@@ -1228,6 +1246,14 @@ function DeleteResourceDialog({
   resource: { id: string; name: string } | null;
   onDeleted: () => void;
 }) {
+  const [deleteVolumes, setDeleteVolumes] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setDeleteVolumes(false);
+    }
+  }, [open]);
+
   const mutation = useMutation({
     ...trpc.resource.delete.mutationOptions(),
     onSuccess: () => {
@@ -1254,6 +1280,21 @@ function DeleteResourceDialog({
             ? This action is permanent and will stop any running instances.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center space-x-2 py-2">
+          <Checkbox
+            id="env-delete-volumes"
+            checked={deleteVolumes}
+            onCheckedChange={(checked) => setDeleteVolumes(!!checked)}
+          />
+          <label
+            htmlFor="env-delete-volumes"
+            className="cursor-pointer select-none font-medium text-foreground text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Remove associated volumes
+          </label>
+        </div>
+
         <DialogFooter className="gap-2 pt-2">
           <Button
             type="button"
@@ -1269,7 +1310,7 @@ function DeleteResourceDialog({
             className="gap-2"
             onClick={() => {
               if (resource) {
-                mutation.mutate({ id: resource.id });
+                mutation.mutate({ id: resource.id, deleteVolumes });
               }
             }}
           >
@@ -1321,6 +1362,12 @@ export default function EnvironmentDetail({
   const { data: project } = useQuery({
     ...trpc.project.get.queryOptions({ id: projectId }),
   });
+  const { data: servers = [] } = useQuery({
+    ...trpc.server.list.queryOptions({
+      organizationId: project?.organizationId ?? "",
+    }),
+    enabled: Boolean(project?.organizationId),
+  });
 
   // Fetch environment details
   const { data: env, isPending: loadingEnv } = useQuery({
@@ -1344,7 +1391,7 @@ export default function EnvironmentDetail({
     ...trpc.environment.delete.mutationOptions(),
     onSuccess: () => {
       toast.success("Environment deleted successfully");
-      router.push(`/projects/${projectId}` as any);
+      router.push(`/projects/${projectId}` as Route);
     },
     onError: (err) =>
       toast.error(err.message || "Failed to delete environment"),
@@ -1373,7 +1420,7 @@ export default function EnvironmentDetail({
     ...trpc.environment.clone.mutationOptions(),
     onSuccess: (created) => {
       toast.success(`Cloned environment ${created.name}`);
-      router.push(`/projects/${projectId}/${created.id}` as any);
+      router.push(`/projects/${projectId}/${created.id}` as Route);
     },
     onError: (err) => toast.error(err.message || "Failed to clone environment"),
   });
@@ -1404,7 +1451,7 @@ export default function EnvironmentDetail({
     return (
       <div className="mx-auto w-full min-w-0 max-w-7xl space-y-4 overflow-x-hidden px-4 py-8 text-center">
         <p className="text-muted-foreground">Environment not found.</p>
-        <Link href={`/projects/${projectId}` as any}>
+        <Link href={`/projects/${projectId}` as Route}>
           <Button variant="outline">Back to Project</Button>
         </Link>
       </div>
@@ -1412,8 +1459,8 @@ export default function EnvironmentDetail({
   }
 
   const filteredResources =
-    resources?.filter((res: any) =>
-      res.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    resources?.filter((resource) =>
+      resource.name.toLowerCase().includes(searchQuery.toLowerCase()),
     ) ?? [];
 
   const hasResources = (resources?.length ?? 0) > 0;
@@ -1425,14 +1472,14 @@ export default function EnvironmentDetail({
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
           <Link
-            href={"/projects" as any}
+            href={"/projects" as Route}
             className="transition-colors hover:text-primary"
           >
             Projects
           </Link>
           <HugeiconsIcon icon={ArrowRight01Icon} className="size-3" />
           <Link
-            href={`/projects/${projectId}` as any}
+            href={`/projects/${projectId}` as Route}
             className="transition-colors hover:text-primary"
           >
             {project.name}
@@ -1527,6 +1574,15 @@ export default function EnvironmentDetail({
                   projectId={projectId}
                   environmentId={environmentId}
                   resource={res}
+                  serverName={
+                    servers.find((server) => server.id === res.serverId)
+                      ?.name ??
+                    (res.serverId === "local"
+                      ? "Local Docker"
+                      : res.serverId === "manager"
+                        ? "Swarm manager"
+                        : "Not assigned")
+                  }
                   onDelete={() => {
                     setSelectedRes(res);
                     setDeleteResOpen(true);
@@ -1698,7 +1754,7 @@ export default function EnvironmentDetail({
                   tested configuration.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 border-border/20 border-t pt-4">
+              <CardContent className="space-y-4 border-border/20">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
@@ -1732,10 +1788,8 @@ export default function EnvironmentDetail({
                     </SelectTrigger>
                     <SelectContent>
                       {environments
-                        .filter(
-                          (candidate: any) => candidate.id !== environmentId,
-                        )
-                        .map((candidate: any) => (
+                        .filter((candidate) => candidate.id !== environmentId)
+                        .map((candidate) => (
                           <SelectItem key={candidate.id} value={candidate.id}>
                             {candidate.name}
                           </SelectItem>
@@ -1757,13 +1811,15 @@ export default function EnvironmentDetail({
                         setDiffResult({
                           variablesCount: diff.variables.length,
                           resourcesCount: diff.resources.filter(
-                            (entry: any) => entry.changed,
+                            (entry: EnvironmentDiff["resources"][number]) =>
+                              entry.changed,
                           ).length,
                         });
                         setDiffDialogOpen(true);
-                      } catch (err: any) {
+                      } catch (error: unknown) {
                         toast.error(
-                          err.message || "Failed to compare environments",
+                          errorMessage(error) ||
+                            "Failed to compare environments",
                         );
                       } finally {
                         setLoadingDiff(false);

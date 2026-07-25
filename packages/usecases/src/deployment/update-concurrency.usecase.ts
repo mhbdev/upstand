@@ -1,6 +1,7 @@
 import {
   type IUnitOfWork,
   type ServerBuildSettings,
+  type UpdateServerBuildSettingsDTO,
   ValidationError,
 } from "@upstand/domain";
 import { redis } from "@upstand/redis";
@@ -56,7 +57,9 @@ export class UpdateConcurrencyUseCase {
           concurrency: input.concurrency,
         });
       } else {
-        const patch: any = { concurrency: input.concurrency };
+        const patch: UpdateServerBuildSettingsDTO = {
+          concurrency: input.concurrency,
+        };
         if (input.hostname) patch.hostname = input.hostname;
         if (input.ip) patch.ip = input.ip;
 

@@ -13,6 +13,7 @@ export const webServerSettings = pgTable("web_server_settings", {
   certificateProvider: text("certificate_provider")
     .default("letsencrypt")
     .notNull(),
+  certificateId: text("certificate_id"),
   letsEncryptEmail: text("lets_encrypt_email"),
   cloudflareApiToken: text("cloudflare_api_token"),
   httpPort: integer("http_port").default(80).notNull(),

@@ -5,9 +5,7 @@ import {
   serializeResourceEnvironmentVariables,
 } from "./resource-environment";
 
-process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
-  "base64",
-);
+process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
 test("resource environment variables encrypt on write and decrypt on read", () => {
   const serialized = serializeResourceEnvironmentVariables({

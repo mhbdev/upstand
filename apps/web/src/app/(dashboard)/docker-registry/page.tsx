@@ -1,7 +1,10 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { inferRouterOutputs } from "@trpc/server";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
+import type { AppRouter } from "@upstand/api/router";
 import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -45,6 +48,9 @@ import { trpc } from "@/utils/trpc";
 const createDockerRegistryTarget = getUpGalTargetDefinition(
   "create-docker-registry",
 );
+type DockerRegistry =
+  inferRouterOutputs<AppRouter>["dockerRegistry"]["list"][number];
+type DockerRegistryError = TRPCClientErrorLike<AppRouter>;
 
 export default function DockerRegistryPage() {
   const organizationState = useRequiredActiveOrganization();
@@ -90,8 +96,8 @@ export default function DockerRegistryPage() {
       resetForm();
       refetch();
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to add registry");
+    onError: (error: DockerRegistryError) => {
+      toast.error(error.message || "Failed to add registry");
     },
   });
 
@@ -102,8 +108,8 @@ export default function DockerRegistryPage() {
       setDeleteTarget(null);
       refetch();
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to delete registry");
+    onError: (error: DockerRegistryError) => {
+      toast.error(error.message || "Failed to delete registry");
     },
   });
 
@@ -115,21 +121,21 @@ export default function DockerRegistryPage() {
       resetForm();
       refetch();
     },
-    onError: (err: any) =>
-      toast.error(err.message || "Failed to update registry"),
+    onError: (error: DockerRegistryError) =>
+      toast.error(error.message || "Failed to update registry"),
   });
 
   const testConnectionMutation = useMutation({
     ...trpc.dockerRegistry.testConnection.mutationOptions(),
-    onSuccess: (res: any) => {
-      if (res.success) {
-        toast.success(res.message);
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(result.message);
       } else {
-        toast.error(res.message);
+        toast.error(result.message);
       }
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Unable to test connection");
+    onError: (error: DockerRegistryError) => {
+      toast.error(error.message || "Unable to test connection");
     },
   });
 
@@ -138,7 +144,7 @@ export default function DockerRegistryPage() {
     setDialogOpen(true);
   };
 
-  const openEdit = (reg: any) => {
+  const openEdit = (reg: DockerRegistry): void => {
     setEditingId(reg.id);
     setName(reg.name);
     setUsername(reg.username || "");
@@ -150,11 +156,11 @@ export default function DockerRegistryPage() {
   };
 
   const handleDelete = (id: string) => {
-    const registry = registries?.find((item: any) => item.id === id);
+    const registry = registries?.find((item) => item.id === id);
     setDeleteTarget(registry ? { id: registry.id, name: registry.name } : null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (env.NEXT_PUBLIC_IS_CLOUD && !serverId.trim()) {
       toast.error("Please enter a Target Server ID.");
@@ -206,7 +212,7 @@ export default function DockerRegistryPage() {
         <CardGridSkeleton count={3} />
       ) : registries && registries.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {registries.map((reg: any) => (
+          {registries.map((reg: DockerRegistry) => (
             <Card
               key={reg.id}
               className="relative overflow-hidden border-border/40 bg-card/30"

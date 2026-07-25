@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { CreateScheduleDTO, Resource, Schedule } from "@upstand/domain";
 import { SyncUpstandConfigUseCase } from "./sync-upstand-config.usecase";
 
 describe("SyncUpstandConfigUseCase", () => {
@@ -28,8 +29,8 @@ describe("SyncUpstandConfigUseCase", () => {
       },
     ];
 
-    const created: any[] = [];
-    const updated: any[] = [];
+    const created: CreateScheduleDTO[] = [];
+    const updated: Array<{ id: string; patch: Partial<Schedule> }> = [];
     const deletedIds: string[] = [];
 
     const mockResource = {
@@ -38,35 +39,38 @@ describe("SyncUpstandConfigUseCase", () => {
       advancedConfig: JSON.stringify({ command: [], ports: [] }),
       watchPaths: "[]",
     };
-    const updatedResources: any[] = [];
+    const updatedResources: Array<{ id: string; patch: Partial<Resource> }> =
+      [];
 
-    const mockUow: any = {
+    const mockUow = {
       resourceRepository: {
         findById: mock(async () => mockResource),
-        updateById: mock(async (id: string, patch: any) => {
-          updatedResources.push({ id, ...patch });
+        updateById: mock(async (id: string, patch: Partial<Resource>) => {
+          updatedResources.push({ id, patch });
           return { ...mockResource, ...patch };
         }),
       },
       scheduleRepository: {
         findByResourceId: mock(async () => mockExistingSchedules),
-        create: mock(async (data: any) => {
+        create: mock(async (data: CreateScheduleDTO) => {
           created.push(data);
           return data;
         }),
-        updateById: mock(async (id: any, patch: any) => {
-          updated.push({ id, ...patch });
+        updateById: mock(async (id: string, patch: Partial<Schedule>) => {
+          updated.push({ id, patch });
           return { id, ...patch };
         }),
-        deleteById: mock(async (id: any) => {
+        deleteById: mock(async (id: string) => {
           deletedIds.push(id);
           return true;
         }),
       },
+      transaction: async (
+        callback: (unitOfWork: unknown) => Promise<unknown>,
+      ) => callback(mockUow),
     };
-    mockUow.transaction = mock(async (cb: any) => cb(mockUow));
 
-    const useCase = new SyncUpstandConfigUseCase(mockUow);
+    const useCase = new SyncUpstandConfigUseCase(mockUow as never);
     const newConfigJson = JSON.stringify({
       build: {
         type: "nixpacks",
@@ -95,11 +99,13 @@ describe("SyncUpstandConfigUseCase", () => {
     expect(result.removed).toBe(1);
     expect(deletedIds).toEqual(["sch-1"]);
     expect(deletedIds).not.toContain("sch-manual");
-    expect(created[0].command).toBe("/api/new");
-    expect(created[0].source).toBe("upstand.json");
+    expect(created[0]?.command).toBe("/api/new");
+    expect(created[0]?.source).toBe("upstand.json");
     expect(updatedResources).toHaveLength(1);
-    expect(updatedResources[0].watchPaths).toBe('["apps/web/**"]');
-    expect(updatedResources[0].buildConfig).toContain('"type":"nixpacks"');
-    expect(updatedResources[0].advancedConfig).toContain('"cpuLimit":2');
+    expect(updatedResources[0]?.patch.watchPaths).toBe('["apps/web/**"]');
+    expect(updatedResources[0]?.patch.buildConfig).toContain(
+      '"type":"nixpacks"',
+    );
+    expect(updatedResources[0]?.patch.advancedConfig).toContain('"cpuLimit":2');
   });
 });

@@ -86,13 +86,13 @@ describe("template catalog use cases", () => {
           createInput = input;
           return created;
         },
-      } as any,
+      } as never,
       {
         execute: async ({ id }: { id: string }) => {
           deployedId = id;
           return created;
         },
-      } as any,
+      } as never,
     );
 
     await useCase.execute(
@@ -136,8 +136,8 @@ describe("template catalog use cases", () => {
           createInput = input;
           return { id: "resource-remote" };
         },
-      } as any,
-      { execute: async () => ({ id: "resource-remote" }) } as any,
+      } as never,
+      { execute: async () => ({ id: "resource-remote" }) } as never,
       () => ({
         id: "ackee",
         name: "Ackee",

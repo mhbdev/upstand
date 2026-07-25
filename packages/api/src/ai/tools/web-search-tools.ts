@@ -9,6 +9,23 @@ import {
 } from "./factory";
 import { webSearchOutputSchema, webSearchSchema } from "./web-search-schemas";
 
+interface ExecutableTool {
+  execute(input: unknown): Promise<unknown>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isExecutableTool(value: unknown): value is ExecutableTool {
+  return isRecord(value) && typeof value.execute === "function";
+}
+
+function stringField(record: Record<string, unknown>, name: string): string {
+  const value: unknown = record[name];
+  return typeof value === "string" ? value : "";
+}
+
 export type UpGalWebSearchTools = {
   search_web: UpGalExecutableTool<
     z.infer<typeof webSearchSchema>,
@@ -31,19 +48,34 @@ export function createUpGalWebSearchTools(
             context.organizationId,
             aiRepo,
           );
-          if (tavily.enabled && tavily.tools.tavilySearch) {
-            const result = await tavily.tools.tavilySearch.execute(input);
-            const rawResults = Array.isArray(result?.results)
-              ? result.results
-              : [];
+          const tavilySearchTool = tavily.tools.tavilySearch;
+          if (tavily.enabled && isExecutableTool(tavilySearchTool)) {
+            const result: unknown = await tavilySearchTool.execute(input);
+            const rawResults =
+              isRecord(result) && Array.isArray(result.results)
+                ? result.results
+                : [];
             return {
               query: input.query,
-              results: rawResults.slice(0, input.limit).map((r: any) => ({
-                title: r.title || r.url || "Search Result",
-                url: r.url || "",
-                description: r.content || r.snippet || r.title || "",
-                ...(r.publishedDate ? { age: r.publishedDate } : {}),
-              })),
+              results: rawResults
+                .slice(0, input.limit)
+                .filter(isRecord)
+                .map((resultItem) => {
+                  const title = stringField(resultItem, "title");
+                  const url = stringField(resultItem, "url");
+                  const content = stringField(resultItem, "content");
+                  const snippet = stringField(resultItem, "snippet");
+                  const publishedDate = stringField(
+                    resultItem,
+                    "publishedDate",
+                  );
+                  return {
+                    title: title || url || "Search Result",
+                    url,
+                    description: content || snippet || title,
+                    ...(publishedDate ? { age: publishedDate } : {}),
+                  };
+                }),
               searchedAt: new Date().toISOString(),
             };
           }

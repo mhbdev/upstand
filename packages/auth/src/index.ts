@@ -50,6 +50,20 @@ const memberPermissionField = {
   required: false,
 } as const;
 
+type UnknownRecord = Record<string, unknown>;
+interface JsonRequest {
+  json(): Promise<unknown>;
+}
+
+function isUnknownRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null;
+}
+
+async function readJsonRecord(request: JsonRequest): Promise<UnknownRecord> {
+  const body: unknown = await request.json().catch(() => null);
+  return isUnknownRecord(body) ? body : {};
+}
+
 function getSharedCookieDomain(
   configuration: AuthConfiguration,
 ): string | undefined {
@@ -236,11 +250,11 @@ export function createAuth(options: {
 
         if (ctx.path.startsWith("/organization/delete")) {
           if (!ctx.request) return;
-          const body = (await ctx.request.json().catch(() => ({}))) as Record<
-            string,
-            unknown
-          >;
-          const organizationId = body.organizationId as string | undefined;
+          const body: UnknownRecord = await readJsonRecord(ctx.request);
+          const organizationId =
+            typeof body.organizationId === "string"
+              ? body.organizationId
+              : undefined;
           if (!organizationId) return;
 
           if (await callbacks.isPersonalOrganization(organizationId)) {
@@ -257,12 +271,7 @@ export function createAuth(options: {
         // no registered provider are ignored to prevent accidental lockout.
         if (ctx.path.endsWith("/sign-in/email")) {
           if (!ctx.request) return;
-          const body = (await ctx.request
-            .clone()
-            .json()
-            .catch(() => ({}))) as {
-            email?: unknown;
-          };
+          const body: UnknownRecord = await readJsonRecord(ctx.request.clone());
           const email = typeof body.email === "string" ? body.email.trim() : "";
           if (!email) return;
 
@@ -314,7 +323,7 @@ export function createAuth(options: {
             email,
             role,
             organization: { id: organization.id, name: organization.name },
-            invitation: invitation as Record<string, unknown>,
+            invitation: Object.fromEntries(Object.entries(invitation)),
           });
         },
         organizationHooks: {

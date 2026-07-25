@@ -110,6 +110,15 @@ export class TriggerUpdateUseCase {
                   : entry,
               )
             : [...currentEnv, `UPSTAND_VERSION=${version}`];
+          nextEnv = nextEnv.some((entry) =>
+            entry.startsWith("UPSTAND_UPDATE_COMPLETION_VERSION="),
+          )
+            ? nextEnv.map((entry) =>
+                entry.startsWith("UPSTAND_UPDATE_COMPLETION_VERSION=")
+                  ? `UPSTAND_UPDATE_COMPLETION_VERSION=${version}`
+                  : entry,
+              )
+            : [...nextEnv, `UPSTAND_UPDATE_COMPLETION_VERSION=${version}`];
           if (imageName === "server") {
             const monitoringBaseImage = baseImage.replace(
               /-server$/,
@@ -176,12 +185,14 @@ export class TriggerUpdateUseCase {
         });
 
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error({
         message: `Self-update to ${version} failed`,
         err,
       });
-      throw new Error(`Self-update failed: ${err.message}`);
+      throw new Error(
+        `Self-update failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

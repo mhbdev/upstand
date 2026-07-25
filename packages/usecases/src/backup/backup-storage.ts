@@ -1,4 +1,8 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { S3Destination } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 
@@ -19,8 +23,21 @@ function decryptDestinationField(value: string): string {
   return decryptSecret(payload);
 }
 
+export function ensureCaCertificateFile(certificatePem: string): string {
+  const hash = createHash("sha256")
+    .update(certificatePem.trim())
+    .digest("hex")
+    .slice(0, 16);
+  const certPath = path.join(os.tmpdir(), `upstand-ca-${hash}.pem`);
+  if (!existsSync(certPath)) {
+    writeFileSync(certPath, `${certificatePem.trim()}\n`, { mode: 0o600 });
+  }
+  return certPath;
+}
+
 export function toBackupStorageDestination(
   destination: S3Destination,
+  caCertificatePem?: string | null,
 ): BackupStorageDestination {
   const accessKeyId = decryptDestinationField(destination.accessKeyId);
   const secretAccessKey = decryptDestinationField(destination.secretAccessKey);
@@ -29,6 +46,12 @@ export function toBackupStorageDestination(
     additionalFlags = JSON.parse(destination.additionalFlags || "[]");
   } catch {
     additionalFlags = [];
+  }
+
+  const caFlags: string[] = [];
+  if (caCertificatePem?.trim()) {
+    const certPath = ensureCaCertificateFile(caCertificatePem);
+    caFlags.push(`--ca-cert=${certPath}`);
   }
 
   return {
@@ -41,6 +64,7 @@ export function toBackupStorageDestination(
       `--s3-endpoint=${destination.endpoint}`,
       "--s3-no-check-bucket",
       "--s3-force-path-style",
+      ...caFlags,
       ...additionalFlags,
     ],
   };

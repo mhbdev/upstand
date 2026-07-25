@@ -7,7 +7,7 @@ function textMessage(id: string, role: "user" | "assistant", text: string) {
     id,
     role,
     parts: [{ type: "text", text }],
-  } as any;
+  } as never;
 }
 
 function createRepository() {

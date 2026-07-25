@@ -38,10 +38,26 @@ export interface DockerRegistryAuth {
   serveraddress?: string;
 }
 
+/**
+ * Minimal Docker daemon capability shared with deployment workflows.
+ *
+ * The application layer passes this value between adapters without inspecting
+ * it. The concrete Docker client remains an infrastructure concern.
+ */
+export type DockerApiTarget = unknown;
+
+export interface DockerResourceContainer {
+  id: string;
+  name: string;
+  status: string;
+  ports: string;
+  node: string;
+}
+
 export interface ConvergenceOptions {
   timeoutSeconds?: number;
   stabilityWindowSeconds?: number;
-  destinationDocker?: any;
+  destinationDocker?: DockerApiTarget;
   serviceNameOverride?: string;
   onLog?: (log: string) => void;
 }
@@ -87,7 +103,7 @@ export interface DockerServicePort {
       password?: string;
       imageTag: string;
     },
-    destination?: any,
+    destination?: DockerApiTarget,
     sourceRevision?: string,
     onGitCloned?: (clonePath: string) => Promise<Resource | undefined>,
     revision?: DeploymentRevisionOptions,
@@ -112,7 +128,7 @@ export interface DockerServicePort {
   ): Promise<ConvergenceResult>;
   transferImage(
     imageName: string,
-    targetDocker: any,
+    targetDocker: DockerApiTarget,
     onLog?: (log: string) => void,
   ): Promise<void>;
   controlService(
@@ -142,16 +158,17 @@ export interface DockerServicePort {
     serviceNameOverride?: string,
   ): Promise<boolean>;
   execContainerCommand?(
-    target: any,
+    target: DockerInspectionTarget,
     serviceName: string,
     command: string,
+    options?: { timeoutSeconds?: number; onLog?: (chunk: string) => void },
   ): Promise<{ output?: string; stderr?: string; exitCode?: number }>;
   controlContainer(
     resource: Resource,
     containerId: string,
     command: "start" | "stop" | "restart" | "kill",
   ): Promise<void>;
-  getContainers(resource: Resource): Promise<any[]>;
+  getContainers(resource: Resource): Promise<DockerResourceContainer[]>;
   getRoutingServices(resource: Resource): Promise<string[]>;
   getLogs(
     resource: Resource,
@@ -167,7 +184,7 @@ export interface DockerServicePort {
   runCommandInResourceContainer(
     resource: Resource,
     command: string,
-    target?: any,
+    target?: DockerApiTarget,
   ): Promise<string>;
 }
 
@@ -377,7 +394,7 @@ export interface DockerExecPort {
     target: DockerInspectionTarget,
     containerId: string,
     command: string,
-  ): Promise<{ output: string }>;
+  ): Promise<{ output: string; stderr?: string; exitCode?: number }>;
   execServerTerminalCommand(
     target: DockerInspectionTarget,
     command: string,
@@ -431,13 +448,13 @@ export interface DockerInfrastructureResolverPort {
     cleanup: () => void;
   }>;
   createRemoteServices(connection: RemoteDockerConnectionPort): {
-    docker: any;
+    docker: DockerApiTarget;
     dockerService: DockerServicePort;
     caddyService: CaddyServicePort;
     cli: {
       environment: Record<string, string | undefined>;
       cleanup: () => void;
     };
-    info(): Promise<any>;
+    info(): Promise<unknown>;
   };
 }

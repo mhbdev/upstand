@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   type IUnitOfWork,
+  type PreviewDeployment,
   parseResourceAdvancedConfig,
   type Resource,
 } from "@upstand/domain";
@@ -15,6 +16,8 @@ import { resolveEnvironmentVariables } from "../environment/update-environment.u
 import { assertSafeGitUrl } from "../git-provider/git-url-sanitizer";
 import { getInstallationToken } from "../git-provider/github-client";
 import type { NotificationPublisher } from "../notification/publish-notification.usecase";
+import type { CaddyResource } from "../ports/caddy";
+import type { DockerApiTarget } from "../ports/docker";
 import { getDatabaseEnvironment } from "../resource/database-environment";
 import type { DockerDeploymentService as DockerService } from "../resource/docker-client";
 import { createRemoteServices } from "../resource/docker-client";
@@ -42,6 +45,56 @@ export interface DeploymentWorkerScope {
 export interface DeploymentWorkerDependencies {
   getBuildSettings: () => Promise<{ concurrency: number } | null>;
   createScope: () => Promise<DeploymentWorkerScope>;
+}
+
+interface RegistryInfo {
+  url: string;
+  username?: string;
+  password?: string;
+  imageTag: string;
+}
+
+interface DockerHookService {
+  runCommandInResourceContainer(
+    resource: Resource,
+    command: string,
+  ): Promise<string>;
+}
+
+function supportsDockerHookService(
+  service: DockerService,
+): service is DockerService & DockerHookService {
+  const record: Record<string, unknown> | null = isRecord(service)
+    ? service
+    : null;
+  return typeof record?.runCommandInResourceContainer === "function";
+}
+
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringField(
+  record: Record<string, unknown>,
+  field: string,
+): string | undefined {
+  const value: unknown = record[field];
+  return typeof value === "string" ? value : undefined;
+}
+
+function parseFirstDomain(value: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return {};
+    const first: unknown = parsed.at(0);
+    return isRecord(first) ? first : {};
+  } catch {
+    return {};
+  }
 }
 
 function isLocalServerIp(ip: string): boolean {
@@ -163,7 +216,7 @@ export class DeploymentWorker {
       } else {
         concurrency = this.serverId === "local" ? 2 : 1;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error({
         message:
           "Failed to fetch build settings for worker, using default concurrency",
@@ -183,7 +236,7 @@ export class DeploymentWorker {
           await this.processJob(job);
         },
         {
-          connection: redisConn as any,
+          connection: redisConn,
           concurrency,
           limiter: {
             max: 10,
@@ -194,18 +247,21 @@ export class DeploymentWorker {
         },
       );
 
-      this.worker.on("failed", (job: any, err: any) => {
-        log.error({
-          message: "Deployment queue job failed",
-          deployment: {
-            jobId: job?.id,
-            deploymentId: job?.data?.deploymentId,
-            resourceId: job?.data?.resourceId,
-            serverId: this.serverId,
-          },
-          err,
-        });
-      });
+      this.worker.on(
+        "failed",
+        (job: Job<Record<string, unknown>> | undefined, err: Error) => {
+          log.error({
+            message: "Deployment queue job failed",
+            deployment: {
+              jobId: job?.id,
+              deploymentId: job?.data?.deploymentId,
+              resourceId: job?.data?.resourceId,
+              serverId: this.serverId,
+            },
+            err,
+          });
+        },
+      );
       this.worker.on("error", (error) => {
         log.error({
           message: "Deployment worker connection error",
@@ -252,7 +308,7 @@ export class DeploymentWorker {
             }
             this.worker.concurrency = concurrency;
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           log.error({
             message: "Error processing concurrency update message",
             err,
@@ -511,7 +567,7 @@ export class DeploymentWorker {
       }
       const deployedResource = { ...resource };
 
-      let previewDeploymentRecord: any = null;
+      let previewDeploymentRecord: PreviewDeployment | null = null;
       if (previewDeploymentId) {
         previewDeploymentRecord =
           await uow.previewDeploymentRepository.findById(previewDeploymentId);
@@ -537,8 +593,8 @@ export class DeploymentWorker {
 
       let buildDockerService = dockerService;
       buildCliCleanup = null;
-      let registryInfo: any;
-      let targetDestinationDocker: any;
+      let registryInfo: RegistryInfo | undefined;
+      let targetDestinationDocker: DockerApiTarget | undefined;
       const cancellationKey = `upstand:deployment:cancel:${deploymentId}`;
       dockerService.setCancellationKey(cancellationKey);
 
@@ -658,7 +714,7 @@ export class DeploymentWorker {
         );
         const configuredBuildRegistryId =
           deployedResource.buildRegistryId ||
-          resourceCredentials.buildRegistryId;
+          stringField(resourceCredentials, "buildRegistryId");
         const registry = configuredBuildRegistryId
           ? await uow.dockerRegistryRepository.findById(
               configuredBuildRegistryId,
@@ -698,8 +754,8 @@ export class DeploymentWorker {
 
           registryInfo = {
             url: cleanUrl,
-            username: registry.username,
-            password: decryptedPassword,
+            username: registry.username ?? undefined,
+            password: decryptedPassword ?? undefined,
             imageTag,
           };
         } else {
@@ -798,7 +854,7 @@ export class DeploymentWorker {
         let composeFile = "";
         const credentials = parseResourceCredentials(resource.credentials);
         if (resource.provider === "raw") {
-          composeFile = credentials.composeFile || "";
+          composeFile = stringField(credentials, "composeFile") ?? "";
         } else {
           const source = await resolveGitSource(resource, uow, appendLog);
           tempSshKeyPath = source.sshKeyPath || null;
@@ -833,10 +889,10 @@ export class DeploymentWorker {
           const imageCredentials = parseResourceCredentials(
             resource.credentials,
           );
-          if (imageCredentials.registryId) {
-            const registry = await uow.dockerRegistryRepository.findById(
-              imageCredentials.registryId,
-            );
+          const registryId = stringField(imageCredentials, "registryId");
+          if (registryId) {
+            const registry =
+              await uow.dockerRegistryRepository.findById(registryId);
             if (!registry)
               throw new Error("Selected Docker registry not found");
             const environment = await uow.environmentRepository.findById(
@@ -888,7 +944,7 @@ export class DeploymentWorker {
             `Setting up Git deployment provider: ${resource.provider}...\n`,
           );
           let cloneUrl = "";
-          let credentialsObj: any = {};
+          let credentialsObj: Record<string, unknown> = {};
           try {
             credentialsObj = parseResourceCredentials(resource.credentials);
           } catch {}
@@ -898,7 +954,7 @@ export class DeploymentWorker {
               resource.provider,
             )
           ) {
-            const gitProviderId = credentialsObj.githubAccount;
+            const gitProviderId = stringField(credentialsObj, "githubAccount");
             if (!gitProviderId) {
               throw new Error(
                 "Git Provider not associated. Please configure repository connection.",
@@ -913,43 +969,50 @@ export class DeploymentWorker {
               throw new Error("Associated Git Provider not found");
             }
 
-            const config = JSON.parse(gitProvider.config);
+            const parsedConfig: unknown = JSON.parse(gitProvider.config);
+            const config: Record<string, unknown> = isRecord(parsedConfig)
+              ? parsedConfig
+              : {};
+            const repository = stringField(credentialsObj, "repository");
+            if (!repository) {
+              throw new Error("Repository is empty in configuration");
+            }
 
             if (resource.provider === "github") {
               appendLog("Retrieving GitHub App installation access token...\n");
               const token = await getInstallationToken(
                 String(config.githubAppId),
-                config.githubPrivateKey,
-                config.githubInstallationId,
+                String(config.githubPrivateKey ?? ""),
+                String(config.githubInstallationId ?? ""),
               );
-              cloneUrl = `https://x-access-token:${token}@github.com/${credentialsObj.repository}.git`;
+              cloneUrl = `https://x-access-token:${token}@github.com/${repository}.git`;
             } else if (resource.provider === "gitlab") {
               appendLog("Connecting to GitLab using OAuth access token...\n");
-              const token = config.accessToken;
-              const gitlabHost = (
-                config.gitlabUrl || "https://gitlab.com"
+              const token = String(config.accessToken ?? "");
+              const gitlabHost = String(
+                config.gitlabUrl ?? "https://gitlab.com",
               ).replace(/https?:\/\//, "");
-              cloneUrl = `https://oauth2:${token}@${gitlabHost}/${credentialsObj.repository}.git`;
+              cloneUrl = `https://oauth2:${token}@${gitlabHost}/${repository}.git`;
             } else if (resource.provider === "gitea") {
               appendLog("Connecting to Gitea using OAuth access token...\n");
-              const token = config.accessToken;
-              const giteaHost = (config.giteaUrl || "").replace(
+              const token = String(config.accessToken ?? "");
+              const giteaHost = String(config.giteaUrl ?? "").replace(
                 /https?:\/\//,
                 "",
               );
-              cloneUrl = `https://oauth2:${token}@${giteaHost}/${credentialsObj.repository}.git`;
+              cloneUrl = `https://oauth2:${token}@${giteaHost}/${repository}.git`;
             } else if (resource.provider === "bitbucket") {
               appendLog("Connecting to Bitbucket using app password...\n");
-              cloneUrl = `https://${config.bitbucketUsername}:${config.appPassword}@bitbucket.org/${credentialsObj.repository}.git`;
+              cloneUrl = `https://${String(config.bitbucketUsername ?? "")}:${String(config.appPassword ?? "")}@bitbucket.org/${repository}.git`;
             }
           } else if (resource.provider === "git") {
-            cloneUrl = credentialsObj.repositoryUrl || "";
+            cloneUrl = stringField(credentialsObj, "repositoryUrl") ?? "";
             if (!cloneUrl) {
               throw new Error("Repository URL is empty in configuration");
             }
             assertSafeGitUrl(cloneUrl);
 
-            const sshKeyId = credentialsObj.sshKeyId;
+            const sshKeyId = stringField(credentialsObj, "sshKeyId");
             if (sshKeyId) {
               appendLog(
                 "Retrieving SSH key credentials for authentication...\n",
@@ -1024,9 +1087,9 @@ export class DeploymentWorker {
                   });
                   if (reloaded) return reloaded;
                 }
-              } catch (syncErr: any) {
+              } catch (syncErr: unknown) {
                 appendLog(
-                  `Warning: Failed to sync upstand.json configuration: ${syncErr.message}\n`,
+                  `Warning: Failed to sync upstand.json configuration: ${errorMessage(syncErr)}\n`,
                 );
               }
             },
@@ -1073,9 +1136,9 @@ export class DeploymentWorker {
             appendLog(
               "Caddy routing safely maintained on previous container image (0 dropped connections).\n",
             );
-          } catch (rollbackErr: any) {
+          } catch (rollbackErr: unknown) {
             appendLog(
-              `Warning: Automated rollback encountered an issue: ${rollbackErr.message || rollbackErr}\n`,
+              `Warning: Automated rollback encountered an issue: ${errorMessage(rollbackErr)}\n`,
             );
           }
           throw new Error(
@@ -1092,29 +1155,45 @@ export class DeploymentWorker {
           advancedConfig.preDeployHook?.enabled &&
           advancedConfig.preDeployHook.command
         ) {
+          const timeoutSeconds =
+            advancedConfig.preDeployHook.timeoutSeconds ?? 300;
           appendLog(
-            `Executing Pre-Deploy Hook command: '${advancedConfig.preDeployHook.command}'...\n`,
+            `Executing Pre-Deploy Hook command: '${advancedConfig.preDeployHook.command}' (timeout: ${timeoutSeconds}s)...\n`,
           );
           try {
             const hookTargetService = revisionServiceName || baseServiceName;
+            let hookResult: {
+              output?: string;
+              stderr?: string;
+              exitCode?: number;
+            } = {};
             if (typeof dockerService.execContainerCommand === "function") {
-              const hookResult = await dockerService.execContainerCommand(
+              hookResult = await dockerService.execContainerCommand(
                 { kind: "local", name: "Target" },
                 hookTargetService,
                 advancedConfig.preDeployHook.command,
+                {
+                  timeoutSeconds,
+                  onLog: (chunk) => appendLog(chunk),
+                },
               );
-              if (hookResult.exitCode && hookResult.exitCode !== 0) {
-                throw new Error(
-                  hookResult.stderr ||
-                    `Command exited with code ${hookResult.exitCode}`,
-                );
-              }
+            } else if (supportsDockerHookService(dockerService)) {
+              const output = await dockerService.runCommandInResourceContainer(
+                deployedResource,
+                advancedConfig.preDeployHook.command,
+              );
+              hookResult = { output, exitCode: 0 };
+              if (output) appendLog(`${output}\n`);
+            }
+            if (hookResult.exitCode && hookResult.exitCode !== 0) {
+              throw new Error(
+                hookResult.stderr ||
+                  `Command exited with code ${hookResult.exitCode}`,
+              );
             }
             appendLog("Pre-Deploy Hook completed successfully! ✅\n");
-          } catch (hookErr: any) {
-            appendLog(
-              `❌ Pre-Deploy Hook failed: ${hookErr.message || hookErr}\n`,
-            );
+          } catch (hookErr: unknown) {
+            appendLog(`❌ Pre-Deploy Hook failed: ${errorMessage(hookErr)}\n`);
             appendLog("Triggering automatic deployment rollback...\n");
             try {
               if (stagedDelivery && revisionServiceName) {
@@ -1125,11 +1204,13 @@ export class DeploymentWorker {
               } else {
                 await dockerService.rollbackService(deployedResource);
               }
-            } catch (rollbackErr: any) {
-              appendLog(`Warning: Rollback issue: ${rollbackErr.message}\n`);
+            } catch (rollbackErr: unknown) {
+              appendLog(
+                `Warning: Rollback issue: ${errorMessage(rollbackErr)}\n`,
+              );
             }
             throw new Error(
-              `Pre-Deploy Hook execution failed: ${hookErr.message}`,
+              `Pre-Deploy Hook execution failed: ${errorMessage(hookErr)}`,
             );
           }
         }
@@ -1266,28 +1347,53 @@ export class DeploymentWorker {
         advancedConfig.postDeployHook?.enabled &&
         advancedConfig.postDeployHook.command
       ) {
+        const timeoutSeconds =
+          advancedConfig.postDeployHook.timeoutSeconds ?? 300;
+        const failureMode = advancedConfig.postDeployHook.onFailure ?? "warn";
         appendLog(
-          `Executing Post-Deploy Hook command: '${advancedConfig.postDeployHook.command}'...\n`,
+          `Executing Post-Deploy Hook command: '${advancedConfig.postDeployHook.command}' (timeout: ${timeoutSeconds}s, failure policy: ${failureMode})...\n`,
         );
         try {
+          let hookResult: {
+            output?: string;
+            stderr?: string;
+            exitCode?: number;
+          } = {};
           if (typeof dockerService.execContainerCommand === "function") {
-            const hookResult = await dockerService.execContainerCommand(
+            hookResult = await dockerService.execContainerCommand(
               { kind: "local", name: "Target" },
               baseServiceName,
               advancedConfig.postDeployHook.command,
+              {
+                timeoutSeconds,
+                onLog: (chunk) => appendLog(chunk),
+              },
             );
-            if (hookResult.exitCode && hookResult.exitCode !== 0) {
-              appendLog(
-                `⚠️ Post-Deploy Hook exited with code ${hookResult.exitCode}: ${hookResult.stderr || ""}\n`,
-              );
-            } else {
-              appendLog("Post-Deploy Hook completed successfully! ✅\n");
-            }
+          } else if (supportsDockerHookService(dockerService)) {
+            const output = await dockerService.runCommandInResourceContainer(
+              deployedResource,
+              advancedConfig.postDeployHook.command,
+            );
+            hookResult = { output, exitCode: 0 };
+            if (output) appendLog(`${output}\n`);
           }
-        } catch (postHookErr: any) {
-          appendLog(
-            `⚠️ Post-Deploy Hook failed: ${postHookErr.message || postHookErr}\n`,
-          );
+
+          if (hookResult.exitCode && hookResult.exitCode !== 0) {
+            const errMsg = `Post-Deploy Hook exited with code ${hookResult.exitCode}${hookResult.stderr ? `: ${hookResult.stderr}` : ""}`;
+            if (failureMode === "fail") {
+              throw new Error(errMsg);
+            }
+            appendLog(`⚠️ ${errMsg}\n`);
+          } else {
+            appendLog("Post-Deploy Hook completed successfully! ✅\n");
+          }
+        } catch (postHookErr: unknown) {
+          const errMsg = `Post-Deploy Hook failed: ${errorMessage(postHookErr)}`;
+          if (failureMode === "fail") {
+            appendLog(`❌ ${errMsg}\n`);
+            throw new Error(errMsg);
+          }
+          appendLog(`⚠️ ${errMsg}\n`);
         }
       }
 
@@ -1300,15 +1406,15 @@ export class DeploymentWorker {
           err: error instanceof Error ? error.message : error,
         });
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (executionLeaseLost) return;
       const cancelled = Boolean(
         await redis.get(`upstand:deployment:cancel:${deploymentId}`),
       );
       appendLog(
         cancelled
-          ? `\nDeployment cancelled by user. 🛑\nReason: ${err.message}\n`
-          : `\nDeployment failed! ❌\nError: ${err.message}\n`,
+          ? `\nDeployment cancelled by user. 🛑\nReason: ${errorMessage(err)}\n`
+          : `\nDeployment failed! ❌\nError: ${errorMessage(err)}\n`,
       );
       log.error({
         message: "Queue worker deploy pipeline error",
@@ -1330,10 +1436,10 @@ export class DeploymentWorker {
       if (tempSshKeyPath && fs.existsSync(tempSshKeyPath)) {
         try {
           fs.unlinkSync(tempSshKeyPath);
-        } catch (e: any) {
+        } catch (e: unknown) {
           log.error({
             message: "Failed to clean up temp SSH key file",
-            err: e.message,
+            err: errorMessage(e),
           });
         }
       }
@@ -1396,7 +1502,7 @@ async function syncCaddyRouting(
     (preview) =>
       preview.status === "success" || preview.id === previewDeploymentId,
   );
-  const routingPreviews: any[] = [];
+  const routingPreviews: CaddyResource[] = [];
   for (const preview of activePreviews) {
     const parentResource = resources.find(
       (candidate) => candidate.id === preview.resourceId,
@@ -1406,8 +1512,23 @@ async function syncCaddyRouting(
       !resourceMatchesServer(parentResource, deployedResource.serverId)
     )
       continue;
-    const parentDomains = JSON.parse(parentResource.domains || "[]");
-    const parentDomain = parentDomains[0] ?? {};
+    const parentDomain = parseFirstDomain(parentResource.domains || "[]");
+    const parentPort =
+      typeof parentDomain.port === "number" ? parentDomain.port : 80;
+    const parentHttps = parentDomain.https === true;
+    const parentCertificateType =
+      typeof parentDomain.certificateType === "string"
+        ? parentDomain.certificateType
+        : "letsencrypt";
+    const parentCertificateId =
+      typeof parentDomain.certificateId === "string"
+        ? parentDomain.certificateId
+        : undefined;
+    const parentMiddlewares = Array.isArray(parentDomain.middlewares)
+      ? parentDomain.middlewares.filter(
+          (middleware): middleware is string => typeof middleware === "string",
+        )
+      : [];
     routingPreviews.push({
       id: preview.id,
       name: preview.appName,
@@ -1417,10 +1538,13 @@ async function syncCaddyRouting(
         {
           host: preview.domain,
           path: "/",
-          port: parentDomain.port || 80,
-          https: parentDomain.https ?? false,
-          certificateType: parentDomain.certificateType ?? "none",
-          middlewares: parentDomain.middlewares ?? [],
+          port: parentPort,
+          https: parentHttps,
+          certificateType: parentCertificateType,
+          ...(parentCertificateId !== undefined && {
+            certificateId: parentCertificateId,
+          }),
+          middlewares: parentMiddlewares,
         },
       ]),
       composeType: parentResource.composeType,
@@ -1486,7 +1610,7 @@ async function resolveGitSource(
       resource.provider,
     )
   ) {
-    const gitProviderId = credentials.githubAccount;
+    const gitProviderId = stringField(credentials, "githubAccount");
     if (!gitProviderId) {
       throw new Error(
         "Git Provider not associated. Please configure repository connection.",
@@ -1497,35 +1621,48 @@ async function resolveGitSource(
       tx.gitProviderRepository.findById(gitProviderId),
     );
     if (!gitProvider) throw new Error("Associated Git Provider not found");
-    const config = JSON.parse(gitProvider.config);
+    const parsedConfig: unknown = JSON.parse(gitProvider.config);
+    const config: Record<string, unknown> = isRecord(parsedConfig)
+      ? parsedConfig
+      : {};
+    const repository = stringField(credentials, "repository");
+    if (!repository) {
+      throw new Error("Repository is empty in configuration");
+    }
 
     if (resource.provider === "github") {
       appendLog("Retrieving GitHub App installation access token...\n");
       const token = await getInstallationToken(
         String(config.githubAppId),
-        config.githubPrivateKey,
-        config.githubInstallationId,
+        String(config.githubPrivateKey ?? ""),
+        String(config.githubInstallationId ?? ""),
       );
-      cloneUrl = `https://x-access-token:${token}@github.com/${credentials.repository}.git`;
+      cloneUrl = `https://x-access-token:${token}@github.com/${repository}.git`;
     } else if (resource.provider === "gitlab") {
       appendLog("Connecting to GitLab using OAuth access token...\n");
-      const gitlabHost = (config.gitlabUrl || "https://gitlab.com").replace(
+      const gitlabHost = String(
+        config.gitlabUrl ?? "https://gitlab.com",
+      ).replace(/https?:\/\//, "");
+      cloneUrl = `https://oauth2:${String(config.accessToken ?? "")}@${gitlabHost}/${repository}.git`;
+    } else if (resource.provider === "gitea") {
+      appendLog("Connecting to Gitea using OAuth access token...\n");
+      const giteaHost = String(config.giteaUrl ?? "").replace(
         /https?:\/\//,
         "",
       );
-      cloneUrl = `https://oauth2:${config.accessToken}@${gitlabHost}/${credentials.repository}.git`;
-    } else if (resource.provider === "gitea") {
-      appendLog("Connecting to Gitea using OAuth access token...\n");
-      const giteaHost = (config.giteaUrl || "").replace(/https?:\/\//, "");
-      cloneUrl = `https://oauth2:${config.accessToken}@${giteaHost}/${credentials.repository}.git`;
+      cloneUrl = `https://oauth2:${String(config.accessToken ?? "")}@${giteaHost}/${repository}.git`;
     } else if (resource.provider === "generic") {
       appendLog(
         "Connecting to generic Git repository (Forgejo/Sourcehut/Bare Git)...\n",
       );
-      cloneUrl = credentials.repositoryUrl || config.gitUrl || "";
+      cloneUrl =
+        stringField(credentials, "repositoryUrl") ??
+        stringField(config, "gitUrl") ??
+        "";
       if (!cloneUrl)
         throw new Error("Repository URL is empty in generic Git configuration");
-      const sshKeyId = credentials.sshKeyId || config.sshKeyId;
+      const sshKeyId =
+        stringField(credentials, "sshKeyId") ?? stringField(config, "sshKeyId");
       if (sshKeyId) {
         const sshKey = await uow.transaction((tx) =>
           tx.sshKeyRepository.findById(sshKeyId),
@@ -1544,22 +1681,23 @@ async function resolveGitSource(
         fs.mkdirSync(buildDir, { recursive: true });
         sshKeyPath = path.join(buildDir, `ssh-key-${resource.id}`);
         fs.writeFileSync(sshKeyPath, `${privateKey.trim()}\n`, { mode: 0o600 });
-      } else if (config.accessToken) {
+      } else if (stringField(config, "accessToken")) {
         const cleanRepo = cloneUrl.replace(/^https?:\/\//, "");
-        cloneUrl = `https://oauth2:${config.accessToken}@${cleanRepo}`;
+        cloneUrl = `https://oauth2:${stringField(config, "accessToken")}@${cleanRepo}`;
       }
     } else {
       appendLog("Connecting to Bitbucket using app password...\n");
-      cloneUrl = `https://${config.bitbucketUsername}:${config.appPassword}@bitbucket.org/${credentials.repository}.git`;
+      cloneUrl = `https://${String(config.bitbucketUsername ?? "")}:${String(config.appPassword ?? "")}@bitbucket.org/${repository}.git`;
     }
   } else if (resource.provider === "git") {
-    cloneUrl = credentials.repositoryUrl || "";
+    cloneUrl = stringField(credentials, "repositoryUrl") ?? "";
     if (!cloneUrl) throw new Error("Repository URL is empty in configuration");
     assertSafeGitUrl(cloneUrl);
 
-    if (credentials.sshKeyId) {
+    const sshKeyId = stringField(credentials, "sshKeyId");
+    if (sshKeyId) {
       const sshKey = await uow.transaction((tx) =>
-        tx.sshKeyRepository.findById(credentials.sshKeyId),
+        tx.sshKeyRepository.findById(sshKeyId),
       );
       if (!sshKey) throw new Error("Configured SSH key not found in workspace");
       const privateKey = decryptSecret({

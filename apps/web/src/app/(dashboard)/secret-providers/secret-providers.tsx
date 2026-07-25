@@ -10,6 +10,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@upstand/api/router";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -68,6 +70,16 @@ export const SECRET_PROVIDER_TYPES = [
 ] as const;
 
 type SecretProviderType = "vault" | "aws-secrets-manager" | "onepassword";
+type SecretProvider =
+  inferRouterOutputs<AppRouter>["secret"]["providers"][number];
+
+function isSecretProviderType(value: string): value is SecretProviderType {
+  return (
+    value === "vault" ||
+    value === "aws-secrets-manager" ||
+    value === "onepassword"
+  );
+}
 
 export default function SecretProviders(_props: {
   session: typeof authClient.$Infer.Session;
@@ -167,7 +179,7 @@ export default function SecretProviders(_props: {
     },
   });
 
-  const handleTestConnection = () => {
+  const buildProviderConfiguration = (): Record<string, string> => {
     const config: Record<string, string> = {};
     if (providerType === "vault") {
       if (vaultAddress.trim()) config.address = vaultAddress.trim();
@@ -186,6 +198,11 @@ export default function SecretProviders(_props: {
       if (onePasswordVaultId.trim()) config.vaultId = onePasswordVaultId.trim();
       if (onePasswordItemId.trim()) config.itemId = onePasswordItemId.trim();
     }
+    return config;
+  };
+
+  const handleTestConnection = () => {
+    const config = buildProviderConfiguration();
 
     testMutation.mutate({
       provider: providerType,
@@ -215,10 +232,10 @@ export default function SecretProviders(_props: {
     setDialogOpen(true);
   };
 
-  const handleOpenEdit = (prov: (typeof providers & Array<any>)[number]) => {
+  const handleOpenEdit = (prov: SecretProvider): void => {
     setEditId(prov.id);
     setName(prov.name);
-    setProviderType(prov.provider as SecretProviderType);
+    if (isSecretProviderType(prov.provider)) setProviderType(prov.provider);
     setVaultAddress("");
     setVaultPath("");
     setVaultToken("");
@@ -233,40 +250,21 @@ export default function SecretProviders(_props: {
     setDialogOpen(true);
   };
 
-  const handleToggleEnabled = (
-    prov: (typeof providers & Array<any>)[number],
-  ) => {
+  const handleToggleEnabled = (prov: SecretProvider): void => {
     updateMutation.mutate({
       id: prov.id,
       enabled: !prov.enabled,
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       toast.error("Please enter a name for the secret provider");
       return;
     }
 
-    const config: Record<string, string> = {};
-    if (providerType === "vault") {
-      if (vaultAddress.trim()) config.address = vaultAddress.trim();
-      if (vaultPath.trim()) config.path = vaultPath.trim();
-      if (vaultToken.trim()) config.token = vaultToken.trim();
-    } else if (providerType === "aws-secrets-manager") {
-      if (awsRegion.trim()) config.region = awsRegion.trim();
-      if (awsAccessKeyId.trim()) config.accessKeyId = awsAccessKeyId.trim();
-      if (awsSecretAccessKey.trim())
-        config.secretAccessKey = awsSecretAccessKey.trim();
-      if (awsPath.trim()) config.path = awsPath.trim();
-    } else if (providerType === "onepassword") {
-      if (onePasswordHost.trim()) config.connectHost = onePasswordHost.trim();
-      if (onePasswordToken.trim())
-        config.connectToken = onePasswordToken.trim();
-      if (onePasswordVaultId.trim()) config.vaultId = onePasswordVaultId.trim();
-      if (onePasswordItemId.trim()) config.itemId = onePasswordItemId.trim();
-    }
+    const config = buildProviderConfiguration();
 
     // Verify connection before saving
     if (Object.keys(config).length > 0 || !editId) {
@@ -281,8 +279,12 @@ export default function SecretProviders(_props: {
           );
           return;
         }
-      } catch (err: any) {
-        toast.error(err.message || "Failed to verify provider connection");
+      } catch (error: unknown) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to verify provider connection",
+        );
         return;
       }
     }

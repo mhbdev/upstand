@@ -26,7 +26,7 @@ export function CreateOrganizationDialog({
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);

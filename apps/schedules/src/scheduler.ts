@@ -10,6 +10,7 @@ import {
   CaddyServiceToken,
   DockerServiceToken,
   GeneralSchedulerToken,
+  GetUpdateStatusUseCaseToken,
   PublishNotificationUseCaseToken,
   RunDueSecretRotationsUseCaseToken,
   UnitOfWorkToken,
@@ -129,6 +130,48 @@ export class ScheduledDockerCleanup {
   }
 }
 
+export class UpstandUpdateNotificationScheduler {
+  private timer: ReturnType<typeof setInterval> | null = null;
+
+  start(): void {
+    this.timer = setInterval(() => void this.run(), 15 * 60 * 1000);
+    this.timer.unref?.();
+    void this.run();
+  }
+
+  stop(): void {
+    if (!this.timer) return;
+    clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  async run(): Promise<void> {
+    const scope = getServiceProvider().createScope();
+    try {
+      const status = await scope.resolve(GetUpdateStatusUseCaseToken).execute();
+      if (!status.updateAvailable) return;
+      await scope.resolve(PublishNotificationUseCaseToken).execute({
+        event: "upstand_update_available",
+        idempotencyKey: `upstand-update-available:${status.latestVersion}`,
+        title: `Upstand ${status.latestVersion} is available`,
+        message: `A new Upstand version is ready to install. The current version is ${status.currentVersion}.`,
+        metadata: {
+          currentVersion: status.currentVersion,
+          latestVersion: status.latestVersion,
+          channel: status.channel,
+        },
+      });
+    } catch (error: unknown) {
+      log.warn({
+        message: "Upstand update availability check failed",
+        err: error instanceof Error ? error.message : error,
+      });
+    } finally {
+      await scope.dispose();
+    }
+  }
+}
+
 export class AutoscalingRuntime {
   private timer: ReturnType<typeof setInterval> | undefined;
   private running = false;
@@ -176,6 +219,8 @@ export class AutoscalingRuntime {
 export class SchedulerManager {
   private secretRotationTimer: ReturnType<typeof setInterval> | null = null;
   private readonly scheduledDockerCleanup = new ScheduledDockerCleanup();
+  private readonly upstandUpdateNotifications =
+    new UpstandUpdateNotificationScheduler();
   private readonly autoscalingRuntime = new AutoscalingRuntime();
   private accessLogCleanupScheduler: AccessLogCleanupScheduler | null = null;
 
@@ -217,6 +262,7 @@ export class SchedulerManager {
     await this.accessLogCleanupScheduler.start();
     this.autoscalingRuntime.start();
     this.scheduledDockerCleanup.start();
+    this.upstandUpdateNotifications.start();
 
     this.secretRotationTimer = setInterval(() => {
       const scope = getServiceProvider().createScope();
@@ -245,6 +291,7 @@ export class SchedulerManager {
     );
 
     this.scheduledDockerCleanup.stop();
+    this.upstandUpdateNotifications.stop();
     this.autoscalingRuntime.stop();
     if (this.secretRotationTimer) {
       clearInterval(this.secretRotationTimer);

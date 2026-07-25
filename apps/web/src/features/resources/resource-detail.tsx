@@ -48,6 +48,7 @@ import {
 import { ResourceAdvancedSettings } from "@/components/resource/resource-advanced-settings";
 import { ShowDockerLogs } from "@/components/shared/docker-logs";
 import { BackupPanel } from "@/features/backups";
+import type { authClient } from "@/lib/auth-client";
 import { ConsoleTab } from "./components/console-tab";
 import { ContainersTab } from "./components/containers-tab";
 import { CronJobsTab } from "./components/cron-jobs-tab";
@@ -58,6 +59,10 @@ import { GeneralTab } from "./components/general-tab";
 import { MonitoringTab } from "./components/monitoring-tab";
 import { TagsTab } from "./components/tags-tab";
 import { useResourceDetail } from "./hooks/use-resource-detail";
+import {
+  determineResourceRuntimeStatus,
+  type ResourceRuntimeStatus,
+} from "./utils/resource-status";
 
 const TYPE_ICONS: Record<string, IconSvgElement> = {
   application: ComputerIcon,
@@ -91,7 +96,24 @@ interface ResourceDetailProps {
   projectId: string;
   environmentId: string;
   resourceId: string;
-  session: any;
+  session: typeof authClient.$Infer.Session;
+}
+
+function composeFileFromCredentials(credentials: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(credentials);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "composeFile" in parsed &&
+      typeof parsed.composeFile === "string"
+    ) {
+      return parsed.composeFile;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 export default function ResourceDetail({
@@ -141,6 +163,8 @@ export default function ResourceDetail({
     loadingResource,
     routingTargets,
     liveContainers,
+    liveContainersPending,
+    liveContainersError,
     deployments,
     refetchDeployments,
     logsData,
@@ -188,6 +212,14 @@ export default function ResourceDetail({
     );
   }
 
+  const runtimeStatus: ResourceRuntimeStatus = liveContainersError
+    ? "unknown"
+    : liveContainersPending && liveContainers === undefined
+      ? "unknown"
+      : determineResourceRuntimeStatus(resource.status, liveContainers);
+  const displayedStatus =
+    runtimeStatus === "unknown" ? resource.status : runtimeStatus;
+
   const Icon = TYPE_ICONS[resource.type] || ComputerIcon;
 
   return (
@@ -196,7 +228,7 @@ export default function ResourceDetail({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <EditableEntityIcon
-            icon={(resource as any).icon}
+            icon={resource.icon}
             defaultIcon={<HugeiconsIcon icon={Icon} className="size-6" />}
             entityName={resource.name}
             entityType="resource"
@@ -220,12 +252,27 @@ export default function ResourceDetail({
               <span
                 className={cn(
                   "font-bold",
-                  resource.status === "running"
+                  runtimeStatus === "running"
                     ? "text-success"
-                    : "text-muted-foreground",
+                    : runtimeStatus === "errored"
+                      ? "text-destructive"
+                      : "text-muted-foreground",
                 )}
               >
-                {resource.status}
+                {displayedStatus}
+              </span>
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 text-muted-foreground text-xs">
+              <HugeiconsIcon icon={ServerStack01Icon} className="size-3.5" />
+              Deployed on{" "}
+              <span className="font-medium text-foreground">
+                {servers.find((server) => server.id === resource.serverId)
+                  ?.name ??
+                  (resource.serverId === "local"
+                    ? "Local Docker"
+                    : resource.serverId === "manager"
+                      ? "Swarm manager"
+                      : "Not assigned")}
               </span>
             </p>
           </div>
@@ -306,6 +353,7 @@ export default function ResourceDetail({
             isRebuildingDatabase={isRebuildingDatabase}
             deleteResource={deleteResource}
             isDeletingResource={isDeletingResource}
+            runtimeStatus={runtimeStatus}
           />
         </TabsContent>
 
@@ -315,6 +363,7 @@ export default function ResourceDetail({
         >
           <EnvironmentTab
             resource={resource}
+            secrets={secrets}
             updateResource={updateResource}
             isUpdatingResource={isUpdatingResource}
           />
@@ -328,6 +377,12 @@ export default function ResourceDetail({
             resourceId={resourceId}
             resourceType={resource.type}
             advancedConfig={resource.advancedConfig}
+            organizationId={project?.organizationId}
+            composeFile={
+              resource.type === "compose" && secrets.credentials
+                ? composeFileFromCredentials(secrets.credentials)
+                : undefined
+            }
           />
         </TabsContent>
 
@@ -412,7 +467,7 @@ export default function ResourceDetail({
                 <Select
                   items={[
                     { value: "all", label: "All Containers" },
-                    ...containerList.map((con: any) => ({
+                    ...containerList.map((con) => ({
                       value: con.id,
                       label: `${con.name} (${con.id.substring(0, 7)})`,
                     })),
@@ -432,7 +487,7 @@ export default function ResourceDetail({
                     <SelectItem value="all" className="text-xs">
                       All Containers
                     </SelectItem>
-                    {containerList.map((con: any) => (
+                    {containerList.map((con) => (
                       <SelectItem
                         key={con.id}
                         value={con.id}

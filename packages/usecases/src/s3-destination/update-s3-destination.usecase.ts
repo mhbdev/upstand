@@ -13,6 +13,7 @@ export const UpdateS3DestinationInputSchema = z.object({
   bucket: z.string().min(1, "Bucket is required"),
   region: z.string(),
   endpoint: z.string().min(1, "Endpoint is required"),
+  certificateId: z.string().nullable().optional(),
   additionalFlags: z.array(z.string()).optional(),
 });
 
@@ -47,6 +48,10 @@ export class UpdateS3DestinationUseCase {
         bucket: input.bucket,
         region: input.region,
         endpoint: input.endpoint,
+        certificateId:
+          input.certificateId !== undefined
+            ? input.certificateId || null
+            : existing.certificateId,
         additionalFlags: JSON.stringify(input.additionalFlags || []),
       });
 

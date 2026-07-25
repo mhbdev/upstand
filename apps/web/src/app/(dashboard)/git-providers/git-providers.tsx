@@ -230,7 +230,7 @@ export default function GitProviders({
         ],
       };
       setManifest(JSON.stringify(manifestData));
-    } catch (_e: any) {
+    } catch {
       toast.error("Failed to compile manifest setup details");
     }
   }, [orgId]);
@@ -248,7 +248,7 @@ export default function GitProviders({
       : "https://github.com/settings/apps/new";
   };
 
-  const handleCreateNonGithub = (e: React.FormEvent) => {
+  const handleCreateNonGithub = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!orgId) {
       toast.error("No active organization selected");
@@ -259,7 +259,7 @@ export default function GitProviders({
       return;
     }
 
-    let config: Record<string, any> = {};
+    let config: Record<string, unknown> = {};
     if (providerType === "gitlab") {
       config = {
         gitlabUrl: gitlabUrl.trim() || "https://gitlab.com",
@@ -300,13 +300,17 @@ export default function GitProviders({
 
   const getInstallationManagementUrl = (
     provider: ProviderType,
-    config: Record<string, any>,
-  ) => {
+    config: Record<string, unknown>,
+  ): string => {
+    const value = (key: string): string | undefined => {
+      const candidate: unknown = config[key];
+      return typeof candidate === "string" ? candidate : undefined;
+    };
     if (provider === "github") {
-      return `https://github.com/settings/installations/${config.githubInstallationId}`;
+      return `https://github.com/settings/installations/${value("githubInstallationId") ?? ""}`;
     }
     if (provider === "gitlab") {
-      return `${config.gitlabUrl || "https://gitlab.com"}/profile/applications`;
+      return `${value("gitlabUrl") || "https://gitlab.com"}/profile/applications`;
     }
     return "#";
   };

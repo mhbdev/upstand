@@ -217,7 +217,9 @@ export function registerWebhookRoutes(app: Hono<AppEnv>): void {
                   parent.previewPort || parentDomains[0]?.port || 80;
                 const parentHttps =
                   parent.previewHttps || (parentDomains[0]?.https ?? false);
-                const parentCert = parentDomains[0]?.certificateType ?? "none";
+                const parentCert =
+                  parentDomains[0]?.certificateType ?? "letsencrypt";
+                const parentCertId = parentDomains[0]?.certificateId;
                 const parentMiddlewares = parentDomains[0]?.middlewares ?? [];
 
                 routingPreviews.push({
@@ -232,6 +234,9 @@ export function registerWebhookRoutes(app: Hono<AppEnv>): void {
                       port: parentPort,
                       https: parentHttps,
                       certificateType: parentCert,
+                      ...(parentCertId !== undefined && {
+                        certificateId: parentCertId,
+                      }),
                       middlewares: parentMiddlewares,
                     },
                   ]),

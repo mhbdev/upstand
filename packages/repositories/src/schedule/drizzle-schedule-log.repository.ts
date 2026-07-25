@@ -18,6 +18,27 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { BaseRepository } from "../shared/base.repository";
 import type { Executor } from "../shared/types";
 
+type ScheduleJobType = "command" | "deployment" | "backup" | "cron";
+type ScheduleSource = "upstand.json" | "manual";
+type ScheduleRunStatus = "success" | "failed";
+
+function normalizeJobType(value: string | null): ScheduleJobType {
+  return value === "deployment" ||
+    value === "backup" ||
+    value === "cron" ||
+    value === "command"
+    ? value
+    : "command";
+}
+
+function normalizeSource(value: string | null): ScheduleSource {
+  return value === "upstand.json" ? value : "manual";
+}
+
+function normalizeRunStatus(value: string | null): ScheduleRunStatus | null {
+  return value === "success" || value === "failed" ? value : null;
+}
+
 export class DrizzleScheduleLogRepository
   extends BaseRepository<typeof scheduleLog, ScheduleLog, CreateScheduleLogDTO>
   implements IScheduleLogRepository
@@ -68,7 +89,7 @@ export class DrizzleScheduleLogRepository
     const cutoffDate = new Date(now - millisInTimespan);
 
     // Fetch schedules belonging to the organization
-    const scheduleRows = await (this.executor as any)
+    const scheduleRows = await this.executor
       .select({
         scheduleId: schedule.id,
         resourceId: schedule.resourceId,
@@ -95,7 +116,9 @@ export class DrizzleScheduleLogRepository
         ),
       );
 
-    const scheduleIds = scheduleRows.map((s: any) => s.scheduleId);
+    const scheduleIds: string[] = scheduleRows.map(
+      (scheduleRow): string => scheduleRow.scheduleId,
+    );
 
     // Fetch logs within timeframe
     const logs =
@@ -167,15 +190,15 @@ export class DrizzleScheduleLogRepository
         command: sch.command,
         cronExpression: sch.cronExpression,
         timezone: sch.timezone || "UTC",
-        jobType: sch.jobType || "command",
-        source: sch.source || "manual",
+        jobType: normalizeJobType(sch.jobType),
+        source: normalizeSource(sch.source),
         enabled: sch.enabled,
         invocationsCount,
         p75DurationMs,
         successCount,
         failedCount,
         lastRunAt: sch.lastRunAt,
-        lastRunStatus: sch.lastRunStatus,
+        lastRunStatus: normalizeRunStatus(sch.lastRunStatus),
       });
     }
 

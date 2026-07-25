@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import type { Environment } from "@upstand/domain";
 import { ValidationError } from "@upstand/domain";
 import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { DeleteProjectUseCase } from "./delete-project.usecase";
 
 class MockEnvironmentRepository {
-  public store: any[] = [];
+  public store: Array<
+    Pick<Environment, "id" | "projectId" | "name" | "resourceCount">
+  > = [];
 
   async findByProjectId(projectId: string) {
     return this.store.filter((e) => e.projectId === projectId);

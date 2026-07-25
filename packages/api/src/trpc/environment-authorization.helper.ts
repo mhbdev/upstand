@@ -1,20 +1,34 @@
+import type { ServiceKey, TokenLike } from "@circulo-ai/di";
 import { TRPCError } from "@trpc/server";
-import type { Capability } from "@upstand/domain";
+import type { Capability, Environment, Project } from "@upstand/domain";
 import {
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
 } from "@upstand/usecases/tokens";
 import { checkPermission } from "../permissions";
 
+interface LookupUseCase<T> {
+  execute(input: { id: string }): Promise<T | null>;
+}
+
+interface AuthorizationContext {
+  scope: { resolve: <T>(token: TokenLike<T>, key?: ServiceKey) => T };
+  session: { user: { id: string } };
+}
+
+interface AuthorizedEnvironmentContext {
+  environment: Environment;
+  project: Project;
+}
+
 export async function resolveEnvironmentAndCheckPermission(
-  ctx: {
-    scope: { resolve: <T>(token: any) => T };
-    session: { user: { id: string } };
-  },
+  ctx: AuthorizationContext,
   environmentId: string,
   requiredPermission: Capability,
-) {
-  const envUseCase = ctx.scope.resolve<any>(GetEnvironmentUseCaseToken);
+): Promise<AuthorizedEnvironmentContext> {
+  const envUseCase = ctx.scope.resolve<LookupUseCase<Environment>>(
+    GetEnvironmentUseCaseToken,
+  );
   const environment = await envUseCase.execute({ id: environmentId });
   if (!environment) {
     throw new TRPCError({
@@ -23,7 +37,9 @@ export async function resolveEnvironmentAndCheckPermission(
     });
   }
 
-  const projectUseCase = ctx.scope.resolve<any>(GetProjectUseCaseToken);
+  const projectUseCase = ctx.scope.resolve<LookupUseCase<Project>>(
+    GetProjectUseCaseToken,
+  );
   const project = await projectUseCase.execute({
     id: environment.projectId,
   });

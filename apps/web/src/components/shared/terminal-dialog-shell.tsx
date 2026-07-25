@@ -34,6 +34,18 @@ import {
 } from "@/components/huge-icons";
 import { TerminalEmulator } from "./terminal-emulator";
 
+type TerminalThemeName = "auto" | "slate" | "matrix" | "dracula" | "light";
+
+function isTerminalThemeName(value: string): value is TerminalThemeName {
+  return (
+    value === "auto" ||
+    value === "slate" ||
+    value === "matrix" ||
+    value === "dracula" ||
+    value === "light"
+  );
+}
+
 export function TerminalDialogShell({
   open,
   onOpenChange,
@@ -66,9 +78,7 @@ export function TerminalDialogShell({
   const terminalReady = Boolean(token && readyToken === token);
   const terminalConnecting = connecting || Boolean(token && !terminalReady);
 
-  const [themeName, setThemeName] = useState<
-    "auto" | "slate" | "matrix" | "dracula" | "light"
-  >("auto");
+  const [themeName, setThemeName] = useState<TerminalThemeName>("auto");
   const [fontSize, setFontSize] = useState<number>(13);
   const [clearTrigger, setClearTrigger] = useState<number>(0);
   const [downloadTrigger, setDownloadTrigger] = useState<number>(0);
@@ -93,7 +103,7 @@ export function TerminalDialogShell({
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("upstand-terminal-theme");
       if (savedTheme) {
-        setThemeName(savedTheme as any);
+        if (isTerminalThemeName(savedTheme)) setThemeName(savedTheme);
       }
       const savedFontSize = localStorage.getItem("upstand-terminal-fontsize");
       if (savedFontSize) {
@@ -254,7 +264,9 @@ export function TerminalDialogShell({
             {/* Theme selection */}
             <Select
               value={themeName}
-              onValueChange={(val) => handleThemeChange(val as any)}
+              onValueChange={(val) => {
+                if (val && isTerminalThemeName(val)) handleThemeChange(val);
+              }}
             >
               <SelectTrigger
                 className={cn(

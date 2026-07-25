@@ -31,8 +31,9 @@ export const UpdateWebServerSettingsInputSchema = z.object({
   serverDomain: z.string().nullable().optional(),
   httpsEnabled: z.boolean().optional(),
   certificateProvider: z
-    .enum(["letsencrypt", "zerossl", "self-signed", "none"])
+    .enum(["letsencrypt", "zerossl", "self-signed", "custom", "none"])
     .optional(),
+  certificateId: z.string().nullable().optional(),
   letsEncryptEmail: z.string().nullable().optional(),
   cloudflareApiToken: z.string().nullable().optional(),
   httpPort: z.number().int().min(1).max(65535).optional(),
@@ -43,8 +44,30 @@ export const UpdateWebServerSettingsInputSchema = z.object({
   caddyMiddlewares: CaddyMiddlewareListSchema.optional(),
   serverIp: z.string().nullable().optional(),
   dailyDockerCleanup: z.boolean().optional(),
-  caddyEnvironment: z.string().optional(),
-  caddyPorts: z.string().optional(),
+  caddyEnvironment: z
+    .string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      try {
+        const parsed = JSON.parse(val);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed);
+      } catch {
+        return false;
+      }
+    }, "Caddy environment variables must be a valid JSON object"),
+  caddyPorts: z
+    .string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed);
+      } catch {
+        return false;
+      }
+    }, "Additional Caddy ports must be a valid JSON array"),
   accessLogsEnabled: z.boolean().optional(),
   accessLogCleanupCron: AccessLogCleanupCronSchema.optional(),
 });
@@ -74,6 +97,8 @@ export class UpdateWebServerSettingsUseCase {
       patch.httpsEnabled = input.httpsEnabled;
     if (input.certificateProvider !== undefined)
       patch.certificateProvider = input.certificateProvider;
+    if (input.certificateId !== undefined)
+      patch.certificateId = input.certificateId;
     if (input.letsEncryptEmail !== undefined)
       patch.letsEncryptEmail = input.letsEncryptEmail;
     if (input.cloudflareApiToken !== undefined)

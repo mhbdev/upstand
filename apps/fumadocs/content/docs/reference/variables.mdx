@@ -37,7 +37,7 @@ The expansion engine supports dynamic references like `${{env.API_URL}}` or `${{
 | `BETTER_AUTH_SECRET` | Production | Better Auth signing/session secret; the server schema requires at least 32 characters. |
 | `BETTER_AUTH_URL` | Production | Canonical auth API URL. |
 | `CORS_ORIGIN` | Production | Allowed dashboard origin. |
-| `SSH_KEY_ENCRYPTION_KEY_V1` | Production | Encryption key for stored SSH and provider secrets. |
+| `ENCRYPTION_KEY_V1` | Production | Master 256-bit encryption key for stored database secrets and provider credentials. |
 | `REDIS_URL` | No | Redis connection URL; defaults to `redis://localhost:6379`. |
 | `PORT` | No | Server listen port; defaults to `3000`. |
 | `NODE_ENV` | No | `development`, `production`, or `test`; defaults to `development`. |
@@ -103,4 +103,4 @@ The Fumadocs app reads `OPENROUTER_API_KEY` and optional `OPENROUTER_MODEL` for 
 
 ## Secret handling
 
-Do not commit production values to `.env` files. The production installer separates ordinary configuration from sensitive Docker Secret material under `/etc/upstand/secrets/` with restrictive permissions. Keep backups of encryption keys separately from database backups: losing `SSH_KEY_ENCRYPTION_KEY_V1` can make encrypted credentials unrecoverable.
+Do not commit production values to `.env` files. The production installer separates ordinary configuration from sensitive Docker Secret material under `/etc/upstand/secrets/` with restrictive permissions. Keep backups of encryption keys separately from database backups: losing `ENCRYPTION_KEY_V1` can make encrypted credentials unrecoverable.

@@ -61,7 +61,7 @@ export class GetQueueUseCase {
         server?.hostname ||
         (serverId === "local" ? "Dokploy Server" : `Server ${serverId}`);
       const queueName = getDeploymentQueueName(serverId);
-      const queue = new Queue(queueName, { connection: redis as any });
+      const queue = new Queue(queueName, { connection: redis });
 
       try {
         const jobs = await queue.getJobs(
@@ -106,7 +106,7 @@ export class GetQueueUseCase {
             serverName,
           });
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         log.error({
           message: `Failed to read jobs from queue ${queueName}`,
           err,

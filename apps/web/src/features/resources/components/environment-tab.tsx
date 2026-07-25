@@ -11,22 +11,25 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { KeyValueEditor } from "@/components/shared/key-value-editor";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
 
 interface EnvironmentTabProps {
-  resource: any;
-  updateResource: any;
+  resource: NonNullable<ResourceDetailState["resource"]>;
+  secrets: ResourceDetailState["secrets"];
+  updateResource: ResourceDetailState["updateResource"];
   isUpdatingResource: boolean;
 }
 
 export function EnvironmentTab({
   resource,
+  secrets,
   updateResource,
   isUpdatingResource,
 }: EnvironmentTabProps) {
   const [envList, setEnvList] = useState<Array<{ key: string; value: string }>>(
     [],
   );
-  const environmentVersion = resource?.envVars ?? "";
+  const environmentVersion = JSON.stringify(secrets.envVars);
   const managedEnvironment = resource?.managedEnvironment ?? {};
   const managedEntries = Object.entries(managedEnvironment);
 

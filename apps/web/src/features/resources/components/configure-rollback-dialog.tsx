@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import type { Resource } from "@upstand/domain";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { AppRouter } from "@upstand/api/router";
 import { Button } from "@upstand/ui/components/button";
 import {
   Dialog,
@@ -29,11 +30,12 @@ import {
   Layers,
 } from "@/components/huge-icons";
 import { trpc } from "@/utils/trpc";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
 
 interface ConfigureRollbackDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  resource: Resource | any;
+  resource: NonNullable<ResourceDetailState["resource"]>;
   organizationId: string;
   onSuccess?: () => void;
 }
@@ -70,8 +72,8 @@ export function ConfigureRollbackDialog({
       onOpenChange(false);
       onSuccess?.();
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to update rollback configuration");
+    onError: (error: TRPCClientErrorLike<AppRouter>) => {
+      toast.error(error.message || "Failed to update rollback configuration");
     },
   });
 
@@ -203,7 +205,7 @@ export function ConfigureRollbackDialog({
                   <SelectValue placeholder="Select a Docker registry..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {registries.map((reg: any) => (
+                  {registries.map((reg) => (
                     <SelectItem key={reg.id} value={reg.id}>
                       {reg.name} ({reg.registryUrl || "Docker Hub"})
                     </SelectItem>

@@ -9,6 +9,14 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function objectToValues(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(
@@ -46,9 +54,9 @@ export class SecretProviderRegistry implements ExternalSecretProviderPort {
         }
         const response = await fetch(`${address}/v1/${path}`, {
           headers: { "X-Vault-Token": token, Accept: "application/json" },
-        }).catch((err) => {
+        }).catch((err: unknown) => {
           throw new Error(
-            `Unable to connect to Vault at ${address}. If Upstand is running in Docker, use http://host.docker.internal:8200 instead of http://localhost:8200 (${err.message}).`,
+            `Unable to connect to Vault at ${address}. If Upstand is running in Docker, use http://host.docker.internal:8200 instead of http://localhost:8200 (${errorMessage(err)}).`,
           );
         });
         if (response.status === 403 || response.status === 401) {
@@ -89,9 +97,9 @@ export class SecretProviderRegistry implements ExternalSecretProviderPort {
               Accept: "application/json",
             },
           },
-        ).catch((err) => {
+        ).catch((err: unknown) => {
           throw new Error(
-            `Unable to connect to 1Password Connect at ${host} (${err.message}).`,
+            `Unable to connect to 1Password Connect at ${host} (${errorMessage(err)}).`,
           );
         });
         if (!response.ok) {
@@ -123,10 +131,10 @@ export class SecretProviderRegistry implements ExternalSecretProviderPort {
         success: true,
         message: "Successfully connected to AWS Secrets Manager!",
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return {
         success: false,
-        message: err.message || "Failed to connect to secret provider.",
+        message: errorMessage(err) || "Failed to connect to secret provider.",
       };
     }
   }
@@ -141,14 +149,17 @@ export class SecretProviderRegistry implements ExternalSecretProviderPort {
       throw new Error("Vault requires address, path, and token");
     const response = await fetch(`${address}/v1/${path}`, {
       headers: { "X-Vault-Token": token, Accept: "application/json" },
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       throw new Error(
-        `Unable to connect to Vault at ${address}. If Upstand is running in Docker, try using http://host.docker.internal:8200 instead of http://localhost:8200 (${err.message}).`,
+        `Unable to connect to Vault at ${address}. If Upstand is running in Docker, try using http://host.docker.internal:8200 instead of http://localhost:8200 (${errorMessage(err)}).`,
       );
     });
     if (!response.ok) throw new Error(`Vault returned HTTP ${response.status}`);
-    const body = (await response.json()) as { data?: { data?: unknown } };
-    return objectToValues(body.data?.data ?? body.data);
+    const body: unknown = await response.json();
+    if (!isRecord(body)) return {};
+    const data: unknown = body.data;
+    if (!isRecord(data)) return {};
+    return objectToValues(data.data ?? data);
   }
 
   private async readOnePassword(
@@ -173,14 +184,23 @@ export class SecretProviderRegistry implements ExternalSecretProviderPort {
     );
     if (!response.ok)
       throw new Error(`1Password Connect returned HTTP ${response.status}`);
-    const body = (await response.json()) as {
-      fields?: Array<{ label?: string; value?: unknown }>;
-    };
-    return Object.fromEntries(
-      (body.fields ?? [])
-        .filter((field) => field.label && typeof field.value === "string")
-        .map((field) => [field.label as string, field.value as string]),
-    );
+    const body: unknown = await response.json();
+    if (!isRecord(body) || !Array.isArray(body.fields)) return {};
+
+    const values: Array<readonly [string, string]> = [];
+    for (const field of body.fields) {
+      if (!isRecord(field)) continue;
+      const label: unknown = field.label;
+      const value: unknown = field.value;
+      if (
+        typeof label === "string" &&
+        label.length > 0 &&
+        typeof value === "string"
+      ) {
+        values.push([label, value]);
+      }
+    }
+    return Object.fromEntries(values);
   }
 
   private async readAws(

@@ -15,6 +15,8 @@ import {
 import { cn } from "@upstand/ui/lib/utils";
 import {
   type ComponentProps,
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -51,9 +53,19 @@ export type LogType = "error" | "warning" | "success" | "info" | "debug";
 export type LogVariant = NonNullable<ComponentProps<typeof Badge>["variant"]>;
 
 export interface LogLine {
+  id: number;
   rawTimestamp: string | null;
   timestamp: Date | null;
   message: string;
+  /**
+   * Optional human-friendly rendering for structured (JSON) logs — e.g. a
+   * MongoDB/pino-style line's extracted "[component] msg" instead of the raw
+   * JSON blob. `message` always stays the full raw text (used for search and
+   * export); this is display-only.
+   */
+  displayMessage?: string;
+  /** Severity resolved once at parse time — never recomputed on every render/filter pass. */
+  type: LogType;
 }
 
 interface LogStyle {
@@ -84,15 +96,58 @@ const LOG_STYLES: Record<LogType, LogStyle> = {
   },
 } as const;
 
-export const priorities = [
-  { label: "Info", value: "info" },
-  { label: "Success", value: "success" },
-  { label: "Warning", value: "warning" },
-  { label: "Debug", value: "debug" },
-  { label: "Error", value: "error" },
-];
+/**
+ * Normalizes a structured "level"/"severity" field (as found on JSON log lines)
+ * to one of our LogType buckets. Returns null if it isn't recognizable.
+ */
+const normalizeLevelHint = (raw: unknown): LogType | null => {
+  if (typeof raw === "number") {
+    // Common numeric level conventions (e.g. pino/bunyan): higher = more severe
+    if (raw >= 50) return "error";
+    if (raw >= 40) return "warning";
+    if (raw >= 30) return "info";
+    return "debug";
+  }
+  if (typeof raw !== "string") return null;
+  const trimmedRaw = raw.trim();
 
-export const getLogType = (message: string): LogStyle => {
+  // MongoDB-style single-letter severity codes, e.g. "s":"I"/"W"/"E"/"F",
+  // and the "D1".."D5" verbose-debug variants used by newer mongod versions.
+  if (/^[a-z]\d?$/i.test(trimmedRaw)) {
+    const code = trimmedRaw[0].toUpperCase();
+    if (code === "E" || code === "F") return "error";
+    if (code === "W") return "warning";
+    if (code === "D") return "debug";
+    if (code === "I") return "info";
+  }
+
+  const lvl = trimmedRaw.toLowerCase();
+  if (["fatal", "panic", "error", "err", "critical", "crit"].includes(lvl))
+    return "error";
+  if (["warn", "warning"].includes(lvl)) return "warning";
+  if (["ok", "success", "successful", "done"].includes(lvl)) return "success";
+  if (["debug", "trace", "verbose", "silly"].includes(lvl)) return "debug";
+  if (["info", "information", "notice", "log"].includes(lvl)) return "info";
+  return null;
+};
+
+/**
+ * Classifies a log message into a LogStyle. Priority order matters a lot here:
+ * a message that mentions both an error and an incidental "status:"/"state:" word
+ * must still be flagged as an error, so severity-bearing checks (structured hint,
+ * HTTP status code, then error/warning) always run before the softer, broader
+ * info/debug heuristics.
+ *
+ * @param message the raw log message
+ * @param levelHint an explicit level already extracted from structured (JSON) data,
+ *   which — when present — is trusted over any text heuristic.
+ */
+export const getLogType = (
+  message: string,
+  levelHint?: LogType | null,
+): LogStyle => {
+  if (levelHint) return LOG_STYLES[levelHint];
+
   const statusMatch = message.match(/"statusCode"\s*:\s*"?(\d{3})"?/);
   if (statusMatch) {
     const statusCode = Number(statusMatch[1]);
@@ -104,15 +159,8 @@ export const getLogType = (message: string): LogStyle => {
 
   const lowerMessage = message.toLowerCase();
 
-  if (
-    /(?:^|\s)(?:info|inf|information):?\s/i.test(lowerMessage) ||
-    /\[(?:info|information)\]/i.test(lowerMessage) ||
-    /\b(?:status|state|current|progress)\b:?\s/i.test(lowerMessage) ||
-    /\b(?:processing|executing|performing)\b/i.test(lowerMessage)
-  ) {
-    return LOG_STYLES.info;
-  }
-
+  // 1. Errors first — highest severity, and must win over any incidental
+  //    "status"/"state"/"info:" wording elsewhere in the same line.
   if (
     /(?:^|\s)(?:error|err):?\s/i.test(lowerMessage) ||
     /\b(?:exception|failed|failure)\b/i.test(lowerMessage) ||
@@ -122,12 +170,12 @@ export const getLogType = (message: string): LogStyle => {
     /Error:\s.*(?:in|at)\s+.*:\d+(?::\d+)?/.test(lowerMessage) ||
     /\b(?:errno|code):\s*(?:\d+|[A-Z_]+)\b/i.test(lowerMessage) ||
     /\[(?:error|err|fatal)\]/i.test(lowerMessage) ||
-    /\b(?:crash|critical|fatal)\b/i.test(lowerMessage) ||
-    /\b(?:fail(?:ed|ure)?|broken|dead)\b/i.test(lowerMessage)
+    /\b(?:crash|critical|fatal|broken)\b/i.test(lowerMessage)
   ) {
     return LOG_STYLES.error;
   }
 
+  // 2. Warnings next.
   if (
     /(?:^|\s)(?:warning|warn):?\s/i.test(lowerMessage) ||
     /\[(?:warn(?:ing)?|attention)\]/i.test(lowerMessage) ||
@@ -135,13 +183,14 @@ export const getLogType = (message: string): LogStyle => {
     /\b(?:caution|attention|notice):\s/i.test(lowerMessage) ||
     /(?:might|may|could)\s+(?:not|cause|lead\s+to)/i.test(lowerMessage) ||
     /(?:!+\s*(?:warning|caution|attention)\s*!+)/i.test(lowerMessage) ||
-    /\b(?:deprecated|obsolete)\b/i.test(lowerMessage) ||
-    /\b(?:unstable|experimental)\b/i.test(lowerMessage) ||
+    /\b(?:deprecated|obsolete|unstable|experimental)\b/i.test(lowerMessage) ||
     /⚠|⚠️/i.test(lowerMessage)
   ) {
     return LOG_STYLES.warning;
   }
 
+  // 3. Success — explicit completion/readiness signals only, so a line like
+  //    "still starting, not active yet" doesn't get mislabeled.
   if (
     /(?:successfully|complete[d]?)\s+(?:initialized|started|completed|created|done|deployed)/i.test(
       lowerMessage,
@@ -151,22 +200,31 @@ export const getLogType = (message: string): LogStyle => {
     /(?:connected|established|ready)\s+(?:to|for|on)/i.test(lowerMessage) ||
     /\b(?:loaded|mounted|initialized)\s+successfully\b/i.test(lowerMessage) ||
     /✓|√|✅|\[ok\]|done!/i.test(lowerMessage) ||
-    /\b(?:success(?:ful)?|completed|ready)\b/i.test(lowerMessage) ||
-    /\b(?:started|starting|active)\b/i.test(lowerMessage)
+    /\bsuccess(?:ful(?:ly)?)?\b/i.test(lowerMessage)
   ) {
     return LOG_STYLES.success;
   }
 
+  // 4. Debug — requires an explicit debug/trace marker. (Deliberately narrower
+  //    than before: generic words like "get"/"config"/"HTTP" used to catch
+  //    ordinary request logs and mislabel them as debug noise.)
   if (
-    /(?:^|\s)(?:info|inf):?\s/i.test(lowerMessage) ||
-    /\[(info|log|debug|trace|server|db|api|http|request|response)\]/i.test(
-      lowerMessage,
-    ) ||
-    /\b(?:version|config|import|load|get|HTTP|PATCH|POST|debug)\b:?/i.test(
+    /(?:^|\s)(?:debug|trace|verbose):?\s/i.test(lowerMessage) ||
+    /\[(?:debug|trace|verbose)\]/i.test(lowerMessage)
+  ) {
+    return LOG_STYLES.debug;
+  }
+
+  // 5. Info — explicit info markers, or general status/progress narration.
+  if (
+    /(?:^|\s)(?:info|inf|information):?\s/i.test(lowerMessage) ||
+    /\[(?:info|information|log)\]/i.test(lowerMessage) ||
+    /\b(?:status|state|current|progress)\b:?\s/i.test(lowerMessage) ||
+    /\b(?:processing|executing|performing|started|starting)\b/i.test(
       lowerMessage,
     )
   ) {
-    return LOG_STYLES.debug;
+    return LOG_STYLES.info;
   }
 
   return LOG_STYLES.info;
@@ -183,35 +241,73 @@ export function cleanLogLineString(line: string): string {
   );
 }
 
-const parseLogLine = (line: string): LogLine => {
+const parseLogLine = (line: string, id: number): LogLine => {
   const cleaned = cleanLogLineString(line);
   const trimmed = cleaned.trim();
   if (!trimmed) {
-    return { rawTimestamp: null, timestamp: null, message: cleaned };
+    return {
+      id,
+      rawTimestamp: null,
+      timestamp: null,
+      message: cleaned,
+      type: "info",
+    };
   }
 
-  // 1. JSON logs (e.g. Caddy logs or structured application logs)
+  // 1. JSON logs (e.g. Caddy logs, pino/bunyan, or MongoDB's own structured
+  // format, which uses "s" for severity and a nested "t":{"$date":...} timestamp
+  // instead of the more common top-level "level"/"ts" fields).
   if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
     try {
       const parsed = JSON.parse(trimmed);
-      const rawTs =
-        parsed.ts ?? parsed.time ?? parsed.timestamp ?? parsed["@timestamp"];
-      if (rawTs !== undefined && rawTs !== null) {
-        let date: Date | null = null;
-        if (typeof rawTs === "number") {
-          const ms = rawTs < 1e11 ? rawTs * 1000 : rawTs;
-          date = new Date(ms);
-        } else if (typeof rawTs === "string") {
-          date = new Date(rawTs);
-        }
-        if (date && !Number.isNaN(date.getTime())) {
-          return {
-            rawTimestamp: String(rawTs),
-            timestamp: date,
-            message: cleaned,
-          };
-        }
+
+      const levelHint = normalizeLevelHint(
+        parsed.level ??
+          parsed.severity ??
+          parsed.lvl ??
+          parsed.logLevel ??
+          parsed.s,
+      );
+
+      const rawTsCandidate =
+        parsed.ts ??
+        parsed.time ??
+        parsed.timestamp ??
+        parsed["@timestamp"] ??
+        parsed.t?.$date ??
+        parsed.t?.date;
+
+      let date: Date | null = null;
+      if (typeof rawTsCandidate === "number") {
+        const ms =
+          rawTsCandidate < 1e11 ? rawTsCandidate * 1000 : rawTsCandidate;
+        date = new Date(ms);
+      } else if (typeof rawTsCandidate === "string") {
+        date = new Date(rawTsCandidate);
       }
+      const validDate = date && !Number.isNaN(date.getTime()) ? date : null;
+
+      // Structured logs usually carry a short component tag ("c") and a
+      // human-readable "msg" — surface those instead of the raw JSON blob.
+      // Reuses the existing "[Component] message" bracket convention, so it
+      // automatically picks up the same colored service badge as plain-text
+      // logs like "[api] request handled".
+      const component = typeof parsed.c === "string" ? parsed.c : null;
+      const msgText = typeof parsed.msg === "string" ? parsed.msg : null;
+      const displayMessage = msgText
+        ? component
+          ? `[${component}] ${msgText}`
+          : msgText
+        : undefined;
+
+      return {
+        id,
+        rawTimestamp: validDate ? String(rawTsCandidate) : null,
+        timestamp: validDate,
+        message: cleaned,
+        displayMessage,
+        type: getLogType(cleaned, levelHint).type,
+      };
     } catch {
       // Fall back to pattern matching if JSON parse fails
     }
@@ -225,10 +321,13 @@ const parseLogLine = (line: string): LogLine => {
     const rawTs = dateMatch[1];
     const date = new Date(rawTs);
     if (!Number.isNaN(date.getTime())) {
+      const message = dateMatch[2] || cleaned;
       return {
+        id,
         rawTimestamp: rawTs,
         timestamp: date,
-        message: dateMatch[2] || cleaned,
+        message,
+        type: getLogType(message).type,
       };
     }
   }
@@ -241,10 +340,13 @@ const parseLogLine = (line: string): LogLine => {
     const rawTs = syslogMatch[1];
     const date = new Date(rawTs);
     if (!Number.isNaN(date.getTime())) {
+      const message = syslogMatch[2] || cleaned;
       return {
+        id,
         rawTimestamp: rawTs,
         timestamp: date,
-        message: syslogMatch[2] || cleaned,
+        message,
+        type: getLogType(message).type,
       };
     }
   }
@@ -257,15 +359,24 @@ const parseLogLine = (line: string): LogLine => {
     const today = new Date().toISOString().split("T")[0];
     const date = new Date(`${today}T${timeOnlyMatch[1]}`);
     if (!Number.isNaN(date.getTime())) {
+      const message = timeOnlyMatch[2] || cleaned;
       return {
+        id,
         rawTimestamp: timeOnlyMatch[1],
         timestamp: date,
-        message: timeOnlyMatch[2] || cleaned,
+        message,
+        type: getLogType(message).type,
       };
     }
   }
 
-  return { rawTimestamp: null, timestamp: null, message: cleaned };
+  return {
+    id,
+    rawTimestamp: null,
+    timestamp: null,
+    message: cleaned,
+    type: getLogType(cleaned).type,
+  };
 };
 
 const getServiceColor = (name: string): string => {
@@ -287,8 +398,11 @@ const getServiceColor = (name: string): string => {
   return colors[index];
 };
 
-// Individual terminal line component with highlighting and tooltip
-export function TerminalLine({
+// Individual terminal line component with highlighting and tooltip.
+// Memoized: with severity resolved once at parse time, a line only needs to
+// re-render when its own props actually change (search term, font size, etc.),
+// not on every parent re-render or filter pass.
+export const TerminalLine = memo(function TerminalLine({
   log,
   noTimestamp,
   searchTerm,
@@ -299,8 +413,9 @@ export function TerminalLine({
   searchTerm?: string;
   fontSize?: "sm" | "md" | "lg";
 }) {
-  const { timestamp, message } = log;
-  const { type, variant } = getLogType(message);
+  const { timestamp, type } = log;
+  const message = log.displayMessage ?? log.message;
+  const variant = LOG_STYLES[type].variant;
 
   const serviceMatch = message.match(/^\[([^\]]+)\]\s*(.*)$/);
   const servicePrefix = serviceMatch ? serviceMatch[1] : null;
@@ -315,11 +430,11 @@ export function TerminalLine({
     : "---";
 
   const highlightMessage = (text: string, term: string) => {
-    const KyleTerm = term.trim();
-    if (!KyleTerm) return text;
+    const trimmedTerm = term.trim();
+    if (!trimmedTerm) return text;
 
     const expression = new RegExp(
-      `(${KyleTerm.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")})`,
+      `(${trimmedTerm.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")})`,
       "gi",
     );
     return text.split(expression).map((part, index) =>
@@ -395,7 +510,7 @@ export function TerminalLine({
       </span>
     </div>
   );
-}
+});
 
 export interface DockerLogsProps {
   containerId: string;
@@ -405,6 +520,10 @@ export interface DockerLogsProps {
   className?: string;
   maxHeightClass?: string;
 }
+
+// How many parsed lines we keep in memory at most. Keeps long-running streams
+// from growing unbounded even if the caller never truncates `logs` upstream.
+const MAX_RETAINED_LOGS = 2000;
 
 export const ShowDockerLogs = ({
   containerId,
@@ -437,44 +556,78 @@ export const ShowDockerLogs = ({
     return logs.split(/\r?\n/);
   }, [logs]);
 
-  // Parse logs list and count differences when paused / scrolled up
+  // Incremental parse cache: when new logs are just an append to what we saw
+  // last time (the common "tail -f" case), we only parse the new suffix
+  // instead of re-parsing the entire history on every update. Falls back to a
+  // full re-parse whenever the incoming array isn't a superset of the last one
+  // (container restarted, log source reset, filtered upstream, etc).
+  const parsedCacheRef = useRef<LogLine[]>([]);
+  const prevRawRef = useRef<string[]>([]);
+  const idCounterRef = useRef(0);
+
+  const currentParsed = useMemo(() => {
+    const prevRaw = prevRawRef.current;
+    const isAppendOnly =
+      rawLogsArray.length >= prevRaw.length &&
+      prevRaw.every((line, i) => rawLogsArray[i] === line);
+
+    if (isAppendOnly) {
+      const newLines = rawLogsArray.slice(prevRaw.length);
+      const newParsed = newLines
+        .filter((line) => Boolean(line?.trim()))
+        .map((line) => parseLogLine(line, idCounterRef.current++));
+      parsedCacheRef.current =
+        newParsed.length > 0
+          ? [...parsedCacheRef.current, ...newParsed].slice(-MAX_RETAINED_LOGS)
+          : parsedCacheRef.current;
+    } else {
+      idCounterRef.current = 0;
+      parsedCacheRef.current = rawLogsArray
+        .filter((line) => Boolean(line?.trim()))
+        .map((line) => parseLogLine(line, idCounterRef.current++))
+        .slice(-MAX_RETAINED_LOGS);
+    }
+
+    prevRawRef.current = rawLogsArray;
+    return parsedCacheRef.current;
+  }, [rawLogsArray]);
+
+  // Apply the freshly (incrementally) parsed lines, respecting pause/scroll state.
   useEffect(() => {
-    const parsed = rawLogsArray
-      .filter((line) => Boolean(line?.trim()))
-      .map(parseLogLine);
     if (!isPaused) {
       if (!autoScroll && logsList.length > 0) {
-        const diff = parsed.length - logsList.length;
+        const diff = currentParsed.length - logsList.length;
         if (diff > 0) {
           setUnseenCount((prev) => prev + diff);
         }
       }
-      setLogsList(parsed);
+      setLogsList(currentParsed);
       setMessageBuffer([]);
     } else {
-      setMessageBuffer(parsed);
-      const diff = parsed.length - logsList.length;
+      setMessageBuffer(currentParsed);
+      const diff = currentParsed.length - logsList.length;
       if (diff > 0) {
         setUnseenCount((prev) => prev + diff);
       }
     }
-  }, [isPaused, rawLogsArray, autoScroll, logsList.length]);
+    // logsList intentionally excluded: we only want to react to new parsed
+    // data or a pause/autoScroll toggle, not to our own writes to logsList.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaused, currentParsed, autoScroll, logsList.length]);
 
-  // Compute log level matches counts for current list
+  // Severity counts for the level filter — reads the precomputed `type`
+  // instead of re-running detection regexes over every line on every render.
   const levelCounts = useMemo(() => {
     const counts = { info: 0, success: 0, warning: 0, debug: 0, error: 0 };
     for (const log of logsList) {
-      const { type } = getLogType(log.message);
-      if (type in counts) {
-        counts[type]++;
-      }
+      counts[log.type]++;
     }
     return counts;
   }, [logsList]);
 
   // Filter implementation
   useEffect(() => {
-    let result = [...logsList];
+    let result = logsList;
 
     // Search query filter
     if (searchQuery.trim()) {
@@ -493,12 +646,9 @@ export const ShowDockerLogs = ({
       result = result.filter((log) => log.timestamp && log.timestamp >= cutoff);
     }
 
-    // Log type filter
+    // Log type filter — no detection work here, just reads log.type
     if (typeFilters.length > 0) {
-      result = result.filter((log) => {
-        const { type } = getLogType(log.message);
-        return typeFilters.includes(type);
-      });
+      result = result.filter((log) => typeFilters.includes(log.type));
     }
 
     // Apply lines limit
@@ -529,7 +679,7 @@ export const ShowDockerLogs = ({
   const handlePauseResume = () => {
     if (isPaused) {
       if (messageBuffer.length > 0) {
-        setLogsList((prev) => [...prev, ...messageBuffer].slice(-500));
+        setLogsList(messageBuffer.slice(-MAX_RETAINED_LOGS));
         setMessageBuffer([]);
       }
       setUnseenCount(0);
@@ -537,14 +687,16 @@ export const ShowDockerLogs = ({
     setIsPaused(!isPaused);
   };
 
+  const formatLogForExport = useCallback(
+    (log: LogLine) =>
+      showTimestamp
+        ? `${log.timestamp?.toLocaleTimeString() || "---"} [${log.type}] ${log.message}`
+        : log.message,
+    [showTimestamp],
+  );
+
   const handleCopy = () => {
-    const text = filteredLogs
-      .map((log) =>
-        showTimestamp
-          ? `${log.timestamp?.toLocaleTimeString() || "---"} [${getLogType(log.message).type}] ${log.message}`
-          : log.message,
-      )
-      .join("\n");
+    const text = filteredLogs.map(formatLogForExport).join("\n");
     void copyText(text)
       .then(() => toast.success("Logs copied to clipboard"))
       .catch((error: unknown) =>
@@ -555,13 +707,7 @@ export const ShowDockerLogs = ({
   };
 
   const handleDownload = () => {
-    const text = filteredLogs
-      .map((log) =>
-        showTimestamp
-          ? `${log.timestamp?.toLocaleTimeString() || "---"} [${getLogType(log.message).type}] ${log.message}`
-          : log.message,
-      )
-      .join("\n");
+    const text = filteredLogs.map(formatLogForExport).join("\n");
     downloadText(text, `container-${containerId}-logs.txt`);
   };
 
@@ -576,28 +722,23 @@ export const ShowDockerLogs = ({
   return (
     <div className={cn("flex min-w-0 flex-col gap-4", className)}>
       {/* Filters & Control bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/40 bg-card/60 p-2 text-xs">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+      <div className="flex flex-col gap-2 rounded-xl border border-border/40 bg-card/60 p-2 text-xs">
+        {/* Tier 1: primary actions + search + stream controls — always front and center */}
+        <div className="flex flex-wrap items-center gap-1.5">
           {isFetching && (
-            <span className="mr-1 inline-flex animate-pulse items-center gap-1 font-medium font-mono text-[10px] text-primary">
+            <span className="inline-flex shrink-0 animate-pulse items-center gap-1 font-medium font-mono text-[10px] text-primary">
               <RefreshCw className="size-3 animate-spin" />
               <span className="hidden sm:inline">Refreshing…</span>
             </span>
           )}
 
-          {/* Ask UpGal AI Button */}
+          {/* Ask UpGal AI Button — primary action, stays first and full-weight */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
               const linesToAttach = filteredLogs.slice(-100);
-              const logsText = linesToAttach
-                .map((log) =>
-                  showTimestamp
-                    ? `${log.timestamp?.toLocaleTimeString() || "---"} [${getLogType(log.message).type}] ${log.message}`
-                    : log.message,
-                )
-                .join("\n");
+              const logsText = linesToAttach.map(formatLogForExport).join("\n");
               if (!logsText.trim()) {
                 toast.error("No logs available to attach");
                 return;
@@ -608,167 +749,15 @@ export const ShowDockerLogs = ({
               );
               toast.success("Logs attached to UpGal assistant");
             }}
-            className="h-8 gap-1.5 border-primary/40 bg-primary/5 font-medium text-primary text-xs hover:bg-primary/10 active:scale-[0.98]"
+            className="h-8 shrink-0 gap-1.5 border-primary/40 bg-primary/5 font-medium text-primary text-xs hover:bg-primary/10 active:scale-[0.98]"
             title="Attach recent logs (up to 100 lines) to UpGal assistant"
           >
             <Bot className="size-3.5" />
             <span>Ask UpGal</span>
           </Button>
 
-          {/* Limit Filter Select */}
-          <Select
-            value={String(linesLimit)}
-            onValueChange={(val) => val && setLinesLimit(Number(val))}
-          >
-            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
-              <Hash className="size-3.5 text-muted-foreground" />
-              <span>
-                <span className="hidden sm:inline">Limit: </span>
-                {linesLimit}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="100" className="text-xs">
-                100 lines
-              </SelectItem>
-              <SelectItem value="300" className="text-xs">
-                300 lines
-              </SelectItem>
-              <SelectItem value="500" className="text-xs">
-                500 lines
-              </SelectItem>
-              <SelectItem value="1000" className="text-xs">
-                1000 lines
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Time range Select */}
-          <Select
-            value={timeRange}
-            onValueChange={(val) => val && setTimeRange(val)}
-          >
-            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
-              <Clock className="size-3.5 text-muted-foreground" />
-              <span>
-                <span className="hidden md:inline">Range: </span>
-                {timeRange === "all"
-                  ? "All time"
-                  : timeRange === "1h"
-                    ? "Last 1h"
-                    : `Last ${timeRange}`}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">
-                All time
-              </SelectItem>
-              <SelectItem value="1h" className="text-xs">
-                Last hour
-              </SelectItem>
-              <SelectItem value="6h" className="text-xs">
-                Last 6 hours
-              </SelectItem>
-              <SelectItem value="24h" className="text-xs">
-                Last 24 hours
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Log Level Select */}
-          <Select
-            value={
-              typeFilters.length === 1
-                ? typeFilters[0]
-                : typeFilters.length === 0
-                  ? "all"
-                  : "multiple"
-            }
-            onValueChange={(val) => {
-              if (!val) return;
-              if (val === "all") setTypeFilters([]);
-              else setTypeFilters([val]);
-            }}
-          >
-            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
-              <Filter className="size-3.5 text-muted-foreground" />
-              <span>
-                <span className="hidden md:inline">Level: </span>
-                {typeFilters.length === 0
-                  ? "All"
-                  : typeFilters.length === 1
-                    ? typeFilters[0].toUpperCase()
-                    : `(${typeFilters.length})`}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">
-                All Levels
-              </SelectItem>
-              <SelectItem value="error" className="text-xs">
-                Error ({levelCounts.error})
-              </SelectItem>
-              <SelectItem value="warning" className="text-xs">
-                Warning ({levelCounts.warning})
-              </SelectItem>
-              <SelectItem value="success" className="text-xs">
-                Success ({levelCounts.success})
-              </SelectItem>
-              <SelectItem value="info" className="text-xs">
-                Info ({levelCounts.info})
-              </SelectItem>
-              <SelectItem value="debug" className="text-xs">
-                Debug ({levelCounts.debug})
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Text Size Control Select */}
-          <Select
-            value={fontSize}
-            onValueChange={(val) =>
-              val && setFontSize(val as "sm" | "md" | "lg")
-            }
-          >
-            <SelectTrigger className="h-8 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
-              <span className="font-mono font-semibold text-muted-foreground">
-                aA
-              </span>
-              <span className="hidden capitalize lg:inline">
-                {fontSize === "sm"
-                  ? "Small"
-                  : fontSize === "md"
-                    ? "Medium"
-                    : "Large"}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sm" className="text-xs">
-                Small
-              </SelectItem>
-              <SelectItem value="md" className="text-xs">
-                Medium
-              </SelectItem>
-              <SelectItem value="lg" className="text-xs">
-                Large
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Toggle Timestamps Button */}
-          <Button
-            variant={showTimestamp ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setShowTimestamp(!showTimestamp)}
-            className="h-8 gap-1 border-border/30 px-2 text-xs"
-            title="Toggle Timestamps"
-          >
-            <Clock className="size-3 text-muted-foreground" />
-            <span className="hidden xl:inline">Time</span>
-          </Button>
-
-          {/* Search bar */}
-          <InputGroup className="h-8 min-w-[130px] max-w-full flex-1 border border-border/40 bg-background md:max-w-48">
+          {/* Search bar — grows to fill available space, never gets squeezed out */}
+          <InputGroup className="h-8 min-w-30 flex-1">
             <InputGroupAddon align="inline-start">
               <Search className="pointer-events-none size-3.5 text-muted-foreground" />
             </InputGroupAddon>
@@ -796,53 +785,214 @@ export const ShowDockerLogs = ({
               </InputGroupAddon>
             )}
           </InputGroup>
+
+          {/* Stream + export controls — grouped together, right-aligned */}
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePauseResume}
+              className="h-8 gap-1.5 border-border/40 px-2.5 text-xs"
+              aria-label={isPaused ? "Resume log stream" : "Pause log stream"}
+              title={isPaused ? "Resume stream" : "Pause stream"}
+            >
+              {isPaused ? (
+                <Play className="size-3.5 text-primary" />
+              ) : (
+                <Pause className="size-3.5 text-warning" />
+              )}
+              <span className="hidden lg:inline">
+                {isPaused ? "Resume" : "Pause"}
+              </span>
+            </Button>
+
+            <div className="flex items-center gap-1 rounded-2xl border border-border/30 p-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopy}
+                disabled={filteredLogs.length === 0}
+                className="h-7 gap-1.5 px-2 text-xs"
+                aria-label="Copy logs to clipboard"
+                title="Copy logs"
+              >
+                <Copy className="size-3.5 text-muted-foreground" />
+                <span className="hidden xl:inline">Copy</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDownload}
+                disabled={filteredLogs.length === 0}
+                className="h-7 gap-1.5 px-2 text-xs"
+                aria-label="Download logs as text file"
+                title="Download logs"
+              >
+                <Download className="size-3.5 text-muted-foreground" />
+                <span className="hidden xl:inline">Download</span>
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Action Buttons: Responsive icon-only when constrained */}
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:ml-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePauseResume}
-            className="h-8 gap-1.5 border-border/40 px-2.5 text-xs"
-            aria-label={isPaused ? "Resume log stream" : "Pause log stream"}
-            title={isPaused ? "Resume stream" : "Pause stream"}
-          >
-            {isPaused ? (
-              <Play className="size-3.5 text-primary" />
-            ) : (
-              <Pause className="size-3.5 text-warning" />
-            )}
-            <span className="hidden lg:inline">
-              {isPaused ? "Resume" : "Pause"}
-            </span>
-          </Button>
+        {/* Tier 2: filters and display prefs — secondary, visually grouped, wraps independently */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-border/30 border-t pt-1.5">
+          {/* Filter cluster */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Select
+              value={String(linesLimit)}
+              onValueChange={(val) => val && setLinesLimit(Number(val))}
+            >
+              <SelectTrigger className="h-7 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
+                <Hash className="size-3.5 text-muted-foreground" />
+                <span>
+                  <span className="hidden sm:inline">Limit: </span>
+                  {linesLimit}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="100" className="text-xs">
+                  100 lines
+                </SelectItem>
+                <SelectItem value="300" className="text-xs">
+                  300 lines
+                </SelectItem>
+                <SelectItem value="500" className="text-xs">
+                  500 lines
+                </SelectItem>
+                <SelectItem value="1000" className="text-xs">
+                  1000 lines
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            disabled={filteredLogs.length === 0}
-            className="h-8 gap-1.5 border-border/40 px-2.5 text-xs"
-            aria-label="Copy logs to clipboard"
-            title="Copy logs"
-          >
-            <Copy className="size-3.5 text-muted-foreground" />
-            <span className="hidden lg:inline">Copy</span>
-          </Button>
+            <Select
+              value={timeRange}
+              onValueChange={(val) => val && setTimeRange(val)}
+            >
+              <SelectTrigger className="h-7 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
+                <Clock className="size-3.5 text-muted-foreground" />
+                <span>
+                  <span className="hidden md:inline">Range: </span>
+                  {timeRange === "all"
+                    ? "All time"
+                    : timeRange === "1h"
+                      ? "Last 1h"
+                      : `Last ${timeRange}`}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">
+                  All time
+                </SelectItem>
+                <SelectItem value="1h" className="text-xs">
+                  Last hour
+                </SelectItem>
+                <SelectItem value="6h" className="text-xs">
+                  Last 6 hours
+                </SelectItem>
+                <SelectItem value="24h" className="text-xs">
+                  Last 24 hours
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownload}
-            disabled={filteredLogs.length === 0}
-            className="h-8 gap-1.5 border-border/40 px-2.5 text-xs"
-            aria-label="Download logs as text file"
-            title="Download logs"
-          >
-            <Download className="size-3.5 text-muted-foreground" />
-            <span className="hidden lg:inline">Download</span>
-          </Button>
+            <Select
+              value={
+                typeFilters.length === 1
+                  ? typeFilters[0]
+                  : typeFilters.length === 0
+                    ? "all"
+                    : "multiple"
+              }
+              onValueChange={(val) => {
+                if (!val) return;
+                if (val === "all") setTypeFilters([]);
+                else setTypeFilters([val]);
+              }}
+            >
+              <SelectTrigger className="h-7 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
+                <Filter className="size-3.5 text-muted-foreground" />
+                <span>
+                  <span className="hidden md:inline">Level: </span>
+                  {typeFilters.length === 0
+                    ? "All"
+                    : typeFilters.length === 1
+                      ? typeFilters[0].toUpperCase()
+                      : `(${typeFilters.length})`}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">
+                  All Levels
+                </SelectItem>
+                <SelectItem value="error" className="text-xs">
+                  Error ({levelCounts.error})
+                </SelectItem>
+                <SelectItem value="warning" className="text-xs">
+                  Warning ({levelCounts.warning})
+                </SelectItem>
+                <SelectItem value="success" className="text-xs">
+                  Success ({levelCounts.success})
+                </SelectItem>
+                <SelectItem value="info" className="text-xs">
+                  Info ({levelCounts.info})
+                </SelectItem>
+                <SelectItem value="debug" className="text-xs">
+                  Debug ({levelCounts.debug})
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Divider — only shows on wide-enough screens to avoid an orphaned rule */}
+          <div className="hidden h-4 w-px bg-border/40 sm:block" />
+
+          {/* Display-preference cluster */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Select
+              value={fontSize}
+              onValueChange={(val) =>
+                val && setFontSize(val as "sm" | "md" | "lg")
+              }
+            >
+              <SelectTrigger className="h-7 gap-1.5 border-border/40 bg-transparent px-2.5 font-normal text-xs shadow-none">
+                <span className="font-mono font-semibold text-muted-foreground">
+                  aA
+                </span>
+                <span className="hidden capitalize lg:inline">
+                  {fontSize === "sm"
+                    ? "Small"
+                    : fontSize === "md"
+                      ? "Medium"
+                      : "Large"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sm" className="text-xs">
+                  Small
+                </SelectItem>
+                <SelectItem value="md" className="text-xs">
+                  Medium
+                </SelectItem>
+                <SelectItem value="lg" className="text-xs">
+                  Large
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant={showTimestamp ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setShowTimestamp(!showTimestamp)}
+              className="h-7 gap-1 border-border/30 px-2 text-xs"
+              title="Toggle Timestamps"
+            >
+              <Clock className="size-3 text-muted-foreground" />
+              <span className="hidden xl:inline">Time</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -876,9 +1026,9 @@ export const ShowDockerLogs = ({
             )}
           >
             {filteredLogs.length > 0 ? (
-              filteredLogs.map((logItem, index) => (
+              filteredLogs.map((logItem) => (
                 <TerminalLine
-                  key={`${logItem.rawTimestamp ?? "untimed"}-${index}`}
+                  key={logItem.id}
                   log={logItem}
                   noTimestamp={!showTimestamp}
                   searchTerm={searchQuery}

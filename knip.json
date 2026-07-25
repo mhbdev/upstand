@@ -6,7 +6,8 @@
     "**/dist/**",
     "**/build/**",
     "**/.source/**",
-    "apps/web/src/components/ai-elements/**"
+    "apps/web/src/components/ai-elements/**",
+    "apps/web/src/components/huge-icons.tsx"
   ],
   "ignoreDependencies": [
     "@upstand/config",
@@ -17,6 +18,7 @@
     "media-chrome",
     "motion",
     "react-jsx-parser",
+    "ssh2",
     "tokenlens"
   ],
   "ignoreExportsUsedInFile": true

@@ -342,10 +342,9 @@ function labelValue(labels: string[], key: string) {
 }
 
 function routeServiceName(resource: ResourceRecord, fallback?: string) {
-  const mappings = safeJson<Array<{ serviceName?: string; host?: string }>>(
-    resource.domains,
-    [],
-  );
+  const mappings = safeJson<
+    Array<{ serviceName?: string; host?: string; enabled?: boolean }>
+  >(resource.domains, []).filter((mapping) => mapping.enabled !== false);
   return (
     mappings.find((mapping) => mapping.serviceName)?.serviceName || fallback
   );
@@ -1210,7 +1209,10 @@ export function TopologyMap() {
       },
     );
     const routeNodeCount = scopedResources.reduce((count, resource) => {
-      const mappings = safeJson<Array<{ host?: string }>>(resource.domains, []);
+      const mappings = safeJson<Array<{ host?: string; enabled?: boolean }>>(
+        resource.domains,
+        [],
+      ).filter((mapping) => mapping.enabled !== false);
       return count + mappings.filter((mapping) => Boolean(mapping.host)).length;
     }, 0);
 
@@ -1620,8 +1622,9 @@ export function TopologyMap() {
           serviceName?: string;
           port?: number;
           https?: boolean;
+          enabled?: boolean;
         }>
-      >(resource.domains, []);
+      >(resource.domains, []).filter((mapping) => mapping.enabled !== false);
       mappings.forEach((mapping, mappingIndex) => {
         if (!mapping.host) return;
         const id = `domain:${resource.id}:${mappingIndex}`;
@@ -2178,9 +2181,11 @@ export function TopologyMap() {
         if (!silent) {
           toast.success(`Applied ${algo.toUpperCase()} (${dir}) layout`);
         }
-      } catch (err: any) {
+      } catch (error: unknown) {
         if (!silent) {
-          toast.error(`Layout failed: ${err.message || String(err)}`);
+          toast.error(
+            `Layout failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     },

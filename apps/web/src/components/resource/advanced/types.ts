@@ -16,6 +16,8 @@ export type AdvancedCardProps = {
     key: K,
     value: ResourceAdvancedConfig[K],
   ) => void;
+  composeFile?: string;
+  organizationId?: string;
 };
 
 // ──────────────────────────────────────────────────────────────────────────────

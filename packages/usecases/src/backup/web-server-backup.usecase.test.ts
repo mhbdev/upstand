@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { IUnitOfWork } from "@upstand/domain";
 import { UpdateWebServerBackupScheduleUseCase } from "./update-web-server-backup-schedule.usecase";
 import { CreateWebServerBackupScheduleUseCase } from "./web-server-backup.usecase";
 
@@ -14,26 +15,31 @@ function makeUow(destinationOrganizationId = "org-1") {
       };
     },
   };
-  return {
-    created,
-    uow: {
-      s3DestinationRepository: {
-        findById: async () => ({
-          id: "destination-1",
-          organizationId: destinationOrganizationId,
-        }),
-      },
-      transaction: async (work: (value: any) => Promise<unknown>) =>
-        work({ backupScheduleRepository: repository }),
-    } as any,
+  const uow = {
+    s3DestinationRepository: {
+      findById: async () => ({
+        id: "destination-1",
+        organizationId: destinationOrganizationId,
+      }),
+    },
+    backupScheduleRepository: {
+      findById: async (_id: string): Promise<unknown> => null,
+      updateById: async (
+        _id: string,
+        _input: Record<string, unknown>,
+      ): Promise<unknown> => null,
+    },
+    transaction: async (work: (value: never) => Promise<unknown>) =>
+      work({ backupScheduleRepository: repository } as never),
   };
+  return { created, uow };
 }
 
 describe("web-server backup schedules", () => {
   test("creates an organization-owned global schedule without a resource", async () => {
     const { uow, created } = makeUow();
     const schedule = await new CreateWebServerBackupScheduleUseCase(
-      uow,
+      uow as unknown as IUnitOfWork,
     ).execute({
       organizationId: "org-1",
       destinationId: "destination-1",
@@ -56,7 +62,9 @@ describe("web-server backup schedules", () => {
   test("rejects a destination from another organization", async () => {
     const { uow } = makeUow("org-2");
     await expect(
-      new CreateWebServerBackupScheduleUseCase(uow).execute({
+      new CreateWebServerBackupScheduleUseCase(
+        uow as unknown as IUnitOfWork,
+      ).execute({
         organizationId: "org-1",
         destinationId: "destination-1",
         name: "Nightly platform",
@@ -100,7 +108,9 @@ describe("web-server backup schedules", () => {
       },
     };
 
-    await new UpdateWebServerBackupScheduleUseCase(uow).execute({
+    await new UpdateWebServerBackupScheduleUseCase(
+      uow as unknown as IUnitOfWork,
+    ).execute({
       id: existing.id,
       organizationId: existing.organizationId,
       retentionCount: null,

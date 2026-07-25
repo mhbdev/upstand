@@ -157,11 +157,16 @@ export const certificateRouter = router({
             return false;
           }
         });
-        if (isInUse) {
+        const settings = await uow.webServerSettingsRepository.findGlobal();
+        const isServerDomainInUse =
+          settings?.certificateProvider === "custom" &&
+          settings?.certificateId === existing.id;
+
+        if (isInUse || isServerDomainInUse) {
           throw new TRPCError({
             code: "CONFLICT",
             message:
-              "This certificate is assigned to a resource domain. Remove that assignment before deleting it.",
+              "This certificate is currently assigned to a resource domain or server domain. Remove that assignment before deleting it.",
           });
         }
         const result = await ctx.scope

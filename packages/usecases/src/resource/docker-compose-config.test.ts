@@ -49,7 +49,7 @@ describe("Docker Compose configuration", () => {
         resource,
         config,
       ),
-    ) as { services: Record<string, Record<string, any>> };
+    ) as { services: Record<string, Record<string, unknown>> };
 
     expect(result.services.api).toMatchObject({
       environment: {

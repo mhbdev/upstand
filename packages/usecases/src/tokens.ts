@@ -29,6 +29,8 @@ export const ExternalSecretProviderToken =
   createToken<ExternalSecretProviderPort>("ExternalSecretProvider");
 export const ListSecretVersionsUseCaseToken =
   createToken<UseCases.ListSecretVersionsUseCase>("ListSecretVersionsUseCase");
+export const GetSecretVersionUseCaseToken =
+  createToken<UseCases.GetSecretVersionUseCase>("GetSecretVersionUseCase");
 export const RestoreSecretVersionUseCaseToken =
   createToken<UseCases.RestoreSecretVersionUseCase>(
     "RestoreSecretVersionUseCase",

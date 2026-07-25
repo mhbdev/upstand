@@ -351,7 +351,7 @@ export default function TemplatesPage() {
     );
   };
 
-  const submitEditor = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitEditor = (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!organizationId) return toast.error("Select an organization first");
     if (!name.trim()) return toast.error("Template name is required");
@@ -1194,7 +1194,7 @@ function DeployDialog({
   );
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto sm:w-[calc(100%-2rem)]">
+      <DialogContent className="no-scrollbar max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl sm:w-[calc(100%-2rem)]">
         <DialogHeader>
           <DialogTitle>Deploy {template.name}</DialogTitle>
           <DialogDescription>

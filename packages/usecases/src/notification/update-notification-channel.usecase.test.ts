@@ -12,7 +12,7 @@ const TEST_KEY = Buffer.alloc(32, 7).toString("base64");
 function createChannel(
   configuration: NotificationConfiguration,
 ): NotificationChannel {
-  process.env.SSH_KEY_ENCRYPTION_KEY_V1 = TEST_KEY;
+  process.env.ENCRYPTION_KEY_V1 = TEST_KEY;
   return {
     id: "channel-1",
     organizationId: "org-1",

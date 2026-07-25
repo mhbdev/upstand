@@ -8,6 +8,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@upstand/api/router";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -42,6 +44,7 @@ import {
   TooltipTrigger,
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -52,6 +55,8 @@ import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import { FolderIcon, Trash2Icon } from "@/components/huge-icons";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
+
+type Project = NonNullable<inferRouterOutputs<AppRouter>["project"]["get"]>;
 
 // ─── Environment Card ──────────────────────────────────────────────────────────
 
@@ -65,7 +70,7 @@ function EnvironmentCard({
     id: string;
     name: string;
     slug: string;
-    description: string | null;
+    description?: string | null;
     isDefault: boolean;
     isProtected: boolean;
     resourceCount: number;
@@ -92,7 +97,7 @@ function EnvironmentCard({
           <div className="min-w-0">
             <CardTitle className="truncate text-md">
               <Link
-                href={`/projects/${projectId}/${environment.id}` as any}
+                href={`/projects/${projectId}/${environment.id}` as Route}
                 className="hover:underline"
               >
                 {environment.name}
@@ -349,7 +354,7 @@ function DeleteEnvDialog({
 function ProjectGeneralSettings({
   project,
 }: {
-  project: { id: string; name: string; description?: string | null };
+  project: Pick<Project, "id" | "name" | "description">;
 }) {
   const [name, setName] = useState(project.name || "");
   const [description, setDescription] = useState(project.description || "");
@@ -484,7 +489,7 @@ export default function ProjectDetail({
     ...trpc.project.deleteProject.mutationOptions(),
     onSuccess: () => {
       toast.success("Project deleted successfully");
-      router.push("/projects" as any);
+      router.push("/projects" as Route);
     },
     onError: (err) => toast.error(err.message || "Failed to delete project"),
   });
@@ -501,7 +506,7 @@ export default function ProjectDetail({
     return (
       <div className="mx-auto w-full min-w-0 max-w-7xl space-y-4 overflow-x-hidden px-4 py-8 text-center">
         <p className="text-muted-foreground">Project not found.</p>
-        <Link href={"/projects" as any}>
+        <Link href={"/projects" as Route}>
           <Button variant="outline">Back to Projects</Button>
         </Link>
       </div>
@@ -509,7 +514,7 @@ export default function ProjectDetail({
   }
 
   const hasResources =
-    environments?.some((env: any) => env.resourceCount > 0) ?? false;
+    environments?.some((environment) => environment.resourceCount > 0) ?? false;
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-8 overflow-x-hidden px-4 py-8 md:px-8">
@@ -517,7 +522,7 @@ export default function ProjectDetail({
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs">
           <Link
-            href={"/projects" as any}
+            href={"/projects" as Route}
             className="transition-colors hover:text-primary"
           >
             Projects
@@ -530,7 +535,7 @@ export default function ProjectDetail({
         <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <EditableEntityIcon
-              icon={(project as any).icon}
+              icon={project.icon}
               defaultIcon={
                 <FolderIcon
                   className="size-5 text-primary"
@@ -553,7 +558,7 @@ export default function ProjectDetail({
                 {project.name}
               </h1>
               <p className="text-muted-foreground text-sm">
-                {(project as any).description ||
+                {project.description ||
                   "Project environments and configuration."}
               </p>
             </div>
@@ -584,13 +589,13 @@ export default function ProjectDetail({
             </div>
           ) : environments && environments.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {environments.map((env: any) => (
+              {environments.map((environment) => (
                 <EnvironmentCard
-                  key={env.id}
+                  key={environment.id}
                   projectId={projectId}
-                  environment={env}
+                  environment={environment}
                   onDelete={() => {
-                    setSelectedEnv(env);
+                    setSelectedEnv(environment);
                     setDeleteEnvOpen(true);
                   }}
                 />
@@ -606,7 +611,7 @@ export default function ProjectDetail({
         <TabsContent value="settings" className="outline-none">
           <div className="max-w-2xl space-y-6">
             {/* General Settings */}
-            <ProjectGeneralSettings project={project as any} />
+            <ProjectGeneralSettings project={project} />
 
             {/* Project deletion */}
             <DangerZoneCard

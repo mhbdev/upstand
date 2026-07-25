@@ -10,5 +10,8 @@ export interface IProjectRepository {
   create(data: CreateProjectDTO): Promise<Project>;
   updateById(id: string, patch: UpdateProjectDTO): Promise<Project | null>;
   delete(id: string): Promise<Project | null>;
-  findByOrganizationId(organizationId: string): Promise<Project[]>;
+  findByOrganizationId(
+    organizationId: string,
+    options?: { includeArchived?: boolean },
+  ): Promise<Project[]>;
 }

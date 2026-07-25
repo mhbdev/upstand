@@ -56,6 +56,29 @@ interface ContainerFileExplorerProps {
   resourceId: string;
 }
 
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(index, Math.min(index + chunkSize, bytes.length)),
+    );
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(value: string): ArrayBuffer {
+  const binary = atob(value.replace(/\s/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer as ArrayBuffer;
+}
+
 export function ContainerFileExplorer({
   resourceId,
 }: ContainerFileExplorerProps) {
@@ -65,6 +88,7 @@ export function ContainerFileExplorer({
     string | undefined
   >(undefined);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [editingFileContent, setEditingFileContent] = useState<string>("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -115,6 +139,22 @@ export function ContainerFileExplorer({
     }
   }, [containersData, selectedContainer]);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setDebouncedSearchQuery(searchQuery.trim()),
+      250,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset explorer state when the selected container changes
+  useEffect(() => {
+    setCurrentPath("/");
+    setSelectedFilePath(null);
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+  }, [selectedContainer]);
+
   // Fetch file list
   const {
     data: files = [],
@@ -134,15 +174,20 @@ export function ContainerFileExplorer({
   const { data: searchResults = [], isLoading: isSearching } = useQuery({
     ...trpc.containerFileManager.searchFiles.queryOptions({
       resourceId,
-      query: searchQuery,
+      query: debouncedSearchQuery,
       path: currentPath,
       containerId: selectedContainer,
     }),
-    enabled: searchQuery.trim().length > 1,
+    enabled: debouncedSearchQuery.length > 1,
   });
 
   // Read file query
-  const { data: readFileData, isFetching: isReadingFile } = useQuery({
+  const {
+    data: readFileData,
+    isFetching: isReadingFile,
+    error: readFileError,
+    refetch: refetchReadFile,
+  } = useQuery({
     ...trpc.containerFileManager.readFile.queryOptions({
       resourceId,
       path: selectedFilePath ?? "",
@@ -157,6 +202,16 @@ export function ContainerFileExplorer({
       setHasUnsavedChanges(false);
     }
   }, [readFileData]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Mutations
   const writeFileMutation = useMutation({
@@ -258,15 +313,16 @@ export function ContainerFileExplorer({
 
   const handleDownloadFile = async (path: string, fileName: string) => {
     try {
-      toast.loading("Preparing download...", { id: "downloading" });
+      toast.loading("Preparing download…", { id: "downloading" });
       const result = await queryClient.fetchQuery(
         trpc.containerFileManager.readFile.queryOptions({
           resourceId,
           path,
           containerId: selectedContainer,
+          encoding: "base64",
         }),
       );
-      const blob = new Blob([result.content], {
+      const blob = new Blob([base64ToArrayBuffer(result.content)], {
         type: "application/octet-stream",
       });
       const url = URL.createObjectURL(blob);
@@ -278,8 +334,9 @@ export function ContainerFileExplorer({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success("File downloaded", { id: "downloading" });
-    } catch (err: any) {
-      toast.error(`Download failed: ${err.message}`, { id: "downloading" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Download failed: ${message}`, { id: "downloading" });
     }
   };
 
@@ -291,6 +348,11 @@ export function ContainerFileExplorer({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      toast.error("Uploads are limited to 10 MB.");
+      e.target.value = "";
+      return;
+    }
     const uploadDir = targetUploadPath || currentPath;
     const destPath =
       uploadDir === "/"
@@ -301,13 +363,7 @@ export function ContainerFileExplorer({
     reader.onload = (event) => {
       const arrayBuffer = event.target?.result as ArrayBuffer;
       if (!arrayBuffer) return;
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = "";
-      const len = bytes.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64Content = btoa(binary);
+      const base64Content = arrayBufferToBase64(arrayBuffer);
       writeFileMutation.mutate(
         {
           resourceId,
@@ -324,12 +380,13 @@ export function ContainerFileExplorer({
         },
       );
     };
+    reader.onerror = () => toast.error(`Could not read ${file.name}.`);
     reader.readAsArrayBuffer(file);
     e.target.value = "";
   };
 
   const pathParts = currentPath.split("/").filter(Boolean);
-  const displayItems = searchQuery.trim().length > 1 ? searchResults : files;
+  const displayItems = debouncedSearchQuery.length > 1 ? searchResults : files;
 
   const navigateUp = () => {
     if (currentPath === "/") return;
@@ -342,6 +399,16 @@ export function ContainerFileExplorer({
     ? editingFileContent.split("\n").length
     : 0;
   const charCount = editingFileContent ? editingFileContent.length : 0;
+
+  const handleFileRowKeyDown = (
+    event: React.KeyboardEvent<HTMLTableRowElement>,
+    action: () => void,
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      action();
+    }
+  };
 
   return (
     <div className="flex h-[750px] w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg">
@@ -370,7 +437,7 @@ export function ContainerFileExplorer({
             <Select
               items={[
                 { value: "all", label: "All Containers / Default Volume" },
-                ...containersData.map((c: any) => ({
+                ...containersData.map((c) => ({
                   value: c.id || c.name,
                   label: `🐳 ${c.name} (${c.id ? c.id.slice(0, 8) : "container"})`,
                 })),
@@ -379,7 +446,7 @@ export function ContainerFileExplorer({
               onValueChange={(val) =>
                 checkUnsavedAndRun(() =>
                   setSelectedContainer(
-                    val === "all" ? undefined : (val as string),
+                    val === "all" || val === null ? undefined : val,
                   ),
                 )
               }
@@ -394,7 +461,7 @@ export function ContainerFileExplorer({
                 <SelectItem value="all">
                   All Containers / Default Volume
                 </SelectItem>
-                {containersData.map((c: any) => (
+                {containersData.map((c) => (
                   <SelectItem key={c.id || c.name} value={c.id || c.name}>
                     🐳 {c.name} ({c.id ? c.id.slice(0, 8) : "container"})
                   </SelectItem>
@@ -446,6 +513,7 @@ export function ContainerFileExplorer({
             disabled={isRefetching}
             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
             title="Refresh Directory"
+            aria-label="Refresh directory"
           >
             <HugeiconsIcon
               icon={RefreshIcon}
@@ -546,7 +614,8 @@ export function ContainerFileExplorer({
                 className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground"
               />
               <Input
-                placeholder="Search files in container..."
+                placeholder="Search files in container…"
+                aria-label="Search files in container"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-8 bg-background pl-8 font-mono text-foreground text-xs"
@@ -557,13 +626,20 @@ export function ContainerFileExplorer({
           {/* Directory File List */}
           <div className="flex-1 overflow-y-auto">
             {isLoading || isSearching ? (
-              <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
+              <div
+                className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground text-xs"
+                role="status"
+                aria-live="polite"
+              >
                 <Spinner className="h-5 w-5 text-primary" />
-                <span>Reading container file system...</span>
+                <span>Reading container file system…</span>
               </div>
             ) : error ? (
-              <div className="p-4 text-destructive text-xs">
-                Error loading container files: {error.message}
+              <div className="flex flex-col gap-3 p-4 text-destructive text-xs">
+                <span>Error loading container files: {error.message}</span>
+                <Button size="sm" variant="outline" onClick={() => refetch()}>
+                  Retry
+                </Button>
               </div>
             ) : (
               <ContextMenu>
@@ -583,12 +659,17 @@ export function ContainerFileExplorer({
                     </TableHeader>
                     <TableBody>
                       {/* Parent Directory Navigation Row */}
-                      {currentPath !== "/" && !searchQuery.trim() && (
+                      {currentPath !== "/" && !debouncedSearchQuery && (
                         <TableRow
                           onClick={navigateUp}
+                          onKeyDown={(event) =>
+                            handleFileRowKeyDown(event, navigateUp)
+                          }
+                          tabIndex={0}
+                          role="button"
                           className="group cursor-pointer transition-colors hover:bg-accent/60"
                         >
-                          <TableCell className="flex items-center gap-2 truncate py-2 font-mono text-muted-foreground">
+                          <TableCell className="flex min-w-0 items-center gap-2 truncate py-2 font-mono text-muted-foreground">
                             <HugeiconsIcon
                               icon={FolderOpenIcon}
                               className="h-4 w-4 shrink-0 text-amber-500"
@@ -604,13 +685,15 @@ export function ContainerFileExplorer({
                         </TableRow>
                       )}
 
-                      {displayItems.length === 0 && currentPath === "/" ? (
+                      {displayItems.length === 0 ? (
                         <TableRow>
                           <TableCell
                             colSpan={2}
                             className="p-6 text-center text-muted-foreground text-xs"
                           >
-                            Directory is empty.
+                            {debouncedSearchQuery.length > 1
+                              ? `No files found for “${debouncedSearchQuery}”.`
+                              : "Directory is empty."}
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -628,6 +711,19 @@ export function ContainerFileExplorer({
                                       }
                                     });
                                   }}
+                                  onKeyDown={(event) =>
+                                    handleFileRowKeyDown(event, () => {
+                                      checkUnsavedAndRun(() => {
+                                        if (file.type === "directory") {
+                                          setCurrentPath(file.path);
+                                        } else {
+                                          setSelectedFilePath(file.path);
+                                        }
+                                      });
+                                    })
+                                  }
+                                  tabIndex={0}
+                                  role="button"
                                   className={cn(
                                     "group cursor-pointer transition-colors hover:bg-accent/60",
                                     selectedFilePath === file.path &&
@@ -636,7 +732,7 @@ export function ContainerFileExplorer({
                                 />
                               }
                             >
-                              <TableCell className="flex items-center gap-2 truncate py-2 font-mono text-foreground">
+                              <TableCell className="flex min-w-0 items-center gap-2 truncate py-2 font-mono text-foreground">
                                 {file.type === "directory" ? (
                                   <HugeiconsIcon
                                     icon={FolderIcon}
@@ -810,9 +906,7 @@ export function ContainerFileExplorer({
                     disabled={writeFileMutation.isPending || !hasUnsavedChanges}
                     className="h-7 font-medium text-xs"
                   >
-                    {writeFileMutation.isPending
-                      ? "Saving..."
-                      : "Save (Ctrl+S)"}
+                    {writeFileMutation.isPending ? "Saving…" : "Save (Ctrl+S)"}
                   </Button>
                   <Button
                     size="xs"
@@ -824,6 +918,7 @@ export function ContainerFileExplorer({
                       )
                     }
                     className="h-7 text-xs"
+                    aria-label="Download file"
                   >
                     <HugeiconsIcon
                       icon={Download01Icon}
@@ -837,6 +932,7 @@ export function ContainerFileExplorer({
                       checkUnsavedAndRun(() => setSelectedFilePath(null))
                     }
                     className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Close file editor"
                   >
                     <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
                   </Button>
@@ -846,9 +942,24 @@ export function ContainerFileExplorer({
               {/* Code Editor Body */}
               <div className="relative flex-1 overflow-hidden">
                 {isReadingFile ? (
-                  <div className="flex h-full items-center justify-center gap-2 text-muted-foreground text-xs">
+                  <div
+                    className="flex h-full items-center justify-center gap-2 text-muted-foreground text-xs"
+                    role="status"
+                    aria-live="polite"
+                  >
                     <Spinner className="h-5 w-5 text-primary" />
-                    <span>Loading file contents...</span>
+                    <span>Loading file contents…</span>
+                  </div>
+                ) : readFileError ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-destructive text-xs">
+                    <p>Could not read this file: {readFileError.message}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void refetchReadFile()}
+                    >
+                      Retry
+                    </Button>
                   </div>
                 ) : (
                   <textarea
@@ -857,9 +968,10 @@ export function ContainerFileExplorer({
                       setEditingFileContent(e.target.value);
                       setHasUnsavedChanges(true);
                     }}
-                    className="h-full w-full resize-none border-none bg-background p-4 font-mono text-foreground text-xs leading-relaxed outline-none selection:bg-primary/20 focus:ring-0"
-                    placeholder="Empty file content..."
+                    className="h-full w-full resize-none border-none bg-background p-4 font-mono text-foreground text-xs leading-relaxed outline-none selection:bg-primary/20 focus-visible:ring-2 focus-visible:ring-primary/50"
+                    placeholder="Empty file content…"
                     spellCheck={false}
+                    aria-label={`Editing ${selectedFilePath}`}
                   />
                 )}
               </div>
@@ -916,6 +1028,8 @@ export function ContainerFileExplorer({
             </Label>
             <Input
               id="item-name"
+              name="item-name"
+              autoComplete="off"
               placeholder={
                 newItemModal === "directory" ? "my-folder" : "config.env"
               }
@@ -975,6 +1089,9 @@ export function ContainerFileExplorer({
             </Label>
             <Input
               id="rename-path"
+              name="rename-path"
+              autoComplete="off"
+              aria-label="New file path"
               value={newRenamePath}
               onChange={(e) => setNewRenamePath(e.target.value)}
               className="font-mono text-xs"

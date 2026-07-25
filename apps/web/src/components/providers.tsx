@@ -4,6 +4,7 @@ import { organizationPlugin } from "@better-auth-ui/core/plugins";
 import { AuthProvider } from "@better-auth-ui/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@upstand/ui/components/sonner";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { queryClient } from "@/utils/trpc";
@@ -26,9 +27,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           plugins={[organizationPlugin()]}
           navigate={(options) => {
             if (options.replace) {
-              router.replace(options.to as any);
+              router.replace(options.to as Route);
             } else {
-              router.push(options.to as any);
+              router.push(options.to as Route);
             }
           }}
         >

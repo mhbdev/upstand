@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 export default function MonitoringRedirectPage() {
   useEffect(() => {
-    redirect("/observation?tab=monitoring" as any);
+    redirect("/observation?tab=monitoring");
   }, []);
 
   return null;

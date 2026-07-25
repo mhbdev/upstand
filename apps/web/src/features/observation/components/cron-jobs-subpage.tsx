@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@upstand/api/router";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -63,7 +65,11 @@ export function CronJobsSubpage() {
   const [timespan, setTimespan] = useState<"24h" | "7d" | "30d">("30d");
   const [status, setStatus] = useState<"all" | "success" | "failed">("all");
   const [search, setSearch] = useState("");
-  const [viewingLogJob, setViewingLogJob] = useState<any | null>(null);
+  type ObservabilityItem =
+    inferRouterOutputs<AppRouter>["schedule"]["listObservability"]["items"][number];
+  const [viewingLogJob, setViewingLogJob] = useState<ObservabilityItem | null>(
+    null,
+  );
 
   const observabilityQuery = useQuery({
     ...trpc.schedule.listObservability.queryOptions({

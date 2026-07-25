@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
+import { certificate } from "./certificate";
 
 export const s3Destination = pgTable(
   "s3_destination",
@@ -16,6 +17,9 @@ export const s3Destination = pgTable(
     bucket: text("bucket").notNull(),
     region: text("region").notNull(),
     endpoint: text("endpoint").notNull(),
+    certificateId: text("certificate_id").references(() => certificate.id, {
+      onDelete: "set null",
+    }),
     additionalFlags: text("additional_flags").default("[]").notNull(), // JSON array of flags as string
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -32,5 +36,9 @@ export const s3DestinationRelations = relations(s3Destination, ({ one }) => ({
   organization: one(organization, {
     fields: [s3Destination.organizationId],
     references: [organization.id],
+  }),
+  certificate: one(certificate, {
+    fields: [s3Destination.certificateId],
+    references: [certificate.id],
   }),
 }));

@@ -30,6 +30,10 @@ import {
   validateImageFile,
 } from "@/lib/icon-utils";
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export interface EditableEntityIconProps {
   icon?: string | null;
   defaultIcon: React.ReactNode;
@@ -142,8 +146,8 @@ export function EditableEntityIcon({
       setIsProcessing(true);
       const dataUri = await compressAndConvertToDataUri(file, 256);
       setSelectedIcon(dataUri);
-    } catch (err: any) {
-      setValidationError(err.message || "Failed to process image file");
+    } catch (error: unknown) {
+      setValidationError(errorMessage(error) || "Failed to process image file");
     } finally {
       setIsProcessing(false);
     }
@@ -171,8 +175,8 @@ export function EditableEntityIcon({
         `Changed ${entityType} icon for "${entityName}" successfully`,
       );
       setModalOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save icon");
+    } catch (error: unknown) {
+      toast.error(errorMessage(error) || "Failed to save icon");
     } finally {
       setIsSaving(false);
     }
@@ -185,8 +189,8 @@ export function EditableEntityIcon({
       await onSaveIcon(null);
       toast.success(`Reset icon for "${entityName}" to default`);
       setModalOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to reset icon");
+    } catch (error: unknown) {
+      toast.error(errorMessage(error) || "Failed to reset icon");
     } finally {
       setIsSaving(false);
     }
@@ -278,7 +282,9 @@ export function EditableEntityIcon({
             <Tabs
               value={activeTab}
               onValueChange={(v) => {
-                setActiveTab(v as any);
+                if (v === "upload" || v === "presets" || v === "url") {
+                  setActiveTab(v);
+                }
                 setValidationError(null);
               }}
             >

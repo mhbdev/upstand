@@ -4,6 +4,7 @@ import { Button } from "@upstand/ui/components/button";
 import { Tabs, TabsList, TabsTrigger } from "@upstand/ui/components/tabs";
 import { cn } from "@upstand/ui/lib/utils";
 import { useState } from "react";
+import type { BundledLanguage } from "shiki";
 import { toast } from "sonner";
 import { CodeBlock as ShikiCodeBlock } from "@/components/ai-elements/code-block";
 import { Check, Copy, Download } from "@/components/huge-icons";
@@ -26,6 +27,69 @@ interface PerfectCodeBlockProps {
   showCopy?: boolean;
   showDownload?: boolean;
   className?: string;
+}
+
+function normalizeLanguage(language: string): BundledLanguage {
+  switch (language.toLowerCase().trim()) {
+    case "bash":
+    case "sh":
+    case "shell":
+      return "shellscript";
+    case "c#":
+    case "csharp":
+      return "csharp";
+    case "docker":
+      return "dockerfile";
+    case "js":
+      return "javascript";
+    case "md":
+      return "markdown";
+    case "ps1":
+    case "powershell":
+      return "powershell";
+    case "py":
+      return "python";
+    case "rb":
+      return "ruby";
+    case "ts":
+      return "typescript";
+    case "yml":
+      return "yaml";
+    case "css":
+      return "css";
+    case "cpp":
+      return "cpp";
+    case "go":
+      return "go";
+    case "html":
+      return "html";
+    case "java":
+      return "java";
+    case "json":
+      return "json";
+    case "kotlin":
+    case "kt":
+      return "kotlin";
+    case "php":
+      return "php";
+    case "rust":
+    case "rs":
+      return "rust";
+    case "scss":
+      return "scss";
+    case "sql":
+      return "sql";
+    case "swift":
+      return "swift";
+    case "tsx":
+      return "tsx";
+    case "xml":
+      return "xml";
+    case "zsh":
+      return "shellscript";
+    default:
+      return "javascript";
+  }
 }
 
 function getDownloadFilename(
@@ -201,7 +265,7 @@ export function CodeBlock({
         {/* Shiki highlighted body */}
         <ShikiCodeBlock
           code={currentTab.code}
-          language={currentTab.language as any}
+          language={normalizeLanguage(currentTab.language)}
           showLineNumbers={showLineNumbers}
           className="m-0 rounded-none border-none bg-transparent shadow-none [&_pre]:p-4"
         />
@@ -285,7 +349,7 @@ export function CodeBlock({
 
       <ShikiCodeBlock
         code={displayCode}
-        language={displayLang as any}
+        language={normalizeLanguage(displayLang)}
         showLineNumbers={showLineNumbers}
         className="m-0 rounded-none border-none bg-transparent shadow-none [&_pre]:p-4"
       />

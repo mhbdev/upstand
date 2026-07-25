@@ -210,7 +210,7 @@ export default function SSHKeys(_props: {
     },
   });
 
-  const handleGenerate = (e: React.FormEvent) => {
+  const handleGenerate = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!orgId) {
       toast.error("No active organization found");
@@ -228,7 +228,7 @@ export default function SSHKeys(_props: {
     });
   };
 
-  const handleImport = (e: React.FormEvent) => {
+  const handleImport = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!orgId) {
       toast.error("No active organization found");
@@ -261,7 +261,7 @@ export default function SSHKeys(_props: {
     }
   };
 
-  const handleUpdate = (e: React.FormEvent) => {
+  const handleUpdate = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!orgId || !editingKey) return;
     const hasPrivate = Boolean(rotationPrivateKey.trim());

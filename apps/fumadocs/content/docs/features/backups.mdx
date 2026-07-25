@@ -30,9 +30,22 @@ sequenceDiagram
 
 ---
 
-## Storage Destinations
+## Storage Destinations & S3 Encryption
 
-The S3 destination form accepts a name, provider, access key, secret access key, bucket, region, optional endpoint, and optional additional flags. The UI is designed for AWS S3 and compatible services such as Cloudflare R2, Wasabi, and DigitalOcean Spaces. Always test the connection after changing credentials or endpoints.
+The S3 destination form accepts a name, provider, access key, secret access key, bucket, region, optional endpoint, custom CA certificate, and optional additional flags. The UI supports AWS S3 and compatible services such as Cloudflare R2, Wasabi, DigitalOcean Spaces, and self-hosted MinIO. Always test the connection after changing credentials or endpoints.
+
+### Custom CA Certificates for Private S3 Endpoints
+
+When connecting to private or self-hosted S3 storage (such as MinIO or internal S3 clusters using custom or self-signed TLS certificates), you can select an uploaded Custom CA Certificate (from **Infrastructure → Certificates**). Upstand automatically injects `--ca-cert=<path>` into the underlying rclone backup and restore streams.
+
+### S3 Server-Side Encryption (SSE) Support
+
+Upstand supports S3 Server-Side Encryption for all scheduled and **on-demand backups and restores**:
+- **SSE-S3 (AES256)**: Amazon S3-managed keys (`--s3-server-side-encryption=AES256`).
+- **SSE-KMS (AWS KMS)**: AWS Key Management Service keys (`--s3-server-side-encryption=aws:kms` and `--s3-sse-kms-key-id=<kms-key-arn>`).
+- **SSE-C (Customer Key)**: Customer-provided encryption keys (`--s3-sse-customer-algorithm=AES256` and `--s3-sse-customer-key=<key>`).
+
+All encryption headers are applied transparently by rclone on both backup push and restore pull streams. Safe S3 encryption parameters are also supported during S3 connection testing.
 
 ---
 

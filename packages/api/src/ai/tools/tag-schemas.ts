@@ -5,8 +5,8 @@ export const tagSchema = z.object({
   organizationId: z.string(),
   name: z.string(),
   color: z.string(),
-  createdAt: z.any(),
-  updatedAt: z.any(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 export const tagsSchema = z.array(tagSchema);
 export const createTagSchema = z.object({

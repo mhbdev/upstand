@@ -1,5 +1,7 @@
 "use client";
 
+import { GitBranchFreeIcons } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { AIFeature } from "@upstand/domain";
 import {
@@ -96,7 +98,13 @@ export function FeatureAssignmentsSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">AI Feature Routing</CardTitle>
+        <CardTitle className="flex flex-row items-center gap-2 text-sm">
+          <HugeiconsIcon
+            icon={GitBranchFreeIcons}
+            className="size-4 text-primary"
+          />
+          AI Feature Routing
+        </CardTitle>
         <CardDescription className="text-xs">
           Link your added AI provider configurations to specific UpGal
           operations. If no provider is selected, we fall back to the first

@@ -52,7 +52,6 @@ const validatedEnv = createEnv({
     UPGAL_MCP_SERVERS: z.string().optional(),
     UPGAL_WEB_SEARCH_API_KEY: z.string().optional(),
     UPGAL_WEB_SEARCH_BASE_URL: z
-      .string()
       .url()
       .default("https://api.search.brave.com/res/v1/web/search"),
     UPSTAND_INSTANCE_OWNER_USER_ID: z.string().min(1).optional(),
@@ -64,9 +63,7 @@ const validatedEnv = createEnv({
     UPSTAND_BASE_URL: z.url().optional(),
     APP_URL: z.url().optional(),
     UPSTAND_POSTGRES_CONTAINER: z.string().min(1).optional(),
-    SSH_KEY_ENCRYPTION_KEY_V1: isTest
-      ? z.string().optional()
-      : z.string().min(1),
+    ENCRYPTION_KEY_V1: isTest ? z.string().optional() : z.string().min(1),
     UPSTAND_GIT_PROVIDER_ALLOWED_HOSTS: z.string().optional(),
     UPSTAND_DOCKER_VERSION: z.string().min(1).optional(),
     UPSTAND_VERSION: z.string().min(1).optional(),
@@ -94,9 +91,9 @@ const validatedEnv = createEnv({
 });
 
 export const env = new Proxy(validatedEnv, {
-  get(target, prop) {
+  get(target: typeof validatedEnv, prop: string | symbol, receiver: unknown) {
     if (process.env.NODE_ENV === "test") {
-      const val = process.env[prop as string];
+      const val = typeof prop === "string" ? process.env[prop] : undefined;
       if (val !== undefined) {
         if (prop === "IS_CLOUD" || prop === "UPSTAND_AUTO_UPDATE") {
           return val === "true" || val === "1";
@@ -107,10 +104,15 @@ export const env = new Proxy(validatedEnv, {
         return val;
       }
     }
-    return (target as any)[prop];
+    return Reflect.get(target, prop, receiver);
   },
-}) as typeof validatedEnv;
+});
 
 if (!process.env.NODE_ENV) {
-  (process.env as any).NODE_ENV = env.NODE_ENV;
+  Object.defineProperty(process.env, "NODE_ENV", {
+    configurable: true,
+    enumerable: true,
+    value: env.NODE_ENV,
+    writable: true,
+  });
 }

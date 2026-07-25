@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 export default function DeploymentsRedirectPage() {
   useEffect(() => {
-    redirect("/observation?tab=deployments" as any);
+    redirect("/observation?tab=deployments");
   }, []);
 
   return null;

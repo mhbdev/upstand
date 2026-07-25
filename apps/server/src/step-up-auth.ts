@@ -9,5 +9,3 @@ export type { StepUpSession };
 export { isStepUpVerificationValid, stepUpKey };
 export const isStepUpAuthenticationSatisfied =
   stepUp.isStepUpAuthenticationSatisfied;
-export const recordStepUpVerification = stepUp.recordStepUpVerification;
-export const clearStepUpVerification = stepUp.clearStepUpVerification;

@@ -10,9 +10,7 @@ import type {
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
-  CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@upstand/ui/components/card";
@@ -63,9 +61,11 @@ import {
   Mail,
   MessageCircle,
   MessageSquare,
+  Pencil,
   PlusIcon,
   Radio,
   Send,
+  Trash2,
   Users,
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
@@ -413,6 +413,16 @@ const EVENT_OPTIONS: Array<{
     description: "When a platform update starts a restart.",
   },
   {
+    value: "upstand_update_available",
+    label: "Upstand update available",
+    description: "When a newer Upstand release is detected.",
+  },
+  {
+    value: "upstand_update_completed",
+    label: "Upstand update completed",
+    description: "When an Upstand update has finished restarting its services.",
+  },
+  {
     value: "cluster_initialized",
     label: "Cluster initialized",
     description: "When Docker Swarm is initialized.",
@@ -662,7 +672,7 @@ export default function NotificationsPage() {
     return configuration;
   };
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (events.length === 0) {
       toast.error("Select at least one notification action");
@@ -729,11 +739,11 @@ export default function NotificationsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {channels.map((channel) => (
-            <Card key={channel.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+            <Card key={channel.id} className="gap-3 py-4">
+              <CardHeader className="px-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
                       {(() => {
                         const ProviderIcon = PROVIDERS[channel.provider].icon;
                         return (
@@ -742,57 +752,61 @@ export default function NotificationsPage() {
                       })()}
                     </span>
                     <div className="min-w-0">
-                      <CardTitle className="truncate">{channel.name}</CardTitle>
-                      <CardDescription>
-                        {PROVIDERS[channel.provider].label}
+                      <CardTitle className="truncate text-sm">
+                        {channel.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {PROVIDERS[channel.provider].label} ·{" "}
+                        {channel.events.length} action
+                        {channel.events.length === 1 ? "" : "s"}
                       </CardDescription>
                     </div>
                   </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      title="Test channel"
+                      aria-label="Test channel"
+                      onClick={() => testChannel.mutate({ id: channel.id })}
+                      disabled={testChannel.isPending}
+                    >
+                      {testChannel.isPending ? (
+                        <Spinner />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      title="Edit channel"
+                      aria-label="Edit channel"
+                      onClick={() => {
+                        setEditing(channel);
+                        setDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="size-8 text-destructive hover:text-destructive"
+                      title="Remove channel"
+                      aria-label="Remove channel"
+                      onClick={() =>
+                        setRemoveTarget({ id: channel.id, name: channel.name })
+                      }
+                      disabled={removeChannel.isPending}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm">
-                  {channel.events.length} action
-                  {channel.events.length === 1 ? "" : "s"} enabled
-                </p>
-              </CardContent>
-              <CardFooter className="flex flex-wrap justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => testChannel.mutate({ id: channel.id })}
-                  disabled={testChannel.isPending}
-                >
-                  {testChannel.isPending ? (
-                    <>
-                      <Spinner data-icon="inline-start" />
-                      Testing…
-                    </>
-                  ) : (
-                    "Test Channel"
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditing(channel);
-                    setDialogOpen(true);
-                  }}
-                >
-                  Edit Channel
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() =>
-                    setRemoveTarget({ id: channel.id, name: channel.name })
-                  }
-                  disabled={removeChannel.isPending}
-                >
-                  Remove Channel
-                </Button>
-              </CardFooter>
             </Card>
           ))}
         </div>
@@ -814,82 +828,101 @@ export default function NotificationsPage() {
               operational events it should receive.
             </DialogDescription>
           </DialogHeader>
+
           <form
             onSubmit={submit}
-            className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto overscroll-contain px-6 pt-5 pb-0"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="notification-provider">
-                  Provider
-                </FieldLabel>
-                <Select
-                  value={provider}
-                  onValueChange={(next) =>
-                    changeProvider(next as NotificationProviderType)
-                  }
-                >
-                  <SelectTrigger id="notification-provider" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {providerOptions.map(([value, item]) => (
-                        <SelectItem key={value} value={value}>
-                          <item.icon aria-hidden="true" className="size-4" />
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="notification-name">Name</FieldLabel>
-                <Input
-                  id="notification-name"
-                  required
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Production alerts"
-                />
-              </Field>
-            </FieldGroup>
-
-            <ProviderForm
-              provider={provider}
-              values={values}
-              editing={Boolean(editing)}
-              onChange={(key, value) =>
-                setValues((current) => ({ ...current, [key]: value }))
-              }
-            />
-
-            <FieldSet>
-              <FieldLegend>Select the actions</FieldLegend>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {EVENT_OPTIONS.map((option) => (
-                  <Field
-                    key={option.value}
-                    orientation="horizontal"
-                    className="rounded-xl border p-4"
+            <div className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain px-6 pt-5 pb-6">
+              <FieldGroup className="flex flex-row">
+                <Field className="flex-1">
+                  <FieldLabel htmlFor="notification-provider">
+                    Provider
+                  </FieldLabel>
+                  <Select
+                    value={provider}
+                    onValueChange={(next) =>
+                      changeProvider(next as NotificationProviderType)
+                    }
                   >
-                    <FieldContent>
-                      <FieldTitle>{option.label}</FieldTitle>
-                      <FieldDescription>{option.description}</FieldDescription>
-                    </FieldContent>
-                    <Switch
-                      checked={events.includes(option.value)}
-                      onCheckedChange={(checked) =>
-                        toggleEvent(option.value, checked)
-                      }
-                    />
-                  </Field>
-                ))}
-              </div>
-            </FieldSet>
+                    <SelectTrigger
+                      id="notification-provider"
+                      className="w-full"
+                    >
+                      {(() => {
+                        const ProviderIcon = PROVIDERS[provider].icon;
+                        return (
+                          <span className="flex items-center gap-2">
+                            <ProviderIcon
+                              aria-hidden="true"
+                              className="size-4"
+                            />
+                            <SelectValue />
+                          </span>
+                        );
+                      })()}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {providerOptions.map(([value, item]) => (
+                          <SelectItem key={value} value={value}>
+                            <item.icon aria-hidden="true" className="size-4" />
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field className="flex-1">
+                  <FieldLabel htmlFor="notification-name">Name</FieldLabel>
+                  <Input
+                    id="notification-name"
+                    required
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Production alerts"
+                  />
+                </Field>
+              </FieldGroup>
 
-            <DialogFooter className="sticky bottom-0 -mx-6 mt-auto border-border/60 border-t bg-popover/95 px-6 py-4 backdrop-blur supports-backdrop-filter:bg-popover/80">
+              <ProviderForm
+                provider={provider}
+                values={values}
+                editing={Boolean(editing)}
+                onChange={(key, value) =>
+                  setValues((current) => ({ ...current, [key]: value }))
+                }
+              />
+
+              <FieldSet>
+                <FieldLegend>Select the actions</FieldLegend>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {EVENT_OPTIONS.map((option) => (
+                    <Field
+                      key={option.value}
+                      orientation="horizontal"
+                      className="rounded-xl border p-4"
+                    >
+                      <FieldContent>
+                        <FieldTitle>{option.label}</FieldTitle>
+                        <FieldDescription>
+                          {option.description}
+                        </FieldDescription>
+                      </FieldContent>
+                      <Switch
+                        checked={events.includes(option.value)}
+                        onCheckedChange={(checked) =>
+                          toggleEvent(option.value, checked)
+                        }
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </FieldSet>
+            </div>
+
+            <DialogFooter className="shrink-0 border-border/60 border-t bg-popover/95 px-6 py-4 backdrop-blur supports-backdrop-filter:bg-popover/80">
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>

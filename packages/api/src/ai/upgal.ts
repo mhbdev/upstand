@@ -74,6 +74,7 @@ import {
   stepCountIs,
   type ToolExecutionOptions,
   ToolLoopAgent,
+  type ToolSet,
   type UIMessage,
 } from "ai";
 import { log, type RequestLogger } from "evlog";
@@ -85,12 +86,7 @@ import { connectUpGalMCPApps } from "./mcp-apps";
 import { listUpGalModelCatalog } from "./model-catalog";
 import { getUpGalProvider, type UpGalProviderOverrides } from "./provider";
 import { createTavilyToolsForOrg } from "./tavily-tools";
-import {
-  mutationTool,
-  readTool,
-  type UpGalExecutableTool,
-  type UpGalToolContext,
-} from "./tools/factory";
+import { mutationTool, readTool, type UpGalToolContext } from "./tools/factory";
 import { resourceTagSchema } from "./tools/tag-schemas";
 import type { UpGalTagTools } from "./tools/tag-tools";
 import { createUpGalTagTools } from "./tools/tag-tools";
@@ -405,10 +401,16 @@ export const UPGAL_TOOL_METADATA = [
 ] as const;
 
 type UpGalToolRegistry = {
-  [Name in UpGalToolName]: UpGalExecutableTool<any, any>;
+  [Name in Exclude<
+    UpGalToolName,
+    keyof UpGalTagTools | keyof UpGalUiTools | keyof UpGalWebSearchTools
+  >]: UpGalRegisteredTool;
 } & UpGalTagTools &
   UpGalUiTools &
   UpGalWebSearchTools;
+type UpGalRegisteredTool = NonNullable<ToolSet[string]> & {
+  execute: NonNullable<NonNullable<ToolSet[string]>["execute"]>;
+};
 export type UpGalTools = UpGalToolRegistry;
 export type UpGalUIMessage = UIMessage<
   unknown,
@@ -731,8 +733,8 @@ const templateOutputSchema = z
     version: z.string().optional(),
     logoUrl: z.string().optional(),
     links: z.record(z.string(), z.string().optional()).optional(),
-    createdAt: z.any().optional(),
-    updatedAt: z.any().optional(),
+    createdAt: z.unknown().optional(),
+    updatedAt: z.unknown().optional(),
   })
   .describe("Template metadata and Compose definition.");
 const listTemplatesOutputSchema = z.object({
@@ -753,8 +755,8 @@ const projectOutputSchema = z
     id: z.string().describe("Stable project ID."),
     name: z.string().describe("Human-readable project name."),
     organizationId: z.string().describe("Owning organization ID."),
-    createdAt: z.any().describe("Project creation timestamp."),
-    updatedAt: z.any().describe("Most recent project update timestamp."),
+    createdAt: z.unknown().describe("Project creation timestamp."),
+    updatedAt: z.unknown().describe("Most recent project update timestamp."),
   })
   .describe("A project record.");
 const projectsOutputSchema = z
@@ -803,17 +805,19 @@ export const UPGAL_TOOL_INPUT_SCHEMAS: Record<UpGalToolName, z.ZodType> = {
   list_tags: emptySchema,
   get_resource_tags: resourceTagSchema.pick({ resourceId: true }),
   search_web: webSearchSchema,
-  tavilySearch: z.any(),
-  tavilyExtract: z.any(),
-  tavilyCrawl: z.any(),
-  tavilyMap: z.any(),
+  tavilySearch: z.unknown(),
+  tavilyExtract: z.unknown(),
+  tavilyCrawl: z.unknown(),
+  tavilyMap: z.unknown(),
   guide_upstand: guideUpstandSchema,
   create_project: createProjectSchema,
   create_template: templateLookupSchema,
   create_environment: createEnvironmentSchema,
   deploy_resource: idSchema,
   control_resource: controlResourceSchema,
-  delete_resource: idSchema,
+  delete_resource: idSchema.extend({
+    deleteVolumes: z.boolean().optional(),
+  }),
   delete_project: idSchema,
   prune_docker_resources: pruneDockerSchema,
   exec_container_command: execContainerCommandSchema,
@@ -850,7 +854,7 @@ const environmentOutputSchema = z
     name: z.string().describe("Human-readable environment name."),
     slug: z.string().describe("URL-safe environment slug."),
     description: z
-      .any()
+      .unknown()
       .optional()
       .describe("Optional explanation of the environment."),
     isDefault: z
@@ -862,8 +866,10 @@ const environmentOutputSchema = z
     resourceCount: z
       .number()
       .describe("Number of resources in the environment."),
-    createdAt: z.any().describe("Environment creation timestamp."),
-    updatedAt: z.any().describe("Most recent environment update timestamp."),
+    createdAt: z.unknown().describe("Environment creation timestamp."),
+    updatedAt: z
+      .unknown()
+      .describe("Most recent environment update timestamp."),
   })
   .describe("An environment record.");
 const environmentsOutputSchema = z
@@ -886,27 +892,36 @@ const resourceOutputSchema = z
       .describe("Resource type, such as application or database."),
     status: z.string().describe("Current resource lifecycle status."),
     provider: z.string().describe("Deployment or source provider."),
-    appName: z.any().optional().describe("Optional deployed application name."),
-    description: z.any().optional().describe("Optional resource description."),
-    dbType: z.any().optional().describe("Optional database engine type."),
-    composeType: z.any().optional().describe("Optional Compose resource type."),
+    appName: z
+      .unknown()
+      .optional()
+      .describe("Optional deployed application name."),
+    description: z
+      .unknown()
+      .optional()
+      .describe("Optional resource description."),
+    dbType: z.unknown().optional().describe("Optional database engine type."),
+    composeType: z
+      .unknown()
+      .optional()
+      .describe("Optional Compose resource type."),
     dockerImage: z
-      .any()
+      .unknown()
       .optional()
       .describe("Optional Docker image reference."),
     buildConfig: z.string().describe("Serialized build configuration."),
     advancedConfig: z
-      .any()
+      .unknown()
       .optional()
       .describe("Serialized advanced configuration."),
     domains: z.string().describe("Serialized domain mappings."),
     envVars: z.string().describe("Redacted environment variables."),
     serverId: z
-      .any()
+      .unknown()
       .optional()
       .describe("Assigned server ID, or null for local."),
-    createdAt: z.any().describe("Resource creation timestamp."),
-    updatedAt: z.any().describe("Most recent resource update timestamp."),
+    createdAt: z.unknown().describe("Resource creation timestamp."),
+    updatedAt: z.unknown().describe("Most recent resource update timestamp."),
   })
   .describe("A deployable resource record.");
 const resourcesOutputSchema = z
@@ -918,11 +933,17 @@ const serverOutputSchema = z
     id: z.string().describe("Stable server ID."),
     organizationId: z.string().describe("Owning organization ID."),
     name: z.string().describe("Human-readable server name."),
-    description: z.any().optional().describe("Optional server description."),
+    description: z
+      .unknown()
+      .optional()
+      .describe("Optional server description."),
     serverType: z
       .enum(["deploy", "build", "database"])
       .describe("Server role."),
-    sshKeyId: z.any().optional().describe("Configured SSH key ID, if present."),
+    sshKeyId: z
+      .unknown()
+      .optional()
+      .describe("Configured SSH key ID, if present."),
     ipAddress: z.string().describe("Server IP address."),
     port: z.number().describe("SSH port."),
     username: z.string().describe("SSH username."),
@@ -932,8 +953,8 @@ const serverOutputSchema = z
     status: z
       .enum(["idle", "setting_up", "ready", "failed"])
       .describe("Current server setup status."),
-    createdAt: z.any().describe("Server creation timestamp."),
-    updatedAt: z.any().describe("Most recent server update timestamp."),
+    createdAt: z.unknown().describe("Server creation timestamp."),
+    updatedAt: z.unknown().describe("Most recent server update timestamp."),
   })
   .describe("A configured server record.");
 const serversOutputSchema = z
@@ -960,8 +981,8 @@ const deploymentOutputSchema = z
     resourceType: z.string().describe("Resource type."),
     environmentName: z.string().describe("Environment name."),
     projectName: z.string().describe("Project name."),
-    serverId: z.any().describe("Target server ID, if assigned."),
-    serverName: z.any().describe("Target server name, if assigned."),
+    serverId: z.unknown().describe("Target server ID, if assigned."),
+    serverName: z.unknown().describe("Target server name, if assigned."),
     title: z.string().describe("Deployment title."),
     status: z.string().describe("Deployment status."),
     logs: z.string().describe("Deployment log output."),
@@ -1014,7 +1035,7 @@ const dockerContainersOutputSchema = z
       networks: z.array(z.string()).describe("Attached Docker networks."),
       labels: z.array(z.string()).describe("Container labels."),
       createdAt: z
-        .any()
+        .unknown()
         .describe("Container creation timestamp, if available."),
     }),
   )
@@ -1025,7 +1046,9 @@ const dockerImagesOutputSchema = z
       id: z.string().describe("Image ID."),
       tags: z.array(z.string()).describe("Image repository tags."),
       sizeBytes: z.number().describe("Image size in bytes."),
-      createdAt: z.any().describe("Image creation timestamp, if available."),
+      createdAt: z
+        .unknown()
+        .describe("Image creation timestamp, if available."),
     }),
   )
   .describe("Docker image records.");
@@ -1220,6 +1243,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
       async () =>
         run(GetProjectsUseCaseToken).execute({
           organizationId: context.organizationId,
+          includeArchived: false,
         }),
       projectsOutputSchema,
     ),
@@ -1314,7 +1338,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
           organizationId: context.organizationId,
           ...input,
         }),
-      z.any(),
+      z.unknown(),
     ),
     list_deployments: readTool(
       "Read recent deployment history enriched with project and environment names.",
@@ -1337,7 +1361,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
           limit: input.pageSize,
           offset: (input.page - 1) * input.pageSize,
         }),
-      z.any(),
+      z.unknown(),
     ),
     get_docker_info: readTool(
       "Read Docker engine status. Omit serverId or use 'local' to inspect the local engine.",
@@ -1394,19 +1418,19 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         const project = await assertProject(context, id);
         return project;
       },
-      z.any(),
+      z.unknown(),
     ),
     get_environment: readTool(
       "Read one environment with its current metadata.",
       idSchema,
       async ({ id }) => assertEnvironment(context, id),
-      z.any(),
+      z.unknown(),
     ),
     get_resource: readTool(
       "Read one resource with safe, non-secret deployment metadata.",
       idSchema,
       async ({ id }) => redactResource(await assertResource(context, id)),
-      z.any(),
+      z.unknown(),
     ),
     get_resource_containers: readTool(
       "Read live containers belonging to a resource.",
@@ -1415,7 +1439,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await assertResource(context, id);
         return run(GetResourceContainersUseCaseToken).execute({ id });
       },
-      z.any(),
+      z.unknown(),
     ),
     get_resource_previews: readTool(
       "Read preview deployments for a resource.",
@@ -1424,7 +1448,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await assertResource(context, id);
         return run(GetResourcePreviewsUseCaseToken).execute({ id });
       },
-      z.any(),
+      z.unknown(),
     ),
     get_resource_routing_targets: readTool(
       "Read runtime routing targets for a resource.",
@@ -1433,7 +1457,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await assertResource(context, id);
         return run(GetResourceRoutingTargetsUseCaseToken).execute({ id });
       },
-      z.any(),
+      z.unknown(),
     ),
     list_resource_backup_schedules: readTool(
       "Read backup schedules configured for a resource.",
@@ -1442,7 +1466,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await assertResource(context, id);
         return run(GetBackupSchedulesUseCaseToken).execute({ resourceId: id });
       },
-      z.any(),
+      z.unknown(),
     ),
     list_resource_backup_runs: readTool(
       "Read backup run history for a resource.",
@@ -1454,7 +1478,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
           limit,
         });
       },
-      z.any(),
+      z.unknown(),
     ),
     list_backup_volumes: readTool(
       "Read backup-capable volumes for a resource.",
@@ -1463,7 +1487,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await assertResource(context, id);
         return run(ListBackupVolumesUseCaseToken).execute({ resourceId: id });
       },
-      z.any(),
+      z.unknown(),
     ),
     list_git_providers: readTool(
       "Read configured Git providers with secrets redacted.",
@@ -1472,7 +1496,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         run(GetGitProvidersUseCaseToken).execute({
           organizationId: context.organizationId,
         }),
-      z.any(),
+      z.unknown(),
     ),
     list_docker_registries: readTool(
       "Read configured Docker registries with credentials redacted.",
@@ -1486,7 +1510,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
           hasPassword: Boolean(_password),
         }));
       },
-      z.any(),
+      z.unknown(),
     ),
     search_upstand: readTool(
       "Search projects, environments, and resources by name.",
@@ -1497,25 +1521,25 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
           query,
           limit,
         }),
-      z.any(),
+      z.unknown(),
     ),
     get_swarm_info: readTool(
       "Read local Docker Swarm health and manager state.",
       emptySchema,
       async () => run(GetSwarmInfoUseCaseToken).execute(),
-      z.any(),
+      z.unknown(),
     ),
     get_swarm_nodes: readTool(
       "Read Docker Swarm node health and availability.",
       emptySchema,
       async () => run(GetSwarmNodesUseCaseToken).execute(),
-      z.any(),
+      z.unknown(),
     ),
     get_swarm_containers: readTool(
       "Read Docker Swarm task and service health.",
       emptySchema,
       async () => run(GetSwarmContainersUseCaseToken).execute(),
-      z.any(),
+      z.unknown(),
     ),
     get_web_server_logs: readTool(
       "Read recent Upstand web-server logs.",
@@ -1527,7 +1551,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
       "Read the current Upstand update status.",
       emptySchema,
       async () => run(GetUpdateStatusUseCaseToken).execute(),
-      z.any(),
+      z.unknown(),
     ),
     ...createUpGalTagTools(context),
     ...createUpGalWebSearchTools(context),
@@ -1597,10 +1621,12 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
     ),
     delete_resource: mutationTool(
       "Permanently delete a resource and its deployment configuration. This cannot be undone and requires approval.",
-      idSchema,
-      async ({ id }) => {
+      idSchema.extend({
+        deleteVolumes: z.boolean().optional(),
+      }),
+      async ({ id, deleteVolumes }) => {
         await assertResource(context, id);
-        return run(DeleteResourceUseCaseToken).execute({ id });
+        return run(DeleteResourceUseCaseToken).execute({ id, deleteVolumes });
       },
       deletionOutputSchema,
     ),
@@ -1653,7 +1679,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await assertResource(context, resourceId);
         return run(GetSchedulesUseCaseToken).execute({ resourceId });
       },
-      z.array(z.any()),
+      z.array(z.unknown()),
     ),
     create_schedule: mutationTool(
       "Create a new schedule for a resource after approval.",
@@ -1668,7 +1694,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await run(GeneralSchedulerToken).refresh();
         return res;
       },
-      z.any(),
+      z.unknown(),
     ),
     update_schedule: mutationTool(
       "Update an existing schedule for a resource after approval.",
@@ -1684,7 +1710,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await run(GeneralSchedulerToken).refresh();
         return res;
       },
-      z.any(),
+      z.unknown(),
     ),
     delete_schedule: mutationTool(
       "Delete a schedule after approval.",
@@ -1699,7 +1725,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await run(GeneralSchedulerToken).refresh();
         return res;
       },
-      z.any(),
+      z.unknown(),
     ),
     trigger_schedule: mutationTool(
       "Run a schedule immediately after approval.",
@@ -1713,7 +1739,7 @@ function createUpGalToolRegistry(context: UpGalBaseContext): UpGalToolRegistry {
         await run(GeneralSchedulerToken).executeNow(id);
         return { success: true };
       },
-      z.any(),
+      z.unknown(),
     ),
   } as UpGalToolRegistry;
   return tools;

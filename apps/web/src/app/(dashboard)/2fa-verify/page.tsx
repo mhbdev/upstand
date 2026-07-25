@@ -31,7 +31,7 @@ export default function TwoFactorVerifyPage() {
 
   const { data: session } = authClient.useSession();
 
-  const handleVerify = async (e: React.FormEvent) => {
+  const handleVerify = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!code.trim()) return;
 

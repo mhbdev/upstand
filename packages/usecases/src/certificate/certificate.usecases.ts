@@ -13,7 +13,8 @@ const privateKeyPem = z
   .string()
   .min(1)
   .refine(
-    (value) => /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(value),
+    (value) =>
+      /-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----/.test(value),
     "Private key must be PEM encoded",
   );
 

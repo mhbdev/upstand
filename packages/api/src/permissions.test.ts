@@ -25,26 +25,28 @@ mock.module("@upstand/db/schema/auth", () => {
 });
 
 // Dynamic mock storage for database queries
-let mockDbRows: any[] = [];
-const dbSelectSpy = mock((..._args: any[]) => {});
-const dbWhereSpy = mock((..._args: any[]) => {});
+let mockDbRows: unknown[] = [];
+const dbSelectSpy = mock((..._args: unknown[]) => {});
+const dbWhereSpy = mock((..._args: unknown[]) => {});
 
 mock.module("@upstand/db", () => {
   const chain = {
     from: mock(() => chain),
-    where: mock((...args: any[]) => {
+    where: mock((...args: unknown[]) => {
       dbWhereSpy(...args);
       return chain;
     }),
     orderBy: mock(() => chain),
     limit: mock(() => chain),
     // biome-ignore lint/suspicious/noThenProperty: mock thenable object
-    then: mock((callback: any) => Promise.resolve(callback(mockDbRows))),
+    then: mock((callback: (rows: unknown[]) => unknown) =>
+      Promise.resolve(callback(mockDbRows)),
+    ),
   };
 
   return {
     db: {
-      select: mock((...args: any[]) => {
+      select: mock((...args: unknown[]) => {
         dbSelectSpy(...args);
         return chain;
       }),

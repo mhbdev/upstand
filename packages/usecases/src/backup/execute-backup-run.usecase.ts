@@ -73,10 +73,22 @@ export class ExecuteBackupRunUseCase {
       );
     }
 
+    const caCert = destination.certificateId
+      ? await this.uow.certificateRepository.findById(destination.certificateId)
+      : null;
+    const effectiveDestination = caCert
+      ? Object.assign({}, destination, {
+          caCertificatePem: caCert.certificatePem,
+        })
+      : destination;
+
     try {
       const fileKey =
         schedule.kind === "web-server"
-          ? await this.runtime.createWebServerBackup(schedule, destination)
+          ? await this.runtime.createWebServerBackup(
+              schedule,
+              effectiveDestination,
+            )
           : await withBackupRuntime(
               this.uow,
               resource as NonNullable<typeof resource>,
@@ -85,7 +97,7 @@ export class ExecuteBackupRunUseCase {
                 runtime.createBackup(
                   schedule,
                   resource as NonNullable<typeof resource>,
-                  destination,
+                  effectiveDestination,
                 ),
             );
       const completed = await this.uow.backupRunRepository.updateById(run.id, {
@@ -100,7 +112,11 @@ export class ExecuteBackupRunUseCase {
       if (schedule.restoreVerification) {
         try {
           if (schedule.kind === "web-server") {
-            await this.runtime.verifyBackup(schedule, destination, fileKey);
+            await this.runtime.verifyBackup(
+              schedule,
+              effectiveDestination,
+              fileKey,
+            );
           } else {
             await withBackupRuntime(
               this.uow,
@@ -109,7 +125,7 @@ export class ExecuteBackupRunUseCase {
               (runtime) =>
                 runtime.verifyBackup(
                   schedule,
-                  destination,
+                  effectiveDestination,
                   fileKey,
                   resource as NonNullable<typeof resource>,
                 ),
@@ -138,7 +154,7 @@ export class ExecuteBackupRunUseCase {
       await this.enforceRetention(
         schedule.id,
         schedule.retentionCount,
-        destination,
+        effectiveDestination,
       );
       await this.publishOutcome({
         organizationId,

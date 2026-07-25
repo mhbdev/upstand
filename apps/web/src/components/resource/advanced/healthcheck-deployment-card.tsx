@@ -215,6 +215,7 @@ export function HealthcheckDeploymentCard({
       enabled: config.postDeployHook?.enabled ?? false,
       command: config.postDeployHook?.command ?? "",
       timeoutSeconds: config.postDeployHook?.timeoutSeconds ?? 300,
+      onFailure: config.postDeployHook?.onFailure ?? "warn",
       ...partial,
     });
 
@@ -531,7 +532,8 @@ export function HealthcheckDeploymentCard({
               <FieldLabel>Post-Deploy Hook Command</FieldLabel>
               <FieldDescription>
                 Command executed inside the container after healthchecks pass
-                and live traffic is active (e.g. <code>npm run seed</code>).
+                and live traffic is active (e.g.{" "}
+                <code>npx prisma migrate deploy</code>).
               </FieldDescription>
               <div className="mb-2 flex items-center gap-3">
                 <Switch
@@ -545,16 +547,58 @@ export function HealthcheckDeploymentCard({
                 <span className="text-sm">Enable Post-Deploy Hook</span>
               </div>
               {config.postDeployHook?.enabled && (
-                <Input
-                  placeholder="e.g. npm run seed"
-                  value={config.postDeployHook?.command ?? ""}
-                  onChange={(e) =>
-                    updatePostDeployHook({
-                      command: e.target.value,
-                      enabled: true,
-                    })
-                  }
-                />
+                <div className="mt-3 flex flex-col gap-3">
+                  <Input
+                    placeholder="e.g. npx prisma migrate deploy"
+                    value={config.postDeployHook?.command ?? ""}
+                    onChange={(e) =>
+                      updatePostDeployHook({
+                        command: e.target.value,
+                        enabled: true,
+                      })
+                    }
+                  />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <FieldLabel className="text-xs">
+                        Timeout (seconds)
+                      </FieldLabel>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={1800}
+                        value={config.postDeployHook?.timeoutSeconds ?? 300}
+                        onChange={(e) =>
+                          updatePostDeployHook({
+                            timeoutSeconds:
+                              Number.parseInt(e.target.value, 10) || 300,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel className="text-xs">
+                        Failure Action
+                      </FieldLabel>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:font-medium file:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={config.postDeployHook?.onFailure ?? "warn"}
+                        onChange={(e) =>
+                          updatePostDeployHook({
+                            onFailure: e.target.value as "warn" | "fail",
+                          })
+                        }
+                      >
+                        <option value="warn">
+                          Log Warning &amp; Continue Deployment
+                        </option>
+                        <option value="fail">
+                          Fail Deployment &amp; Trigger Rollback
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               )}
             </Field>
           </>

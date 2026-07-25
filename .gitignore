@@ -53,5 +53,6 @@ coverage
 # Misc
 *.tgz
 .cache
+.builds/
 tmp
 temp

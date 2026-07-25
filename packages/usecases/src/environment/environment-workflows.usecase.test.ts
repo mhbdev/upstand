@@ -7,9 +7,7 @@ import {
   PromoteEnvironmentUseCase,
 } from "./environment-workflows.usecase";
 
-process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 9).toString(
-  "base64",
-);
+process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 9).toString("base64");
 
 function environment(
   id: string,

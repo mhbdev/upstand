@@ -61,7 +61,7 @@ function harness() {
     resourceRepository: {
       findByEnvironmentId: async () => [service],
     },
-  } as any;
+  } as never;
   const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
     execute: async (input) => {
       queuedInputs.push(input);
@@ -156,7 +156,7 @@ describe("source webhook processing", () => {
       resourceRepository: {
         findByEnvironmentId: async () => [service],
       },
-    } as any;
+    } as never;
     const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
       execute: async ({ resourceId }) => queued.push(resourceId),
     }));
@@ -205,7 +205,7 @@ describe("source webhook processing", () => {
       resourceRepository: {
         findByEnvironmentId: async () => [service],
       },
-    } as any;
+    } as never;
     const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
       execute: async ({ resourceId }) => queued.push(resourceId),
     }));
@@ -261,7 +261,7 @@ describe("source webhook processing", () => {
       resourceRepository: {
         findByEnvironmentId: async () => [service],
       },
-    } as any;
+    } as never;
     const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
       execute: async ({ resourceId }) => queued.push(resourceId),
     }));
@@ -323,7 +323,7 @@ describe("source webhook processing", () => {
         resourceRepository: {
           findByEnvironmentId: async () => [svc],
         },
-      } as any;
+      } as never;
       const useCase = new ProcessSourceWebhookUseCase(uow, () => ({
         execute: async ({ resourceId }: { resourceId: string }) =>
           queued.push(resourceId),

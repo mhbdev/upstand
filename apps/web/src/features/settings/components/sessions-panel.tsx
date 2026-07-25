@@ -13,6 +13,15 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 
+interface ActiveSession {
+  id: string;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  updatedAt: string | Date;
+  active?: boolean;
+  token?: string | null;
+}
+
 function parseUA(ua: string): string {
   if (!ua) return "Unknown Browser";
   let browser = "Unknown";
@@ -66,7 +75,7 @@ export function SessionsPanel() {
           </p>
         ) : (
           <div className="flex flex-col divide-y">
-            {sessions.map((s: any) => {
+            {sessions.map((s: ActiveSession) => {
               const ip =
                 !s.ipAddress ||
                 ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(s.ipAddress)
@@ -79,7 +88,7 @@ export function SessionsPanel() {
                 >
                   <div className="grid min-w-0 flex-1 gap-0.5 text-sm">
                     <span className="truncate font-medium">
-                      {parseUA(s.userAgent)}
+                      {parseUA(s.userAgent ?? "")}
                     </span>
                     <span className="text-muted-foreground text-xs">
                       {ip} · Last active{" "}

@@ -1,5 +1,20 @@
 import { requestJson } from "./http";
 
+interface BitbucketRepository {
+  slug: string;
+  name: string;
+  workspace: { slug: string };
+}
+
+interface BitbucketBranch {
+  name: string;
+}
+
+interface BitbucketPage<T> {
+  values: T[];
+  next?: string;
+}
+
 export function getBitbucketHeaders(
   username: string,
   appPassword: string,
@@ -18,12 +33,12 @@ export async function getBitbucketRepositories(
 ): Promise<{ id: string; name: string; fullName: string; owner: string }[]> {
   const owner = workspaceName || username;
   let url = `https://api.bitbucket.org/2.0/repositories/${owner}?pagelen=100`;
-  let repositories: any[] = [];
+  let repositories: BitbucketRepository[] = [];
 
   const headers = getBitbucketHeaders(username, appPassword);
 
   while (url) {
-    const data = await requestJson<{ values: any[]; next?: string }>(
+    const data = await requestJson<BitbucketPage<BitbucketRepository>>(
       url,
       {
         method: "GET",
@@ -56,7 +71,7 @@ export async function getBitbucketBranches(
   const headers = getBitbucketHeaders(username, appPassword);
 
   while (url) {
-    const data = await requestJson<{ values: any[]; next?: string }>(
+    const data = await requestJson<BitbucketPage<BitbucketBranch>>(
       url,
       {
         method: "GET",

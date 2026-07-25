@@ -11,7 +11,10 @@ import {
   isSafeSshHost,
   isSafeSshUsername,
 } from "@upstand/platform/ssh/validate";
-import type { DockerInfrastructureResolverPort } from "@upstand/usecases/ports/docker";
+import type {
+  DockerInfrastructureResolverPort,
+  DockerServicePort,
+} from "@upstand/usecases/ports/docker";
 import Docker from "dockerode";
 import { Client } from "ssh2";
 import { CaddyService } from "../caddy/caddy.service";
@@ -26,7 +29,7 @@ const remoteDockerProxies = new Map<string, RemoteProxyEntry>();
 
 export function getDockerInstance(): Docker {
   const isWindows = process.platform === "win32";
-  const isBun = typeof (process as any).versions.bun !== "undefined";
+  const isBun = typeof process.versions.bun !== "undefined";
 
   if (isWindows && isBun) {
     ensureDockerProxy();
@@ -97,7 +100,7 @@ function ensureRemoteDockerProxy(
   const proxy = net.createServer((socket) => {
     const bufferedChunks: Buffer[] = [];
     let streamReady = false;
-    let targetStream: any = null;
+    let targetStream: NodeJS.ReadWriteStream | null = null;
 
     let socketEnded = false;
 
@@ -106,7 +109,7 @@ function ensureRemoteDockerProxy(
         ? chunk
         : typeof chunk === "string"
           ? Buffer.from(chunk)
-          : Buffer.from(chunk as any);
+          : Buffer.from(chunk);
       if (streamReady && targetStream) {
         targetStream.write(buf);
       } else {
@@ -256,8 +259,8 @@ export async function resolveDockerCliEnvironmentForServer(
 export async function resolveDockerServiceForServer(
   serverId: string | null | undefined,
   uow: IUnitOfWork,
-  defaultDockerService: DockerService,
-): Promise<{ dockerService: DockerService; cleanup: () => void }> {
+  defaultDockerService: DockerServicePort,
+): Promise<{ dockerService: DockerServicePort; cleanup: () => void }> {
   if (!serverId || serverId === "local" || serverId === "manager") {
     return { dockerService: defaultDockerService, cleanup: () => {} };
   }
@@ -304,10 +307,10 @@ export async function resolveDockerServiceForServer(
 export async function resolveServicesForResource(
   resource: Resource,
   uow: IUnitOfWork,
-  defaultDockerService: DockerService,
+  defaultDockerService: DockerServicePort,
   defaultCaddyService: CaddyService,
 ): Promise<{
-  dockerService: DockerService;
+  dockerService: DockerServicePort;
   caddyService: CaddyService;
   cleanup: () => void;
 }> {

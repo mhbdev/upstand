@@ -21,6 +21,7 @@ import {
   Tag01Icon,
   UserGroupIcon,
 } from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { getUpGalNavigationTarget } from "@upstand/api/ai/upgal-ui-targets";
@@ -73,7 +74,31 @@ import { SettingsDialog } from "@/features/settings";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
-const NAVIGATION_GROUPS = [
+type NavigationPath = `/${string}`;
+type NavigationItem = {
+  title: string;
+  href: NavigationPath;
+  icon?: IconSvgElement;
+  items?: readonly NavigationItem[];
+};
+type NavigationGroup = {
+  title: string;
+  items: readonly NavigationItem[];
+};
+type CollapsibleNavigationItem = NavigationItem & {
+  icon: IconSvgElement;
+  items: readonly NavigationItem[];
+};
+
+function isCollapsibleNavigationItem(
+  item: NavigationItem,
+): item is CollapsibleNavigationItem {
+  return (
+    item.icon !== undefined && item.items !== undefined && item.items.length > 0
+  );
+}
+
+const NAVIGATION_GROUPS: readonly NavigationGroup[] = [
   {
     title: "Workloads",
     items: [
@@ -145,16 +170,37 @@ const NAVIGATION_GROUPS = [
   },
 ];
 
+const FLAT_NAVIGATION_ITEMS: NavigationItem[] = NAVIGATION_GROUPS.flatMap(
+  (group) =>
+    group.items.flatMap((item) =>
+      item.items ? [item, ...item.items] : [item],
+    ),
+);
+
+function getCurrentNavigationItem(
+  pathname: string,
+  currentTab: string | null,
+): NavigationItem | undefined {
+  return FLAT_NAVIGATION_ITEMS.find((item) => {
+    if (item.href.includes("?")) {
+      const [path, query] = item.href.split("?");
+      const targetTab = new URLSearchParams(query).get("tab");
+      return pathname === path && currentTab === targetTab;
+    }
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  });
+}
+
 function CollapsibleMenuItem({
   item,
   pathname,
   currentTab,
 }: {
-  item: any;
+  item: CollapsibleNavigationItem;
   pathname: string;
   currentTab: string | null;
 }) {
-  const isChildActive = item.items.some((subItem: any) => {
+  const isChildActive = item.items.some((subItem: NavigationItem) => {
     if (subItem.href.includes("?")) {
       const [path, query] = subItem.href.split("?");
       const targetTab = new URLSearchParams(query).get("tab");
@@ -197,7 +243,7 @@ function CollapsibleMenuItem({
         />
         <CollapsibleContent>
           <SidebarMenuSub>
-            {item.items.map((subItem: any) => {
+            {item.items.map((subItem: NavigationItem) => {
               const isSubActive = (() => {
                 if (subItem.href.includes("?")) {
                   const [path, query] = subItem.href.split("?");
@@ -241,7 +287,7 @@ function DashboardSidebarGroup({
   pathname,
   isCollapsed,
 }: {
-  group: any;
+  group: NavigationGroup;
   pathname: string;
   isCollapsed: boolean;
 }) {
@@ -251,10 +297,8 @@ function DashboardSidebarGroup({
   const content = (
     <SidebarGroupContent className={isCollapsed ? undefined : "mt-1"}>
       <SidebarMenu>
-        {group.items.map((item: any) => {
-          const hasSubItems = item.items && item.items.length > 0;
-
-          if (hasSubItems) {
+        {group.items.map((item: NavigationItem) => {
+          if (isCollapsibleNavigationItem(item)) {
             return (
               <CollapsibleMenuItem
                 key={item.title}
@@ -264,6 +308,8 @@ function DashboardSidebarGroup({
               />
             );
           }
+
+          if (item.icon === undefined) return null;
 
           return (
             <SidebarMenuItem key={item.title}>
@@ -356,22 +402,7 @@ function BreadcrumbTitle({
   const searchParams = useSearchParams();
   const currentTab = searchParams.get("tab");
 
-  const flatNavItems = NAVIGATION_GROUPS.flatMap((group) =>
-    group.items.flatMap((item: any) => {
-      if (item.items) {
-        return [item, ...item.items];
-      }
-      return [item];
-    }),
-  );
-  const currentNav = flatNavItems.find((item) => {
-    if (item.href.includes("?")) {
-      const [path, query] = item.href.split("?");
-      const targetTab = new URLSearchParams(query).get("tab");
-      return pathname === path && currentTab === targetTab;
-    }
-    return pathname === item.href || pathname.startsWith(`${item.href}/`);
-  });
+  const currentNav = getCurrentNavigationItem(pathname, currentTab);
 
   return (
     <BreadcrumbPage className="max-w-[min(48vw,16rem)] truncate">
@@ -390,22 +421,7 @@ function ChatWrapper({
   const searchParams = useSearchParams();
   const currentTab = searchParams.get("tab");
 
-  const flatNavItems = NAVIGATION_GROUPS.flatMap((group) =>
-    group.items.flatMap((item: any) => {
-      if (item.items) {
-        return [item, ...item.items];
-      }
-      return [item];
-    }),
-  );
-  const currentNav = flatNavItems.find((item) => {
-    if (item.href.includes("?")) {
-      const [path, query] = item.href.split("?");
-      const targetTab = new URLSearchParams(query).get("tab");
-      return pathname === path && currentTab === targetTab;
-    }
-    return pathname === item.href || pathname.startsWith(`${item.href}/`);
-  });
+  const currentNav = getCurrentNavigationItem(pathname, currentTab);
 
   return (
     <UpGalChat organizationId={organizationId} pageTitle={currentNav?.title} />

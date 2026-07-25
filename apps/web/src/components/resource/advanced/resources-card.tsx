@@ -1,5 +1,6 @@
 "use client";
 
+import type { ResourceAdvancedConfig } from "@upstand/domain";
 import {
   Card,
   CardContent,
@@ -28,6 +29,12 @@ import {
 } from "@upstand/ui/components/select";
 import { Textarea } from "@upstand/ui/components/textarea";
 import type { AdvancedCardProps } from "./types";
+
+type RestartCondition = ResourceAdvancedConfig["restartPolicy"]["condition"];
+
+function isRestartCondition(value: string): value is RestartCondition {
+  return value === "any" || value === "none" || value === "on-failure";
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Unit-adorned number input helper
@@ -180,10 +187,10 @@ export function ResourcesCard({ config, onChange }: AdvancedCardProps) {
             <Select
               value={config.restartPolicy.condition}
               onValueChange={(condition) => {
-                if (condition) {
+                if (condition && isRestartCondition(condition)) {
                   onChange("restartPolicy", {
                     ...config.restartPolicy,
-                    condition: condition as "any" | "none" | "on-failure",
+                    condition,
                   });
                 }
               }}

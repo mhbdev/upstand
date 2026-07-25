@@ -8,9 +8,14 @@ export async function resolveDockerInspectionTarget(
     organizationId: string;
     serverId?: string;
   },
+  options: {
+    localName?: string;
+    localServerIds?: readonly string[];
+  } = {},
 ): Promise<DockerInspectionTarget> {
-  if (!input.serverId || input.serverId === "local") {
-    return { kind: "local", name: "Local Docker" };
+  const localServerIds = options.localServerIds ?? ["local"];
+  if (!input.serverId || localServerIds.includes(input.serverId)) {
+    return { kind: "local", name: options.localName ?? "Local Docker" };
   }
   const server = await uow.serverRepository.findById(input.serverId);
   if (!server || server.organizationId !== input.organizationId) {

@@ -4,6 +4,7 @@ import type {
   SecretProviderConfiguration,
   SecretScopeType,
   SecretVersion,
+  SecretVersionPayload,
 } from "@upstand/domain";
 import {
   decryptSecret,
@@ -167,6 +168,20 @@ export class ListSecretVersionsUseCase {
     return this.uow.secretVersionRepository.findByScope(
       input.scopeType,
       input.scopeId,
+    );
+  }
+}
+
+export class GetSecretVersionUseCase {
+  constructor(private readonly uow: IUnitOfWork) {}
+
+  execute(
+    input: z.infer<typeof RestoreSecretVersionInputSchema>,
+  ): Promise<SecretVersionPayload | null> {
+    return this.uow.secretVersionRepository.findByScopeVersion(
+      input.scopeType,
+      input.scopeId,
+      input.version,
     );
   }
 }

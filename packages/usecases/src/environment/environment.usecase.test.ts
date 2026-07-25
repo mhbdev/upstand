@@ -1,4 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import type {
+  CreateEnvironmentDTO,
+  Environment,
+  IEnvironmentRepository,
+  UpdateEnvironmentDTO,
+} from "@upstand/domain";
 import { ValidationError } from "@upstand/domain";
 import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { CreateEnvironmentUseCase } from "./create-environment.usecase";
@@ -8,24 +14,37 @@ import {
   UpdateEnvironmentUseCase,
 } from "./update-environment.usecase";
 
-process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
-  "base64",
-);
+process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
-class MockEnvironmentRepository {
-  public store: any[] = [];
+class MockEnvironmentRepository implements IEnvironmentRepository {
+  public store: Environment[] = [];
+  public ancestorChain: Environment[] = [];
 
-  async findById(id: string) {
+  async findById(id: string): Promise<Environment | null> {
     return this.store.find((e) => e.id === id) || null;
   }
 
-  async findByProjectId(projectId: string) {
+  async findByProjectId(projectId: string): Promise<Environment[]> {
     return this.store.filter((e) => e.projectId === projectId);
   }
 
-  async create(data: any) {
-    const item = {
+  async findAncestors(): Promise<Environment[]> {
+    return this.ancestorChain;
+  }
+
+  async create(data: CreateEnvironmentDTO): Promise<Environment> {
+    const item: Environment = {
       ...data,
+      id: data.id ?? `environment-${this.store.length + 1}`,
+      projectId: data.projectId,
+      parentEnvironmentId: data.parentEnvironmentId ?? null,
+      inheritsVariables: data.inheritsVariables ?? false,
+      name: data.name,
+      slug: data.slug,
+      description: data.description ?? null,
+      isDefault: data.isDefault ?? false,
+      isProtected: data.isProtected ?? false,
+      resourceCount: data.resourceCount ?? 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -33,24 +52,58 @@ class MockEnvironmentRepository {
     return item;
   }
 
-  async updateEnvironment(id: string, patch: any) {
+  async updateEnvironment(
+    id: string,
+    patch: UpdateEnvironmentDTO,
+  ): Promise<Environment | null> {
     const index = this.store.findIndex((e) => e.id === id);
     if (index === -1) return null;
+    const existing = this.store[index];
+    if (!existing) return null;
     this.store[index] = {
-      ...this.store[index],
+      ...existing,
       ...patch,
       updatedAt: new Date(),
     };
     return this.store[index];
   }
 
-  async deleteById(id: string) {
+  async updateById(
+    id: string,
+    patch: Partial<CreateEnvironmentDTO>,
+  ): Promise<Environment | null> {
+    return this.updateEnvironment(id, {
+      name: patch.name,
+      description: patch.description,
+      parentEnvironmentId: patch.parentEnvironmentId,
+      inheritsVariables: patch.inheritsVariables,
+    });
+  }
+
+  async findMany(): Promise<Environment[]> {
+    return this.store;
+  }
+
+  async createMany(values: CreateEnvironmentDTO[]): Promise<Environment[]> {
+    return Promise.all(values.map((value) => this.create(value)));
+  }
+
+  async incrementResourceCount(id: string, delta: number): Promise<void> {
+    const environment = await this.findById(id);
+    if (environment) environment.resourceCount += delta;
+  }
+
+  async deleteById(id: string): Promise<boolean> {
     const index = this.store.findIndex((e) => e.id === id);
     if (index > -1) {
       this.store.splice(index, 1);
       return true;
     }
     return false;
+  }
+
+  async count(): Promise<number> {
+    return this.store.length;
   }
 }
 
@@ -110,29 +163,54 @@ describe("Environment Usecases", () => {
   });
 
   test("resolves inherited variables from the current environment toward its parent", async () => {
-    const parent = {
+    const parent: Environment = {
       id: "parent",
+      projectId: "project-1",
       parentEnvironmentId: null,
       inheritsVariables: false,
+      name: "Parent",
+      slug: "parent",
+      description: null,
+      isDefault: false,
+      isProtected: false,
+      resourceCount: 0,
       envVars: JSON.stringify({ PARENT: "parent-value" }),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-    const child = {
+    const child: Environment = {
       id: "child",
+      projectId: "project-1",
       parentEnvironmentId: "parent",
       inheritsVariables: false,
+      name: "Child",
+      slug: "child",
+      description: null,
+      isDefault: false,
+      isProtected: false,
+      resourceCount: 0,
       envVars: JSON.stringify({ CHILD: "child-value" }),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-    const grandchild = {
+    const grandchild: Environment = {
       id: "grandchild",
+      projectId: "project-1",
       parentEnvironmentId: "child",
       inheritsVariables: true,
+      name: "Grandchild",
+      slug: "grandchild",
+      description: null,
+      isDefault: false,
+      isProtected: false,
+      resourceCount: 0,
       envVars: JSON.stringify({ GRANDCHILD: "grandchild-value" }),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-    const uow = {
-      environmentRepository: {
-        findAncestors: async () => [grandchild, child, parent],
-      },
-    } as any;
+    const repository = new MockEnvironmentRepository();
+    repository.ancestorChain = [grandchild, child, parent];
+    const uow = mockUnitOfWork({ environmentRepository: repository });
 
     await expect(
       resolveEnvironmentVariables(uow, grandchild.id),
@@ -155,7 +233,9 @@ describe("Environment Usecases", () => {
     });
 
     // Manually mark it default
-    uow.environmentRepository.store[0].isDefault = true;
+    const environment = uow.environmentRepository.store[0];
+    if (!environment) throw new Error("Expected created environment");
+    environment.isDefault = true;
 
     expect(deleteUseCase.execute({ id: env.id })).rejects.toThrow(
       ValidationError,
@@ -175,7 +255,9 @@ describe("Environment Usecases", () => {
     });
 
     // Manually update resourceCount
-    uow.environmentRepository.store[0].resourceCount = 1;
+    const environment = uow.environmentRepository.store[0];
+    if (!environment) throw new Error("Expected created environment");
+    environment.resourceCount = 1;
 
     expect(deleteUseCase.execute({ id: env.id })).rejects.toThrow(
       ValidationError,

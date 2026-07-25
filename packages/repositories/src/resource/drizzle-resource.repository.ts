@@ -1,9 +1,4 @@
-import {
-  resource,
-  resourceConfiguration,
-  resourceSecret,
-  secretVersion,
-} from "@upstand/db";
+import { resource, resourceConfiguration, resourceSecret } from "@upstand/db";
 import type {
   CreateResourceDTO,
   IResourceRepository,
@@ -15,6 +10,7 @@ import {
   ValidationError,
 } from "@upstand/domain";
 import { and, count, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { DrizzleSecretVersionRepository } from "../secret/drizzle-secret-version.repository";
 import { isPostgresUniqueViolation } from "../shared/database-errors";
 import type { Executor } from "../shared/types";
 
@@ -252,8 +248,7 @@ export class DrizzleResourceRepository implements IResourceRepository {
       resourceId,
       ...secrets,
     });
-    await this.executor.insert(secretVersion).values({
-      id: `secret-${resourceId}-1`,
+    await new DrizzleSecretVersionRepository(this.executor).append({
       scopeType: "resource",
       scopeId: resourceId,
       version: secrets.version,
@@ -317,19 +312,15 @@ export class DrizzleResourceRepository implements IResourceRepository {
       .where(eq(resourceSecret.resourceId, resourceId))
       .limit(1);
     if (updated) {
-      await this.executor
-        .insert(secretVersion)
-        .values({
-          id: `secret-${resourceId}-${nextVersion}`,
-          scopeType: "resource",
-          scopeId: resourceId,
-          version: nextVersion,
-          credentials: updated.credentials,
-          buildSecrets: updated.buildSecrets,
-          envVars: updated.envVars,
-          source: "local",
-        })
-        .onConflictDoNothing();
+      await new DrizzleSecretVersionRepository(this.executor).append({
+        scopeType: "resource",
+        scopeId: resourceId,
+        version: nextVersion,
+        credentials: updated.credentials,
+        buildSecrets: updated.buildSecrets,
+        envVars: updated.envVars,
+        source: "local",
+      });
     }
   }
 }

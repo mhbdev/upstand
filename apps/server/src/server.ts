@@ -2,7 +2,10 @@ import { auth } from "@upstand/api/auth";
 import { closeDb } from "@upstand/db";
 import { env } from "@upstand/env/server";
 import { closeRedis, redis } from "@upstand/redis";
-import { GetWebServerSettingsUseCaseToken } from "@upstand/usecases/tokens";
+import {
+  GetWebServerSettingsUseCaseToken,
+  PublishNotificationUseCaseToken,
+} from "@upstand/usecases/tokens";
 import { type DrainContext, initLogger, log } from "evlog";
 import {
   type BetterAuthInstance,
@@ -131,6 +134,29 @@ initializeMonitoring().catch((err) => {
 });
 
 log.info({ message: "Upstand Control Plane API Server started 🚀" });
+
+const completedUpdateVersion = process.env.UPSTAND_UPDATE_COMPLETION_VERSION;
+if (completedUpdateVersion) {
+  setTimeout(() => {
+    const scope = getServiceProvider().createScope();
+    void scope
+      .resolve(PublishNotificationUseCaseToken)
+      .execute({
+        event: "upstand_update_completed",
+        idempotencyKey: `upstand-update-completed:${completedUpdateVersion}`,
+        title: "Upstand update completed",
+        message: `Upstand has finished updating to version ${completedUpdateVersion}.`,
+        metadata: { version: completedUpdateVersion },
+      })
+      .catch((error: unknown) => {
+        log.warn({
+          message: "Unable to queue Upstand update completion notification",
+          err: error instanceof Error ? error.message : error,
+        });
+      })
+      .finally(() => scope.dispose());
+  }, 15_000).unref?.();
+}
 
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;

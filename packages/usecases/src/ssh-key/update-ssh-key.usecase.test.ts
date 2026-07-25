@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import type { IUnitOfWork } from "@upstand/domain";
 import { generateEd25519KeyPair } from "@upstand/platform/ssh/keygen";
 import { GetSshKeysUseCase } from "./get-ssh-keys.usecase";
 import { UpdateSshKeyUseCase } from "./update-ssh-key.usecase";
@@ -26,7 +27,7 @@ function makeKey() {
 
 describe("SSH key lifecycle", () => {
   beforeEach(() => {
-    process.env.SSH_KEY_ENCRYPTION_KEY_V1 = TEST_KEY;
+    process.env.ENCRYPTION_KEY_V1 = TEST_KEY;
   });
 
   test("rotates a key pair and encrypts the replacement private key", async () => {
@@ -35,7 +36,7 @@ describe("SSH key lifecycle", () => {
       generateEd25519KeyPair("replacement");
     let patch: Record<string, unknown> | undefined;
     const uow = {
-      transaction: async (work: (tx: any) => Promise<unknown>) =>
+      transaction: async (work: (tx: never) => Promise<unknown>) =>
         work({
           sshKeyRepository: {
             findById: async () => current,
@@ -44,10 +45,12 @@ describe("SSH key lifecycle", () => {
               return { ...current, ...input };
             },
           },
-        }),
-    } as any;
+        } as never),
+    };
 
-    const result = await new UpdateSshKeyUseCase(uow).execute({
+    const result = await new UpdateSshKeyUseCase(
+      uow as unknown as IUnitOfWork,
+    ).execute({
       id: current.id,
       organizationId: current.organizationId,
       privateKey,
@@ -67,7 +70,7 @@ describe("SSH key lifecycle", () => {
 
   test("requires both halves of a rotated key pair", async () => {
     await expect(
-      new UpdateSshKeyUseCase({} as any).execute({
+      new UpdateSshKeyUseCase({} as unknown as IUnitOfWork).execute({
         id: "key-1",
         organizationId: "org-1",
         publicKey: "ssh-ed25519 invalid",
@@ -78,15 +81,17 @@ describe("SSH key lifecycle", () => {
   test("redacts encrypted material from organization list responses", async () => {
     const key = makeKey();
     const uow = {
-      transaction: async (work: (tx: any) => Promise<unknown>) =>
+      transaction: async (work: (tx: never) => Promise<unknown>) =>
         work({
           sshKeyRepository: {
             findByOrganizationId: async () => [key],
           },
-        }),
-    } as any;
+        } as never),
+    };
 
-    const [view] = await new GetSshKeysUseCase(uow).execute({
+    const [view] = await new GetSshKeysUseCase(
+      uow as unknown as IUnitOfWork,
+    ).execute({
       organizationId: "org-1",
     });
     expect(view).toMatchObject({ id: key.id, publicKey: key.publicKey });

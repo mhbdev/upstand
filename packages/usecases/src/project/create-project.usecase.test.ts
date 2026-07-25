@@ -1,13 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import type {
+  CreateEnvironmentDTO,
+  CreateProjectDTO,
+  Environment,
   IEnvironmentRepository,
   IProjectRepository,
+  IUserRepository,
+  Project,
+  UpdateProjectDTO,
 } from "@upstand/domain";
 import { mockUnitOfWork } from "../testing/mock-unit-of-work";
 import { CreateProjectUseCase } from "./create-project.usecase";
 
 class MockEnvironmentRepository implements IEnvironmentRepository {
-  public created: Array<Record<string, unknown>> = [];
+  public created: CreateEnvironmentDTO[] = [];
 
   async findById() {
     return null;
@@ -17,9 +23,22 @@ class MockEnvironmentRepository implements IEnvironmentRepository {
     return [];
   }
 
-  async create(data: any) {
+  async create(data: CreateEnvironmentDTO): Promise<Environment> {
     this.created.push(data);
-    return { ...data, createdAt: new Date(), updatedAt: new Date() };
+    return {
+      id: data.id ?? `environment-${this.created.length}`,
+      projectId: data.projectId,
+      parentEnvironmentId: data.parentEnvironmentId ?? null,
+      inheritsVariables: data.inheritsVariables ?? false,
+      name: data.name,
+      slug: data.slug,
+      description: data.description ?? null,
+      isDefault: data.isDefault ?? false,
+      isProtected: data.isProtected ?? false,
+      resourceCount: data.resourceCount ?? 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 
   async findMany() {
@@ -50,7 +69,7 @@ class MockEnvironmentRepository implements IEnvironmentRepository {
 }
 
 class MockProjectRepository implements IProjectRepository {
-  public created: Array<Record<string, unknown>> = [];
+  public created: CreateProjectDTO[] = [];
 
   async findById() {
     return null;
@@ -64,12 +83,21 @@ class MockProjectRepository implements IProjectRepository {
     return null;
   }
 
-  async create(data: any) {
+  async create(data: CreateProjectDTO): Promise<Project> {
     this.created.push(data);
-    return { ...data, createdAt: new Date(), updatedAt: new Date() };
+    return {
+      id: data.id ?? `project-${this.created.length}`,
+      name: data.name,
+      description: data.description ?? null,
+      organizationId: data.organizationId,
+      icon: data.icon ?? null,
+      archivedAt: data.archivedAt ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 
-  async updateById(_id: string, _patch: any) {
+  async updateById(_id: string, _patch: UpdateProjectDTO) {
     return null;
   }
 
@@ -83,15 +111,23 @@ describe("CreateProjectUseCase", () => {
     const uow = mockUnitOfWork({
       projectRepository: new MockProjectRepository(),
       environmentRepository: new MockEnvironmentRepository(),
-      userRepository: {
-        findById: async () => null,
-        findByEmail: async () => null,
-        create: async (data: any) => ({
-          ...data,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }),
-      } as any,
+      userRepository: (() => {
+        const repository: IUserRepository = {
+          findById: async () => null,
+          findByEmail: async () => null,
+          count: async () => 0,
+          create: async (data) => ({
+            id: data.id ?? "user-1",
+            name: data.name,
+            email: data.email,
+            emailVerified: data.emailVerified ?? false,
+            image: data.image ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        };
+        return repository;
+      })(),
     });
     const usecase = new CreateProjectUseCase(uow);
 

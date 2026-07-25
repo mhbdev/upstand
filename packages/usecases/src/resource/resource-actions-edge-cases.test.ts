@@ -7,17 +7,27 @@ import { RotateResourceWebhookTokenUseCase } from "./rotate-resource-webhook-tok
 import { UpdateResourceUseCase } from "./update-resource.usecase";
 import { generateWebhookToken, hashWebhookToken } from "./webhook-token";
 
-process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
-  "base64",
-);
+process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
+
+interface TestRecord {
+  id: string;
+  projectId?: string;
+  organizationId?: string;
+  name?: string;
+  appName?: string;
+  type?: string;
+  environmentId?: string;
+  resourceCount?: number;
+  [key: string]: unknown;
+}
 
 function createMockStoreUow() {
   const store = {
-    environments: [] as any[],
-    projects: [] as any[],
-    resources: [] as any[],
-    servers: [] as any[],
-    deployments: [] as any[],
+    environments: [] as TestRecord[],
+    projects: [] as TestRecord[],
+    resources: [] as TestRecord[],
+    servers: [] as TestRecord[],
+    deployments: [] as TestRecord[],
   };
 
   const environmentRepository = {
@@ -53,7 +63,7 @@ function createMockStoreUow() {
 
   const resourceRepository = {
     store: store.resources,
-    async create(data: any) {
+    async create(data: TestRecord) {
       const created = { ...data, createdAt: new Date(), updatedAt: new Date() };
       store.resources.push(created);
       return { ...created };
@@ -78,7 +88,7 @@ function createMockStoreUow() {
       );
       return dup ? { ...dup } : null;
     },
-    async updateById(id: string, patch: any) {
+    async updateById(id: string, patch: Partial<TestRecord>) {
       const r = store.resources.find((item) => item.id === id);
       if (r) {
         Object.assign(r, patch);
@@ -98,12 +108,12 @@ function createMockStoreUow() {
 
   const deploymentRepository = {
     store: store.deployments,
-    async create(data: any) {
+    async create(data: TestRecord) {
       const d = { ...data, createdAt: new Date() };
       store.deployments.push(d);
       return { ...d };
     },
-    async updateById(id: string, patch: any) {
+    async updateById(id: string, patch: Partial<TestRecord>) {
       const d = store.deployments.find((item) => item.id === id);
       if (d) Object.assign(d, patch);
       return d ? { ...d } : null;
@@ -117,7 +127,8 @@ function createMockStoreUow() {
     certificateRepository,
     resourceRepository,
     deploymentRepository,
-    transaction: async (fn: any) => fn(uow),
+    transaction: async (fn: (unitOfWork: never) => Promise<unknown>) =>
+      fn(uow as never),
     store,
   };
 
@@ -146,7 +157,7 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
   describe("CreateResourceUseCase Edge Cases", () => {
     test("rejects resource creation if environment does not exist", async () => {
       const uow = createMockStoreUow();
-      const useCase = new CreateResourceUseCase(uow as any);
+      const useCase = new CreateResourceUseCase(uow as never);
 
       expect(
         useCase.execute({
@@ -168,7 +179,7 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
         appName: "existing-app",
       });
 
-      const useCase = new CreateResourceUseCase(uow as any);
+      const useCase = new CreateResourceUseCase(uow as never);
 
       expect(
         useCase.execute({
@@ -195,7 +206,7 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
         appName: "app-two",
       });
 
-      const useCase = new UpdateResourceUseCase(uow as any, null as any);
+      const useCase = new UpdateResourceUseCase(uow as never, null as never);
 
       expect(
         useCase.execute({
@@ -214,7 +225,7 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
         environmentId: "env-1",
       });
 
-      const useCase = new UpdateResourceUseCase(uow as any, null as any);
+      const useCase = new UpdateResourceUseCase(uow as never, null as never);
 
       expect(
         useCase.execute({
@@ -237,7 +248,7 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
       uow.store.environments.push({ id: "env-1", projectId: "proj-1" });
       uow.store.projects.push({ id: "proj-1", organizationId: "org-1" });
 
-      const useCase = new UpdateResourceUseCase(uow as any, null as any);
+      const useCase = new UpdateResourceUseCase(uow as never, null as never);
 
       expect(
         useCase.execute({
@@ -260,9 +271,9 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
       };
 
       const useCase = new DeleteResourceUseCase(
-        uow as any,
-        mockCaddyService as any,
-        mockDockerService as any,
+        uow as never,
+        mockCaddyService as never,
+        mockDockerService as never,
       );
 
       expect(useCase.execute({ id: "missing-resource-id" })).rejects.toThrow(
@@ -280,7 +291,7 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
         type: "application",
       });
 
-      const useCase = new RebuildDatabaseUseCase(uow as any, {} as any);
+      const useCase = new RebuildDatabaseUseCase(uow as never, {} as never);
 
       expect(
         useCase.execute({ id: "app-resource-id", confirm: true }),
@@ -298,7 +309,7 @@ describe("Resource Actions Exhaustive Edge-Case Suite", () => {
         webhookTokenPrefix: "old-prefix",
       });
 
-      const useCase = new RotateResourceWebhookTokenUseCase(uow as any);
+      const useCase = new RotateResourceWebhookTokenUseCase(uow as never);
       const result = await useCase.execute({ id: "res-wh-1" });
 
       expect(result.token).toStartWith("upw_");

@@ -1,7 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
+import type { AppRouter } from "@upstand/api/router";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -30,6 +32,7 @@ import {
   TooltipTrigger,
 } from "@upstand/ui/components/tooltip";
 import { cn } from "@upstand/ui/lib/utils";
+import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -43,6 +46,7 @@ import { PageToolbar } from "@/components/dashboard/page-toolbar";
 import { EditableEntityIcon } from "@/components/editable-entity-icon";
 import {
   AlertTriangleIcon,
+  ArchiveRestore,
   CopyIcon,
   FolderIcon,
   Pencil,
@@ -66,13 +70,8 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
-interface Project {
-  id: string;
-  name: string;
-  description?: string | null;
-  icon?: string | null;
-  createdAt: Date | string;
-}
+type Project = inferRouterOutputs<AppRouter>["project"]["list"][number];
+type Environment = inferRouterOutputs<AppRouter>["environment"]["list"][number];
 
 function ProjectCard({
   project,
@@ -154,7 +153,7 @@ function ProjectCard({
           <div className="min-w-0">
             <CardTitle className="truncate text-base">
               <Link
-                href={`/projects/${project.id}` as any}
+                href={`/projects/${project.id}` as Route}
                 className="hover:underline"
               >
                 {project.name}
@@ -178,7 +177,9 @@ function ProjectCard({
             </CardDescription>
           </div>
         </div>
-        <Badge variant="success">Active</Badge>
+        <Badge variant={project.archivedAt ? "secondary" : "success"}>
+          {project.archivedAt ? "Archived" : "Active"}
+        </Badge>
       </CardHeader>
 
       {project.description && (
@@ -195,6 +196,31 @@ function ProjectCard({
         </span>
 
         <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={updateMutation.isPending}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    updateMutation.mutate({
+                      id: project.id,
+                      archived: !project.archivedAt,
+                    });
+                  }}
+                  aria-label={`${project.archivedAt ? "Restore" : "Archive"} project ${project.name}`}
+                >
+                  <ArchiveRestore aria-hidden="true" />
+                </Button>
+              }
+            />
+            <TooltipContent>
+              {project.archivedAt ? "Restore" : "Archive"}
+            </TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger
               render={
@@ -565,7 +591,7 @@ function DeleteProjectDialog({
   organizationId: string;
   onDeleted: () => void;
 }) {
-  const [envsWithResources, setEnvsWithResources] = useState<any[]>([]);
+  const [envsWithResources, setEnvsWithResources] = useState<Environment[]>([]);
   const [_checking, _setChecking] = useState(false);
 
   const { data: envs } = useQuery({
@@ -575,7 +601,7 @@ function DeleteProjectDialog({
 
   useEffect(() => {
     if (envs) {
-      const busy = envs.filter((e: any) => e.resourceCount > 0);
+      const busy = envs.filter((environment) => environment.resourceCount > 0);
       setEnvsWithResources(busy);
     }
   }, [envs]);
@@ -705,21 +731,28 @@ export default function Projects(_props: {
     description?: string | null;
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
-  const organizationId = organizationState.organizationId as string;
+  const organizationId =
+    organizationState.status === "ready"
+      ? organizationState.organizationId
+      : "";
 
   const {
     data: projects,
     isLoading: loadingProjects,
     refetch,
   } = useQuery({
-    ...trpc.project.list.queryOptions({ organizationId }),
+    ...trpc.project.list.queryOptions({
+      organizationId,
+      includeArchived: showArchived,
+    }),
     enabled: organizationState.status === "ready",
   });
 
   const filteredProjects =
-    projects?.filter((proj: any) =>
-      proj.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    projects?.filter((project) =>
+      project.name.toLowerCase().includes(searchQuery.toLowerCase()),
     ) ?? [];
 
   return (
@@ -738,18 +771,27 @@ export default function Projects(_props: {
         }
         icon={<FolderIcon className="size-6 text-primary" />}
         actions={
-          filteredProjects.length > 0 && (
-            <UpGalTarget definition={createProjectTarget}>
-              <Button
-                onClick={() => setCreateProjectOpen(true)}
-                className="gap-2 font-medium"
-                disabled={!organizationId}
-              >
-                <PlusIcon data-icon="inline-start" />
-                Create Project
-              </Button>
-            </UpGalTarget>
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowArchived((value) => !value)}
+            >
+              <ArchiveRestore data-icon="inline-start" />
+              {showArchived ? "Hide archived" : "Show archived"}
+            </Button>
+            {(filteredProjects.length > 0 || showArchived) && (
+              <UpGalTarget definition={createProjectTarget}>
+                <Button
+                  onClick={() => setCreateProjectOpen(true)}
+                  className="gap-2 font-medium"
+                  disabled={!organizationId}
+                >
+                  <PlusIcon data-icon="inline-start" />
+                  Create Project
+                </Button>
+              </UpGalTarget>
+            )}
+          </div>
         }
       />
 

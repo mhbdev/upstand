@@ -59,6 +59,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { getServerApiUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
 import { parseJsonObject } from "./general-tab.helpers";
 
 type ContainerItem = {
@@ -70,17 +71,19 @@ type ContainerItem = {
 };
 
 interface ContainersTabProps {
-  resource: any;
-  secrets: { envVars: Record<string, string> };
-  liveContainers: any;
-  containerLogsData: any;
-  controlContainer: any;
+  resource: NonNullable<ResourceDetailState["resource"]>;
+  secrets: ResourceDetailState["secrets"];
+  liveContainers: ResourceDetailState["liveContainers"];
+  containerLogsData: ResourceDetailState["containerLogsData"];
+  controlContainer: ResourceDetailState["controlContainer"];
   isControllingContainer: boolean;
   setContainerModalOpen: (open: boolean) => void;
   setSelectedContainerId: (id: string | null) => void;
 }
 
-function resourceIngressNetwork(resource: any): {
+function resourceIngressNetwork(
+  resource: NonNullable<ResourceDetailState["resource"]>,
+): {
   name: string;
   scope: string;
 } {
@@ -432,7 +435,7 @@ export function ContainersTab({
         open={containerModalType !== null}
         onOpenChange={(v) => !v && handleCloseModal()}
       >
-        <DialogContent className="max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl sm:min-w-[36rem]">
+        <DialogContent className="no-scrollbar max-h-[90svh] w-[calc(100vw-1rem)] max-w-[min(96vw,48rem)] rounded-2xl border border-border bg-card shadow-2xl sm:min-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-bold text-foreground text-lg">
               {containerModalType === "logs" && (

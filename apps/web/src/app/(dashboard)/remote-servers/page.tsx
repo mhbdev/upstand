@@ -158,7 +158,7 @@ export default function RemoteServersPage() {
     setEnableDockerCleanup(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!name || !ipAddress || !sshKeyId) {
       toast.error("Name, IP Address, and SSH Key are required");

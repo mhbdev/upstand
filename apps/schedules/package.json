@@ -13,20 +13,16 @@
   "dependencies": {
     "@circulo-ai/di": "catalog:",
     "@upstand/api": "workspace:*",
-    "@upstand/auth": "workspace:*",
     "@upstand/db": "workspace:*",
     "@upstand/domain": "workspace:*",
     "@upstand/env": "workspace:*",
     "@upstand/infrastructure": "workspace:*",
-    "@upstand/platform": "workspace:*",
     "@upstand/redis": "workspace:*",
-    "@upstand/repositories": "workspace:*",
     "@upstand/usecases": "workspace:*",
     "bullmq": "catalog:",
-    "drizzle-orm": "catalog:",
     "evlog": "catalog:",
     "hono": "catalog:",
-    "zod": "catalog:"
+    "ssh2": "^1.17.0"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

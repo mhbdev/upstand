@@ -71,6 +71,16 @@ Upstand supports multiple modern build systems:
   </Tab>
 </Tabs>
 
+### Pre-Deploy & Post-Deploy Hooks
+
+Upstand allows you to execute commands directly inside deployment containers before or after a new version rolls out:
+- **Pre-Deploy Hook**: Runs commands before shifting active traffic (e.g. running database schema migrations `prisma migrate deploy` or `drizzle-kit push`).
+- **Post-Deploy Hook**: Runs commands after successful container rollout (e.g. warming caches, triggering search indexes, or sending post-deployment notifications).
+- **Execution Timeouts**: Customize maximum execution time per hook (`timeoutSeconds`, default 300 seconds).
+- **Failure Policy**: Configure how failures are handled:
+  - `warn` (default): Log execution failures to deployment output but allow deployment to complete.
+  - `fail`: Abort deployment pipeline immediately if the hook command exits with a non-zero status.
+
 ---
 
 ## 2. Database Provisioning
@@ -151,6 +161,8 @@ sequenceDiagram
 
 Deploy multi-container applications from raw YAML configurations or repository-hosted Compose files.
 
+- **Custom Compose File Paths**: Specify custom Compose definition paths within your repository (e.g. `docker-compose.prod.yml` or `deploy/stack.yaml`).
+- **Service Container Auto-Detection**: Upstand automatically parses service names, dependencies, ports, and volumes from Compose files and matches them to active running containers.
 - **Compose Mode**: Runs workloads using standard `docker compose up --detach`. Better suited for single-node development testing.
 - **Stack Mode**: Deploys services using `docker stack deploy` on Docker Swarm.
 - **Mode Conversion**: Automatically converts Compose configurations to Swarm-compatible Stack files:

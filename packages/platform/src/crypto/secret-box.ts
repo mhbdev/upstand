@@ -21,8 +21,7 @@ function getMasterKey(keyVersion: number): Buffer {
     throw new Error(`Unsupported encryption key version ${keyVersion}`);
   }
   const raw =
-    env.SSH_KEY_ENCRYPTION_KEY_V1 ||
-    "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=";
+    env.ENCRYPTION_KEY_V1 || "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=";
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32)
     throw new Error("Encryption key must be 32 bytes, base64-encoded");

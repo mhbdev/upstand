@@ -32,7 +32,7 @@ function makeUseCase(
         capturedCommand = cmd;
         return onRun ? onRun(cmd) : "OK\n";
       },
-    } as any,
+    } as never,
   );
   return { useCase, getCommand: () => capturedCommand };
 }
@@ -164,7 +164,7 @@ describe("database command use case", () => {
           findById: async () => ({ id: "app-1", type: "application" }),
         },
       } as unknown as IUnitOfWork,
-      {} as any,
+      {} as never,
     );
     await expect(
       useCase.execute({ id: "app-1", command: "health" }),
@@ -182,7 +182,7 @@ describe("database command use case", () => {
           }),
         },
       } as unknown as IUnitOfWork,
-      {} as any,
+      {} as never,
     );
     await expect(
       useCase.execute({ id: "db-1", command: "health" }),

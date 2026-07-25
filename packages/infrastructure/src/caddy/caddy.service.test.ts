@@ -16,6 +16,7 @@ describe("Caddy domain configuration", () => {
         stripPath: false,
         port: 3000,
         serviceName: undefined,
+        enabled: true,
         certificateType: "letsencrypt",
         https: true,
         middlewares: [],
@@ -43,6 +44,44 @@ describe("Caddy domain configuration", () => {
     expect(caddyfile).toContain("app.example.com {");
     expect(caddyfile).toContain("reverse_proxy application:3000");
     expect(caddyfile).not.toContain("http://app.example.com");
+  });
+
+  test("creates an Automatic HTTPS site without email when letsEncryptEmail is not provided", () => {
+    const mappings = parseDomainMappings(
+      JSON.stringify([{ host: "app.example.com", port: 3000 }]),
+    );
+
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "resource-1",
+        name: "Application",
+        type: "application",
+        appName: "application",
+        domains: JSON.stringify(mappings),
+      },
+    ]);
+
+    expect(caddyfile).not.toContain("email ");
+    expect(caddyfile).toContain("app.example.com {");
+    expect(caddyfile).toContain("reverse_proxy application:3000");
+  });
+
+  test("keeps disabled domain mappings out of the active Caddy config", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "resource-1",
+        name: "Application",
+        type: "application",
+        appName: "application",
+        domains: JSON.stringify([
+          { host: "disabled.example.com", port: 3000, enabled: false },
+          { host: "active.example.com", port: 3000 },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).not.toContain("disabled.example.com");
+    expect(caddyfile).toContain("active.example.com");
   });
 
   test("ignores empty optional auth and redirect values from older generated routes", () => {

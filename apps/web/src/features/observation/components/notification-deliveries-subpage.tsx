@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@upstand/api/router";
 import { Badge } from "@upstand/ui/components/badge";
 import { Button } from "@upstand/ui/components/button";
 import { Card, CardContent } from "@upstand/ui/components/card";
@@ -84,7 +86,11 @@ export function NotificationDeliveriesSubpage() {
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  const [selectedDelivery, setSelectedDelivery] = useState<any | null>(null);
+  type DeliveryItem =
+    inferRouterOutputs<AppRouter>["notification"]["deliveries"]["items"][number];
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryItem | null>(
+    null,
+  );
 
   const deliveriesQuery = useQuery({
     ...trpc.notification.deliveries.queryOptions({

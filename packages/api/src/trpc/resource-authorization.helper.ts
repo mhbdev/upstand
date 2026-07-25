@@ -1,5 +1,11 @@
+import type { ServiceKey, TokenLike } from "@circulo-ai/di";
 import { TRPCError } from "@trpc/server";
-import type { Capability } from "@upstand/domain";
+import type {
+  Capability,
+  Environment,
+  Project,
+  Resource,
+} from "@upstand/domain";
 import {
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
@@ -7,15 +13,29 @@ import {
 } from "@upstand/usecases/tokens";
 import { checkPermission } from "../permissions";
 
+interface LookupUseCase<T> {
+  execute(input: { id: string }): Promise<T | null>;
+}
+
+interface AuthorizationContext {
+  scope: { resolve: <T>(token: TokenLike<T>, key?: ServiceKey) => T };
+  session: { user: { id: string } };
+}
+
+interface AuthorizedResourceContext {
+  resource: Resource;
+  environment: Environment;
+  project: Project;
+}
+
 export async function resolveResourceAndCheckPermission(
-  ctx: {
-    scope: { resolve: <T>(token: any) => T };
-    session: { user: { id: string } };
-  },
+  ctx: AuthorizationContext,
   resourceId: string,
   requiredPermission: Capability,
-) {
-  const useCase = ctx.scope.resolve<any>(GetResourceUseCaseToken);
+): Promise<AuthorizedResourceContext> {
+  const useCase = ctx.scope.resolve<LookupUseCase<Resource>>(
+    GetResourceUseCaseToken,
+  );
   const resource = await useCase.execute({ id: resourceId });
   if (!resource) {
     throw new TRPCError({
@@ -24,7 +44,9 @@ export async function resolveResourceAndCheckPermission(
     });
   }
 
-  const envUseCase = ctx.scope.resolve<any>(GetEnvironmentUseCaseToken);
+  const envUseCase = ctx.scope.resolve<LookupUseCase<Environment>>(
+    GetEnvironmentUseCaseToken,
+  );
   const environment = await envUseCase.execute({
     id: resource.environmentId,
   });
@@ -35,7 +57,9 @@ export async function resolveResourceAndCheckPermission(
     });
   }
 
-  const projectUseCase = ctx.scope.resolve<any>(GetProjectUseCaseToken);
+  const projectUseCase = ctx.scope.resolve<LookupUseCase<Project>>(
+    GetProjectUseCaseToken,
+  );
   const project = await projectUseCase.execute({
     id: environment.projectId,
   });

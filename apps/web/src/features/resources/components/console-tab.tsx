@@ -27,6 +27,7 @@ import { TerminalEmulator } from "@/components/shared/terminal-emulator";
 import { getServerApiUrl } from "@/lib/server-url";
 import { cleanDockerLogs } from "@/utils/clean-logs";
 import { trpc } from "@/utils/trpc";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
 
 interface ContainerInfo {
   id: string;
@@ -45,7 +46,7 @@ interface ConsoleTabProps {
   };
   organizationId: string;
   containers: ContainerInfo[];
-  sshKeys: any[];
+  sshKeys: ResourceDetailState["sshKeys"];
 }
 
 export function ConsoleTab({

@@ -11,9 +11,7 @@ import {
   SyncSecretProviderUseCase,
 } from "./secret-version.usecases";
 
-process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 11).toString(
-  "base64",
-);
+process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 11).toString("base64");
 
 const resource: Resource = {
   id: "resource-1",

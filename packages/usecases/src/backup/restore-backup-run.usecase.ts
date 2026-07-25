@@ -37,8 +37,17 @@ export class RestoreBackupRunUseCase {
     }
     if (!destination) throw new ValidationError("Backup destination not found");
 
+    const caCert = destination.certificateId
+      ? await this.uow.certificateRepository.findById(destination.certificateId)
+      : null;
+    const effectiveDestination = caCert
+      ? Object.assign({}, destination, {
+          caCertificatePem: caCert.certificatePem,
+        })
+      : destination;
+
     if (schedule.kind === "web-server") {
-      await this.runtime.restoreWebServerBackup(destination, fileKey);
+      await this.runtime.restoreWebServerBackup(effectiveDestination, fileKey);
       return;
     }
     await withBackupRuntime(
@@ -49,7 +58,7 @@ export class RestoreBackupRunUseCase {
         runtime.restoreBackup(
           schedule,
           resource as NonNullable<typeof resource>,
-          destination,
+          effectiveDestination,
           fileKey,
           input.targetTime
             ? new Date(input.targetTime).toISOString()

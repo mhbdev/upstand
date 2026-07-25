@@ -1,5 +1,12 @@
 import { requestJson, requestJsonWithResponse } from "./http";
 
+interface GitLabProject {
+  id: number;
+  name: string;
+  path_with_namespace: string;
+  namespace: { full_path: string; kind: string; path: string };
+}
+
 export async function refreshGitlabToken(
   gitlabUrl: string,
   refreshToken: string,
@@ -39,12 +46,14 @@ export async function getGitlabRepositories(
   accessToken: string,
   groupName?: string,
 ): Promise<{ id: number; name: string; fullName: string; owner: string }[]> {
-  const allProjects: any[] = [];
+  const allProjects: GitLabProject[] = [];
   let page = 1;
   const perPage = 100;
 
   while (true) {
-    const { data: projects, response } = await requestJsonWithResponse<any[]>(
+    const { data: projects, response } = await requestJsonWithResponse<
+      GitLabProject[]
+    >(
       `${gitlabUrl}/api/v4/projects?membership=true&page=${page}&per_page=${perPage}`,
       {
         headers: {

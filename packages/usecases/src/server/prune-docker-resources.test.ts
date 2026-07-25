@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import type { IUnitOfWork } from "@upstand/domain";
 import { encryptSecret } from "@upstand/platform/crypto/secret-box";
+import type { DockerPrunePort } from "../ports/docker";
 import { PruneDockerResourcesUseCase } from "./prune-docker-resources.usecase";
 
-const keyName = "SSH_KEY_ENCRYPTION_KEY_V1";
+const keyName = "ENCRYPTION_KEY_V1";
 const previousKey = process.env[keyName];
 
 afterEach(() => {
@@ -11,7 +12,15 @@ afterEach(() => {
   else process.env[keyName] = previousKey;
 });
 
-function createMockUow(server: any, sshKey: any) {
+interface RepositoryItem {
+  id: string;
+  organizationId?: string;
+}
+
+function createMockUow(
+  server: RepositoryItem | null,
+  sshKey: RepositoryItem | null,
+): IUnitOfWork {
   return {
     serverRepository: {
       findById: async (id: string) => (id === server?.id ? server : null),
@@ -25,9 +34,9 @@ function createMockUow(server: any, sshKey: any) {
 describe("PruneDockerResourcesUseCase", () => {
   test("successfully prunes local docker resources", async () => {
     const prune = mock(() =>
-      Promise.resolve({ success: true, output: ["images: pruned"] }),
+      Promise.resolve({ success: true as const, output: ["images: pruned"] }),
     );
-    const mockDockerService = { prune } as any;
+    const mockDockerService: DockerPrunePort = { prune };
     const uow = createMockUow(null, null);
 
     const useCase = new PruneDockerResourcesUseCase(uow, mockDockerService);
@@ -66,9 +75,9 @@ describe("PruneDockerResourcesUseCase", () => {
     };
 
     const prune = mock(() =>
-      Promise.resolve({ success: true, output: ["volumes: pruned"] }),
+      Promise.resolve({ success: true as const, output: ["volumes: pruned"] }),
     );
-    const mockDockerService = { prune } as any;
+    const mockDockerService: DockerPrunePort = { prune };
     const uow = createMockUow(server, sshKey);
 
     const useCase = new PruneDockerResourcesUseCase(uow, mockDockerService);
@@ -101,7 +110,11 @@ describe("PruneDockerResourcesUseCase", () => {
       sshKeyId: "key-1",
     };
     const uow = createMockUow(server, null);
-    const mockDockerService = { prune: mock() } as any;
+    const mockDockerService: DockerPrunePort = {
+      prune: mock(() =>
+        Promise.resolve({ success: true as const, output: [] as string[] }),
+      ),
+    };
 
     const useCase = new PruneDockerResourcesUseCase(uow, mockDockerService);
     await expect(

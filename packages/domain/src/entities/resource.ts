@@ -160,8 +160,9 @@ export const ResourceAdvancedConfigSchema = z.object({
       command: z.string().trim().max(1024).optional(),
       enabled: z.boolean().default(false),
       timeoutSeconds: z.number().int().min(10).max(1800).default(300),
+      onFailure: z.enum(["warn", "fail"]).default("warn"),
     })
-    .default({ enabled: false, timeoutSeconds: 300 }),
+    .default({ enabled: false, timeoutSeconds: 300, onFailure: "warn" }),
   databaseReplication: z
     .object({
       enabled: z.boolean().default(false),

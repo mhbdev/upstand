@@ -6,6 +6,7 @@ import {
   ApplicationBuildConfigSchema,
   DATABASE_IMAGE_OPTIONS,
   type DatabaseType,
+  parseResourceAdvancedConfig,
   type ResourceComposeType,
 } from "@upstand/domain";
 import { env } from "@upstand/env/web";
@@ -66,6 +67,9 @@ import { uploadArchive, validateArchiveFile } from "@/lib/archive-upload";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
+import { extractPortsAndVolumesFromServices } from "../utils/compose-parser";
+import type { ResourceRuntimeStatus } from "../utils/resource-status";
 import { ConfigureRollbackDialog } from "./configure-rollback-dialog";
 import {
   createBuildConfig,
@@ -78,27 +82,39 @@ import {
 } from "./general-tab.helpers";
 
 interface GeneralTabProps {
-  resource: any;
-  secrets: {
-    credentials: string;
-    envVars: Record<string, string>;
-    buildSecretsConfigured: boolean;
-  };
-  refetchSecrets: () => Promise<unknown>;
-  deployments: Array<{ status: string }>;
-  sshKeys: any[];
-  servers: any[];
-  gitProviders: any[];
-  updateResource: any;
+  resource: NonNullable<ResourceDetailState["resource"]>;
+  secrets: ResourceDetailState["secrets"];
+  refetchSecrets: ResourceDetailState["refetchSecrets"];
+  deployments: ResourceDetailState["deployments"];
+  sshKeys: ResourceDetailState["sshKeys"];
+  servers: ResourceDetailState["servers"];
+  gitProviders: ResourceDetailState["gitProviders"];
+  updateResource: ResourceDetailState["updateResource"];
   isUpdatingResource: boolean;
-  deployResource: any;
+  deployResource: ResourceDetailState["deployResource"];
   isDeployingResource: boolean;
-  controlResource: any;
+  controlResource: ResourceDetailState["controlResource"];
   isControllingResource: boolean;
-  rebuildDatabase: any;
+  rebuildDatabase: ResourceDetailState["rebuildDatabase"];
   isRebuildingDatabase: boolean;
-  deleteResource: any;
+  deleteResource: ResourceDetailState["deleteResource"];
   isDeletingResource: boolean;
+  runtimeStatus?: ResourceRuntimeStatus;
+}
+
+type ResourceUpdateInput = Parameters<ResourceDetailState["updateResource"]>[0];
+
+function isResourceProvider(value: string): value is ResourceProvider {
+  return [
+    "docker",
+    "github",
+    "gitlab",
+    "bitbucket",
+    "gitea",
+    "git",
+    "raw",
+    "drop",
+  ].includes(value);
 }
 
 export function GeneralTab({
@@ -119,6 +135,7 @@ export function GeneralTab({
   isRebuildingDatabase,
   deleteResource,
   isDeletingResource,
+  runtimeStatus,
 }: GeneralTabProps) {
   const queryClient = useQueryClient();
   const organizationState = useRequiredActiveOrganization();
@@ -139,7 +156,14 @@ export function GeneralTab({
     refetchInterval: 5000,
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteVolumes, setDeleteVolumes] = useState(false);
   const [rebuildDialogOpen, setRebuildDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!deleteDialogOpen) {
+      setDeleteVolumes(false);
+    }
+  }, [deleteDialogOpen]);
   const webhookBaseUrl = getServerUrl();
   const [webhookToken, setWebhookToken] = useState<string | null>(null);
   const rotateWebhookToken = useMutation({
@@ -312,7 +336,10 @@ export function GeneralTab({
     }
   };
 
-  const isRunning = resource.status === "running";
+  const isRunning =
+    runtimeStatus === "unknown"
+      ? resource.status === "running"
+      : (runtimeStatus ?? resource.status) === "running";
   const isBuilding = deployments.some(
     (deployment) => deployment.status === "running",
   );
@@ -367,11 +394,11 @@ export function GeneralTab({
       setDeploymentServerId(resource.serverId ?? "default");
       setBuildServerId(resource.buildServerId ?? "default");
       if (resource.provider) {
-        setProviderType(
+        const provider =
           resource.provider === "docker-registry"
             ? "docker"
-            : resource.provider,
-        );
+            : resource.provider;
+        if (isResourceProvider(provider)) setProviderType(provider);
       }
       if (resource.dbType && resource.dbType in DATABASE_IMAGE_OPTIONS) {
         setDatabaseType(resource.dbType as DatabaseType);
@@ -585,7 +612,7 @@ export function GeneralTab({
   // Reset repository when account changes
   useEffect(() => {
     if (githubAccount && gitRepos && gitRepos.length > 0) {
-      const exists = gitRepos.some((r: any) => r.fullName === githubRepo);
+      const exists = gitRepos.some((repo) => repo.fullName === githubRepo);
       if (!exists) {
         setGithubRepo(gitRepos[0].fullName);
       }
@@ -603,7 +630,10 @@ export function GeneralTab({
   }, [githubRepo, gitBranches, githubBranch]);
 
   const handleSaveProvider = () => {
-    let config: any = { provider: providerType, autoDeploy };
+    let config: Record<string, unknown> = {
+      provider: providerType,
+      autoDeploy,
+    };
     let provider: string = providerType;
     if (providerType === "docker") {
       provider = "docker-registry";
@@ -766,7 +796,7 @@ export function GeneralTab({
     controlResource({ id: resource.id, command });
   };
 
-  const handleRename = (e: React.FormEvent) => {
+  const handleRename = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (nameInput.trim() && appNameInput.trim()) {
       updateResource(
@@ -1919,7 +1949,7 @@ export function GeneralTab({
                       );
                       return;
                     }
-                    const patch: Record<string, unknown> = {
+                    const patch: ResourceUpdateInput = {
                       id: resource.id,
                       buildConfig: parsed.data,
                     };
@@ -2439,7 +2469,7 @@ export function GeneralTab({
                   <div className="space-y-2">
                     <Label>Repository</Label>
                     <Select
-                      items={(gitRepos || []).map((repo: any) => ({
+                      items={(gitRepos || []).map((repo) => ({
                         value: repo.fullName,
                         label: repo.fullName,
                       }))}
@@ -2461,7 +2491,7 @@ export function GeneralTab({
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {gitRepos?.map((repo: any) => (
+                        {gitRepos?.map((repo) => (
                           <SelectItem key={repo.id} value={repo.fullName}>
                             {repo.fullName}
                           </SelectItem>
@@ -2979,8 +3009,80 @@ export function GeneralTab({
                     </div>
                     {composeInspection && (
                       <div className="space-y-2 rounded-md border border-border/30 bg-muted/10 p-3">
-                        <div className="font-medium text-sm">
-                          Service discovery
+                        <div className="flex flex-wrap items-center justify-between gap-2 font-medium text-sm">
+                          <span>Service discovery</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              const {
+                                ports: detectedPorts,
+                                volumes: detectedVolumes,
+                              } = extractPortsAndVolumesFromServices(
+                                composeInspection.services,
+                              );
+
+                              const currentConfig = parseResourceAdvancedConfig(
+                                resource.advancedConfig,
+                              );
+                              const existingPortKeys = new Set(
+                                currentConfig.ports.map(
+                                  (p) =>
+                                    `${p.publishedPort}:${p.targetPort}/${p.protocol}`,
+                                ),
+                              );
+                              const existingVolKeys = new Set(
+                                currentConfig.volumes.map(
+                                  (v) => `${v.source}:${v.target}`,
+                                ),
+                              );
+
+                              const mergedPorts = [...currentConfig.ports];
+                              let portsAdded = 0;
+                              for (const p of detectedPorts) {
+                                const key = `${p.publishedPort}:${p.targetPort}/${p.protocol}`;
+                                if (!existingPortKeys.has(key)) {
+                                  mergedPorts.push(p);
+                                  portsAdded++;
+                                }
+                              }
+
+                              const mergedVolumes = [...currentConfig.volumes];
+                              let volsAdded = 0;
+                              for (const v of detectedVolumes) {
+                                const key = `${v.source}:${v.target}`;
+                                if (!existingVolKeys.has(key)) {
+                                  mergedVolumes.push(v);
+                                  volsAdded++;
+                                }
+                              }
+
+                              if (portsAdded === 0 && volsAdded === 0) {
+                                toast.info(
+                                  "All detected ports and volumes are already present in Advanced Config.",
+                                );
+                                return;
+                              }
+
+                              const updatedConfig = {
+                                ...currentConfig,
+                                ports: mergedPorts,
+                                volumes: mergedVolumes,
+                              };
+
+                              updateResource({
+                                id: resource.id,
+                                advancedConfig: JSON.stringify(updatedConfig),
+                              });
+                              toast.success(
+                                `Applied ${portsAdded} port(s) and ${volsAdded} volume(s) to Advanced Config`,
+                              );
+                            }}
+                          >
+                            Apply Ports &amp; Volumes to Advanced Config
+                          </Button>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2">
                           {composeInspection.services.map((service) => (
@@ -3154,9 +3256,23 @@ export function GeneralTab({
         requireConfirmText={true}
         pending={isDeletingResource}
         onConfirm={() => {
-          deleteResource({ id: resource.id });
+          deleteResource({ id: resource.id, deleteVolumes });
         }}
-      />
+      >
+        <div className="flex items-center space-x-2 py-2">
+          <Checkbox
+            id="general-delete-volumes"
+            checked={deleteVolumes}
+            onCheckedChange={(checked) => setDeleteVolumes(!!checked)}
+          />
+          <label
+            htmlFor="general-delete-volumes"
+            className="cursor-pointer select-none font-medium text-foreground text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Remove associated volumes
+          </label>
+        </div>
+      </ConfirmActionDialog>
 
       <Dialog open={rebuildDialogOpen} onOpenChange={setRebuildDialogOpen}>
         <DialogContent>

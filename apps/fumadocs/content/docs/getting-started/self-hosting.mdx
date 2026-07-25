@@ -133,7 +133,7 @@ The installer isolates configuration from secrets to protect credentials:
 - **/etc/upstand/secrets/**: Stores sensitive credentials (Postgres passwords, Redis keys, SSH keys, encryption keys) as individual `0600` files. Injected directly into containers as Docker Secrets.
 
 > [!CAUTION]
-> **Secret Key Management:** Ensure you back up `/etc/upstand/` securely. The cluster master key (`SSH_KEY_ENCRYPTION_KEY_V1`) is used to encrypt remote server credentials at rest; losing it makes stored SSH keys and AI provider keys unrecoverable.
+> **Secret Key Management:** Ensure you back up `/etc/upstand/` securely. The cluster master key (`ENCRYPTION_KEY_V1`) is used to encrypt database secrets and credentials at rest; losing it makes stored tokens, passwords, and SSH keys unrecoverable.
 
 ---
 
@@ -201,7 +201,7 @@ Store your database, redis, and session encryption credentials as secure docker 
 openssl rand -hex 32 | sudo tee /etc/upstand/secrets/postgres_password >/dev/null
 openssl rand -hex 32 | sudo tee /etc/upstand/secrets/redis_password >/dev/null
 openssl rand -hex 32 | sudo tee /etc/upstand/secrets/better_auth_secret >/dev/null
-openssl rand -base64 32 | tr -d '\n' | sudo tee /etc/upstand/secrets/ssh_key_encryption_key >/dev/null
+openssl rand -base64 32 | tr -d '\n' | sudo tee /etc/upstand/secrets/encryption_key >/dev/null
 sudo chmod 600 /etc/upstand/secrets/*
 ```
 

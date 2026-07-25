@@ -46,6 +46,8 @@ type Props = {
   resourceId: string;
   resourceType: string;
   advancedConfig?: string | null;
+  organizationId?: string;
+  composeFile?: string;
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -103,6 +105,8 @@ export function ResourceAdvancedSettings({
   resourceId,
   resourceType,
   advancedConfig,
+  organizationId,
+  composeFile,
 }: Props) {
   // ── Initial state ──
   const initial = useMemo(
@@ -119,11 +123,8 @@ export function ResourceAdvancedSettings({
   const update = useMutation(trpc.resource.update.mutationOptions());
 
   const visibleTabs = useMemo(() => {
-    if (resourceType === "compose") {
-      return TABS.filter((tab) => ["general", "json"].includes(tab.value));
-    }
     return TABS;
-  }, [resourceType]);
+  }, []);
 
   const visibleTabValues = useMemo(() => {
     return new Set<string>(visibleTabs.map((t) => t.value));
@@ -185,7 +186,13 @@ export function ResourceAdvancedSettings({
   const isJsonValid = validateRawJson(rawJson).valid;
 
   // ── Card props factory ──
-  const cardProps = { config, resourceType, onChange: updateConfig };
+  const cardProps = {
+    config,
+    resourceType,
+    onChange: updateConfig,
+    composeFile,
+    organizationId,
+  };
 
   return (
     <div className="flex flex-col gap-6">

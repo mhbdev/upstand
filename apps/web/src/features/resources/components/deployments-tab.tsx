@@ -27,6 +27,7 @@ import {
 } from "@/components/shared/deployment-presentation";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
 import { trpc } from "@/utils/trpc";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
 import { ConfigureRollbackDialog } from "./configure-rollback-dialog";
 
 type DeploymentItem = {
@@ -46,10 +47,10 @@ type PendingAction =
   | { type: "remove-deployment"; label: string; deploymentId: string };
 
 interface DeploymentsTabProps {
-  resource: any;
+  resource: NonNullable<ResourceDetailState["resource"]>;
   deployments: DeploymentItem[];
-  refetchDeployments: () => Promise<unknown>;
-  deployResource: any;
+  refetchDeployments: ResourceDetailState["refetchDeployments"];
+  deployResource: ResourceDetailState["deployResource"];
   isDeployingResource: boolean;
   onNavigateToCrons?: () => void;
 }

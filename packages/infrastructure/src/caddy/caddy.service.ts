@@ -10,6 +10,7 @@ import type {
   CaddyCertificate,
   CaddyResource,
   CaddySettings,
+  CaddyStatus,
 } from "@upstand/usecases/ports/caddy";
 import {
   ensureResourceOverlayNetwork,
@@ -30,6 +31,14 @@ const CADDY_DATA_VOLUME = "upstand-caddy-data";
 const CADDY_CONFIG_VOLUME = "upstand-caddy-config";
 const CADDY_LOG_VOLUME = "upstand-caddy-logs";
 export const CADDY_ACCESS_LOG_PATH = "/var/log/caddy/access.log";
+
+function statusCodeOf(value: unknown): number | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  if (!("statusCode" in value)) return undefined;
+  return typeof value.statusCode === "number" ? value.statusCode : undefined;
+}
 
 type CaddyRoute = DomainMapping & {
   resourceId: string;
@@ -224,7 +233,7 @@ function getRoutes(
       );
     }
 
-    for (const mapping of mappings) {
+    for (const mapping of mappings.filter((candidate) => candidate.enabled)) {
       const routeKey = `${mapping.host}${mapping.path}`;
       const owner = routeOwners.get(routeKey);
       if (owner) {
@@ -470,6 +479,17 @@ export function generateCaddyfileContent(
     const certificateType = routesForHost[0]?.certificateType;
     if (protocol === "https" && certificateType === "internal") {
       sites.push("\ttls internal");
+    } else if (protocol === "https" && certificateType === "zerossl") {
+      const email = effectiveSettings.letsEncryptEmail?.trim();
+      if (email) {
+        sites.push(`\ttls ${email} {`);
+        sites.push("\t\tca https://acme.zerossl.com/v2/DV90");
+        sites.push("\t}");
+      } else {
+        sites.push("\ttls {");
+        sites.push("\t\tca https://acme.zerossl.com/v2/DV90");
+        sites.push("\t}");
+      }
     } else if (protocol === "https" && certificateType === "cloudflare") {
       const token = effectiveSettings.cloudflareApiToken
         ? effectiveSettings.cloudflareApiToken
@@ -485,6 +505,11 @@ export function generateCaddyfileContent(
       sites.push(
         `\ttls /etc/caddy/certificates/${certificate.id}.crt /etc/caddy/certificates/${certificate.id}.key`,
       );
+    } else if (protocol === "https") {
+      const email = effectiveSettings.letsEncryptEmail?.trim();
+      if (email) {
+        sites.push(`\ttls ${email}`);
+      }
     }
     orderedRoutes.forEach((route, index) => {
       sites.push(`# Resource: ${route.resourceName} (${route.resourceId})`);
@@ -672,8 +697,9 @@ export class CaddyService {
         log.info({
           message: `Detached Caddy from stale resource network '${network.Name}'.`,
         });
-      } catch (error: any) {
-        if (error.statusCode !== 404 && error.statusCode !== 409) {
+      } catch (error: unknown) {
+        const statusCode = statusCodeOf(error);
+        if (statusCode !== 404 && statusCode !== 409) {
           log.warn({
             message: `Unable to detach Caddy from stale resource network '${network.Name}'.`,
             err: error,
@@ -1076,7 +1102,7 @@ export class CaddyService {
     }
   }
 
-  async getStatus() {
+  async getStatus(): Promise<CaddyStatus> {
     const container = await this.findContainer();
     if (!container) {
       return {

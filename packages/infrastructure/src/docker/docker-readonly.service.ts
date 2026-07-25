@@ -196,7 +196,8 @@ export class DockerReadOnlyService implements DockerExecPort {
     target: DockerInspectionTarget,
     containerId: string,
     command: string,
-  ): Promise<{ output: string }> {
+    options?: { timeoutSeconds?: number; onLog?: (chunk: string) => void },
+  ): Promise<{ output: string; exitCode?: number }> {
     assertIdentifier(containerId, "Container");
     if (target.kind === "local") {
       const container = this.docker.getContainer(containerId);
@@ -207,13 +208,45 @@ export class DockerReadOnlyService implements DockerExecPort {
       });
       const stream = await exec.start({ Detach: false });
       const chunks: Buffer[] = [];
+      const timeoutMs = (options?.timeoutSeconds ?? 300) * 1000;
+
       await new Promise<void>((resolve, reject) => {
-        stream.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-        stream.on("end", resolve);
-        stream.on("error", reject);
+        const timer = setTimeout(() => {
+          try {
+            if ("destroy" in stream && typeof stream.destroy === "function") {
+              stream.destroy();
+            }
+          } catch {}
+          reject(
+            new Error(
+              `Container command execution timed out after ${options?.timeoutSeconds ?? 300}s`,
+            ),
+          );
+        }, timeoutMs);
+
+        stream.on("data", (chunk: Buffer) => {
+          chunks.push(Buffer.from(chunk));
+          if (options?.onLog) {
+            const cleaned = this.cleanDockerLogs(Buffer.from(chunk));
+            if (cleaned) options.onLog(cleaned);
+          }
+        });
+        stream.on("end", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        stream.on("error", (err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
       });
       const cleanOutput = this.cleanDockerLogs(Buffer.concat(chunks));
-      return { output: cleanOutput };
+      let exitCode = 0;
+      try {
+        const inspect = await exec.inspect();
+        exitCode = inspect.ExitCode ?? 0;
+      } catch {}
+      return { output: cleanOutput, exitCode };
     }
     const safeContainer = shellQuote(containerId);
     const safeCommand = shellQuote(command);
@@ -221,7 +254,10 @@ export class DockerReadOnlyService implements DockerExecPort {
       target,
       `docker exec ${safeContainer} sh -c ${safeCommand}`,
     );
-    return { output };
+    if (options?.onLog && output) {
+      options.onLog(output);
+    }
+    return { output, exitCode: 0 };
   }
 
   async execServerTerminalCommand(
@@ -573,27 +609,43 @@ export class DockerReadOnlyService implements DockerExecPort {
       };
     }
 
-    const value = (await this.docker
-      .getContainer(containerId)
-      .stats({ stream: false })) as Record<string, any>;
-    const cpu = value.cpu_stats ?? {};
-    const previousCpu = value.precpu_stats ?? {};
+    const value = asRecord(
+      await this.docker.getContainer(containerId).stats({ stream: false }),
+    );
+    const cpu = asRecord(value.cpu_stats);
+    const previousCpu = asRecord(value.precpu_stats);
+    const cpuUsage = asRecord(cpu.cpu_usage);
+    const previousCpuUsage = asRecord(previousCpu.cpu_usage);
     const cpuDelta =
-      Number(cpu.cpu_usage?.total_usage ?? 0) -
-      Number(previousCpu.cpu_usage?.total_usage ?? 0);
+      Number(cpuUsage.total_usage ?? 0) -
+      Number(previousCpuUsage.total_usage ?? 0);
     const systemDelta =
       Number(cpu.system_cpu_usage ?? 0) -
       Number(previousCpu.system_cpu_usage ?? 0);
     const onlineCpus =
-      Number(cpu.online_cpus) || cpu.cpu_usage?.percpu_usage?.length || 1;
-    const memory = value.memory_stats ?? {};
+      Number(cpu.online_cpus) ||
+      (Array.isArray(cpuUsage.percpu_usage)
+        ? cpuUsage.percpu_usage.length
+        : 0) ||
+      1;
+    const memory = asRecord(value.memory_stats);
     const memoryUsageBytes = Number(memory.usage ?? 0);
     const memoryLimitBytes = Number(memory.limit ?? 0);
-    const networks = Object.values(value.networks ?? {}) as Array<
-      Record<string, unknown>
-    >;
-    const blockDevices = (value.blkio_stats?.io_service_bytes_recursive ??
-      []) as Array<Record<string, unknown>>;
+    const networkValues: unknown[] = Object.values(asRecord(value.networks));
+    const networks: Record<string, unknown>[] = networkValues.filter(
+      (item: unknown): item is Record<string, unknown> =>
+        typeof item === "object" && item !== null && !Array.isArray(item),
+    );
+    const blockIoStats = asRecord(value.blkio_stats);
+    const blockDeviceValues: unknown[] = Array.isArray(
+      blockIoStats.io_service_bytes_recursive,
+    )
+      ? blockIoStats.io_service_bytes_recursive
+      : [];
+    const blockDevices: Record<string, unknown>[] = blockDeviceValues.filter(
+      (item: unknown): item is Record<string, unknown> =>
+        typeof item === "object" && item !== null && !Array.isArray(item),
+    );
     return {
       containerId,
       cpuPercent:
@@ -604,11 +656,13 @@ export class DockerReadOnlyService implements DockerExecPort {
         ? (memoryUsageBytes / memoryLimitBytes) * 100
         : 0,
       networkRxBytes: networks.reduce(
-        (total, item) => total + Number(item.rx_bytes ?? 0),
+        (total: number, item: Record<string, unknown>): number =>
+          total + Number(item.rx_bytes ?? 0),
         0,
       ),
       networkTxBytes: networks.reduce(
-        (total, item) => total + Number(item.tx_bytes ?? 0),
+        (total: number, item: Record<string, unknown>): number =>
+          total + Number(item.tx_bytes ?? 0),
         0,
       ),
       blockReadBytes: blockDevices
@@ -617,7 +671,7 @@ export class DockerReadOnlyService implements DockerExecPort {
       blockWriteBytes: blockDevices
         .filter((item) => item.op === "Write")
         .reduce((total, item) => total + Number(item.value ?? 0), 0),
-      pids: Number(value.pids_stats?.current ?? 0),
+      pids: Number(asRecord(value.pids_stats).current ?? 0),
     };
   }
 

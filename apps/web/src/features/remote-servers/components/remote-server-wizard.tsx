@@ -80,6 +80,13 @@ interface RemoteServerWizardProps {
   onComplete?: (serverId: string) => void;
 }
 
+function dockerSwarmState(value: unknown): string {
+  if (typeof value !== "object" || value === null || !("swarmState" in value)) {
+    return "active";
+  }
+  return typeof value.swarmState === "string" ? value.swarmState : "active";
+}
+
 export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 const SUPPORTED_DISTROS = [
@@ -265,7 +272,7 @@ export function RemoteServerWizard({
     });
   };
 
-  const handleConnectSubmit = (e: React.FormEvent) => {
+  const handleConnectSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       toast.error("Please enter a server name");
@@ -1130,8 +1137,7 @@ export function RemoteServerWizard({
                           Operational
                         </p>
                         <p className="font-mono text-[11px] text-muted-foreground">
-                          Swarm:{" "}
-                          {(validateQuery.data as any)?.swarmState ?? "active"}
+                          Swarm: {dockerSwarmState(validateQuery.data)}
                         </p>
                       </>
                     )}

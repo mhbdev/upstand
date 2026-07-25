@@ -27,26 +27,38 @@ describe("server-domain-caddy.helper", () => {
 
   test("generates Let's Encrypt SSL Caddy block with email", () => {
     const result = buildServerDomainCaddySnippet({
-      serverDomain: "dokploy.circulo-ai.com",
+      serverDomain: "upstand.dev",
       httpsEnabled: true,
       certificateProvider: "letsencrypt",
       letsEncryptEmail: "1839491@gmail.com",
     });
 
-    expect(result).toContain("dokploy.circulo-ai.com {");
+    expect(result).toContain("upstand.dev {");
     expect(result).toContain("tls 1839491@gmail.com");
+    expect(result).toContain("reverse_proxy /api/*");
+  });
+
+  test("generates Let's Encrypt SSL Caddy block without email", () => {
+    const result = buildServerDomainCaddySnippet({
+      serverDomain: "upstand.dev",
+      httpsEnabled: true,
+      certificateProvider: "letsencrypt",
+    });
+
+    expect(result).toContain("upstand.dev {");
+    expect(result).not.toContain("tls ");
     expect(result).toContain("reverse_proxy /api/*");
   });
 
   test("generates ZeroSSL Caddy block with email", () => {
     const result = buildServerDomainCaddySnippet({
-      serverDomain: "dokploy.circulo-ai.com",
+      serverDomain: "upstand.dev",
       httpsEnabled: true,
       certificateProvider: "zerossl",
       letsEncryptEmail: "user@example.com",
     });
 
-    expect(result).toContain("dokploy.circulo-ai.com {");
+    expect(result).toContain("upstand.dev {");
     expect(result).toContain("ca https://acme.zerossl.com/v2/DV90");
   });
 
@@ -59,6 +71,42 @@ describe("server-domain-caddy.helper", () => {
 
     expect(result).toContain("local.upstand.test {");
     expect(result).toContain("tls internal");
+  });
+
+  test("generates custom certificate TLS block", () => {
+    const result = buildServerDomainCaddySnippet({
+      serverDomain: "custom.upstand.test",
+      httpsEnabled: true,
+      certificateProvider: "custom",
+      certificateId: "cert-999-abc",
+    });
+
+    expect(result).toContain("custom.upstand.test {");
+    expect(result).toContain(
+      "tls /etc/caddy/certificates/cert-999-abc.crt /etc/caddy/certificates/cert-999-abc.key",
+    );
+  });
+
+  test("generates internal TLS block when custom certificateId is missing", () => {
+    const result = buildServerDomainCaddySnippet({
+      serverDomain: "custom.upstand.test",
+      httpsEnabled: true,
+      certificateProvider: "custom",
+    });
+
+    expect(result).toContain("custom.upstand.test {");
+    expect(result).toContain("tls internal");
+  });
+
+  test("generates plain HTTP Caddy block when certificateProvider is none", () => {
+    const result = buildServerDomainCaddySnippet({
+      serverDomain: "upstand.example.com",
+      httpsEnabled: true,
+      certificateProvider: "none",
+    });
+
+    expect(result).toContain("http://upstand.example.com {");
+    expect(result).not.toContain("tls");
   });
 
   test("syncServerDomainInCaddySnippets replaces existing marker block cleanly", () => {

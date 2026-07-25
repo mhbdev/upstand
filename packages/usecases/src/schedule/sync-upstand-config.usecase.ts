@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { IUnitOfWork } from "@upstand/domain";
 import {
+  ApplicationBuildConfigSchema,
   parseApplicationBuildConfig,
   parseResourceAdvancedConfig,
   parseUpstandConfig,
@@ -63,21 +64,10 @@ export class SyncUpstandConfigUseCase {
             resource.buildConfig,
           );
 
-          const updatedBuildConfig: any = { ...currentBuildConfig };
-          if (b.type) updatedBuildConfig.type = b.type;
-          if (b.buildPath) updatedBuildConfig.buildPath = b.buildPath;
-          if (b.dockerfilePath)
-            updatedBuildConfig.dockerfilePath = b.dockerfilePath;
-          if (b.dockerContextPath)
-            updatedBuildConfig.dockerContextPath = b.dockerContextPath;
-          if (b.publishDirectory)
-            updatedBuildConfig.publishDirectory = b.publishDirectory;
-          if (b.dockerBuildStage)
-            updatedBuildConfig.dockerBuildStage = b.dockerBuildStage;
-          if (b.dockerBuildArgs)
-            updatedBuildConfig.dockerBuildArgs = b.dockerBuildArgs;
-          if (typeof b.dockerNoCache === "boolean")
-            updatedBuildConfig.dockerNoCache = b.dockerNoCache;
+          const updatedBuildConfig = ApplicationBuildConfigSchema.parse({
+            ...currentBuildConfig,
+            ...b,
+          });
 
           resourcePatch.buildConfig =
             serializeApplicationBuildConfig(updatedBuildConfig);

@@ -6,6 +6,7 @@
     "dev": "next dev --port 3001",
     "build": "next build --webpack",
     "start": "next start",
+    "test": "bun test src",
     "check-types": "tsc --noEmit",
     "lint": "biome check ."
   },
@@ -41,7 +42,6 @@
     "@trpc/server": "catalog:",
     "@trpc/tanstack-react-query": "^11.18.0",
     "@types/d3-force": "^3.0.10",
-    "@types/dagre": "^0.7.54",
     "@uiw/codemirror-theme-github": "^4.25.11",
     "@uiw/react-codemirror": "^4.25.11",
     "@upstand/api": "workspace:*",
@@ -78,7 +78,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "catalog:",
-    "@tanstack/react-query-devtools": "^5.101.2",
     "@types/node": "^26",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

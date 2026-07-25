@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import "@xterm/xterm/css/xterm.css";
+import type { Terminal } from "@xterm/xterm";
 
 import { useTheme } from "next-themes";
 import { downloadText } from "@/lib/browser";
@@ -173,7 +174,7 @@ export function TerminalEmulator({
 }: TerminalEmulatorProps) {
   const { resolvedTheme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<any>(null);
+  const termRef = useRef<Terminal | null>(null);
   const onReadyRef = useRef(onReady);
   const onCloseRef = useRef(onClose);
 
@@ -215,7 +216,7 @@ export function TerminalEmulator({
   // Handle download scrollback buffer trigger
   useEffect(() => {
     if (termRef.current && downloadTrigger > 0) {
-      const getTerminalBufferText = (term: any): string => {
+      const getTerminalBufferText = (term: Terminal): string => {
         const buffer = term.buffer.active;
         const lines: string[] = [];
         for (let i = 0; i < buffer.length; i++) {

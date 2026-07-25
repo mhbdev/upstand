@@ -283,11 +283,8 @@ export function BackupPanel({
 
   const openEdit = (schedule: BackupSchedule) => {
     setEditingSchedule(schedule);
-    form.reset();
     const initVals = makeForm(resource, schedule);
-    Object.entries(initVals).forEach(([k, v]) => {
-      form.setFieldValue(k as any, v);
-    });
+    form.reset(initVals);
     setDialogOpen(true);
   };
 

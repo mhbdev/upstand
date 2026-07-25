@@ -15,6 +15,7 @@ import {
   CreateSecretRotationScheduleUseCaseToken,
   DeleteSecretProviderUseCaseToken,
   DeleteSecretRotationScheduleUseCaseToken,
+  GetSecretVersionUseCaseToken,
   ListSecretProvidersUseCaseToken,
   ListSecretRotationSchedulesUseCaseToken,
   ListSecretVersionsUseCaseToken,
@@ -42,6 +43,17 @@ export const secretRouter = router({
         "resource:view",
       );
       return ctx.scope.resolve(ListSecretVersionsUseCaseToken).execute(input);
+    }),
+  version: twoFactorVerifiedProcedure
+    .input(RestoreSecretVersionInputSchema)
+    .query(async ({ ctx, input }) => {
+      await resolveSecretScopeAndCheckPermission(
+        ctx,
+        input.scopeType,
+        input.scopeId,
+        "resource:view",
+      );
+      return ctx.scope.resolve(GetSecretVersionUseCaseToken).execute(input);
     }),
   restore: twoFactorVerifiedProcedure
     .input(RestoreSecretVersionInputSchema)

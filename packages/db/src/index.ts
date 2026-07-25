@@ -1,7 +1,7 @@
 import { env } from "@upstand/env/server";
+import type { NodePgTransaction } from "drizzle-orm/node-postgres";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import type { PgTransaction } from "drizzle-orm/pg-core";
 import { Pool } from "pg";
 
 import * as schema from "./schema";
@@ -27,4 +27,7 @@ export async function migrateDatabase(migrationsFolder: string): Promise<void> {
 }
 
 export type DatabaseExecutor = NodePgDatabase<typeof schema>;
-export type DatabaseTransactionClient = PgTransaction<any, typeof schema, any>;
+export type DatabaseTransactionClient = NodePgTransaction<
+  typeof schema,
+  Record<string, never>
+>;

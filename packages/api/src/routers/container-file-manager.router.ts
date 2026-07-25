@@ -14,12 +14,13 @@ import {
   GetProjectUseCaseToken,
   GetResourceUseCaseToken,
 } from "@upstand/usecases/tokens";
+import type { AuthenticatedContext } from "../context";
 import { handleUseCaseError } from "../errors";
 import { router, twoFactorVerifiedProcedure } from "../index";
 import { checkPermission } from "../permissions";
 
 async function resolveResourceOrgId(
-  ctx: any,
+  ctx: AuthenticatedContext,
   resourceId: string,
 ): Promise<string> {
   const getResource = ctx.scope.resolve(GetResourceUseCaseToken);

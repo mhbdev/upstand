@@ -1,7 +1,10 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
 import { getBitbucketBranches } from "./bitbucket-client";
-import { getOrRefreshGitProviderToken } from "./git-provider-config";
+import {
+  getOrRefreshGitProviderToken,
+  requiredGitProviderString,
+} from "./git-provider-config";
 import { resolveGitProviderAndConfig } from "./git-provider-resolution.helper";
 import { getGiteaBranches } from "./gitea-client";
 import { getBranches } from "./github-client";
@@ -28,8 +31,8 @@ export class ListGitBranchesUseCase {
       if (provider.provider === "github") {
         return await getBranches(
           String(config.githubAppId),
-          config.githubPrivateKey,
-          config.githubInstallationId,
+          requiredGitProviderString(config, "githubPrivateKey"),
+          requiredGitProviderString(config, "githubInstallationId"),
           input.owner,
           input.repo,
         );
@@ -43,7 +46,7 @@ export class ListGitBranchesUseCase {
         );
         const projectPath = `${input.owner}/${input.repo}`;
         return await getGitlabBranches(
-          config.gitlabUrl,
+          requiredGitProviderString(config, "gitlabUrl"),
           accessToken,
           projectPath,
         );
@@ -51,8 +54,8 @@ export class ListGitBranchesUseCase {
 
       if (provider.provider === "bitbucket") {
         return await getBitbucketBranches(
-          config.bitbucketUsername,
-          config.appPassword,
+          requiredGitProviderString(config, "bitbucketUsername"),
+          requiredGitProviderString(config, "appPassword"),
           input.owner,
           input.repo,
         );
@@ -65,7 +68,7 @@ export class ListGitBranchesUseCase {
           config,
         );
         return await getGiteaBranches(
-          config.giteaUrl,
+          requiredGitProviderString(config, "giteaUrl"),
           accessToken,
           input.owner,
           input.repo,

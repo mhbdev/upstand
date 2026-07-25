@@ -95,7 +95,7 @@ export function SecretRotationDialog({
     },
   });
 
-  const handleCreateSchedule = (e: React.FormEvent) => {
+  const handleCreateSchedule = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const keys = keysInput
       .split(",")

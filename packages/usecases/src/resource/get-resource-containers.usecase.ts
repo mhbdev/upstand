@@ -1,5 +1,6 @@
 import { type IUnitOfWork, ValidationError } from "@upstand/domain";
 import { z } from "zod";
+import type { DockerResourceContainer } from "../ports/docker";
 import type { DockerResourceReadService as DockerService } from "./docker-client";
 import { resolveDockerServiceForServer } from "./docker-client";
 
@@ -17,7 +18,9 @@ export class GetResourceContainersUseCase {
     private readonly dockerService: DockerService,
   ) {}
 
-  async execute(input: GetResourceContainersInput): Promise<any[]> {
+  async execute(
+    input: GetResourceContainersInput,
+  ): Promise<DockerResourceContainer[]> {
     return this.uow.transaction(async (tx) => {
       const resource = await tx.resourceRepository.findById(input.id);
       if (!resource) {

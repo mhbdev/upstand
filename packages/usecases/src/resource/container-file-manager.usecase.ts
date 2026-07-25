@@ -1,5 +1,4 @@
 import type { IUnitOfWork } from "@upstand/domain";
-import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 import type {
   DockerExecPort,
@@ -10,6 +9,7 @@ import {
   containerBelongsToResource,
   shellQuote,
 } from "../server/container-resolution.helper";
+import { resolveDockerInspectionTarget } from "../server/docker-inspection-target.helper";
 
 export function normalizeContainerPath(rawPath: string): string {
   if (!rawPath?.trim()) return "/";
@@ -24,6 +24,92 @@ export function normalizeContainerPath(rawPath: string): string {
     }
   }
   return stack.length === 0 ? "/" : `/${stack.join("/")}`;
+}
+
+export const MAX_CONTAINER_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_CONTAINER_FILE_CONTENT_LENGTH =
+  Math.ceil(MAX_CONTAINER_FILE_SIZE_BYTES / 3) * 4;
+const MAX_CONTAINER_FILE_PATH_LENGTH = 4096;
+const MAX_CONTAINER_FILE_NAME_LENGTH = 255;
+
+const PROTECTED_SYSTEM_PATHS = [
+  "/bin",
+  "/boot",
+  "/dev",
+  "/etc",
+  "/lib",
+  "/lib64",
+  "/proc",
+  "/sys",
+  "/usr",
+] as const;
+
+function assertValidContainerPath(rawPath: string, label = "Path"): string {
+  if (rawPath.length > MAX_CONTAINER_FILE_PATH_LENGTH) {
+    throw new Error(`${label} is too long.`);
+  }
+  if (
+    [...rawPath].some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 0x1f || code === 0x7f;
+    })
+  ) {
+    throw new Error(`${label} contains unsupported control characters.`);
+  }
+
+  const normalizedPath = normalizeContainerPath(rawPath);
+  if (
+    PROTECTED_SYSTEM_PATHS.some(
+      (protectedPath) =>
+        normalizedPath === protectedPath ||
+        normalizedPath.startsWith(`${protectedPath}/`),
+    )
+  ) {
+    throw new Error(`${label} targets a protected system path.`);
+  }
+
+  return normalizedPath;
+}
+
+function assertValidItemName(name: string): string {
+  const trimmedName = name.trim();
+  if (!trimmedName || trimmedName.length > MAX_CONTAINER_FILE_NAME_LENGTH) {
+    throw new Error("Item name must be between 1 and 255 characters.");
+  }
+  if (
+    trimmedName === "." ||
+    trimmedName === ".." ||
+    trimmedName.includes("/") ||
+    trimmedName.includes("\\") ||
+    trimmedName.includes("|") ||
+    trimmedName.includes("\0")
+  ) {
+    throw new Error("Item name contains invalid path characters.");
+  }
+  return trimmedName;
+}
+
+function assertContentSize(content: string, isBase64 = false): void {
+  if (isBase64) {
+    if (
+      content.length % 4 !== 0 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        content,
+      )
+    ) {
+      throw new Error("Uploaded file content is not valid base64.");
+    }
+    if (
+      Buffer.from(content, "base64").byteLength > MAX_CONTAINER_FILE_SIZE_BYTES
+    ) {
+      throw new Error("File exceeds the 10 MB size limit.");
+    }
+    return;
+  }
+
+  if (Buffer.byteLength(content, "utf8") > MAX_CONTAINER_FILE_SIZE_BYTES) {
+    throw new Error("File exceeds the 10 MB size limit.");
+  }
 }
 
 const DANGEROUS_SYSTEM_PATHS = new Set([
@@ -55,22 +141,23 @@ export const ListContainerFilesInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
   containerId: z.string().optional(),
-  path: z.string().default("/"),
+  path: z.string().max(MAX_CONTAINER_FILE_PATH_LENGTH).default("/"),
 });
 
 export const ReadContainerFileInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
   containerId: z.string().optional(),
-  path: z.string().min(1),
+  path: z.string().min(1).max(MAX_CONTAINER_FILE_PATH_LENGTH),
+  encoding: z.enum(["text", "base64"]).default("text"),
 });
 
 export const WriteContainerFileInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
   containerId: z.string().optional(),
-  path: z.string().min(1),
-  content: z.string(),
+  path: z.string().min(1).max(MAX_CONTAINER_FILE_PATH_LENGTH),
+  content: z.string().max(MAX_CONTAINER_FILE_CONTENT_LENGTH),
   isBase64: z.boolean().optional(),
 });
 
@@ -78,8 +165,8 @@ export const CreateContainerItemInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
   containerId: z.string().optional(),
-  parentPath: z.string().default("/"),
-  name: z.string().min(1),
+  parentPath: z.string().max(MAX_CONTAINER_FILE_PATH_LENGTH).default("/"),
+  name: z.string().min(1).max(MAX_CONTAINER_FILE_NAME_LENGTH),
   type: z.enum(["file", "directory"]),
 });
 
@@ -87,23 +174,23 @@ export const RenameContainerItemInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
   containerId: z.string().optional(),
-  oldPath: z.string().min(1),
-  newPath: z.string().min(1),
+  oldPath: z.string().min(1).max(MAX_CONTAINER_FILE_PATH_LENGTH),
+  newPath: z.string().min(1).max(MAX_CONTAINER_FILE_PATH_LENGTH),
 });
 
 export const DeleteContainerItemInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
   containerId: z.string().optional(),
-  path: z.string().min(1),
+  path: z.string().min(1).max(MAX_CONTAINER_FILE_PATH_LENGTH),
 });
 
 export const SearchContainerFilesInputSchema = z.object({
   organizationId: z.string().min(1),
   resourceId: z.string().min(1),
   containerId: z.string().optional(),
-  path: z.string().default("/"),
-  query: z.string().min(1),
+  path: z.string().max(MAX_CONTAINER_FILE_PATH_LENGTH).default("/"),
+  query: z.string().min(1).max(100),
 });
 
 export class ContainerFileManagerUseCase {
@@ -132,44 +219,32 @@ export class ContainerFileManagerUseCase {
     }
 
     const resourceServerId = resource.serverId || "local";
-    const target = await this.getTarget({
-      organizationId,
-      serverId: resourceServerId,
-    });
+    const target = await resolveDockerInspectionTarget(
+      this.uow,
+      {
+        organizationId,
+        serverId: resourceServerId,
+      },
+      { localServerIds: ["local", "manager"] },
+    );
 
     const containers = await this.dockerInventory.listContainers(target);
     const ownedContainers = containers.filter((container) =>
       containerBelongsToResource(container, resource),
     );
 
-    let selected = requestedContainerId
-      ? ownedContainers.find(
-          (c) =>
-            c.id === requestedContainerId ||
-            c.id.startsWith(requestedContainerId) ||
-            requestedContainerId.startsWith(c.id) ||
-            c.name === requestedContainerId ||
-            c.name.startsWith(requestedContainerId) ||
-            requestedContainerId.startsWith(c.name),
-        )
-      : ownedContainers[0];
-
-    if (!selected && ownedContainers.length > 0) {
-      selected = ownedContainers[0];
-    }
-
-    if (!selected && containers.length > 0) {
-      const resName = (resource.appName || resource.name).toLowerCase();
-      selected = containers.find((c) => {
-        const cleanName = (c.name || "").replace(/^\//, "").toLowerCase();
-        return (
-          cleanName.includes(resName) ||
-          (requestedContainerId &&
-            (c.id === requestedContainerId ||
-              c.id.startsWith(requestedContainerId) ||
-              requestedContainerId.startsWith(c.id)))
-        );
-      });
+    let selected = ownedContainers[0];
+    if (requestedContainerId) {
+      const matches = ownedContainers.filter(
+        (c) =>
+          c.id === requestedContainerId ||
+          c.id.startsWith(requestedContainerId) ||
+          c.name === requestedContainerId,
+      );
+      if (matches.length !== 1) {
+        throw new Error("Requested container is not part of this resource.");
+      }
+      selected = matches[0];
     }
 
     if (!selected) {
@@ -192,11 +267,7 @@ export class ContainerFileManagerUseCase {
     const safePath = shellQuote(normalizedPath);
     const command = `cd ${safePath} 2>/dev/null && for f in ./* ./.* ; do [ -e "$f" ] || [ -L "$f" ] || continue; [ "$f" = "./." ] || [ "$f" = "./.." ] && continue; name=\${f#./}; if [ -d "$f" ]; then type="directory"; elif [ -L "$f" ]; then type="symlink"; else type="file"; fi; stat_out=$(stat -c '%s|%a|%Y' "$f" 2>/dev/null || echo "0|644|0"); echo "$type|$stat_out|$name"; done`;
 
-    const result = await this.docker.execContainerCommand(
-      target,
-      containerId,
-      command,
-    );
+    const result = await this.execChecked(target, containerId, command);
 
     const items: FileExplorerItem[] = [];
     const lines = (result.output || "")
@@ -252,23 +323,28 @@ export class ContainerFileManagerUseCase {
 
   async readFile(
     input: z.infer<typeof ReadContainerFileInputSchema>,
-  ): Promise<{ content: string; path: string }> {
+  ): Promise<{ content: string; path: string; encoding: "text" | "base64" }> {
     const { target, containerId } = await this.resolveTargetContainer(
       input.organizationId,
       input.resourceId,
       input.containerId,
     );
 
-    const normalizedPath = normalizeContainerPath(input.path);
-    const command = `cat -- ${shellQuote(normalizedPath)}`;
+    const normalizedPath = assertValidContainerPath(input.path, "File path");
+    const encoding = input.encoding ?? "text";
+    const safePath = shellQuote(normalizedPath);
+    const command =
+      encoding === "base64"
+        ? `test -f ${safePath} && test -r ${safePath} && [ "$(wc -c < ${safePath})" -le ${MAX_CONTAINER_FILE_SIZE_BYTES} ] && base64 ${safePath}`
+        : `test -f ${safePath} && test -r ${safePath} && [ "$(wc -c < ${safePath})" -le ${MAX_CONTAINER_FILE_SIZE_BYTES} ] && cat -- ${safePath}`;
 
-    const result = await this.docker.execContainerCommand(
-      target,
-      containerId,
-      command,
-    );
+    const result = await this.execChecked(target, containerId, command);
 
-    return { content: result.output || "", path: normalizedPath };
+    return {
+      content: result.output || "",
+      path: normalizedPath,
+      encoding,
+    };
   }
 
   async writeFile(
@@ -280,7 +356,8 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const normalizedPath = normalizeContainerPath(input.path);
+    const normalizedPath = assertValidContainerPath(input.path, "File path");
+    assertContentSize(input.content, input.isBase64);
     const base64Content = input.isBase64
       ? input.content
       : Buffer.from(input.content, "utf8").toString("base64");
@@ -290,9 +367,9 @@ export class ContainerFileManagerUseCase {
       normalizedPath.substring(0, normalizedPath.lastIndexOf("/")) || "/",
     );
 
-    const command = `mkdir -p -- ${dirPath} && printf '%s' ${shellQuote(base64Content)} | base64 -d > ${safePath}`;
+    const command = `test -d ${dirPath} && printf '%s' ${shellQuote(base64Content)} | base64 -d > ${safePath}`;
 
-    await this.docker.execContainerCommand(target, containerId, command);
+    await this.execChecked(target, containerId, command);
 
     return { success: true };
   }
@@ -306,11 +383,13 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const parent = normalizeContainerPath(input.parentPath);
+    const parent = assertValidContainerPath(input.parentPath, "Parent path");
+    const itemName = assertValidItemName(input.name);
     const targetPath =
       parent === "/"
-        ? `/${input.name.replace(/^\//, "")}`
-        : `${parent.replace(/\/$/, "")}/${input.name.replace(/^\//, "")}`;
+        ? `/${itemName}`
+        : `${parent.replace(/\/$/, "")}/${itemName}`;
+    assertValidContainerPath(targetPath, "Item path");
 
     const safeTarget = shellQuote(targetPath);
     const dirPath = shellQuote(
@@ -322,7 +401,7 @@ export class ContainerFileManagerUseCase {
         ? `mkdir -p -- ${safeTarget}`
         : `mkdir -p -- ${dirPath} && touch -- ${safeTarget}`;
 
-    await this.docker.execContainerCommand(target, containerId, command);
+    await this.execChecked(target, containerId, command);
 
     return { success: true };
   }
@@ -336,8 +415,11 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const oldNormalized = normalizeContainerPath(input.oldPath);
-    const newNormalized = normalizeContainerPath(input.newPath);
+    const oldNormalized = assertValidContainerPath(
+      input.oldPath,
+      "Original path",
+    );
+    const newNormalized = assertValidContainerPath(input.newPath, "New path");
 
     if (DANGEROUS_SYSTEM_PATHS.has(oldNormalized) || oldNormalized === "/") {
       throw new Error(
@@ -349,9 +431,9 @@ export class ContainerFileManagerUseCase {
       newNormalized.substring(0, newNormalized.lastIndexOf("/")) || "/",
     );
 
-    const command = `mkdir -p -- ${newDir} && mv -f -- ${shellQuote(oldNormalized)} ${shellQuote(newNormalized)}`;
+    const command = `test -d ${newDir} && mv -f -- ${shellQuote(oldNormalized)} ${shellQuote(newNormalized)}`;
 
-    await this.docker.execContainerCommand(target, containerId, command);
+    await this.execChecked(target, containerId, command);
 
     return { success: true };
   }
@@ -365,7 +447,7 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const normalizedPath = normalizeContainerPath(input.path);
+    const normalizedPath = assertValidContainerPath(input.path, "Delete path");
     if (DANGEROUS_SYSTEM_PATHS.has(normalizedPath) || normalizedPath === "/") {
       throw new Error(
         "Deletion of system root or system directory is forbidden for security.",
@@ -374,7 +456,7 @@ export class ContainerFileManagerUseCase {
 
     const command = `rm -rf -- ${shellQuote(normalizedPath)}`;
 
-    await this.docker.execContainerCommand(target, containerId, command);
+    await this.execChecked(target, containerId, command);
 
     return { success: true };
   }
@@ -388,25 +470,27 @@ export class ContainerFileManagerUseCase {
       input.containerId,
     );
 
-    const normalizedPath = normalizeContainerPath(input.path);
-    const safePattern = shellQuote(`*${input.query.replace(/[*?]/g, "")}*`);
-    const command = `find ${shellQuote(normalizedPath)} -name ${safePattern} -maxdepth 4 2>/dev/null | head -n 50`;
+    const normalizedPath = assertValidContainerPath(input.path, "Search path");
+    const searchTerm = input.query.replace(/[*?]/g, "").trim();
+    if (!searchTerm) return [];
+    const safePattern = shellQuote(`*${searchTerm}*`);
+    const command = `find ${shellQuote(normalizedPath)} -maxdepth 4 -name ${safePattern} -print 2>/dev/null | head -n 50 | while IFS= read -r filePath; do if [ -d "$filePath" ]; then type="directory"; elif [ -L "$filePath" ]; then type="symlink"; else type="file"; fi; printf '%s|%s\\n' "$type" "$filePath"; done`;
 
-    const result = await this.docker.execContainerCommand(
-      target,
-      containerId,
-      command,
-    );
+    const result = await this.execChecked(target, containerId, command);
     const lines = (result.output || "")
       .split("\n")
       .filter((l: string) => l.trim());
 
-    return lines.map((filePath: string) => {
+    return lines.map((line: string) => {
+      const [rawType, ...pathParts] = line.split("|");
+      const filePath = pathParts.length > 0 ? pathParts.join("|") : line;
+      const type =
+        rawType === "directory" || rawType === "symlink" ? rawType : "file";
       const name = filePath.split("/").pop() || filePath;
       return {
         name,
         path: filePath,
-        type: "file",
+        type,
         sizeBytes: 0,
         permissions: "644",
         updatedAt: new Date().toISOString(),
@@ -414,36 +498,21 @@ export class ContainerFileManagerUseCase {
     });
   }
 
-  private async getTarget(input: {
-    organizationId: string;
-    serverId?: string;
-  }): Promise<DockerInspectionTarget> {
-    if (
-      !input.serverId ||
-      input.serverId === "local" ||
-      input.serverId === "manager"
-    ) {
-      return { kind: "local", name: "Local Docker" };
+  private async execChecked(
+    target: DockerInspectionTarget,
+    containerId: string,
+    command: string,
+  ): Promise<{ output: string; stderr?: string; exitCode?: number }> {
+    const result = await this.docker.execContainerCommand(
+      target,
+      containerId,
+      command,
+    );
+    if (result.exitCode !== undefined && result.exitCode !== 0) {
+      throw new Error(
+        result.stderr?.trim() || "Container file operation failed.",
+      );
     }
-    const server = await this.uow.serverRepository.findById(input.serverId);
-    if (!server || server.organizationId !== input.organizationId) {
-      throw new Error("Server is not part of the active organization.");
-    }
-    if (!server.sshKeyId) throw new Error("Server has no SSH key configured.");
-    const key = await this.uow.sshKeyRepository.findById(server.sshKeyId);
-    if (!key) throw new Error("Configured server SSH key was not found.");
-    return {
-      kind: "remote",
-      name: server.name,
-      host: server.ipAddress,
-      port: server.port,
-      username: server.username,
-      privateKey: decryptSecret({
-        ciphertext: key.privateKeyCiphertext,
-        iv: key.privateKeyIv,
-        authTag: key.privateKeyAuthTag,
-        keyVersion: key.privateKeyVersion,
-      }),
-    };
+    return result;
   }
 }

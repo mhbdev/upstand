@@ -10,7 +10,7 @@ import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 export type TavilyToolsResult = {
   enabled: boolean;
   settings: AITavilySettingsRecord | null;
-  tools: Record<string, any>;
+  tools: Record<string, unknown>;
 };
 
 export async function createTavilyToolsForOrg(
@@ -46,7 +46,7 @@ export async function createTavilyToolsForOrg(
     return { enabled: false, settings, tools: {} };
   }
 
-  const tools: Record<string, any> = {};
+  const tools: Record<string, unknown> = {};
 
   if (settings.enableSearch) {
     tools.tavilySearch = tavilySearch({

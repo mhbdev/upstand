@@ -7,6 +7,7 @@ export const UpdateProjectInputSchema = z.object({
   name: z.string().min(1, "Project name cannot be empty").optional(),
   description: z.string().optional().nullable(),
   icon: EntityIconSchema,
+  archived: z.boolean().optional(),
 });
 
 export type UpdateProjectInput = z.infer<typeof UpdateProjectInputSchema>;
@@ -24,10 +25,14 @@ export class UpdateProjectUseCase {
       name?: string;
       description?: string | null;
       icon?: string | null;
+      archivedAt?: Date | null;
     } = {};
     if (input.name !== undefined) patch.name = input.name;
     if (input.description !== undefined) patch.description = input.description;
     if (input.icon !== undefined) patch.icon = input.icon;
+    if (input.archived !== undefined) {
+      patch.archivedAt = input.archived ? new Date() : null;
+    }
 
     const updated = await this.uow.projectRepository.updateById(
       input.id,

@@ -10,6 +10,7 @@ export const S3DestinationSchema = z.object({
   bucket: z.string(),
   region: z.string(),
   endpoint: z.string(),
+  certificateId: z.string().nullable().optional(),
   additionalFlags: z.string(), // JSON string representing string[]
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -27,5 +28,6 @@ export interface CreateS3DestinationDTO {
   bucket: string;
   region: string;
   endpoint: string;
+  certificateId?: string | null;
   additionalFlags?: string;
 }

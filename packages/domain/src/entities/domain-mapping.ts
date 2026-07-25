@@ -56,6 +56,8 @@ export function normalizeDomainPath(value: string): string {
 }
 
 const DomainMappingInputSchema = z.object({
+  /** Disabled routes remain stored but are excluded from the active proxy config. */
+  enabled: z.boolean().optional().default(true),
   host: z.string().min(1).max(253),
   /** Public request path. */
   path: z.string().max(2048).optional().default("/"),
@@ -70,7 +72,7 @@ const DomainMappingInputSchema = z.object({
   https: z.boolean().optional().default(true),
   /** Certificate strategy used by the edge proxy for HTTPS routes. */
   certificateType: z
-    .enum(["letsencrypt", "internal", "custom", "cloudflare"])
+    .enum(["letsencrypt", "zerossl", "internal", "custom", "cloudflare"])
     .optional()
     .default("letsencrypt"),
   certificateId: z.string().min(1).optional(),
@@ -199,6 +201,7 @@ export const DomainMappingSchema = DomainMappingInputSchema.transform(
 );
 
 export type DomainMapping = {
+  enabled: boolean;
   host: string;
   path: string;
   internalPath: string;
@@ -206,7 +209,12 @@ export type DomainMapping = {
   port: number;
   serviceName?: string;
   https: boolean;
-  certificateType: "letsencrypt" | "internal" | "custom" | "cloudflare";
+  certificateType:
+    | "letsencrypt"
+    | "zerossl"
+    | "internal"
+    | "custom"
+    | "cloudflare";
   certificateId?: string;
   middlewares: string[];
   redirectTo?: string;

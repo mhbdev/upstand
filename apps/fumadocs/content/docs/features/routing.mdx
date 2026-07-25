@@ -22,17 +22,26 @@ A domain mapping consists of:
 
 ## 2. HTTPS & SSL Strategies
 
-Upstand configures and reloads certificates dynamically. You can choose between two certificate strategies:
+Upstand configures and reloads certificates dynamically. You can choose between four certificate strategies:
 
 ### Let's Encrypt (Production Default)
 - Automatically completes ACME HTTP-01 or TLS-ALPN-01 challenges.
+- Optional ACME contact email for certificate expiration alerts and account registration.
 - Caddy caches certificates, private keys, and renewal statuses in a persistent volume.
 - **Prerequisites**: DNS must resolve to the server IP and TCP ports **80** and **443** must be open publicly.
 
-### Caddy Internal CA
+### ZeroSSL
+- Issues certificates via ZeroSSL ACME endpoints with ACME contact email registration.
+- Useful when Let's Encrypt rate limits or policy restrictions apply.
+
+### Caddy Internal CA (Self-Signed)
 - Generates locally-trusted certificates using Caddy's built-in Certificate Authority.
 - Best for staging, local development, or isolated private network deployments.
 - *Note: Browsers and clients must manually import the Caddy root certificate to avoid untrusted warning screens.*
+
+### Custom SSL Certificates
+- Upload custom SSL certificates and matching private keys under **Infrastructure → Certificates**.
+- Select the uploaded certificate directly on domain mappings or main web server domain configurations for enterprise or wildcard TLS management.
 
 ---
 

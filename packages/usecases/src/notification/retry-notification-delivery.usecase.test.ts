@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { NotificationDelivery } from "@upstand/domain";
+import type { IUnitOfWork, NotificationDelivery } from "@upstand/domain";
 import { RetryNotificationDeliveryUseCase } from "./retry-notification-delivery.usecase";
 
 function delivery(
@@ -35,7 +35,7 @@ test("requeues a failed notification and resets delivery attempts", async () => 
     notificationDeliveryRepository: {
       findById: async () => current,
     },
-    transaction: async (work: (tx: any) => Promise<unknown>) =>
+    transaction: async (work: (tx: never) => Promise<unknown>) =>
       work({
         notificationDeliveryRepository: {
           updateById: async (_id: string, patch: Record<string, unknown>) => {
@@ -49,9 +49,11 @@ test("requeues a failed notification and resets delivery attempts", async () => 
             return message;
           },
         },
-      }),
-  } as never;
-  const useCase = new RetryNotificationDeliveryUseCase(uow);
+      } as never),
+  };
+  const useCase = new RetryNotificationDeliveryUseCase(
+    uow as unknown as IUnitOfWork,
+  );
 
   const result = await useCase.execute(current.id);
 
@@ -75,8 +77,10 @@ test("does not retry a delivered notification", async () => {
       findById: async () => current,
       updateById: async () => current,
     },
-  } as never;
-  const useCase = new RetryNotificationDeliveryUseCase(uow);
+  };
+  const useCase = new RetryNotificationDeliveryUseCase(
+    uow as unknown as IUnitOfWork,
+  );
 
   await expect(useCase.execute(current.id)).rejects.toThrow(
     "Only failed notification deliveries can be retried",

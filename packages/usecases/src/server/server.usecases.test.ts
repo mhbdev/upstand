@@ -13,8 +13,31 @@ import {
 import { buildDockerInstallCommand } from "./setup-server.usecase";
 import { UpdateServerUseCase } from "./update-server.usecase";
 
+interface TestServer {
+  id: string;
+  organizationId?: string;
+  name?: string;
+  description?: string | null;
+  serverType?: string;
+  sshKeyId?: string | null;
+  ipAddress?: string;
+  port?: number;
+  username?: string;
+  enableDockerCleanup?: boolean;
+  status?: string;
+  setupError?: string | null;
+}
+
+interface TestResource {
+  id: string;
+  serverId: string | null;
+  name?: string;
+  type?: string;
+  buildServerId?: string | null;
+}
+
 function createUow() {
-  const servers = new Map<string, any>([
+  const servers = new Map<string, TestServer>([
     [
       "server-1",
       {
@@ -33,7 +56,7 @@ function createUow() {
       },
     ],
   ]);
-  const resources = new Map<string, any>();
+  const resources = new Map<string, TestResource>();
   const uow = {
     serverRepository: {
       findById: async (id: string) => servers.get(id) ?? null,

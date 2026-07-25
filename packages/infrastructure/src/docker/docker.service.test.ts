@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { redactCommandOutput } from "./docker.service";
+import {
+  redactCommandOutput,
+  shouldSuppressComposeRestart,
+} from "./docker.service";
 
 describe("deployment command log safety", () => {
   test("redacts build and registry secrets without leaking shorter values", () => {
@@ -17,5 +20,26 @@ describe("deployment command log safety", () => {
         "registry-password",
       ]),
     ).not.toContain("registry-password");
+  });
+
+  test("suppresses restart-policy recreation only for standalone Compose kill", () => {
+    expect(
+      shouldSuppressComposeRestart(
+        { type: "compose", composeType: "compose" },
+        "kill",
+      ),
+    ).toBe(true);
+    expect(
+      shouldSuppressComposeRestart(
+        { type: "compose", composeType: "stack" },
+        "kill",
+      ),
+    ).toBe(false);
+    expect(
+      shouldSuppressComposeRestart(
+        { type: "application", composeType: null },
+        "kill",
+      ),
+    ).toBe(false);
   });
 });

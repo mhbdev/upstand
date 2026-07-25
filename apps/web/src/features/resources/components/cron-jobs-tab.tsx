@@ -54,6 +54,7 @@ import {
 import { CodeBlock } from "@/components/shared/code-block";
 import { getDocsUrl } from "@/lib/server-url";
 import { trpc } from "@/utils/trpc";
+import type { ResourceDetailState } from "../hooks/use-resource-detail";
 
 const TIMEZONES = [
   "UTC",
@@ -168,7 +169,34 @@ if (authHeader !== \`Bearer \${process.env.CRON_SECRET}\`) {
 };
 
 interface CronJobsTabProps {
-  resource: any;
+  resource: NonNullable<ResourceDetailState["resource"]>;
+}
+
+type CronJobType = "command" | "cron" | "deployment" | "backup";
+type ShellType = "bash" | "sh";
+type Schedule = {
+  id: string;
+  name: string;
+  description?: string | null;
+  jobType: string;
+  command?: string | null;
+  cronExpression: string;
+  timezone?: string | null;
+  shellType?: string | null;
+  serviceName?: string | null;
+  backupScheduleId?: string | null;
+  source?: string | null;
+  lastRunAt?: string | null;
+  lastRunStatus?: string | null;
+};
+function parseCronJobType(value: string | null | undefined): CronJobType {
+  return value === "cron" || value === "deployment" || value === "backup"
+    ? value
+    : "command";
+}
+
+function parseShellType(value: string | null | undefined): ShellType {
+  return value === "sh" ? "sh" : "bash";
 }
 
 export function CronJobsTab({ resource }: CronJobsTabProps) {
@@ -176,7 +204,7 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
   const [_copiedKey, setCopiedKey] = useState<string | null>(null);
   const [selectedFramework, setSelectedFramework] = useState("nextApp");
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [logsModalScheduleId, setLogsModalScheduleId] = useState<string | null>(
     null,
   );
@@ -297,16 +325,16 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
     });
   };
 
-  const openEdit = (sch: any) => {
+  const openEdit = (sch: Schedule) => {
     setEditingSchedule(sch);
     setFormData({
       name: sch.name,
       description: sch.description || "",
-      jobType: sch.jobType || "command",
+      jobType: parseCronJobType(sch.jobType),
       command: sch.command || "",
       cronExpression: sch.cronExpression,
       timezone: sch.timezone || "UTC",
-      shellType: sch.shellType || "bash",
+      shellType: parseShellType(sch.shellType),
       serviceName: sch.serviceName || "",
       backupScheduleId: sch.backupScheduleId || "",
     });
@@ -406,7 +434,7 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {schedules.map((sch: any) => (
+                  {schedules.map((sch) => (
                     <TableRow key={sch.id} className="hover:bg-muted/20">
                       <TableCell className="font-medium text-xs">
                         <div>
@@ -740,9 +768,16 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
                     { value: "backup", label: "Backup Schedule" },
                   ]}
                   value={formData.jobType}
-                  onValueChange={(val: any) =>
-                    setFormData({ ...formData, jobType: val })
-                  }
+                  onValueChange={(val) => {
+                    if (
+                      val === "command" ||
+                      val === "cron" ||
+                      val === "deployment" ||
+                      val === "backup"
+                    ) {
+                      setFormData({ ...formData, jobType: val });
+                    }
+                  }}
                 >
                   <SelectTrigger className="h-9 text-xs">
                     <SelectValue placeholder="Select type" />
@@ -791,9 +826,8 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
               <Label className="font-medium text-xs">Predefined Schedule</Label>
               <Select
                 items={PREDEFINED_CRONS}
-                onValueChange={(val: any) => {
-                  const str = typeof val === "string" ? val : val?.value;
-                  if (str) setFormData({ ...formData, cronExpression: str });
+                onValueChange={(val: string | null | undefined) => {
+                  if (val) setFormData({ ...formData, cronExpression: val });
                 }}
               >
                 <SelectTrigger className="h-9 text-xs">
@@ -921,9 +955,11 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
                         { value: "sh", label: "sh" },
                       ]}
                       value={formData.shellType}
-                      onValueChange={(val: any) =>
-                        setFormData({ ...formData, shellType: val })
-                      }
+                      onValueChange={(val) => {
+                        if (val === "bash" || val === "sh") {
+                          setFormData({ ...formData, shellType: val });
+                        }
+                      }}
                     >
                       <SelectTrigger className="h-9 text-xs">
                         <SelectValue placeholder="Shell" />
@@ -1010,7 +1046,7 @@ export function CronJobsTab({ resource }: CronJobsTabProps) {
               </div>
             ) : logsData && logsData.length > 0 ? (
               <div className="space-y-3">
-                {logsData.map((log: any) => (
+                {logsData.map((log) => (
                   <div
                     key={log.id}
                     className="space-y-2 rounded-lg border border-border/30 bg-background/50 p-3 text-xs"

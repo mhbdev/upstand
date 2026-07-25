@@ -15,6 +15,24 @@ type StepUpRecord = {
   purpose: "sensitive-operations";
 };
 
+type UnknownRecord = Record<string, unknown>;
+
+function isUnknownRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function isStepUpRecord(value: unknown): value is StepUpRecord {
+  if (!isUnknownRecord(value)) return false;
+  return (
+    typeof value.version === "number" &&
+    typeof value.userId === "string" &&
+    typeof value.sessionId === "string" &&
+    typeof value.verifiedAt === "number" &&
+    typeof value.expiresAt === "number" &&
+    value.purpose === "sensitive-operations"
+  );
+}
+
 export interface StepUpStorage {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
@@ -77,7 +95,9 @@ export function isStepUpVerificationValid(
   if (!twoFactorEnabled) return true;
   if (!verificationValue) return false;
   try {
-    const record = JSON.parse(verificationValue) as Partial<StepUpRecord>;
+    const parsed: unknown = JSON.parse(verificationValue);
+    if (!isStepUpRecord(parsed)) return false;
+    const record: StepUpRecord = parsed;
     const now = Math.floor(Date.now() / 1000);
     return (
       record.version === STEP_UP_VERSION &&

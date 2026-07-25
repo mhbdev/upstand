@@ -19,6 +19,15 @@ export type CaddyCertificate = Pick<
   Certificate,
   "id" | "certificatePem" | "privateKeyPem"
 >;
+export interface CaddyStatus {
+  running: boolean;
+  status: string;
+  uptime: string;
+  ports: string[];
+  activeDomainsCount: number;
+  activeDomains: string[];
+  mainCaddyfile: string;
+}
 export type CaddyResource = Pick<
   Resource,
   "id" | "name" | "type" | "appName" | "domains" | "composeType"
@@ -37,7 +46,7 @@ export interface CaddyServicePort {
     certificates?: CaddyCertificate[],
   ): Promise<{ success: true; domains: string[]; changed: boolean }>;
   reloadCaddy(): Promise<{ success: boolean; error?: string }>;
-  getStatus(): Promise<Record<string, unknown>>;
+  getStatus(): Promise<CaddyStatus>;
   getLogs(tail?: number): Promise<string>;
   getAccessLogs(tail?: number): Promise<string>;
   cleanupAccessLogs(): Promise<void>;

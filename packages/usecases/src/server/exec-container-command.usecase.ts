@@ -1,9 +1,7 @@
 import type { IUnitOfWork } from "@upstand/domain";
-import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { z } from "zod";
 import type {
   DockerExecPort,
-  DockerInspectionTarget,
   DockerInventoryReaderPort,
 } from "../ports/docker";
 
@@ -19,6 +17,7 @@ import {
   containerBelongsToResource,
   matchesContainerIdentifier,
 } from "./container-resolution.helper";
+import { resolveDockerInspectionTarget } from "./docker-inspection-target.helper";
 
 export class ExecContainerCommandUseCase {
   constructor(
@@ -52,10 +51,14 @@ export class ExecContainerCommandUseCase {
       throw new Error("Resource is not assigned to the requested server.");
     }
 
-    const target = await this.getTarget({
-      organizationId: input.organizationId,
-      serverId: resourceServerId,
-    });
+    const target = await resolveDockerInspectionTarget(
+      this.uow,
+      {
+        organizationId: input.organizationId,
+        serverId: resourceServerId,
+      },
+      { localServerIds: ["local", "manager"] },
+    );
     const containers = await this.dockerInventory.listContainers(target);
     const ownedContainers = containers.filter((container) =>
       containerBelongsToResource(container, resource),
@@ -93,38 +96,5 @@ export class ExecContainerCommandUseCase {
     }
 
     return this.docker.execContainerCommand(target, selected.id, input.command);
-  }
-
-  private async getTarget(input: {
-    organizationId: string;
-    serverId?: string;
-  }): Promise<DockerInspectionTarget> {
-    if (
-      !input.serverId ||
-      input.serverId === "local" ||
-      input.serverId === "manager"
-    ) {
-      return { kind: "local", name: "Local Docker" };
-    }
-    const server = await this.uow.serverRepository.findById(input.serverId);
-    if (!server || server.organizationId !== input.organizationId) {
-      throw new Error("Server is not part of the active organization.");
-    }
-    if (!server.sshKeyId) throw new Error("Server has no SSH key configured.");
-    const key = await this.uow.sshKeyRepository.findById(server.sshKeyId);
-    if (!key) throw new Error("Configured server SSH key was not found.");
-    return {
-      kind: "remote",
-      name: server.name,
-      host: server.ipAddress,
-      port: server.port,
-      username: server.username,
-      privateKey: decryptSecret({
-        ciphertext: key.privateKeyCiphertext,
-        iv: key.privateKeyIv,
-        authTag: key.privateKeyAuthTag,
-        keyVersion: key.privateKeyVersion,
-      }),
-    };
   }
 }

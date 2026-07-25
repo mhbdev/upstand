@@ -1,7 +1,11 @@
 import type { IUnitOfWork } from "@upstand/domain";
 import { z } from "zod";
 import { getBitbucketRepositories } from "./bitbucket-client";
-import { getOrRefreshGitProviderToken } from "./git-provider-config";
+import {
+  getOrRefreshGitProviderToken,
+  optionalGitProviderString,
+  requiredGitProviderString,
+} from "./git-provider-config";
 import { resolveGitProviderAndConfig } from "./git-provider-resolution.helper";
 import { getGiteaRepositories } from "./gitea-client";
 import { getRepositories } from "./github-client";
@@ -28,8 +32,8 @@ export class ListGitRepositoriesUseCase {
       if (provider.provider === "github") {
         return await getRepositories(
           String(config.githubAppId),
-          config.githubPrivateKey,
-          config.githubInstallationId,
+          requiredGitProviderString(config, "githubPrivateKey"),
+          requiredGitProviderString(config, "githubInstallationId"),
         );
       }
 
@@ -40,17 +44,17 @@ export class ListGitRepositoriesUseCase {
           config,
         );
         return await getGitlabRepositories(
-          config.gitlabUrl,
+          requiredGitProviderString(config, "gitlabUrl"),
           accessToken,
-          config.groupName,
+          optionalGitProviderString(config, "groupName"),
         );
       }
 
       if (provider.provider === "bitbucket") {
         return await getBitbucketRepositories(
-          config.bitbucketUsername,
-          config.appPassword,
-          config.bitbucketWorkspaceName,
+          requiredGitProviderString(config, "bitbucketUsername"),
+          requiredGitProviderString(config, "appPassword"),
+          optionalGitProviderString(config, "bitbucketWorkspaceName"),
         );
       }
 
@@ -60,7 +64,10 @@ export class ListGitRepositoriesUseCase {
           provider,
           config,
         );
-        return await getGiteaRepositories(config.giteaUrl, accessToken);
+        return await getGiteaRepositories(
+          requiredGitProviderString(config, "giteaUrl"),
+          accessToken,
+        );
       }
 
       throw new Error(

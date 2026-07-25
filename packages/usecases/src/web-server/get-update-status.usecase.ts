@@ -49,6 +49,10 @@ let cachedStatus: {
 
 const VERSION_PATTERN = /^(?:v)?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/i;
 
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
+}
+
 function compareVersions(left: string, right: string): number {
   const parse = (value: string) => {
     const match = value.trim().match(VERSION_PATTERN);
@@ -229,11 +233,11 @@ export class GetUpdateStatusUseCase {
             message: `GitHub API returned ${response.status} when checking for updates.`,
           });
         }
-      } catch (apiErr: any) {
+      } catch (apiErr: unknown) {
         log.warn({
           message:
             "Failed to connect to GitHub API, checking redirect fallback",
-          err: apiErr.message,
+          err: errorMessage(apiErr),
         });
       }
 
@@ -273,10 +277,10 @@ export class GetUpdateStatusUseCase {
               }
             }
           }
-        } catch (fallbackErr: any) {
+        } catch (fallbackErr: unknown) {
           log.warn({
             message: "GitHub redirect fallback check failed",
-            err: fallbackErr.message,
+            err: errorMessage(fallbackErr),
           });
         }
       }
@@ -324,7 +328,7 @@ export class GetUpdateStatusUseCase {
       };
 
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error({
         message: "Failed to check for updates from GitHub",
         err,

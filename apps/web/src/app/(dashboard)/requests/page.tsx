@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 export default function RequestsRedirectPage() {
   useEffect(() => {
-    redirect("/observation?tab=requests" as any);
+    redirect("/observation?tab=requests");
   }, []);
 
   return null;

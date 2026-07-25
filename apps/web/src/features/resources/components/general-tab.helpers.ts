@@ -48,18 +48,7 @@ const ResourceCredentialsSchema = z
     composeFile: z.string().optional(),
   })
   .catchall(z.unknown());
-const DeploymentSnapshotSchema = z.object({
-  id: z.string().optional(),
-  status: z.string().optional(),
-  title: z.string().optional(),
-  logs: z.string().optional(),
-  createdAt: z.string().optional(),
-  sourceRevision: z.string().nullable().optional(),
-});
-const DeploymentSnapshotsSchema = z.array(DeploymentSnapshotSchema);
-
 export type ResourceCredentials = z.infer<typeof ResourceCredentialsSchema>;
-export type DeploymentSnapshot = z.infer<typeof DeploymentSnapshotSchema>;
 
 export function toStringRecord(
   value: Record<string, unknown>,
@@ -113,18 +102,6 @@ export function parseResourceCredentials(
     return ResourceCredentialsSchema.parse(parsed);
   } catch {
     return null;
-  }
-}
-
-export function parseDeployments(
-  value: string | null | undefined,
-): DeploymentSnapshot[] {
-  if (!value) return [];
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return DeploymentSnapshotsSchema.parse(parsed);
-  } catch {
-    return [];
   }
 }
 

@@ -338,7 +338,7 @@ export class NotificationTransportRegistry implements NotificationTransport {
       ? message.title
       : `${emoji} ${message.title}`;
 
-    const blocks: any[] = [
+    const blocks: Record<string, unknown>[] = [
       {
         type: "header",
         text: { type: "plain_text", text: formattedTitle, emoji: true },

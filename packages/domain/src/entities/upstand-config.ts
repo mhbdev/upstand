@@ -133,10 +133,12 @@ export function parseUpstandConfig(input: unknown): ParseUpstandConfigResult {
   if (typeof input === "string") {
     try {
       objectToValidate = JSON.parse(input);
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const message: string =
+        error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        error: `Invalid JSON syntax: ${err.message}`,
+        error: `Invalid JSON syntax: ${message}`,
         issues: [],
       };
     }

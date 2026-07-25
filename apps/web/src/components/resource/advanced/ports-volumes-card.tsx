@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import type { ResourceAdvancedConfig } from "@upstand/domain";
 import { Button } from "@upstand/ui/components/button";
 import {
@@ -26,7 +27,10 @@ import {
 } from "@upstand/ui/components/select";
 import { Switch } from "@upstand/ui/components/switch";
 import { Textarea } from "@upstand/ui/components/textarea";
-import { Plus, Trash2 } from "@/components/huge-icons";
+import { toast } from "sonner";
+import { Download, Plus, Trash2 } from "@/components/huge-icons";
+import { extractPortsAndVolumesFromServices } from "@/features/resources/utils/compose-parser";
+import { trpc } from "@/utils/trpc";
 import type { AdvancedCardProps } from "./types";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -238,19 +242,107 @@ export function PortsVolumesCard({
   config,
   resourceType,
   onChange,
+  composeFile,
+  organizationId,
 }: AdvancedCardProps) {
   const addPort = () => onChange("ports", [...config.ports, DEFAULT_PORT]);
   const addVolume = () =>
     onChange("volumes", [...config.volumes, buildDefaultVolume(resourceType)]);
 
+  const inspectCompose = useMutation(trpc.compose.inspect.mutationOptions());
+
+  const handleAutoDetect = () => {
+    if (!composeFile || !organizationId) {
+      toast.error(
+        "Compose specification is required to auto-detect ports and volumes.",
+      );
+      return;
+    }
+    inspectCompose.mutate(
+      { organizationId, composeFile },
+      {
+        onSuccess: (res) => {
+          const { ports: detectedPorts, volumes: detectedVolumes } =
+            extractPortsAndVolumesFromServices(res.services);
+
+          let portsAdded = 0;
+          let volumesAdded = 0;
+
+          if (detectedPorts.length > 0) {
+            const existingKeys = new Set(
+              config.ports.map(
+                (p) => `${p.publishedPort}:${p.targetPort}/${p.protocol}`,
+              ),
+            );
+            const newPorts = [...config.ports];
+            for (const p of detectedPorts) {
+              const key = `${p.publishedPort}:${p.targetPort}/${p.protocol}`;
+              if (!existingKeys.has(key)) {
+                newPorts.push(p);
+                portsAdded++;
+              }
+            }
+            if (portsAdded > 0) {
+              onChange("ports", newPorts);
+            }
+          }
+
+          if (detectedVolumes.length > 0) {
+            const existingKeys = new Set(
+              config.volumes.map((v) => `${v.source}:${v.target}`),
+            );
+            const newVolumes = [...config.volumes];
+            for (const v of detectedVolumes) {
+              const key = `${v.source}:${v.target}`;
+              if (!existingKeys.has(key)) {
+                newVolumes.push(v);
+                volumesAdded++;
+              }
+            }
+            if (volumesAdded > 0) {
+              onChange("volumes", newVolumes);
+            }
+          }
+
+          if (portsAdded === 0 && volumesAdded === 0) {
+            toast.info(
+              `Auto-detection complete: ${detectedPorts.length} port(s) and ${detectedVolumes.length} volume(s) found (all already present in config).`,
+            );
+          } else {
+            toast.success(
+              `Auto-fulfilled ${portsAdded} port(s) and ${volumesAdded} volume(s) from Compose definition.`,
+            );
+          }
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to inspect Compose file");
+        },
+      },
+    );
+  };
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Ports &amp; storage</CardTitle>
-        <CardDescription>
-          Publish service ports through the Swarm ingress mesh and mount
-          persistent Docker volumes or host paths into the container.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle>Ports &amp; storage</CardTitle>
+          <CardDescription>
+            Publish service ports through the Swarm ingress mesh and mount
+            persistent Docker volumes or host paths into the container.
+          </CardDescription>
+        </div>
+        {(resourceType === "compose" || composeFile) && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={inspectCompose.isPending}
+            onClick={handleAutoDetect}
+          >
+            <Download data-icon="inline-start" />
+            {inspectCompose.isPending ? "Detecting..." : "Detect from Compose"}
+          </Button>
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-8 border-t pt-5">

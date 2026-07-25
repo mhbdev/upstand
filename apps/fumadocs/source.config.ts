@@ -1,12 +1,45 @@
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { defineConfig, defineDocs } from "fumadocs-mdx/config";
+import type { Node, Parent } from "unist";
 import { visit } from "unist-util-visit";
 
-function remarkMermaid() {
-  return (tree: any) => {
-    visit(tree, "code", (node: any, index: number | undefined, parent: any) => {
-      if (node.lang === "mermaid" && parent && typeof index === "number") {
-        parent.children[index] = {
+type CodeNode = Node & {
+  type: "code";
+  lang?: string | null;
+  value: string;
+};
+type RootNode = Parent & { type: "root" };
+type MdxAttributeNode = Node & {
+  name: string;
+  value: string;
+};
+type MdxFlowNode = Node & {
+  name: string;
+  attributes: MdxAttributeNode[];
+  children: Node[];
+};
+
+function isCodeNode(node: Node): node is CodeNode {
+  return (
+    node.type === "code" && "value" in node && typeof node.value === "string"
+  );
+}
+
+function remarkMermaid(): (tree: RootNode) => void {
+  return (tree: RootNode): void => {
+    visit(
+      tree,
+      "code",
+      (node: Node, index: number | undefined, parent: Parent | undefined) => {
+        if (
+          !isCodeNode(node) ||
+          node.lang !== "mermaid" ||
+          !parent ||
+          typeof index !== "number"
+        ) {
+          return;
+        }
+        const replacement: MdxFlowNode = {
           type: "mdxJsxFlowElement",
           name: "Mermaid",
           attributes: [
@@ -18,8 +51,9 @@ function remarkMermaid() {
           ],
           children: [],
         };
-      }
-    });
+        parent.children[index] = replacement;
+      },
+    );
   };
 }
 

@@ -91,6 +91,16 @@ An application is a Git-backed or image-backed workload. Its configuration inclu
 - **Placement**: Target deployment server and optional dedicated build server.
 - **Runtime Configuration**: Command, arguments, published ports, persistent volumes, replicas, placement constraints, restart policies, and health checks.
 
+### Advanced Runtime & Health Check Configuration
+
+From the resource **Advanced** tab, operators can configure granular container execution settings:
+- **Container Health Checks**: Define custom container probes:
+  - **Test Command**: Specify a test command (e.g. `CMD-SHELL curl -f http://localhost:8080/health || exit 1`).
+  - **Interval & Timeout**: Set evaluation frequency (e.g. 30s) and timeout limits (e.g. 5s).
+  - **Retries & Start Period**: Configure maximum retry attempts before marking unhealthy and initial grace period for cold-starting applications.
+- **Port Mappings**: Map container ports to host network ports with TCP/UDP protocol selection and optional host IP bindings (e.g. `127.0.0.1:8080:80/tcp`).
+- **Volume Mounts**: Attach persistent host paths or named Docker volumes to specified container directories (e.g. `/var/lib/app/data`).
+
 Use the resource **General** and **Advanced** tabs to review the effective configuration before deploying.
 
 ---

@@ -17,6 +17,10 @@ type EncryptedResourceEnvironment = {
   keyVersion: number;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function isEncryptedResourceEnvironment(
   value: unknown,
 ): value is EncryptedResourceEnvironment {
@@ -81,61 +85,83 @@ export function extractAndParametrizeEnvVars(composeFile: string): {
 } {
   let finalComposeFile = composeFile;
   const envVars: Record<string, string> = {};
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = yaml.parse(composeFile);
   } catch {
     return { composeFile, envVars };
   }
 
-  if (parsed && typeof parsed === "object" && parsed.services) {
-    const services = parsed.services;
-    for (const serviceName of Object.keys(services)) {
-      const service = services[serviceName];
-      if (service && typeof service === "object" && service.environment) {
-        const environment = service.environment;
-        if (Array.isArray(environment)) {
-          const newEnvList: string[] = [];
-          for (const item of environment) {
-            if (typeof item === "string") {
-              const index = item.indexOf("=");
-              if (index > -1) {
-                const key = item.slice(0, index).trim();
-                const val = item.slice(index + 1).trim();
-                if (key) {
-                  envVars[key] = val;
-                  newEnvList.push(`${key}=\${${key}}`);
-                }
-              } else {
-                const key = item.trim();
-                if (key) {
-                  envVars[key] = "";
-                  newEnvList.push(`${key}=\${${key}}`);
-                }
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
+    !("services" in parsed) ||
+    typeof parsed.services !== "object" ||
+    parsed.services === null ||
+    Array.isArray(parsed.services)
+  ) {
+    return { composeFile: finalComposeFile, envVars };
+  }
+
+  const services: Record<string, unknown> = isRecord(parsed.services)
+    ? parsed.services
+    : {};
+  for (const serviceName of Object.keys(services)) {
+    const serviceValue: unknown = services[serviceName];
+    if (
+      !serviceValue ||
+      typeof serviceValue !== "object" ||
+      Array.isArray(serviceValue) ||
+      !("environment" in serviceValue)
+    ) {
+      continue;
+    }
+    const service: Record<string, unknown> = isRecord(serviceValue)
+      ? serviceValue
+      : {};
+    const environment: unknown = service.environment;
+    if (environment !== undefined && environment !== null) {
+      if (Array.isArray(environment)) {
+        const newEnvList: unknown[] = [];
+        const environmentItems: unknown[] = environment;
+        for (const item of environmentItems) {
+          if (typeof item === "string") {
+            const index = item.indexOf("=");
+            if (index > -1) {
+              const key = item.slice(0, index).trim();
+              const val = item.slice(index + 1).trim();
+              if (key) {
+                envVars[key] = val;
+                newEnvList.push(`${key}=\${${key}}`);
               }
             } else {
-              newEnvList.push(item);
+              const key = item.trim();
+              if (key) {
+                envVars[key] = "";
+                newEnvList.push(`${key}=\${${key}}`);
+              }
             }
+          } else {
+            newEnvList.push(item);
           }
-          service.environment = newEnvList;
-        } else if (typeof environment === "object") {
-          const newEnvObj: Record<string, string> = {};
-          for (const [key, value] of Object.entries(environment)) {
-            const normalizedKey = key.trim();
-            if (normalizedKey) {
-              envVars[normalizedKey] =
-                value !== null && value !== undefined
-                  ? String(value).trim()
-                  : "";
-              newEnvObj[normalizedKey] = `\${${normalizedKey}}`;
-            }
-          }
-          service.environment = newEnvObj;
         }
+        service.environment = newEnvList;
+      } else if (typeof environment === "object") {
+        const newEnvObj: Record<string, string> = {};
+        for (const [key, value] of Object.entries(environment)) {
+          const normalizedKey = key.trim();
+          if (normalizedKey) {
+            envVars[normalizedKey] =
+              value !== null && value !== undefined ? String(value).trim() : "";
+            newEnvObj[normalizedKey] = `\${${normalizedKey}}`;
+          }
+        }
+        service.environment = newEnvObj;
       }
     }
-    finalComposeFile = yaml.stringify(parsed);
   }
+  finalComposeFile = yaml.stringify(parsed);
 
   return { composeFile: finalComposeFile, envVars };
 }

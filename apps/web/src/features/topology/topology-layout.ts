@@ -1,6 +1,7 @@
 import dagre from "@dagrejs/dagre";
 import type { Edge, Node } from "@xyflow/react";
 import { Position } from "@xyflow/react";
+import type { SimulationNodeDatum } from "d3-force";
 import {
   forceCollide,
   forceManyBody,
@@ -13,15 +14,17 @@ import ELK from "elkjs/lib/elk.bundled.js";
 export type LayoutAlgorithm = "dagre" | "elk";
 export type LayoutDirection = "vertical" | "horizontal";
 
-export interface LayoutOptions {
-  algorithm: LayoutAlgorithm;
-  direction: LayoutDirection;
-  nodeWidth?: number;
-  nodeHeight?: number;
-}
-
 const DEFAULT_NODE_WIDTH = 240;
 const DEFAULT_NODE_HEIGHT = 120;
+
+interface CollisionNode extends SimulationNodeDatum {
+  id: string;
+  targetX: number;
+  targetY: number;
+  width: number;
+  height: number;
+  radius: number;
+}
 
 /**
  * Apply Dagre hierarchical layout strategy
@@ -135,7 +138,7 @@ export function resolveNodeCollisions<T extends Node = Node>(
 ): T[] {
   if (nodes.length <= 1) return nodes;
 
-  const simNodes = nodes.map((node) => {
+  const simNodes: CollisionNode[] = nodes.map((node) => {
     const width = node.measured?.width || node.width || DEFAULT_NODE_WIDTH;
     const height = node.measured?.height || node.height || DEFAULT_NODE_HEIGHT;
     const radius = Math.sqrt(width * width + height * height) / 2 + padding;
@@ -152,11 +155,14 @@ export function resolveNodeCollisions<T extends Node = Node>(
     };
   });
 
-  const simulation = forceSimulation(simNodes as any)
+  const simulation = forceSimulation<CollisionNode>(simNodes)
     .force("charge", forceManyBody().strength(-100))
-    .force("collide", forceCollide((d: any) => d.radius).iterations(4))
-    .force("x", forceX((d: any) => d.targetX).strength(0.3))
-    .force("y", forceY((d: any) => d.targetY).strength(0.3))
+    .force(
+      "collide",
+      forceCollide<CollisionNode>((d) => d.radius).iterations(4),
+    )
+    .force("x", forceX<CollisionNode>((d) => d.targetX).strength(0.3))
+    .force("y", forceY<CollisionNode>((d) => d.targetY).strength(0.3))
     .stop();
 
   for (let i = 0; i < 120; ++i) {
@@ -173,8 +179,8 @@ export function resolveNodeCollisions<T extends Node = Node>(
     return {
       ...node,
       position: {
-        x: Math.round(simNode.x - width / 2),
-        y: Math.round(simNode.y - height / 2),
+        x: Math.round((simNode.x ?? node.position.x) - width / 2),
+        y: Math.round((simNode.y ?? node.position.y) - height / 2),
       },
     };
   });

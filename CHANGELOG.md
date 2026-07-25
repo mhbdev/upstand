@@ -4,6 +4,21 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.150 - 2026-07-26
+
+### Added & Enhanced
+
+- Split the API control plane from schedules, workers, and background runtimes, with dedicated health/status endpoints and release images.
+- Hardened resource, container-file, secret, webhook, terminal, authorization, backup, and deployment workflows across the server and use-case layers.
+- Improved dashboard resource, topology, notification, Docker, secrets, projects, and server-domain experiences, including safer runtime status and Compose inspection utilities.
+- Added isolated local E2E workflow suites for HTTP contracts, resource lifecycle, deployment workflows, and resource configuration.
+
+### Tests & Security
+
+- Added focused unit coverage for Compose port/volume parsing and resource runtime status resolution.
+- Included existing auth, domain, platform, and repository tests in the Turbo test graph so they run in the root test gate.
+- Verified dependency security with `bun audit` and static checks with the repository's CodeQL workflow.
+
 ## 0.1.149 - 2026-07-25
 
 ### Fixed & Enhanced

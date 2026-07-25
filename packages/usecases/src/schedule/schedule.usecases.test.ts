@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { IUnitOfWork } from "@upstand/domain";
+import type { CreateScheduleDTO, IUnitOfWork, Schedule } from "@upstand/domain";
 import { GeneralScheduler } from "./general-scheduler";
 import {
   CreateScheduleUseCase,
@@ -8,14 +8,20 @@ import {
   UpdateScheduleUseCase,
 } from "./schedule.usecases";
 
-function createUow() {
-  const resources = new Map<string, any>([
+interface ResourceReference {
+  id: string;
+  name: string;
+  serverId: string | null;
+}
+
+function createUow(): { uow: IUnitOfWork; schedules: Map<string, Schedule> } {
+  const resources = new Map<string, ResourceReference>([
     [
       "resource-1",
       { id: "resource-1", name: "Test resource", serverId: "local" },
     ],
   ]);
-  const schedules = new Map<string, any>();
+  const schedules = new Map<string, Schedule>();
   const uow = {
     resourceRepository: {
       findById: async (id: string) => resources.get(id) ?? null,
@@ -28,12 +34,29 @@ function createUow() {
         ),
       findEnabled: async () =>
         [...schedules.values()].filter((item) => item.enabled),
-      create: async (data: any) => {
-        const item = { ...data, createdAt: new Date(), updatedAt: new Date() };
+      create: async (data: CreateScheduleDTO): Promise<Schedule> => {
+        const item: Schedule = {
+          ...data,
+          id: data.id ?? `schedule-${schedules.size + 1}`,
+          resourceId: data.resourceId ?? null,
+          description: data.description ?? null,
+          timezone: data.timezone ?? "UTC",
+          serviceName: data.serviceName ?? null,
+          shellType: data.shellType ?? "bash",
+          source: data.source ?? "manual",
+          backupScheduleId: data.backupScheduleId ?? null,
+          lastRunAt: data.lastRunAt ?? null,
+          lastRunStatus: data.lastRunStatus ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
         schedules.set(item.id, item);
         return item;
       },
-      updateById: async (id: string, patch: any) => {
+      updateById: async (
+        id: string,
+        patch: Partial<Schedule>,
+      ): Promise<Schedule | null> => {
         const item = schedules.get(id);
         if (!item) return null;
         Object.assign(item, patch);
@@ -118,15 +141,24 @@ describe("resource schedules", () => {
 
   test("runs a disabled command schedule when explicitly requested", async () => {
     const { schedules } = createUow();
-    const schedule = {
+    const schedule: Schedule = {
       id: "schedule-1",
       resourceId: "resource-1",
       name: "Manual maintenance",
+      description: null,
       cronExpression: "0 4 * * *",
+      timezone: "UTC",
       jobType: "command",
+      serviceName: null,
+      shellType: "bash",
+      source: "manual",
       backupScheduleId: null,
       command: "echo maintenance",
       enabled: false,
+      lastRunAt: null,
+      lastRunStatus: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     schedules.set(schedule.id, schedule);
     const executed: string[] = [];

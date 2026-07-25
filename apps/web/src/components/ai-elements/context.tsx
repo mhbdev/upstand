@@ -12,6 +12,7 @@ import type { LanguageModelUsage } from "ai";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
 import { getUsage } from "tokenlens";
+import type { TokenBreakdown } from "tokenlens/core";
 
 const PERCENT_MAX = 100;
 const ICON_RADIUS = 10;
@@ -349,7 +350,11 @@ export const ContextReasoningUsage = ({
   const reasoningCost = modelId
     ? getUsage({
         modelId,
-        usage: { reasoningTokens } as any,
+        usage: {
+          input: 0,
+          output: 0,
+          reasoningTokens,
+        } satisfies TokenBreakdown,
       }).costUSD?.totalUSD
     : undefined;
   const reasoningCostText = new Intl.NumberFormat("en-US", {
@@ -389,7 +394,11 @@ export const ContextCacheUsage = ({
   const cacheCost = modelId
     ? getUsage({
         modelId,
-        usage: { cacheReads: cacheTokens, input: 0, output: 0 } as any,
+        usage: {
+          cacheReads: cacheTokens,
+          input: 0,
+          output: 0,
+        } satisfies TokenBreakdown,
       }).costUSD?.totalUSD
     : undefined;
   const cacheCostText = new Intl.NumberFormat("en-US", {

@@ -7,6 +7,14 @@ import { log } from "evlog";
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
+function errorCause(error: unknown): string | undefined {
+  if (!error || typeof error !== "object" || !("cause" in error)) {
+    return undefined;
+  }
+  const cause: unknown = error.cause;
+  return cause === undefined ? undefined : String(cause);
+}
+
 export async function runDatabaseMigrations(options?: {
   attempts?: number;
   delayMs?: number;
@@ -53,9 +61,7 @@ export async function runDatabaseMigrations(options?: {
             ? {
                 message: error.message,
                 stack: error.stack,
-                cause: (error as any).cause
-                  ? String((error as any).cause)
-                  : undefined,
+                cause: errorCause(error),
               }
             : error,
       });

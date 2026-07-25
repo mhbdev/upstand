@@ -65,6 +65,7 @@ export const SESSION_ONLY_PROCEDURES = [
   "secret.testConnection",
   "secret.updateProvider",
   "secret.versions",
+  "secret.version",
   "secret.rotationSchedules",
   "secret.createRotationSchedule",
   "secret.updateRotationSchedule",

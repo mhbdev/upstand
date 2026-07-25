@@ -7,9 +7,7 @@ import {
 } from "./resource-credentials";
 
 beforeEach(() => {
-  process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 23).toString(
-    "base64",
-  );
+  process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 23).toString("base64");
 });
 
 describe("resource credential storage", () => {

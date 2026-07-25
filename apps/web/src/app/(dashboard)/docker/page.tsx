@@ -85,6 +85,223 @@ const kinds = [
   { id: "stats", label: "Live Stats", icon: LineChart },
 ] as const;
 
+type DockerContainerState =
+  | "created"
+  | "running"
+  | "paused"
+  | "restarting"
+  | "removing"
+  | "exited"
+  | "dead";
+type DockerInventoryLogLevel =
+  | "error"
+  | "warning"
+  | "success"
+  | "info"
+  | "debug";
+
+interface DockerInfo {
+  name: string;
+  serverVersion: string;
+  operatingSystem: string;
+  architecture: string;
+  containers: number;
+  images: number;
+  memoryBytes: number;
+  swarmState: string;
+}
+
+interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  ports: string;
+  mounts: string[];
+  networks: string[];
+  labels: string[];
+  createdAt: string | null;
+}
+
+interface DockerImage {
+  id: string;
+  tags: string[];
+  sizeBytes: number;
+  createdAt: string | null;
+}
+
+interface DockerVolume {
+  name: string;
+  driver: string;
+  mountpoint: string;
+}
+
+interface DockerNetwork {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+  internal: boolean;
+  attachable: boolean;
+}
+
+interface DockerServiceSummary {
+  id: string;
+  name: string;
+  mode: string;
+  replicas: string;
+  image: string;
+  ports: string;
+}
+
+interface DockerContainerStats {
+  containerId: string;
+  cpuPercent: number;
+  memoryUsageBytes: number;
+  memoryLimitBytes: number;
+  memoryPercent: number;
+  networkRxBytes: number;
+  networkTxBytes: number;
+  blockReadBytes: number;
+  blockWriteBytes: number;
+  pids: number;
+}
+
+function isDockerContainerState(value: string): value is DockerContainerState {
+  return [
+    "created",
+    "running",
+    "paused",
+    "restarting",
+    "removing",
+    "exited",
+    "dead",
+  ].includes(value);
+}
+
+function isDockerInventoryLogLevel(
+  value: string,
+): value is DockerInventoryLogLevel {
+  return ["error", "warning", "success", "info", "debug"].includes(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number";
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === "boolean";
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isString);
+}
+
+function isDockerContainer(value: unknown): value is DockerContainer {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.image) &&
+    isString(value.state) &&
+    isString(value.status) &&
+    isString(value.ports) &&
+    isStringArray(value.mounts) &&
+    isStringArray(value.networks) &&
+    isStringArray(value.labels) &&
+    (value.createdAt === null || isString(value.createdAt))
+  );
+}
+
+function isDockerImage(value: unknown): value is DockerImage {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isStringArray(value.tags) &&
+    isNumber(value.sizeBytes) &&
+    (value.createdAt === null || isString(value.createdAt))
+  );
+}
+
+function isDockerVolume(value: unknown): value is DockerVolume {
+  return (
+    isRecord(value) &&
+    isString(value.name) &&
+    isString(value.driver) &&
+    isString(value.mountpoint)
+  );
+}
+
+function isDockerNetwork(value: unknown): value is DockerNetwork {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.driver) &&
+    isString(value.scope) &&
+    isBoolean(value.internal) &&
+    isBoolean(value.attachable)
+  );
+}
+
+function isDockerService(value: unknown): value is DockerServiceSummary {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.mode) &&
+    isString(value.replicas) &&
+    isString(value.image) &&
+    isString(value.ports)
+  );
+}
+
+function isDockerInfo(value: unknown): value is DockerInfo {
+  return (
+    isRecord(value) &&
+    isString(value.name) &&
+    isString(value.serverVersion) &&
+    isString(value.operatingSystem) &&
+    isString(value.architecture) &&
+    isNumber(value.containers) &&
+    isNumber(value.images) &&
+    isNumber(value.memoryBytes) &&
+    isString(value.swarmState)
+  );
+}
+
+function isDockerStats(value: unknown): value is DockerContainerStats {
+  return (
+    isRecord(value) &&
+    isString(value.containerId) &&
+    isNumber(value.cpuPercent) &&
+    isNumber(value.memoryUsageBytes) &&
+    isNumber(value.memoryLimitBytes) &&
+    isNumber(value.memoryPercent) &&
+    isNumber(value.networkRxBytes) &&
+    isNumber(value.networkTxBytes) &&
+    isNumber(value.blockReadBytes) &&
+    isNumber(value.blockWriteBytes) &&
+    isNumber(value.pids)
+  );
+}
+
+function getInventoryItems<T>(
+  value: unknown,
+  guard: (item: unknown) => item is T,
+): T[] {
+  return Array.isArray(value) ? value.filter(guard) : [];
+}
+
 function formatBytes(bytes: number, decimals = 2) {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
@@ -105,7 +322,10 @@ type PendingRemoval =
 
 export default function DockerInventoryPage() {
   const organizationState = useRequiredActiveOrganization();
-  const organizationId = organizationState.organizationId as string;
+  const organizationId =
+    organizationState.status === "ready"
+      ? organizationState.organizationId
+      : "";
   const [serverId, setServerId] = useState("local");
   const [kind, setKind] = useState<(typeof kinds)[number]["id"]>("info");
 
@@ -160,14 +380,9 @@ export default function DockerInventoryPage() {
       search: kind === "containers" && search ? search : undefined,
       state:
         kind === "containers" && state
-          ? (state as
-              | "created"
-              | "running"
-              | "paused"
-              | "restarting"
-              | "removing"
-              | "exited"
-              | "dead")
+          ? isDockerContainerState(state)
+            ? state
+            : undefined
           : undefined,
       since:
         kind === "logs" && since
@@ -176,9 +391,7 @@ export default function DockerInventoryPage() {
       searchLogs: kind === "logs" && logSearch ? logSearch : undefined,
       logLevels:
         kind === "logs" && logLevels.length > 0
-          ? (logLevels as Array<
-              "error" | "warning" | "success" | "info" | "debug"
-            >)
+          ? logLevels.filter(isDockerInventoryLogLevel)
           : undefined,
       tail: Math.min(1000, Math.max(1, Number(tail) || 150)),
     }),
@@ -191,6 +404,13 @@ export default function DockerInventoryPage() {
     refetchInterval:
       kind === "stats" ? 3_000 : kind === "info" ? 10_000 : false,
   });
+
+  const dockerInfo = isDockerInfo(inventoryQuery.data)
+    ? inventoryQuery.data
+    : null;
+  const dockerStats = isDockerStats(inventoryQuery.data)
+    ? inventoryQuery.data
+    : null;
 
   // Keep logs scrolled down if auto-scroll is checked
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll height updates are driven by data updates
@@ -289,9 +509,10 @@ export default function DockerInventoryPage() {
         "Remote Daemon");
 
   // Render container list helper
-  const availableContainers = Array.isArray(containersQuery.data)
-    ? (containersQuery.data as Array<{ id: string; name: string }>)
-    : [];
+  const availableContainers = getInventoryItems(
+    containersQuery.data,
+    isDockerContainer,
+  );
 
   return (
     <DashboardPage className="flex-1">
@@ -404,14 +625,9 @@ export default function DockerInventoryPage() {
                   {/* Kind: INFO / OVERVIEW */}
                   {kind === "info" && (
                     <div className="space-y-6">
-                      {inventoryQuery.data &&
-                      typeof inventoryQuery.data === "object" &&
-                      !Array.isArray(inventoryQuery.data) ? (
+                      {dockerInfo ? (
                         (() => {
-                          const info = inventoryQuery.data as Record<
-                            string,
-                            any
-                          >;
+                          const info = dockerInfo;
                           return (
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                               <Card className="bg-muted/20">
@@ -577,8 +793,8 @@ export default function DockerInventoryPage() {
                       </div>
 
                       {/* Container Grid Table */}
-                      {Array.isArray(inventoryQuery.data) &&
-                      inventoryQuery.data.length > 0 ? (
+                      {getInventoryItems(inventoryQuery.data, isDockerContainer)
+                        .length > 0 ? (
                         <div className="overflow-hidden rounded-md border">
                           <Table>
                             <TableHeader>
@@ -595,7 +811,10 @@ export default function DockerInventoryPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(inventoryQuery.data as any[]).map((c) => {
+                              {getInventoryItems(
+                                inventoryQuery.data,
+                                isDockerContainer,
+                              ).map((c) => {
                                 const isRunning = c.state === "running";
                                 let badgeVariant:
                                   | "default"
@@ -765,8 +984,8 @@ export default function DockerInventoryPage() {
                   {/* Kind: IMAGES */}
                   {kind === "images" && (
                     <div className="space-y-4">
-                      {Array.isArray(inventoryQuery.data) &&
-                      inventoryQuery.data.length > 0 ? (
+                      {getInventoryItems(inventoryQuery.data, isDockerImage)
+                        .length > 0 ? (
                         <div className="overflow-hidden rounded-md border">
                           <Table>
                             <TableHeader>
@@ -780,7 +999,10 @@ export default function DockerInventoryPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(inventoryQuery.data as any[]).map((img) => (
+                              {getInventoryItems(
+                                inventoryQuery.data,
+                                isDockerImage,
+                              ).map((img) => (
                                 <TableRow key={img.id}>
                                   <TableCell className="font-sans font-semibold">
                                     {img.tags && img.tags.length > 0
@@ -848,8 +1070,8 @@ export default function DockerInventoryPage() {
                         />
                       </div>
 
-                      {Array.isArray(inventoryQuery.data) &&
-                      inventoryQuery.data.length > 0 ? (
+                      {getInventoryItems(inventoryQuery.data, isDockerVolume)
+                        .length > 0 ? (
                         <div className="overflow-hidden rounded-md border">
                           <Table>
                             <TableHeader>
@@ -862,7 +1084,10 @@ export default function DockerInventoryPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(inventoryQuery.data as any[]).map((v) => (
+                              {getInventoryItems(
+                                inventoryQuery.data,
+                                isDockerVolume,
+                              ).map((v) => (
                                 <TableRow key={v.name}>
                                   <TableCell className="font-mono font-semibold text-xs">
                                     {v.name}
@@ -929,8 +1154,8 @@ export default function DockerInventoryPage() {
                   {/* Kind: NETWORKS */}
                   {kind === "networks" && (
                     <div className="space-y-4">
-                      {Array.isArray(inventoryQuery.data) &&
-                      inventoryQuery.data.length > 0 ? (
+                      {getInventoryItems(inventoryQuery.data, isDockerNetwork)
+                        .length > 0 ? (
                         <div className="overflow-hidden rounded-md border">
                           <Table>
                             <TableHeader>
@@ -946,7 +1171,10 @@ export default function DockerInventoryPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(inventoryQuery.data as any[]).map((net) => (
+                              {getInventoryItems(
+                                inventoryQuery.data,
+                                isDockerNetwork,
+                              ).map((net) => (
                                 <TableRow key={net.id}>
                                   <TableCell className="font-mono font-semibold text-xs">
                                     {net.name}
@@ -1015,8 +1243,8 @@ export default function DockerInventoryPage() {
                   {/* Kind: SERVICES */}
                   {kind === "services" && (
                     <div className="space-y-4">
-                      {Array.isArray(inventoryQuery.data) &&
-                      inventoryQuery.data.length > 0 ? (
+                      {getInventoryItems(inventoryQuery.data, isDockerService)
+                        .length > 0 ? (
                         <div className="overflow-hidden rounded-md border">
                           <Table>
                             <TableHeader>
@@ -1029,7 +1257,10 @@ export default function DockerInventoryPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(inventoryQuery.data as any[]).map((srv) => (
+                              {getInventoryItems(
+                                inventoryQuery.data,
+                                isDockerService,
+                              ).map((srv) => (
                                 <TableRow key={srv.id}>
                                   <TableCell className="font-semibold text-foreground">
                                     {srv.name}
@@ -1192,20 +1423,13 @@ export default function DockerInventoryPage() {
                         </Select>
                       </div>
 
-                      {containerId &&
-                      inventoryQuery.data &&
-                      typeof inventoryQuery.data === "object" &&
-                      !Array.isArray(inventoryQuery.data) ? (
+                      {containerId && dockerStats ? (
                         (() => {
-                          const stats = inventoryQuery.data as Record<
-                            string,
-                            any
-                          >;
-                          const cpuVal = Number(stats.cpuPercent) || 0;
-                          const memPercentVal =
-                            Number(stats.memoryPercent) || 0;
-                          const memUsed = Number(stats.memoryUsageBytes) || 0;
-                          const memLimit = Number(stats.memoryLimitBytes) || 0;
+                          const stats = dockerStats;
+                          const cpuVal = stats.cpuPercent;
+                          const memPercentVal = stats.memoryPercent;
+                          const memUsed = stats.memoryUsageBytes;
+                          const memLimit = stats.memoryLimitBytes;
 
                           return (
                             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">

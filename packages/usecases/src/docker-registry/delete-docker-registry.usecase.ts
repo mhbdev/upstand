@@ -1,4 +1,4 @@
-import type { IUnitOfWork } from "@upstand/domain";
+import type { IUnitOfWork, UpdateResourceDTO } from "@upstand/domain";
 import { z } from "zod";
 
 export const DeleteDockerRegistryInputSchema = z.object({
@@ -17,7 +17,7 @@ export class DeleteDockerRegistryUseCase {
       const referencingResources =
         await tx.resourceRepository.findByDockerRegistryId(input.id);
       for (const res of referencingResources) {
-        const updates: Partial<any> = {};
+        const updates: UpdateResourceDTO = {};
         if (res.rollbackRegistryId === input.id) {
           updates.rollbackActive = false;
           updates.rollbackRegistryId = null;

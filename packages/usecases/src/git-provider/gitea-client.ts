@@ -1,5 +1,12 @@
 import { requestJson } from "./http";
 
+interface GiteaRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  owner: { login: string };
+}
+
 export async function refreshGiteaToken(
   giteaUrl: string,
   refreshToken: string,
@@ -39,12 +46,12 @@ export async function getGiteaRepositories(
   giteaUrl: string,
   accessToken: string,
 ): Promise<{ id: number; name: string; fullName: string; owner: string }[]> {
-  let allRepos: any[] = [];
+  let allRepos: GiteaRepository[] = [];
   let page = 1;
   const limit = 50;
 
   while (true) {
-    const repos = await requestJson<any[]>(
+    const repos = await requestJson<GiteaRepository[]>(
       `${giteaUrl}/api/v1/user/repos?page=${page}&limit=${limit}`,
       {
         headers: {

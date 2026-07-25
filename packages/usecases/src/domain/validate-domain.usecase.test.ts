@@ -31,26 +31,26 @@ describe("ValidateDomainUseCase", () => {
   const originalFetch = globalThis.fetch;
 
   beforeAll(() => {
-    globalThis.fetch = (async (url: string | URL | Request) => {
-      const parsedUrl = new URL(url.toString());
-      const headers = new Headers();
+    const fetchImplementation = Object.assign(
+      async (url: string | URL | Request): Promise<Response> => {
+        const parsedUrl = new URL(url.toString());
+        const headers = new Headers();
 
-      if (parsedUrl.hostname === "http-cf.example.com") {
-        headers.set("cf-ray", "1234567890");
-        headers.set("server", "cloudflare");
-      }
+        if (parsedUrl.hostname === "http-cf.example.com") {
+          headers.set("cf-ray", "1234567890");
+          headers.set("server", "cloudflare");
+        }
 
-      if (parsedUrl.hostname === "http-arvan.example.com") {
-        headers.set("ar-ray", "abcdef1234");
-        headers.set("server", "arvancloud");
-      }
+        if (parsedUrl.hostname === "http-arvan.example.com") {
+          headers.set("ar-ray", "abcdef1234");
+          headers.set("server", "arvancloud");
+        }
 
-      return {
-        headers,
-        ok: true,
-        status: 200,
-      } as unknown as Response;
-    }) as any;
+        return new Response(null, { headers, status: 200 });
+      },
+      { preconnect: () => undefined },
+    );
+    globalThis.fetch = fetchImplementation;
   });
 
   afterAll(() => {

@@ -3,7 +3,7 @@ import type { IUnitOfWork } from "@upstand/domain";
 import { decryptSecret } from "@upstand/platform/crypto/secret-box";
 import { CreateDockerRegistryUseCase } from "./create-docker-registry.usecase";
 
-const keyName = "SSH_KEY_ENCRYPTION_KEY_V1";
+const keyName = "ENCRYPTION_KEY_V1";
 const previousKey = process.env[keyName];
 
 afterEach(() => {

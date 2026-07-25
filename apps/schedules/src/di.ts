@@ -37,5 +37,3 @@ registerRuntime(services);
 
 provider = services.build();
 validateCompositionGraph(provider);
-
-export const serviceProvider = provider;

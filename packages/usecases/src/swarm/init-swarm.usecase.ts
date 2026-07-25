@@ -84,7 +84,7 @@ export class InitSwarmUseCase {
               TaskHistoryRetentionLimit: 1,
             },
           },
-        } as any);
+        });
       }
 
       return {

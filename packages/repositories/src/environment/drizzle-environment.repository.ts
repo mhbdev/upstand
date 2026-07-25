@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { environment, environmentSecret, secretVersion } from "@upstand/db";
+import { environment, environmentSecret } from "@upstand/db";
 import type {
   CreateEnvironmentDTO,
   Environment,
@@ -7,6 +6,7 @@ import type {
   UpdateEnvironmentDTO,
 } from "@upstand/domain";
 import { eq, inArray, sql } from "drizzle-orm";
+import { DrizzleSecretVersionRepository } from "../secret/drizzle-secret-version.repository";
 import { BaseRepository } from "../shared/base.repository";
 import type { Executor } from "../shared/types";
 
@@ -131,19 +131,13 @@ export class DrizzleEnvironmentRepository
           target: environmentSecret.environmentId,
           set: { envVars, version: nextVersion, updatedAt: new Date() },
         });
-      await this.executor
-        .insert(secretVersion)
-        .values({
-          id: randomUUID(),
-          scopeType: "environment",
-          scopeId: id,
-          version: nextVersion,
-          credentials: null,
-          buildSecrets: null,
-          envVars,
-          source: "local",
-        })
-        .onConflictDoNothing();
+      await new DrizzleSecretVersionRepository(this.executor).append({
+        scopeType: "environment",
+        scopeId: id,
+        version: nextVersion,
+        envVars,
+        source: "local",
+      });
     }
 
     return this.findById(id);

@@ -103,6 +103,7 @@ export default function WebServerDashboard(_props: {
   const [httpsEnabled, setHttpsEnabled] = useState(true);
   const [certificateProvider, setCertificateProvider] =
     useState<CertificateProvider>("letsencrypt");
+  const [certificateId, setCertificateId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [cloudflareApiToken, setCloudflareApiToken] = useState("");
   const [httpPort, setHttpPort] = useState(80);
@@ -164,6 +165,12 @@ export default function WebServerDashboard(_props: {
 
   const { data: webBackupDestinations = [] } = useQuery({
     ...trpc.s3Destination.list.queryOptions({
+      organizationId,
+    }),
+    enabled: organizationState.status === "ready",
+  });
+  const { data: certificatesData = [] } = useQuery({
+    ...trpc.certificate.list.queryOptions({
       organizationId,
     }),
     enabled: organizationState.status === "ready",
@@ -230,6 +237,7 @@ export default function WebServerDashboard(_props: {
         (info.settings.certificateProvider as CertificateProvider) ||
           "letsencrypt",
       );
+      setCertificateId(info.settings.certificateId || null);
       setEmail(info.settings.letsEncryptEmail || "");
       setCloudflareApiToken(info.settings.cloudflareApiToken || "");
       setHttpPort(info.settings.httpPort);
@@ -525,7 +533,7 @@ export default function WebServerDashboard(_props: {
     onError: (error) => toast.error(error.message),
   });
 
-  const handleSaveServerDomain = (e: React.FormEvent) => {
+  const handleSaveServerDomain = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setEditingSettings(true);
     updateSettingsMutation.mutate({
@@ -533,10 +541,11 @@ export default function WebServerDashboard(_props: {
       letsEncryptEmail: email.trim() || null,
       httpsEnabled,
       certificateProvider,
+      certificateId: certificateProvider === "custom" ? certificateId : null,
     });
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setEditingSettings(true);
     updateSettingsMutation.mutate({
@@ -610,11 +619,11 @@ export default function WebServerDashboard(_props: {
     ]);
   };
 
-  const handleUpdatePort = (
+  const handleUpdatePort = <Field extends keyof PortMapping>(
     idx: number,
-    field: keyof PortMapping,
-    val: any,
-  ) => {
+    field: Field,
+    val: PortMapping[Field],
+  ): void => {
     const next = [...portMappings];
     if (next[idx]) {
       next[idx] = {
@@ -677,6 +686,9 @@ export default function WebServerDashboard(_props: {
             setHttpsEnabled={setHttpsEnabled}
             certificateProvider={certificateProvider}
             setCertificateProvider={setCertificateProvider}
+            certificateId={certificateId}
+            setCertificateId={setCertificateId}
+            certificatesList={certificatesData}
             onSave={handleSaveServerDomain}
             isSaving={updateSettingsMutation.isPending}
           />
@@ -752,7 +764,10 @@ export default function WebServerDashboard(_props: {
                       if (value) setWebBackupDestinationId(value);
                     }}
                   >
-                    <SelectTrigger id="web-backup-destination">
+                    <SelectTrigger
+                      id="web-backup-destination"
+                      className="w-full"
+                    >
                       <SelectValue placeholder="Choose S3 destination" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1283,22 +1298,23 @@ export default function WebServerDashboard(_props: {
                       Configure port bindings and automatic SSL generation
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4 border-border/10 border-t pt-4">
+                  <CardContent className="space-y-4 border-border/10 border-t">
                     {/* Let's Encrypt Email */}
                     <div className="space-y-2">
                       <Label htmlFor="lets-encrypt-email" className="text-xs">
-                        Let's Encrypt Email Address
+                        ACME Email Address (Optional for Let&apos;s Encrypt)
                       </Label>
                       <Input
                         id="lets-encrypt-email"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. ssl-admin@yourdomain.com"
+                        placeholder="e.g. ssl-admin@yourdomain.com (optional)"
                       />
                       <p className="text-[11px] text-muted-foreground">
-                        Let&apos;s Encrypt will notify this email address about
-                        certificate renewals or issues.
+                        Optional for Let&apos;s Encrypt (expiration emails ended
+                        June 4, 2025). Used for ACME registration and ZeroSSL
+                        notifications.
                       </p>
                     </div>
 
@@ -1355,7 +1371,7 @@ export default function WebServerDashboard(_props: {
                     </div>
 
                     {/* HTTP/3 Toggle */}
-                    <div className="flex items-center justify-between rounded-lg border border-border/20 bg-muted/5 p-3">
+                    <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label className="font-semibold text-foreground text-xs">
                           Enable HTTP/3 (QUIC)
@@ -1418,7 +1434,7 @@ export default function WebServerDashboard(_props: {
                       </p>
                     </div>
 
-                    <div className="space-y-3 rounded-lg border border-border/20 bg-muted/5 p-3">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <Label className="font-semibold text-xs">
@@ -1921,7 +1937,11 @@ export default function WebServerDashboard(_props: {
                         ]}
                         value={port.protocol}
                         onValueChange={(val) =>
-                          handleUpdatePort(idx, "protocol", val)
+                          handleUpdatePort(
+                            idx,
+                            "protocol",
+                            val === "udp" ? "udp" : "tcp",
+                          )
                         }
                       >
                         <SelectTrigger className="text-xs">

@@ -26,6 +26,8 @@ export const NotificationEventTypeSchema = z.enum([
   "volume_backup_completed",
   "web_server_backup_completed",
   "platform_restart",
+  "upstand_update_available",
+  "upstand_update_completed",
   "docker_cleanup_completed",
   "cluster_initialized",
   "cluster_node_updated",
@@ -137,7 +139,7 @@ export type NotificationConfiguration = z.infer<
 export const CreateNotificationChannelInputSchema = z.object({
   organizationId: z.string().min(1),
   name: z.string().trim().min(1).max(120),
-  events: z.array(NotificationEventTypeSchema).min(1).max(12),
+  events: z.array(NotificationEventTypeSchema).min(1).max(16),
   configuration: NotificationConfigurationSchema,
 });
 
@@ -148,7 +150,7 @@ export type CreateNotificationChannelInput = z.infer<
 export const UpdateNotificationChannelInputSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(120).optional(),
-  events: z.array(NotificationEventTypeSchema).min(1).max(12).optional(),
+  events: z.array(NotificationEventTypeSchema).min(1).max(16).optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),
 });
 

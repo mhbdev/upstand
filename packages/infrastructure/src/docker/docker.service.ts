@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 import {
   type ApplicationBuildConfig,
   ConflictError,
@@ -18,7 +19,10 @@ import type {
   ConvergenceOptions,
   ConvergenceResult,
   DeploymentRevisionOptions,
+  DockerApiTarget,
+  DockerInspectionTarget,
   DockerRegistryAuth,
+  DockerResourceContainer,
   ServerRuntimeStats,
 } from "@upstand/usecases/ports/docker";
 import { getApplicationBuildSecrets } from "@upstand/usecases/resource/application-build-secrets";
@@ -53,6 +57,87 @@ import { log } from "evlog";
 import yaml from "yaml";
 import { getDockerInstance } from "./docker-client";
 
+function isDockerTarget(value: unknown): value is Docker {
+  return (
+    isUnknownRecord(value) &&
+    typeof value.info === "function" &&
+    typeof value.getContainer === "function" &&
+    typeof value.getNetwork === "function"
+  );
+}
+
+function requireDockerTarget(value: DockerApiTarget): Docker {
+  if (!isDockerTarget(value)) {
+    throw new Error("A valid Docker daemon target is required");
+  }
+  return value;
+}
+
+type DockerImageTarget = Pick<Docker, "loadImage">;
+type MutableContainerSpec = Docker.ContainerSpec & Record<string, unknown>;
+
+function isDockerImageTarget(value: unknown): value is DockerImageTarget {
+  return isUnknownRecord(value) && typeof value.loadImage === "function";
+}
+
+function requireDockerImageTarget(value: DockerApiTarget): DockerImageTarget {
+  if (!isDockerImageTarget(value)) {
+    throw new Error("A Docker image target is required");
+  }
+  return value;
+}
+
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
+}
+
+function errorStatusCode(value: unknown): number | undefined {
+  if (!isUnknownRecord(value)) return undefined;
+  return typeof value.statusCode === "number" ? value.statusCode : undefined;
+}
+
+function stopReadableStream(stream: NodeJS.ReadableStream): void {
+  if ("destroy" in stream && typeof stream.destroy === "function") {
+    stream.destroy();
+  }
+}
+
+interface DockerTaskStatus {
+  State?: string;
+  Err?: string;
+  ContainerStatus?: { ContainerID?: string };
+}
+
+interface DockerTaskSnapshot {
+  Status?: DockerTaskStatus;
+  DesiredState?: string;
+}
+
+function parseDockerTask(value: unknown): DockerTaskSnapshot | null {
+  if (!isUnknownRecord(value)) return null;
+  const statusValue = value.Status;
+  const status: DockerTaskStatus | undefined = isUnknownRecord(statusValue)
+    ? {
+        State:
+          typeof statusValue.State === "string" ? statusValue.State : undefined,
+        Err: typeof statusValue.Err === "string" ? statusValue.Err : undefined,
+        ContainerStatus: isUnknownRecord(statusValue.ContainerStatus)
+          ? {
+              ContainerID:
+                typeof statusValue.ContainerStatus.ContainerID === "string"
+                  ? statusValue.ContainerStatus.ContainerID
+                  : undefined,
+            }
+          : undefined,
+      }
+    : undefined;
+  return {
+    Status: status,
+    DesiredState:
+      typeof value.DesiredState === "string" ? value.DesiredState : undefined,
+  };
+}
+
 export function redactCommandOutput(
   output: string,
   secrets: readonly string[],
@@ -64,6 +149,17 @@ export function redactCommandOutput(
       (redacted, secret) => redacted.replaceAll(secret, "[REDACTED]"),
       output,
     );
+}
+
+export function shouldSuppressComposeRestart(
+  resource: Pick<Resource, "type" | "composeType">,
+  command: string,
+): boolean {
+  return (
+    command === "kill" &&
+    resource.type === "compose" &&
+    resource.composeType === "compose"
+  );
 }
 
 function getUrlRedactions(value: string): string[] {
@@ -345,13 +441,15 @@ export class DockerService {
 
   private async ensureDeploymentNetwork(
     resource: Resource,
-    targetDocker?: Docker,
+    targetDocker?: DockerApiTarget,
   ): Promise<{
     id: string;
     name: string;
     isolated: boolean;
   }> {
-    const docker = targetDocker || this.docker;
+    const docker = targetDocker
+      ? requireDockerTarget(targetDocker)
+      : this.docker;
     const isolated = parseResourceAdvancedConfig(
       resource.advancedConfig,
     ).isolatedDeployment;
@@ -361,7 +459,7 @@ export class DockerService {
     }
 
     return {
-      id: await this.ensureNetwork(targetDocker),
+      id: await this.ensureNetwork(docker),
       name: this.networkName,
       isolated: false,
     };
@@ -475,10 +573,10 @@ export class DockerService {
           },
         );
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (onLog)
         onLog(
-          `Warning: Failed to pull database image: ${err.message}. Relying on local cache.\n`,
+          `Warning: Failed to pull database image: ${errorMessage(err)}. Relying on local cache.\n`,
         );
     }
 
@@ -522,7 +620,7 @@ export class DockerService {
       return p + 1;
     };
 
-    const containerSpec: any = {
+    const containerSpec: MutableContainerSpec = {
       Image: image,
       Env: envArray,
       Mounts: [
@@ -627,7 +725,7 @@ export class DockerService {
 
     if (onLog) onLog(`Pulling application image: ${resource.dockerImage}...\n`);
     try {
-      const stream = await (this.docker as any).pull(resource.dockerImage, {
+      const stream = await this.docker.pull(resource.dockerImage, {
         ...(registryAuth ? { authconfig: registryAuth } : {}),
       });
       await new Promise<void>((resolve, reject) => {
@@ -644,10 +742,10 @@ export class DockerService {
           },
         );
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (onLog)
         onLog(
-          `Warning: Failed to pull image: ${err.message}. Relying on local cache.\n`,
+          `Warning: Failed to pull image: ${errorMessage(err)}. Relying on local cache.\n`,
         );
     }
 
@@ -708,7 +806,7 @@ export class DockerService {
       password?: string;
       imageTag: string;
     },
-    destinationDocker?: Docker,
+    destinationDocker?: DockerApiTarget,
     sourceRevision?: string,
     onGitCloned?: (clonePath: string) => Promise<Resource | undefined>,
     revision?: DeploymentRevisionOptions,
@@ -1699,7 +1797,7 @@ export class DockerService {
             }),
           });
           await Promise.all(
-            containers.map((container: any) =>
+            containers.map((container) =>
               this.docker.getContainer(container.Id).remove({ force: true }),
             ),
           );
@@ -1715,7 +1813,11 @@ export class DockerService {
         try {
           if (resource.credentials) {
             const config = parseResourceCredentials(resource.credentials);
-            composeFile = config.composeFile || "";
+            const configuredComposeFile = config.composeFile;
+            composeFile =
+              typeof configuredComposeFile === "string"
+                ? configuredComposeFile
+                : "";
           }
         } catch {}
         if (!composeFile) {
@@ -1728,11 +1830,11 @@ export class DockerService {
 
     // Single Swarm Service control
     const service = this.docker.getService(serviceName);
-    let inspect: any = null;
+    let inspect: Awaited<ReturnType<typeof service.inspect>>;
     try {
       inspect = await service.inspect();
-    } catch (err: any) {
-      if (err.statusCode === 404 && cmd === "start") {
+    } catch (err: unknown) {
+      if (errorStatusCode(err) === 404 && cmd === "start") {
         const envVars = parseResourceEnvironmentVariables(resource.envVars);
         if (resource.type === "database") {
           log.info({
@@ -1917,8 +2019,8 @@ export class DockerService {
         );
       }
       await service.remove();
-    } catch (error: any) {
-      if (error?.statusCode === 404) return;
+    } catch (error: unknown) {
+      if (errorStatusCode(error) === 404) return;
       throw error;
     }
   }
@@ -1958,8 +2060,8 @@ export class DockerService {
     try {
       await this.docker.getService(serviceName).inspect();
       return true;
-    } catch (error: any) {
-      if (error?.statusCode === 404) return false;
+    } catch (error: unknown) {
+      if (errorStatusCode(error) === 404) return false;
       throw error;
     }
   }
@@ -1984,8 +2086,8 @@ export class DockerService {
     if (!config.enabled) {
       try {
         await this.docker.getService(replicaName).remove();
-      } catch (error: any) {
-        if (error?.statusCode !== 404) throw error;
+      } catch (error: unknown) {
+        if (errorStatusCode(error) !== 404) throw error;
       }
       return;
     }
@@ -2064,8 +2166,8 @@ export class DockerService {
     const container = this.docker.getContainer(target.id);
     try {
       await container.inspect();
-    } catch (error: any) {
-      if (error.statusCode === 404) {
+    } catch (error: unknown) {
+      if (errorStatusCode(error) === 404) {
         throw new ConflictError(
           "This replica is running on another Swarm node. Manage it from the node that hosts the container or use the resource restart action.",
         );
@@ -2076,10 +2178,32 @@ export class DockerService {
     if (cmd === "start") await container.start();
     if (cmd === "stop") await container.stop();
     if (cmd === "restart") await container.restart();
-    if (cmd === "kill") await container.kill({ signal: "SIGKILL" });
+    if (cmd === "kill") {
+      // A standalone Compose service may have `restart: always` or
+      // `restart: unless-stopped`. A raw kill then immediately creates a new
+      // container, which makes the UI appear to undo the operator action.
+      // Temporarily disable the policy for this explicit container action,
+      // kill the current container, then restore the service's policy while
+      // it remains stopped. Future deployments still apply the Compose file.
+      if (shouldSuppressComposeRestart(resource, cmd)) {
+        const inspection = await container.inspect();
+        const restartPolicy = inspection.HostConfig?.RestartPolicy;
+        await container.update({ RestartPolicy: { Name: "no" } });
+        try {
+          await container.kill({ signal: "SIGKILL" });
+        } finally {
+          await container.update({ RestartPolicy: restartPolicy });
+        }
+      } else {
+        // Swarm and other orchestrators intentionally replace killed tasks.
+        // That is the correct semantics for a task-level kill; use the
+        // resource stop/scale action when the desired replica count must drop.
+        await container.kill({ signal: "SIGKILL" });
+      }
+    }
   }
 
-  async getContainers(resource: Resource): Promise<any[]> {
+  async getContainers(resource: Resource): Promise<DockerResourceContainer[]> {
     const nameFilter = this.sanitizeName(resource.appName || resource.name);
 
     if (resource.type === "compose") {
@@ -2091,24 +2215,24 @@ export class DockerService {
               label: [`com.docker.compose.project=${nameFilter}`],
             }),
           });
-          return containers.map((container: any) => ({
+          return containers.map((container) => ({
             id: container.Id.substring(0, 12),
             name: (container.Names?.[0] || container.Id).replace(/^\//, ""),
             status: container.State || "unknown",
             ports:
-              container.Ports?.map((port: any) =>
+              container.Ports?.map((port) =>
                 port.PublicPort
                   ? `${port.PublicPort}:${port.PrivatePort}`
                   : `${port.PrivatePort}`,
               ).join(", ") || "N/A",
             node: "local",
           }));
-        } catch (err: any) {
+        } catch (err: unknown) {
           log.error({
             message: "Error getting Docker Compose containers",
             err,
           });
-          return [];
+          throw err;
         }
       }
 
@@ -2120,31 +2244,28 @@ export class DockerService {
           }),
         });
 
-        const containersList: any[] = [];
+        const containersList: DockerResourceContainer[] = [];
         const nodes = await this.docker.listNodes().catch(() => []);
         const nodeMap = new Map(
-          nodes.map((n: any) => [n.ID, n.Description?.Hostname || n.ID]),
+          nodes.map((n) => [n.ID, n.Description?.Hostname || n.ID]),
         );
 
         for (const s of services) {
-          const sAny = s as any;
-          const serviceName = sAny.Spec?.Name || "";
+          const serviceName = s.Spec?.Name || "";
           const tasks = await this.docker.listTasks({
             filters: JSON.stringify({
               service: [serviceName],
+              "desired-state": ["running"],
             }),
           });
 
           for (const task of tasks) {
-            if (
-              task.DesiredState === "running" ||
-              task.Status?.State === "running"
-            ) {
+            if (task.Status?.State || task.DesiredState) {
               const nodeName =
                 nodeMap.get(task.NodeID) || task.NodeID || "local";
               const ports =
-                sAny.Endpoint?.Ports?.map(
-                  (p: any) => `${p.PublishedPort}:${p.TargetPort}`,
+                s.Endpoint?.Ports?.map(
+                  (p) => `${p.PublishedPort}:${p.TargetPort}`,
                 ).join(", ") || "N/A";
               containersList.push({
                 id: (
@@ -2159,12 +2280,12 @@ export class DockerService {
           }
         }
         return containersList;
-      } catch (err: any) {
+      } catch (err: unknown) {
         log.error({
           message: "Error getting compose stack containers",
           err,
         });
-        return [];
+        throw err;
       }
     }
 
@@ -2177,30 +2298,30 @@ export class DockerService {
         return [];
       }
 
-      const s = services[0];
-      const sAny = s as any;
-      const serviceName = sAny.Spec?.Name || "";
+      const s = services.at(0);
+      if (!s) {
+        return [];
+      }
+      const serviceName = s.Spec?.Name || "";
       const tasks = await this.docker.listTasks({
         filters: JSON.stringify({
           service: [serviceName],
+          "desired-state": ["running"],
         }),
       });
 
       const nodes = await this.docker.listNodes().catch(() => []);
       const nodeMap = new Map(
-        nodes.map((n: any) => [n.ID, n.Description?.Hostname || n.ID]),
+        nodes.map((n) => [n.ID, n.Description?.Hostname || n.ID]),
       );
 
       return tasks
-        .filter(
-          (task) =>
-            task.DesiredState === "running" || task.Status?.State === "running",
-        )
+        .filter((task) => Boolean(task.Status?.State || task.DesiredState))
         .map((task) => {
           const nodeName = nodeMap.get(task.NodeID) || task.NodeID || "local";
           const ports =
-            sAny.Endpoint?.Ports?.map(
-              (p: any) => `${p.PublishedPort}:${p.TargetPort}`,
+            s.Endpoint?.Ports?.map(
+              (p) => `${p.PublishedPort}:${p.TargetPort}`,
             ).join(", ") || "N/A";
           return {
             id: (
@@ -2212,12 +2333,12 @@ export class DockerService {
             node: nodeName,
           };
         });
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error({
         message: "Error getting service containers",
         err,
       });
-      return [];
+      throw err;
     }
   }
 
@@ -2239,7 +2360,7 @@ export class DockerService {
           ...new Set(
             containers
               .map(
-                (container: any) =>
+                (container) =>
                   container.Labels?.["com.docker.compose.service"] ||
                   container.Names?.[0]?.replace(/^\//, ""),
               )
@@ -2259,7 +2380,7 @@ export class DockerService {
       );
 
       const names = services
-        .map((service: any) => service.Spec?.Name)
+        .map((service) => service.Spec?.Name)
         .filter((name): name is string => Boolean(name));
 
       // A resource can be configured before its first deployment. The default
@@ -2267,7 +2388,7 @@ export class DockerService {
       return resource.type === "compose"
         ? [...new Set(names)].sort()
         : [...new Set([resourceName, ...names])].sort();
-    } catch (error: any) {
+    } catch (error: unknown) {
       log.error({
         message: "Failed to discover Caddy routing services",
         resourceId: resource.id,
@@ -2305,26 +2426,26 @@ export class DockerService {
               ...(since ? { since } : {}),
             });
             return filterDockerLogs(this.cleanDockerLogs(buffer), filter ?? {});
-          } catch (err: any) {
-            return `No logs found for container task: ${err.message}`;
+          } catch (err: unknown) {
+            return `No logs found for container task: ${errorMessage(err)}`;
           }
         }
 
         // Try raw container ID
         try {
           const container = this.docker.getContainer(containerId);
-          const buffer = (await container.logs({
+          const buffer = await container.logs({
             stdout: true,
             stderr: true,
             tail,
             timestamps: true,
             ...(since ? { since } : {}),
-          })) as any as Buffer;
+          });
           if (buffer) {
             return filterDockerLogs(this.cleanDockerLogs(buffer), filter ?? {});
           }
-        } catch (err: any) {
-          return `No logs found for container: ${err.message}`;
+        } catch (err: unknown) {
+          return `No logs found for container: ${errorMessage(err)}`;
         }
       }
 
@@ -2358,11 +2479,11 @@ export class DockerService {
                   line: `[${con.name}] ${line}`,
                 };
               });
-          } catch (err: any) {
+          } catch (err: unknown) {
             return [
               {
                 timestamp: "",
-                line: `[${con.name}] Error fetching logs: ${err.message}`,
+                line: `[${con.name}] Error fetching logs: ${errorMessage(err)}`,
               },
             ];
           }
@@ -2385,8 +2506,8 @@ export class DockerService {
       }
 
       return `No active containers found. The service '${serviceName}' may not be deployed yet, is starting up, or is stopped.`;
-    } catch (err: any) {
-      return `Failed to fetch logs: ${err.message}`;
+    } catch (err: unknown) {
+      return `Failed to fetch logs: ${errorMessage(err)}`;
     }
   }
 
@@ -2397,26 +2518,29 @@ export class DockerService {
   private async upsertService(
     serviceName: string,
     spec: Docker.CreateServiceOptions,
-    authconfig?: any,
-    targetDocker?: Docker,
+    authconfig?: Docker.AuthConfig,
+    targetDocker?: DockerApiTarget,
   ): Promise<void> {
-    const docker = targetDocker || this.docker;
+    const docker = targetDocker
+      ? requireDockerTarget(targetDocker)
+      : this.docker;
     try {
       const service = docker.getService(serviceName);
       const inspect = await service.inspect();
       log.info({
         message: `Updating existing Swarm service '${serviceName}'...`,
       });
-      await (service as any).update(authconfig, {
+      await service.update({
+        ...(authconfig ? { authconfig } : {}),
         version: inspect.Version.Index,
         Name: serviceName,
         TaskTemplate: spec.TaskTemplate,
         EndpointSpec: spec.EndpointSpec,
       });
-    } catch (err: any) {
-      if (err.statusCode === 404) {
+    } catch (err: unknown) {
+      if (errorStatusCode(err) === 404) {
         log.info({ message: `Creating new Swarm service '${serviceName}'...` });
-        await (docker as any).createService(authconfig || {}, spec);
+        await docker.createService(authconfig ?? {}, spec);
       } else {
         throw err;
       }
@@ -2432,9 +2556,11 @@ export class DockerService {
   private async ensureServiceNetwork(
     serviceName: string,
     networkId: string,
-    targetDocker?: Docker,
+    targetDocker?: DockerApiTarget,
   ): Promise<void> {
-    const docker = targetDocker || this.docker;
+    const docker = targetDocker
+      ? requireDockerTarget(targetDocker)
+      : this.docker;
     const service = docker.getService(serviceName);
     const inspect = await service.inspect();
     const networks =
@@ -2597,7 +2723,7 @@ export class DockerService {
         networkRxBytes: networkTotals.rx,
         networkTxBytes: networkTotals.tx,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error({
         message: "Failed to fetch container stats",
         err,
@@ -2709,7 +2835,7 @@ export class DockerService {
             ? `com.docker.compose.project=${serviceName}`
             : `com.docker.stack.namespace=${serviceName}`;
         await this.waitForManagedContainersGone(containerLabel);
-      } catch (err: any) {
+      } catch (err: unknown) {
         log.error({
           message: `Failed to remove Compose resource ${serviceName}`,
           err,
@@ -2728,7 +2854,7 @@ export class DockerService {
                 .catch(() => {});
             }
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           log.error({
             message: "Failed to clean up compose stack volumes",
             err,
@@ -2742,8 +2868,8 @@ export class DockerService {
     try {
       const service = this.docker.getService(serviceName);
       await service.remove();
-    } catch (err: any) {
-      if (err.statusCode !== 404) {
+    } catch (err: unknown) {
+      if (errorStatusCode(err) !== 404) {
         log.error({
           message: `Failed to remove Swarm service ${serviceName}`,
           err,
@@ -2760,7 +2886,7 @@ export class DockerService {
         const volumeName = `upstand-db-data-${resource.id}`;
         const volume = this.docker.getVolume(volumeName);
         await volume.remove().catch(() => {});
-      } catch (err: any) {
+      } catch (err: unknown) {
         log.error({
           message: `Failed to remove volume for resource ${resource.id}`,
           err,
@@ -2787,8 +2913,8 @@ export class DockerService {
     const serviceName = this.sanitizeName(resource.appName || resource.name);
     try {
       await this.docker.getService(serviceName).remove();
-    } catch (error: any) {
-      if (error?.statusCode !== 404) throw error;
+    } catch (error: unknown) {
+      if (errorStatusCode(error) !== 404) throw error;
     }
 
     // Swarm acknowledges service removal before the task container has
@@ -2802,8 +2928,8 @@ export class DockerService {
     const volumeName = `upstand-db-data-${resource.id}`;
     try {
       await this.docker.getVolume(volumeName).remove();
-    } catch (error: any) {
-      if (error?.statusCode !== 404) throw error;
+    } catch (error: unknown) {
+      if (errorStatusCode(error) !== 404) throw error;
     }
 
     await this.removeResourceNetwork(resource);
@@ -2840,9 +2966,9 @@ export class DockerService {
           network: getResourceOverlayNetworkName(resource.id),
         });
         return;
-      } catch (error: any) {
-        if (error.statusCode === 404) return;
-        if (error.statusCode !== 409 || attempt === 9) {
+      } catch (error: unknown) {
+        if (errorStatusCode(error) === 404) return;
+        if (errorStatusCode(error) !== 409 || attempt === 9) {
           log.warn({
             message: `Isolated network for resource '${resource.id}' could not be removed yet.`,
             network: getResourceOverlayNetworkName(resource.id),
@@ -2858,9 +2984,11 @@ export class DockerService {
   async runCommandInResourceContainer(
     resource: Resource,
     command: string,
-    targetDocker?: Docker,
+    targetDocker?: DockerApiTarget,
   ): Promise<string> {
-    const docker = targetDocker || this.docker;
+    const docker = targetDocker
+      ? requireDockerTarget(targetDocker)
+      : this.docker;
     const containers = await this.getContainers(resource);
     if (containers.length === 0) {
       throw new Error(
@@ -2868,7 +2996,13 @@ export class DockerService {
       );
     }
 
-    const containerId = containers[0].id;
+    const firstContainer = containers.at(0);
+    if (!firstContainer) {
+      throw new Error(
+        `No running containers found for resource '${resource.name}'`,
+      );
+    }
+    const containerId = firstContainer.id;
     const container = docker.getContainer(containerId);
 
     const exec = await container.exec({
@@ -2892,9 +3026,83 @@ export class DockerService {
     });
   }
 
+  async execContainerCommand(
+    _target: DockerInspectionTarget,
+    serviceName: string,
+    command: string,
+    options?: { timeoutSeconds?: number; onLog?: (chunk: string) => void },
+  ): Promise<{ output: string; stderr?: string; exitCode: number }> {
+    const list = await this.docker.listContainers({ all: false });
+    let containerInfo = list.find((c) =>
+      c.Names?.some(
+        (n) => n.includes(serviceName) || n.replace(/^\//, "") === serviceName,
+      ),
+    );
+    if (!containerInfo && list.length > 0) {
+      containerInfo = list[0];
+    }
+    if (!containerInfo) {
+      throw new Error(
+        `No running container found for service '${serviceName}'`,
+      );
+    }
+
+    const container = this.docker.getContainer(containerInfo.Id);
+    const exec = await container.exec({
+      Cmd: ["sh", "-c", command],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+
+    const stream = await exec.start({ Detach: false });
+    const stdoutChunks: Buffer[] = [];
+    const timeoutMs = (options?.timeoutSeconds ?? 300) * 1000;
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        try {
+          stopReadableStream(stream);
+        } catch {}
+        reject(
+          new Error(
+            `Container command execution timed out after ${options?.timeoutSeconds ?? 300}s`,
+          ),
+        );
+      }, timeoutMs);
+
+      stream.on("data", (chunk: Buffer | string) => {
+        const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+        stdoutChunks.push(buf);
+        if (options?.onLog) {
+          const cleaned = this.cleanDockerLogs(buf);
+          if (cleaned) options.onLog(cleaned);
+        }
+      });
+      stream.on("end", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      stream.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    const cleanOutput = this.cleanDockerLogs(
+      Buffer.concat(stdoutChunks),
+    ).trim();
+    let exitCode = 0;
+    try {
+      const inspect = await exec.inspect();
+      exitCode = inspect.ExitCode ?? 0;
+    } catch {}
+
+    return { output: cleanOutput, stderr: "", exitCode };
+  }
+
   async transferImage(
     imageName: string,
-    targetDocker: any,
+    targetDocker: DockerApiTarget,
     onLog?: (log: string) => void,
   ): Promise<void> {
     if (!targetDocker || targetDocker === this.docker) {
@@ -2914,7 +3122,9 @@ export class DockerService {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       }
       const tarBuffer = Buffer.concat(chunks);
-      const responseStream = await targetDocker.loadImage(tarBuffer);
+      const responseStream = await requireDockerImageTarget(
+        targetDocker,
+      ).loadImage(Readable.from(tarBuffer));
       if (responseStream && typeof responseStream.on === "function") {
         await new Promise<void>((resolve, reject) => {
           responseStream.on("data", (chunk: Buffer) => {
@@ -2927,14 +3137,14 @@ export class DockerService {
         });
       }
       onLog?.(`Image '${imageName}' transferred successfully! ✅\n`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       log.error({
         message: "Failed to transfer image between Docker daemons",
         imageName,
         err,
       });
       throw new Error(
-        `Failed to transfer image '${imageName}': ${err.message || err}`,
+        `Failed to transfer image '${imageName}': ${errorMessage(err)}`,
       );
     }
   }
@@ -2946,7 +3156,9 @@ export class DockerService {
     const serviceName = this.sanitizeName(
       options.serviceNameOverride || resource.appName || resource.name,
     );
-    const docker = options.destinationDocker || this.docker;
+    const docker = options.destinationDocker
+      ? requireDockerTarget(options.destinationDocker)
+      : this.docker;
     const timeoutSeconds = options.timeoutSeconds ?? 60;
     const stabilityWindowSeconds = options.stabilityWindowSeconds ?? 5;
     const onLog = options.onLog;
@@ -2962,12 +3174,20 @@ export class DockerService {
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        const tasks = await (docker as any).listTasks({
+        const rawTasks: unknown[] = await docker.listTasks({
           filters: JSON.stringify({
             service: [serviceName],
             "desired-state": ["running"],
           }),
         });
+        const tasks: DockerTaskSnapshot[] = rawTasks
+          .map((task: unknown): DockerTaskSnapshot | null =>
+            parseDockerTask(task),
+          )
+          .filter(
+            (task: DockerTaskSnapshot | null): task is DockerTaskSnapshot =>
+              task !== null,
+          );
 
         if (!Array.isArray(tasks) || tasks.length === 0) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -2975,12 +3195,12 @@ export class DockerService {
         }
 
         const activeTasks = tasks.filter(
-          (t: any) =>
+          (t: DockerTaskSnapshot) =>
             t.Status?.State === "running" || t.Status?.State === "starting",
         );
 
         const failedTasks = tasks.filter(
-          (t: any) =>
+          (t: DockerTaskSnapshot) =>
             t.Status?.State === "failed" ||
             t.Status?.State === "rejected" ||
             (t.Status?.State === "shutdown" && t.DesiredState !== "shutdown"),
@@ -3068,7 +3288,7 @@ export class DockerService {
             healthyStartTime = null;
           }
         }
-      } catch (_err: any) {
+      } catch (_err: unknown) {
         // Swarm task API call error, retry until timeout
       }
 

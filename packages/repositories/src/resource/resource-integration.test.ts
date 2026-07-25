@@ -3,9 +3,7 @@ import { db, environment, organization, project, resource } from "@upstand/db";
 import { eq } from "drizzle-orm";
 import { DrizzleUnitOfWork } from "../drizzle-unit-of-work";
 
-process.env.SSH_KEY_ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString(
-  "base64",
-);
+process.env.ENCRYPTION_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
 describe("Drizzle Resource Repository Integration Tests", () => {
   test("performs full resource lifecycle CRUD operations inside database transaction", async () => {

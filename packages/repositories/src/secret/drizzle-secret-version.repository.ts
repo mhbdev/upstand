@@ -6,8 +6,48 @@ import type {
   SecretVersion,
   SecretVersionPayload,
 } from "@upstand/domain";
+import {
+  decryptSecret,
+  type EncryptedPayload,
+  encryptSecret,
+} from "@upstand/platform/crypto/secret-box";
 import { and, desc, eq } from "drizzle-orm";
 import type { Executor } from "../shared/types";
+
+function getEncryptedPayload(value: string): EncryptedPayload | null {
+  try {
+    const parsed = JSON.parse(value);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed.ciphertext === "string" &&
+      typeof parsed.iv === "string" &&
+      typeof parsed.authTag === "string" &&
+      typeof parsed.keyVersion === "number"
+    ) {
+      return parsed as EncryptedPayload;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function decodeSecret(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === null || value === undefined || value === "") return value;
+  const payload = getEncryptedPayload(value);
+  return payload ? decryptSecret(payload) : value;
+}
+
+function encodeSecret(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === null || value === undefined || value === "") return value;
+  if (getEncryptedPayload(value)) return value;
+  return JSON.stringify(encryptSecret(value));
+}
 
 export class DrizzleSecretVersionRepository
   implements ISecretVersionRepository
@@ -59,9 +99,9 @@ export class DrizzleSecretVersionRepository
           scopeType: row.scopeType as SecretScopeType,
           scopeId: row.scopeId,
           version: row.version,
-          credentials: row.credentials,
-          buildSecrets: row.buildSecrets,
-          envVars: row.envVars,
+          credentials: decodeSecret(row.credentials) ?? row.credentials,
+          buildSecrets: decodeSecret(row.buildSecrets) ?? row.buildSecrets,
+          envVars: decodeSecret(row.envVars) ?? row.envVars,
           source: row.source,
           createdBy: row.createdBy,
         }
@@ -71,7 +111,14 @@ export class DrizzleSecretVersionRepository
   async append(payload: SecretVersionPayload): Promise<SecretVersion> {
     const [row] = await this.executor
       .insert(secretVersion)
-      .values({ id: randomUUID(), ...payload })
+      .values({
+        id: randomUUID(),
+        ...payload,
+        credentials: encodeSecret(payload.credentials) ?? payload.credentials,
+        buildSecrets:
+          encodeSecret(payload.buildSecrets) ?? payload.buildSecrets,
+        envVars: encodeSecret(payload.envVars) ?? payload.envVars,
+      })
       .returning({
         id: secretVersion.id,
         scopeType: secretVersion.scopeType,

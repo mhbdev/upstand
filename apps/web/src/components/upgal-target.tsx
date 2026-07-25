@@ -9,7 +9,6 @@ import { cloneElement, type ReactElement } from "react";
 
 export type UpGalTargetKind = UpGalUiTargetKind;
 export type UpGalTargetAction = UpGalUiTargetAction;
-export type UpGalInternalPath = `/${string}`;
 export type UpGalTargetDefinition<Id extends string = string> =
   UpGalUiTargetDefinition<Id>;
 
