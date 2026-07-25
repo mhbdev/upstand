@@ -157,16 +157,23 @@ export const certificateRouter = router({
             return false;
           }
         });
+        const s3Destinations =
+          await uow.s3DestinationRepository.findByOrganizationId(
+            existing.organizationId,
+          );
+        const isS3DestinationInUse = s3Destinations.some(
+          (destination) => destination.certificateId === existing.id,
+        );
         const settings = await uow.webServerSettingsRepository.findGlobal();
         const isServerDomainInUse =
           settings?.certificateProvider === "custom" &&
           settings?.certificateId === existing.id;
 
-        if (isInUse || isServerDomainInUse) {
+        if (isInUse || isServerDomainInUse || isS3DestinationInUse) {
           throw new TRPCError({
             code: "CONFLICT",
             message:
-              "This certificate is currently assigned to a resource domain or server domain. Remove that assignment before deleting it.",
+              "This certificate is currently assigned to a resource domain, server domain, or S3 backup destination. Remove that assignment before deleting it.",
           });
         }
         const result = await ctx.scope

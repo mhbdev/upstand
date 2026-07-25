@@ -1066,12 +1066,9 @@ export class DeploymentWorker {
             async (clonePath: string) => {
               try {
                 const upstandJsonPath = path.join(clonePath, "upstand.json");
-                const vercelJsonPath = path.join(clonePath, "vercel.json");
                 let configContent: string | null = null;
                 if (fs.existsSync(upstandJsonPath)) {
                   configContent = fs.readFileSync(upstandJsonPath, "utf-8");
-                } else if (fs.existsSync(vercelJsonPath)) {
-                  configContent = fs.readFileSync(vercelJsonPath, "utf-8");
                 }
 
                 if (configContent) {

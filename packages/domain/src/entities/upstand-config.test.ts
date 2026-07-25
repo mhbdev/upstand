@@ -108,4 +108,44 @@ describe("parseUpstandConfig", () => {
     const result = parseUpstandConfig("invalid json");
     expect(result.success).toBe(false);
   });
+
+  it("rejects plaintext cron secrets and ambiguous cron targets", () => {
+    const plaintextSecret = parseUpstandConfig(
+      JSON.stringify({
+        crons: [
+          {
+            path: "/api/cron",
+            schedule: "0 * * * *",
+            secret: "do-not-store-me",
+          },
+        ],
+      }),
+    );
+    expect(plaintextSecret.success).toBe(false);
+
+    const ambiguous = parseUpstandConfig({
+      crons: [
+        {
+          path: "/api/cron",
+          command: "echo nope",
+          schedule: "0 * * * *",
+        },
+      ],
+    });
+    expect(ambiguous.success).toBe(false);
+  });
+
+  it("rejects unsafe repository paths and conflicting runtime aliases", () => {
+    expect(
+      parseUpstandConfig({
+        build: { buildPath: "../outside" },
+      }).success,
+    ).toBe(false);
+    expect(
+      parseUpstandConfig({
+        runtime: { replicas: 2 },
+        resources: { replicas: 3 },
+      }).success,
+    ).toBe(false);
+  });
 });

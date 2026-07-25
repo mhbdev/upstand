@@ -6,6 +6,8 @@ export interface Schedule {
   name: string;
   description: string | null;
   cronExpression: string;
+  httpMethod: "GET" | "POST" | null;
+  secretEnvVar: string | null;
   timezone: string;
   jobType: "command" | "deployment" | "backup" | "cron";
   serviceName: string | null;
@@ -26,6 +28,8 @@ export type CreateScheduleDTO = Omit<
   | "updatedAt"
   | "description"
   | "timezone"
+  | "httpMethod"
+  | "secretEnvVar"
   | "serviceName"
   | "shellType"
   | "source"
@@ -36,6 +40,8 @@ export type CreateScheduleDTO = Omit<
   id?: string;
   description?: string | null;
   timezone?: string;
+  httpMethod?: "GET" | "POST" | null;
+  secretEnvVar?: string | null;
   serviceName?: string | null;
   shellType?: "bash" | "sh";
   source?: "upstand.json" | "manual";
@@ -93,6 +99,13 @@ export const CreateScheduleInputSchema = z
     name: ScheduleNameSchema,
     description: z.string().trim().max(500).optional().nullable(),
     cronExpression: ScheduleCronSchema,
+    httpMethod: z.enum(["GET", "POST"]).optional().nullable(),
+    secretEnvVar: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "Invalid secret environment variable")
+      .optional()
+      .nullable(),
     timezone: z.string().trim().default("UTC").optional(),
     jobType: ScheduleJobTypeSchema.default("command"),
     serviceName: z.string().trim().optional().nullable(),
@@ -139,6 +152,13 @@ export const UpdateScheduleInputSchema = z.object({
   name: ScheduleNameSchema.optional(),
   description: z.string().trim().max(500).nullable().optional(),
   cronExpression: ScheduleCronSchema.optional(),
+  httpMethod: z.enum(["GET", "POST"]).optional().nullable(),
+  secretEnvVar: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "Invalid secret environment variable")
+    .optional()
+    .nullable(),
   timezone: z.string().trim().optional(),
   jobType: ScheduleJobTypeSchema.optional(),
   serviceName: z.string().trim().nullable().optional(),

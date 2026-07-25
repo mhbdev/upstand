@@ -11,6 +11,19 @@ export interface BackupStorageDestination {
   rcloneFlags: string[];
 }
 
+export type BackupRuntimeDestination = S3Destination & {
+  caCertificatePem?: string | null;
+};
+
+export function withBackupCaCertificate(
+  destination: S3Destination,
+  certificatePem?: string | null,
+): BackupRuntimeDestination {
+  return certificatePem?.trim()
+    ? { ...destination, caCertificatePem: certificatePem }
+    : destination;
+}
+
 export function normalizeBackupPrefix(prefix: string): string {
   let normalized = prefix.trim();
   while (normalized.startsWith("/")) normalized = normalized.slice(1);
@@ -36,7 +49,7 @@ export function ensureCaCertificateFile(certificatePem: string): string {
 }
 
 export function toBackupStorageDestination(
-  destination: S3Destination,
+  destination: BackupRuntimeDestination,
   caCertificatePem?: string | null,
 ): BackupStorageDestination {
   const accessKeyId = decryptDestinationField(destination.accessKeyId);

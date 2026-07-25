@@ -20,6 +20,8 @@ export const schedule = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     cronExpression: text("cron_expression").notNull(),
+    httpMethod: text("http_method"),
+    secretEnvVar: text("secret_env_var"),
     timezone: text("timezone").notNull().default("UTC"),
     jobType: text("job_type").notNull().default("command"), // "command" | "deployment" | "backup" | "cron"
     serviceName: text("service_name"),
