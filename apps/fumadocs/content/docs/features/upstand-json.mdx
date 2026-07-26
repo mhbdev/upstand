@@ -101,6 +101,12 @@ Define container resource limits, entrypoint commands, replica scaling, and rest
 
 ### C. Scheduled Cron Jobs (`crons`)
 
+HTTP cron authentication is intentionally indirect: set the named variable in
+the resource's encrypted Environment configuration, then reference only its
+name with `secretEnvVar`. Upstand never accepts or stores a bearer-token value
+from `upstand.json`; a missing or empty referenced variable causes the run to
+fail instead of sending an unauthenticated request.
+
 Declare recurring HTTP route cron jobs or in-container script schedules.
 
 | Property | Type | Default | Description |
@@ -108,7 +114,7 @@ Declare recurring HTTP route cron jobs or in-container script schedules.
 | `schedule` | `string` | **(Required)** | Cron expression schedule (e.g. `0 0 * * *` for daily at midnight). |
 | `path` | `string` | — | HTTP route endpoint path for HTTP cron jobs (must start with `/`). |
 | `method` | `string` | `"GET"` | HTTP method (`GET` or `POST`). |
-| `secret` | `string` | — | Authorization token sent as `Authorization: Bearer <secret>`. |
+| `secretEnvVar` | `string` | — | Name of the encrypted resource environment variable containing the bearer token. Never put the secret value in `upstand.json`. |
 | `command` | `string` | — | In-container script command to execute. |
 | `shellType` | `string` | `"bash"` | Shell type (`"bash"` or `"sh"`). |
 | `timezone` | `string` | `"UTC"` | IANA timezone identifier (e.g. `"UTC"`, `"America/New_York"`). |
@@ -120,6 +126,8 @@ Declare recurring HTTP route cron jobs or in-container script schedules.
     {
       "name": "Daily Cleanup",
       "path": "/api/cron/cleanup",
+      "method": "POST",
+      "secretEnvVar": "CRON_SECRET",
       "schedule": "0 0 * * *"
     },
     {

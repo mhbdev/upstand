@@ -28,21 +28,25 @@
         },
         "buildPath": {
           "type": "string",
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+",
           "default": ".",
           "description": "Relative directory path where build commands should execute."
         },
         "dockerfilePath": {
           "type": "string",
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+",
           "default": "Dockerfile",
           "description": "Relative path to the Dockerfile."
         },
         "dockerContextPath": {
           "type": "string",
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+",
           "default": ".",
           "description": "Relative path to the Docker build context."
         },
         "publishDirectory": {
           "type": "string",
+          "pattern": "^(?![\\\\/])(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+",
           "description": "Relative directory where static artifacts are published."
         },
         "dockerBuildStage": {
@@ -109,9 +113,10 @@
             "default": "GET",
             "description": "HTTP method for HTTP cron requests."
           },
-          "secret": {
+          "secretEnvVar": {
             "type": "string",
-            "description": "Authorization secret token for HTTP cron requests."
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "description": "Name of the encrypted resource environment variable containing the HTTP Authorization bearer token."
           },
           "command": {
             "type": "string",

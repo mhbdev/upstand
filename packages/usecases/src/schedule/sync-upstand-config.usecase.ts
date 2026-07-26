@@ -177,6 +177,8 @@ export class SyncUpstandConfigUseCase {
         const shellType = item.shellType || "bash";
         const serviceName = item.serviceName || null;
         const description = item.description || null;
+        const httpMethod = isHttpCron ? item.method || "GET" : null;
+        const secretEnvVar = isHttpCron ? item.secretEnvVar || null : null;
 
         // Attempt to find an existing upstand.json schedule matching this item
         const match = upstandSchedules.find((s) => {
@@ -196,6 +198,8 @@ export class SyncUpstandConfigUseCase {
           matchedScheduleIds.add(match.id);
           const hasChanges =
             match.cronExpression !== item.schedule ||
+            match.httpMethod !== httpMethod ||
+            match.secretEnvVar !== secretEnvVar ||
             match.name !== name ||
             match.description !== description ||
             match.timezone !== timezone ||
@@ -208,6 +212,8 @@ export class SyncUpstandConfigUseCase {
               name,
               description,
               cronExpression: item.schedule,
+              httpMethod,
+              secretEnvVar,
               timezone,
               jobType,
               serviceName,
@@ -228,6 +234,8 @@ export class SyncUpstandConfigUseCase {
             name,
             description,
             cronExpression: item.schedule,
+            httpMethod,
+            secretEnvVar,
             timezone,
             jobType,
             serviceName,

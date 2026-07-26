@@ -85,6 +85,8 @@ describe("SyncUpstandConfigUseCase", () => {
       crons: [
         {
           path: "/api/new",
+          method: "POST",
+          secretEnvVar: "CRON_SECRET",
           schedule: "*/5 * * * *",
         },
       ],
@@ -101,6 +103,8 @@ describe("SyncUpstandConfigUseCase", () => {
     expect(deletedIds).not.toContain("sch-manual");
     expect(created[0]?.command).toBe("/api/new");
     expect(created[0]?.source).toBe("upstand.json");
+    expect(created[0]?.httpMethod).toBe("POST");
+    expect(created[0]?.secretEnvVar).toBe("CRON_SECRET");
     expect(updatedResources).toHaveLength(1);
     expect(updatedResources[0]?.patch.watchPaths).toBe('["apps/web/**"]');
     expect(updatedResources[0]?.patch.buildConfig).toContain(

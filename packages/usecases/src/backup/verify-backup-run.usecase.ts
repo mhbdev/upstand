@@ -3,6 +3,7 @@ import {
   BackupRuntimeService,
   withBackupRuntime,
 } from "./backup-runtime.service";
+import { withBackupCaCertificate } from "./backup-storage";
 
 export class VerifyBackupRunUseCase {
   constructor(
@@ -22,9 +23,20 @@ export class VerifyBackupRunUseCase {
     );
     if (!schedule || !destination)
       throw new ValidationError("Backup configuration not found");
+    const certificate = destination.certificateId
+      ? await this.uow.certificateRepository.findById(destination.certificateId)
+      : null;
+    const effectiveDestination = withBackupCaCertificate(
+      destination,
+      certificate?.certificatePem,
+    );
     try {
       if (schedule.kind === "web-server") {
-        await this.runtime.verifyBackup(schedule, destination, run.fileKey);
+        await this.runtime.verifyBackup(
+          schedule,
+          effectiveDestination,
+          run.fileKey,
+        );
       } else {
         const resource = run.resourceId
           ? await this.uow.resourceRepository.findById(run.resourceId)
@@ -33,7 +45,7 @@ export class VerifyBackupRunUseCase {
         await withBackupRuntime(this.uow, resource, this.runtime, (runtime) =>
           runtime.verifyBackup(
             schedule,
-            destination,
+            effectiveDestination,
             run.fileKey as string,
             resource,
           ),

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { promisify } from "node:util";
-import type { IUnitOfWork, S3Destination } from "@upstand/domain";
+import type { IUnitOfWork } from "@upstand/domain";
 import {
   type BackupDatabaseEngine,
   type BackupSchedule,
@@ -18,6 +18,7 @@ import { resolveDockerCliEnvironmentForServer } from "../resource/docker-client"
 import { parseResourceCredentials as parseCredentialDocument } from "../resource/resource-credentials";
 import { parseResourceEnvironmentVariables } from "../resource/resource-environment";
 import {
+  type BackupRuntimeDestination,
   normalizeBackupPrefix,
   pipeProcesses,
   rcloneRemote,
@@ -202,9 +203,12 @@ export class BackupRuntimeService {
   async createBackup(
     schedule: BackupSchedule,
     resource: Resource,
-    destination: S3Destination,
+    destination: BackupRuntimeDestination,
   ): Promise<string> {
-    const storage = toBackupStorageDestination(destination);
+    const storage = toBackupStorageDestination(
+      destination,
+      destination.caCertificatePem,
+    );
     const resourcePath = `${resource.id}/${normalizeBackupPrefix(schedule.prefix)}`;
     const fileName =
       schedule.kind === "database"
@@ -226,11 +230,14 @@ export class BackupRuntimeService {
   async restoreBackup(
     schedule: BackupSchedule,
     resource: Resource,
-    destination: S3Destination,
+    destination: BackupRuntimeDestination,
     fileKey: string,
     targetTime?: string,
   ): Promise<void> {
-    const storage = toBackupStorageDestination(destination);
+    const storage = toBackupStorageDestination(
+      destination,
+      destination.caCertificatePem,
+    );
     if (schedule.kind === "database") {
       await this.restoreDatabaseBackup(
         schedule,
@@ -245,10 +252,13 @@ export class BackupRuntimeService {
   }
 
   async deleteBackup(
-    destination: S3Destination,
+    destination: BackupRuntimeDestination,
     fileKey: string,
   ): Promise<void> {
-    const storage = toBackupStorageDestination(destination);
+    const storage = toBackupStorageDestination(
+      destination,
+      destination.caCertificatePem,
+    );
     await runProcess("rclone", [
       "deletefile",
       ...storage.rcloneFlags,
@@ -258,11 +268,14 @@ export class BackupRuntimeService {
 
   async verifyBackup(
     schedule: BackupSchedule,
-    destination: S3Destination,
+    destination: BackupRuntimeDestination,
     fileKey: string,
     resource?: Resource,
   ): Promise<void> {
-    const storage = toBackupStorageDestination(destination);
+    const storage = toBackupStorageDestination(
+      destination,
+      destination.caCertificatePem,
+    );
     if (schedule.kind !== "database") {
       await runProcess("rclone", [
         "size",
@@ -806,9 +819,12 @@ export class BackupRuntimeService {
 
   async createWebServerBackup(
     schedule: BackupSchedule,
-    destination: S3Destination,
+    destination: BackupRuntimeDestination,
   ): Promise<string> {
-    const storage = toBackupStorageDestination(destination);
+    const storage = toBackupStorageDestination(
+      destination,
+      destination.caCertificatePem,
+    );
     const base = `web-server/${normalizeBackupPrefix(schedule.prefix)}${backupTimestamp()}-${randomSuffix()}/`;
     const postgresKey = `${base}control-plane.dump`;
     const volumeKeys = WEB_SERVER_BACKUP_VOLUMES.map(
@@ -870,10 +886,13 @@ export class BackupRuntimeService {
   }
 
   async restoreWebServerBackup(
-    destination: S3Destination,
+    destination: BackupRuntimeDestination,
     manifestKey: string,
   ): Promise<void> {
-    const storage = toBackupStorageDestination(destination);
+    const storage = toBackupStorageDestination(
+      destination,
+      destination.caCertificatePem,
+    );
     const manifest = await this.readWebServerManifest(storage, manifestKey);
     const postgresContainer = await this.resolvePostgresContainer();
     let caddyWasRunning = false;
@@ -956,10 +975,13 @@ export class BackupRuntimeService {
   }
 
   async deleteWebServerBackup(
-    destination: S3Destination,
+    destination: BackupRuntimeDestination,
     manifestKey: string,
   ): Promise<void> {
-    const storage = toBackupStorageDestination(destination);
+    const storage = toBackupStorageDestination(
+      destination,
+      destination.caCertificatePem,
+    );
     let manifest: WebServerBackupManifest;
     try {
       manifest = await this.readWebServerManifest(storage, manifestKey);

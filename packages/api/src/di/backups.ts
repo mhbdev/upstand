@@ -184,7 +184,14 @@ export function registerBackups(
                   const envs = parseResourceEnvironmentVariables(
                     resourceSecret.envVars,
                   );
-                  cronSecret = envs.CRON_SECRET || "";
+                  cronSecret = schedule.secretEnvVar
+                    ? envs[schedule.secretEnvVar] || ""
+                    : envs.CRON_SECRET || "";
+                }
+                if (schedule.secretEnvVar && !cronSecret) {
+                  throw new Error(
+                    `Configured cron secret environment variable '${schedule.secretEnvVar}' is missing or empty`,
+                  );
                 }
 
                 const path = schedule.command.startsWith("/")
@@ -203,7 +210,7 @@ export function registerBackups(
                 const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
                 const response = await fetch(targetUrl, {
-                  method: "GET",
+                  method: schedule.httpMethod || "GET",
                   headers,
                   signal: controller.signal,
                 });

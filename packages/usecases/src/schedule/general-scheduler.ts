@@ -12,6 +12,8 @@ export interface CustomScheduleItem extends ScheduledJobItem {
   serviceName?: string | null;
   shellType?: string | null;
   backupScheduleId?: string | null;
+  httpMethod?: string | null;
+  secretEnvVar?: string | null;
   command: string;
 }
 
@@ -31,7 +33,7 @@ export class GeneralScheduler extends BaseCronScheduler<CustomScheduleItem> {
 
   buildSignature(schedule: CustomScheduleItem): string {
     const timezone = schedule.timezone || "UTC";
-    return `${schedule.cronExpression}\0${timezone}\0${schedule.jobType ?? "command"}\0${schedule.serviceName ?? ""}\0${schedule.shellType ?? "bash"}\0${schedule.backupScheduleId ?? ""}\0${schedule.command}`;
+    return `${schedule.cronExpression}\0${timezone}\0${schedule.jobType ?? "command"}\0${schedule.serviceName ?? ""}\0${schedule.shellType ?? "bash"}\0${schedule.backupScheduleId ?? ""}\0${schedule.httpMethod ?? "GET"}\0${schedule.secretEnvVar ?? ""}\0${schedule.command}`;
   }
 
   /** Execute a persisted schedule immediately, even when it is disabled. */

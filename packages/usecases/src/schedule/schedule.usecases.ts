@@ -68,6 +68,8 @@ export class CreateScheduleUseCase {
       name: parsed.name,
       description: parsed.description ?? null,
       cronExpression: parsed.cronExpression,
+      httpMethod: parsed.httpMethod ?? null,
+      secretEnvVar: parsed.secretEnvVar ?? null,
       timezone: parsed.timezone ?? "UTC",
       jobType: parsed.jobType,
       serviceName: parsed.serviceName ?? null,

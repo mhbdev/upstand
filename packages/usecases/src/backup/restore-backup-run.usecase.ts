@@ -4,6 +4,7 @@ import {
   BackupRuntimeService,
   withBackupRuntime,
 } from "./backup-runtime.service";
+import { withBackupCaCertificate } from "./backup-storage";
 
 export const RestoreBackupRunInputSchema = z.object({
   runId: z.string().min(1),
@@ -40,11 +41,10 @@ export class RestoreBackupRunUseCase {
     const caCert = destination.certificateId
       ? await this.uow.certificateRepository.findById(destination.certificateId)
       : null;
-    const effectiveDestination = caCert
-      ? Object.assign({}, destination, {
-          caCertificatePem: caCert.certificatePem,
-        })
-      : destination;
+    const effectiveDestination = withBackupCaCertificate(
+      destination,
+      caCert?.certificatePem,
+    );
 
     if (schedule.kind === "web-server") {
       await this.runtime.restoreWebServerBackup(effectiveDestination, fileKey);

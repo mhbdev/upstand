@@ -4,6 +4,14 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.151 - 2026-07-26
+
+### Fixed & Enhanced
+
+- Propagated configured CA certificates through backup create, restore, verify, and deletion runtimes for S3-compatible destinations.
+- Prevented deletion of certificates that are still assigned to S3 backup destinations.
+- Centralized backup destination certificate enrichment and standardized the local development encryption-key example.
+
 ## 0.1.150 - 2026-07-26
 
 ### Added & Enhanced

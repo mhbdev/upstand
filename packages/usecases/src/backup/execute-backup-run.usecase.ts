@@ -11,6 +11,7 @@ import {
   withBackupRuntime,
 } from "./backup-runtime.service";
 import { resolveBackupOrganizationId } from "./backup-schedule.service";
+import { withBackupCaCertificate } from "./backup-storage";
 
 export class ExecuteBackupRunUseCase {
   constructor(
@@ -76,11 +77,10 @@ export class ExecuteBackupRunUseCase {
     const caCert = destination.certificateId
       ? await this.uow.certificateRepository.findById(destination.certificateId)
       : null;
-    const effectiveDestination = caCert
-      ? Object.assign({}, destination, {
-          caCertificatePem: caCert.certificatePem,
-        })
-      : destination;
+    const effectiveDestination = withBackupCaCertificate(
+      destination,
+      caCert?.certificatePem,
+    );
 
     try {
       const fileKey =
