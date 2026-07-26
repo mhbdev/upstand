@@ -29,6 +29,7 @@ export const NotificationEventTypeSchema = z.enum([
   "upstand_update_available",
   "upstand_update_completed",
   "docker_cleanup_completed",
+  "docker_cleanup_failed",
   "cluster_initialized",
   "cluster_node_updated",
   "cluster_node_removed",

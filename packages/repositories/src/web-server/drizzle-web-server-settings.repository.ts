@@ -119,6 +119,7 @@ export class DrizzleWebServerSettingsRepository
     caddyPorts?: string;
     caddyDashboardEnabled?: boolean;
     accessLogsEnabled?: boolean;
+    ipAccessEnabled?: boolean;
     accessLogCleanupCron?: string;
   }): Promise<WebServerSettings> {
     const row = await this.create({
@@ -137,6 +138,7 @@ export class DrizzleWebServerSettingsRepository
       caddyPorts: data.caddyPorts ?? "[]",
       caddyDashboardEnabled: data.caddyDashboardEnabled ?? false,
       accessLogsEnabled: data.accessLogsEnabled ?? false,
+      ipAccessEnabled: data.ipAccessEnabled ?? true,
       accessLogCleanupCron: data.accessLogCleanupCron ?? "0 3 * * *",
     });
     return this.publicRow(row);

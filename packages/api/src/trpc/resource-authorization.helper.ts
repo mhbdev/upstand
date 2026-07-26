@@ -76,5 +76,12 @@ export async function resolveResourceAndCheckPermission(
     requiredPermission,
   );
 
+  if (requiredPermission !== "resource:view" && project.archivedAt) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Project is archived. Unarchive it before modifying resources.",
+    });
+  }
+
   return { resource, environment, project };
 }

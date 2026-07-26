@@ -22,6 +22,7 @@ export interface IWebServerSettingsRepository {
     caddyPorts?: string;
     caddyDashboardEnabled?: boolean;
     accessLogsEnabled?: boolean;
+    ipAccessEnabled?: boolean;
     accessLogCleanupCron?: string;
   }): Promise<WebServerSettings>;
 }

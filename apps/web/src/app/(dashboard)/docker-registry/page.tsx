@@ -5,7 +5,6 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { inferRouterOutputs } from "@trpc/server";
 import { getUpGalTargetDefinition } from "@upstand/api/ai/upgal-ui-targets";
 import type { AppRouter } from "@upstand/api/router";
-import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -43,6 +42,7 @@ import {
 } from "@/components/huge-icons";
 import { UpGalTarget } from "@/components/upgal-target";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
+import { useSystemConfig } from "@/hooks/use-system-config";
 import { trpc } from "@/utils/trpc";
 
 const createDockerRegistryTarget = getUpGalTargetDefinition(
@@ -54,6 +54,7 @@ type DockerRegistryError = TRPCClientErrorLike<AppRouter>;
 
 export default function DockerRegistryPage() {
   const organizationState = useRequiredActiveOrganization();
+  const { isCloud } = useSystemConfig();
   const organizationId = organizationState.organizationId as string;
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -162,7 +163,7 @@ export default function DockerRegistryPage() {
 
   const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
-    if (env.NEXT_PUBLIC_IS_CLOUD && !serverId.trim()) {
+    if (isCloud && !serverId.trim()) {
       toast.error("Please enter a Target Server ID.");
       return;
     }
@@ -347,16 +348,12 @@ export default function DockerRegistryPage() {
 
               <Field>
                 <FieldLabel htmlFor="serverId">
-                  {env.NEXT_PUBLIC_IS_CLOUD
-                    ? "Target Server ID"
-                    : "Server (Optional)"}
+                  {isCloud ? "Target Server ID" : "Server (Optional)"}
                 </FieldLabel>
                 <Input
                   id="serverId"
-                  required={env.NEXT_PUBLIC_IS_CLOUD}
-                  placeholder={
-                    env.NEXT_PUBLIC_IS_CLOUD ? "Enter server ID" : "Server ID"
-                  }
+                  required={isCloud}
+                  placeholder={isCloud ? "Enter server ID" : "Server ID"}
                   value={serverId}
                   onChange={(e) => setServerId(e.target.value)}
                 />

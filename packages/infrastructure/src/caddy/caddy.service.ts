@@ -31,6 +31,20 @@ const CADDY_DATA_VOLUME = "upstand-caddy-data";
 const CADDY_CONFIG_VOLUME = "upstand-caddy-config";
 const CADDY_LOG_VOLUME = "upstand-caddy-logs";
 export const CADDY_ACCESS_LOG_PATH = "/var/log/caddy/access.log";
+const CONTROL_PLANE_PORTS_LABEL = "com.upstand.control-plane.ip-ports";
+
+const CONTROL_PLANE_SERVICES = [
+  { name: "upstand_server", targetPort: 3000 },
+  { name: "upstand_web", targetPort: 3001 },
+  { name: "upstand_fumadocs", targetPort: 4000 },
+] as const;
+
+type PublishedPort = {
+  Protocol?: string;
+  TargetPort?: number;
+  PublishedPort?: number;
+  PublishMode?: string;
+};
 
 function statusCodeOf(value: unknown): number | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -579,6 +593,86 @@ export class CaddyService {
   private async ensureNetwork(): Promise<void> {
     await this.initializeSwarm();
     await ensureUpstandOverlayNetwork(this.docker);
+  }
+
+  async setControlPlaneIpAccess(enabled: boolean): Promise<void> {
+    await this.serializeConfiguration(async () => {
+      await this.initializeSwarm();
+
+      for (const serviceConfig of CONTROL_PLANE_SERVICES) {
+        const service = this.docker.getService(serviceConfig.name);
+        let inspect: Docker.Service;
+        try {
+          inspect = await service.inspect();
+        } catch (error: unknown) {
+          if (statusCodeOf(error) === 404) {
+            log.warn({
+              message: `Control-plane service '${serviceConfig.name}' is not deployed yet; skipping IP access update.`,
+            });
+            continue;
+          }
+          throw error;
+        }
+
+        if (!inspect.Spec) continue;
+        const serviceSpec = inspect.Spec;
+        const endpointSpec = {
+          ...(serviceSpec.EndpointSpec ?? {}),
+        } as {
+          Ports?: PublishedPort[];
+          [key: string]: unknown;
+        };
+        const labels = { ...(serviceSpec.Labels ?? {}) };
+        const currentPorts = endpointSpec.Ports ?? [];
+
+        if (enabled) {
+          if (currentPorts.length > 0) continue;
+
+          let savedPorts: PublishedPort[] | undefined;
+          try {
+            const parsed = JSON.parse(labels[CONTROL_PLANE_PORTS_LABEL] ?? "");
+            if (Array.isArray(parsed)) {
+              savedPorts = parsed.filter(
+                (port): port is PublishedPort =>
+                  Boolean(port) &&
+                  typeof port === "object" &&
+                  typeof port.TargetPort === "number" &&
+                  typeof port.PublishedPort === "number",
+              );
+            }
+          } catch {
+            savedPorts = undefined;
+          }
+
+          endpointSpec.Ports =
+            savedPorts && savedPorts.length > 0
+              ? savedPorts
+              : [
+                  {
+                    Protocol: "tcp",
+                    TargetPort: serviceConfig.targetPort,
+                    PublishedPort: serviceConfig.targetPort,
+                    PublishMode: "host",
+                  },
+                ];
+        } else {
+          if (currentPorts.length === 0) continue;
+          labels[CONTROL_PLANE_PORTS_LABEL] = JSON.stringify(currentPorts);
+          delete endpointSpec.Ports;
+        }
+
+        await service.update({
+          version: inspect.Version?.Index,
+          Name: serviceSpec.Name ?? serviceConfig.name,
+          Labels: labels,
+          Mode: serviceSpec.Mode,
+          TaskTemplate: serviceSpec.TaskTemplate,
+          EndpointSpec: endpointSpec,
+          UpdateConfig: serviceSpec.UpdateConfig,
+          RollbackConfig: serviceSpec.RollbackConfig,
+        });
+      }
+    });
   }
 
   private async reconcileResourceNetworks(

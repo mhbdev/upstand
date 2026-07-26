@@ -9,7 +9,6 @@ import {
   parseResourceAdvancedConfig,
   type ResourceComposeType,
 } from "@upstand/domain";
-import { env } from "@upstand/env/web";
 import { Button } from "@upstand/ui/components/button";
 import {
   Card,
@@ -63,6 +62,7 @@ import {
 } from "@/components/huge-icons";
 import { CodeEditor, CodeSurface } from "@/components/shared/code-editor";
 import { useRequiredActiveOrganization } from "@/hooks/use-required-active-organization";
+import { useSystemConfig } from "@/hooks/use-system-config";
 import { uploadArchive, validateArchiveFile } from "@/lib/archive-upload";
 import { copyText } from "@/lib/browser";
 import { getServerApiUrl, getServerUrl } from "@/lib/server-url";
@@ -139,6 +139,7 @@ export function GeneralTab({
 }: GeneralTabProps) {
   const queryClient = useQueryClient();
   const organizationState = useRequiredActiveOrganization();
+  const { isCloud } = useSystemConfig();
   const activeOrganization =
     organizationState.status === "ready"
       ? organizationState.organization
@@ -982,7 +983,7 @@ export function GeneralTab({
               <Label htmlFor="deployment-server">Deployment server</Label>
               <Select
                 items={[
-                  ...(!env.NEXT_PUBLIC_IS_CLOUD
+                  ...(!isCloud
                     ? [{ value: "default", label: "Local Swarm manager" }]
                     : []),
                   ...servers
@@ -1005,14 +1006,12 @@ export function GeneralTab({
                 <SelectTrigger id="deployment-server" className="w-full">
                   <SelectValue
                     placeholder={
-                      env.NEXT_PUBLIC_IS_CLOUD
-                        ? "Select Server"
-                        : "Use local Swarm manager"
+                      isCloud ? "Select Server" : "Use local Swarm manager"
                     }
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {!env.NEXT_PUBLIC_IS_CLOUD && (
+                  {!isCloud && (
                     <SelectItem value="default">Local Swarm manager</SelectItem>
                   )}
                   {servers
@@ -1126,7 +1125,7 @@ export function GeneralTab({
                 disabled={isUpdatingResource}
                 onClick={() => {
                   if (
-                    env.NEXT_PUBLIC_IS_CLOUD &&
+                    isCloud &&
                     (deploymentServerId === "default" || !deploymentServerId)
                   ) {
                     toast.error(

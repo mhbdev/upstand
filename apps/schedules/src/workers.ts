@@ -29,6 +29,7 @@ const RETENTION_INTERVAL_MS = 60 * 60_000;
 const PUBLISHED_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
 export class OutboxRuntime {
+  private started = false;
   private readonly jobPublisher = new BullMqOutboxJobPublisher();
   private publishTimer: ReturnType<typeof setInterval> | null = null;
   private retentionTimer: ReturnType<typeof setInterval> | null = null;
@@ -36,7 +37,12 @@ export class OutboxRuntime {
 
   async start(): Promise<void> {
     await this.publishBatch();
+    this.started = true;
     this.startMaintenance();
+  }
+
+  isReady(): boolean {
+    return this.started;
   }
 
   private startMaintenance(): void {
@@ -58,6 +64,7 @@ export class OutboxRuntime {
     if (this.retentionTimer) clearInterval(this.retentionTimer);
     this.publishTimer = null;
     this.retentionTimer = null;
+    this.started = false;
     if (this.publishInFlight) await this.publishInFlight;
     await this.jobPublisher.close();
   }
@@ -382,7 +389,9 @@ export class WorkerManager {
   isReady(): boolean {
     return (
       (this.notificationWorker?.isReady() ?? false) &&
-      (this.backupWorker?.isReady() ?? false)
+      (this.backupWorker?.isReady() ?? false) &&
+      (this.deploymentRuntime?.isReady() ?? false) &&
+      (this.outboxRuntime?.isReady() ?? false)
     );
   }
 

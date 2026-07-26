@@ -21,6 +21,17 @@ const OrganizationInputSchema = z.object({
   organizationId: z.string().min(1),
 });
 
+const CancelDeploymentInputSchema = z
+  .object({
+    deploymentId: z.string().min(1).optional(),
+    serverId: z.string().min(1).optional(),
+    jobId: z.string().min(1).optional(),
+  })
+  .refine(
+    (input) => Boolean(input.deploymentId || (input.serverId && input.jobId)),
+    "A deploymentId or serverId/jobId pair is required",
+  );
+
 async function getDeploymentScope(
   ctx: AuthenticatedContext,
   deploymentId: string,
@@ -39,7 +50,36 @@ async function getDeploymentScope(
     : null;
   if (!project) throw new ValidationError("Deployment project not found");
   await authorizeContextCapability(ctx, project.organizationId, permission);
+  if (permission !== "resource:view" && project.archivedAt) {
+    throw new ValidationError(
+      "Project is archived. Unarchive it before modifying resources.",
+    );
+  }
   return { uow, deployment, resource, project };
+}
+
+async function markDeploymentCancelled(
+  uow: IUnitOfWork,
+  deploymentId: string,
+): Promise<void> {
+  await uow.transaction(async (tx: IUnitOfWork) => {
+    const deployment = await tx.deploymentRepository.findById(deploymentId);
+    if (!deployment || ["success", "failed"].includes(deployment.status)) {
+      return;
+    }
+    await tx.deploymentRepository.updateById(deploymentId, {
+      status: "failed",
+      logs: `${deployment.logs}\nDeployment cancelled by user. 🛑\n`,
+    });
+    const resource = await tx.resourceRepository.findById(
+      deployment.resourceId,
+    );
+    if (resource?.status === "queued") {
+      await tx.resourceRepository.updateById(deployment.resourceId, {
+        status: "stopped",
+      });
+    }
+  });
 }
 
 export const deploymentRouter = router({
@@ -145,73 +185,80 @@ export const deploymentRouter = router({
     }),
 
   cancelDeploymentJob: twoFactorVerifiedProcedure
-    .input(
-      z.object({
-        serverId: z.string().min(1),
-        jobId: z.string().min(1),
-      }),
-    )
+    .input(CancelDeploymentInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const queueName = getDeploymentQueueName(input.serverId);
-      const queue = new Queue(queueName, { connection: redis.options });
-
       try {
-        const job = await queue.getJob(input.jobId);
-        if (job) {
+        const deploymentId = input.deploymentId ?? input.jobId;
+        if (!deploymentId) {
+          throw new ValidationError("Deployment job has no deployment record");
+        }
+
+        // Deployment IDs are the durable cancellation key. The queue page also
+        // supplies serverId/jobId for compatibility with older clients, but a
+        // stale server selection must never make a real deployment uncancellable.
+        const scope = await getDeploymentScope(
+          ctx,
+          deploymentId,
+          "resource:update",
+        );
+        const candidateServerIds = [
+          scope.deployment.serverId || "local",
+          input.serverId,
+        ].filter((serverId, index, values): serverId is string =>
+          Boolean(serverId && values.indexOf(serverId) === index),
+        );
+
+        await redis.set(
+          `upstand:deployment:cancel:${deploymentId}`,
+          "1",
+          "EX",
+          3600,
+        );
+
+        let job: Awaited<ReturnType<Queue["getJob"]>> | null = null;
+        let queue: Queue | null = null;
+        for (const serverId of candidateServerIds) {
+          const candidateQueue = new Queue(getDeploymentQueueName(serverId), {
+            connection: redis.options,
+          });
+          const candidateJob = await candidateQueue.getJob(
+            input.jobId ?? deploymentId,
+          );
+          if (candidateJob) {
+            job = candidateJob;
+            queue = candidateQueue;
+            break;
+          }
+          await candidateQueue.close();
+        }
+
+        if (job && queue) {
           const state = await job.getState();
           if (state === "active") {
-            const deploymentId = job.data?.deploymentId;
-            if (!deploymentId)
-              throw new ValidationError(
-                "Deployment job has no deployment record",
-              );
-            await getDeploymentScope(ctx, deploymentId, "resource:update");
-            await redis.set(
-              `upstand:deployment:cancel:${deploymentId}`,
-              "1",
-              "EX",
-              3600,
-            );
+            await queue.close();
             return { success: true, state, cancellationRequested: true };
           }
-          const deploymentId = job.data?.deploymentId;
-          if (deploymentId) {
-            const { uow } = await getDeploymentScope(
-              ctx,
-              deploymentId,
-              "resource:update",
-            );
-            await job.remove();
-            // Update deployment status in database to failed
-            await uow.transaction(async (tx: IUnitOfWork) => {
-              const dep = await tx.deploymentRepository.findById(deploymentId);
-              if (dep && dep.status !== "success" && dep.status !== "failed") {
-                await tx.deploymentRepository.updateById(deploymentId, {
-                  status: "failed",
-                  logs: `${dep.logs}\nDeployment cancelled by user. 🛑\n`,
-                });
-
-                const r = await tx.resourceRepository.findById(dep.resourceId);
-                if (r && r.status === "queued") {
-                  await tx.resourceRepository.updateById(dep.resourceId, {
-                    status: "stopped",
-                  });
-                }
-              }
-            });
-          } else {
-            throw new ValidationError(
-              "Deployment job has no deployment record",
-            );
-          }
-
-          return { success: true };
+          await job.remove();
+          await queue.close();
+          await markDeploymentCancelled(scope.uow, deploymentId);
+          return { success: true, state, cancellationRequested: false };
         }
-        throw new ValidationError("Job not found in queue");
+
+        // The outbox publisher may not have created the BullMQ job yet. The
+        // cancellation marker prevents a later publish, so complete the DB
+        // transition instead of incorrectly reporting "Job not found".
+        if (["queued", "waiting"].includes(scope.deployment.status)) {
+          await markDeploymentCancelled(scope.uow, deploymentId);
+          return {
+            success: true,
+            state: scope.deployment.status,
+            cancellationRequested: false,
+          };
+        }
+
+        throw new ValidationError("Deployment job not found in queue");
       } catch (error) {
         handleUseCaseError(error, ctx.log);
-      } finally {
-        await queue.close();
       }
     }),
 

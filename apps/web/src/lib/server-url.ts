@@ -23,6 +23,15 @@ function isConfiguredOrigin(url: URL | null): url is URL {
   return Boolean(url && !PLACEHOLDER_HOST.test(url.hostname));
 }
 
+function isDirectOrigin(url: URL): boolean {
+  return (
+    isLoopbackHost(url.hostname) ||
+    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname) ||
+    url.port === "3000" ||
+    url.port === "3001"
+  );
+}
+
 function inferApiOrigin(protocol: string, hostname: string, port = ""): string {
   const apiHostname = hostname.startsWith("app.")
     ? `api.${hostname.slice("app.".length)}`
@@ -38,7 +47,12 @@ function inferApiOrigin(protocol: string, hostname: string, port = ""): string {
 export function getServerUrl(configured = env.NEXT_PUBLIC_SERVER_URL): string {
   const configuredUrl = parseConfiguredUrl(configured);
 
-  if (isConfiguredOrigin(configuredUrl)) {
+  if (
+    isConfiguredOrigin(configuredUrl) &&
+    (typeof window === "undefined" ||
+      !isDirectOrigin(configuredUrl) ||
+      configuredUrl.hostname === window.location.hostname)
+  ) {
     return configuredUrl.origin;
   }
 
@@ -59,10 +73,6 @@ export function getServerUrlFromHeaders(
   configured = env.NEXT_PUBLIC_SERVER_URL,
 ): string {
   const configuredUrl = parseConfiguredUrl(configured);
-  if (isConfiguredOrigin(configuredUrl)) {
-    return configuredUrl.origin;
-  }
-
   const forwardedHost = requestHeaders.get("x-forwarded-host");
   const host = (forwardedHost || requestHeaders.get("host") || "localhost:3001")
     .split(",")[0]
@@ -80,6 +90,13 @@ export function getServerUrlFromHeaders(
 
   try {
     const requestUrl = new URL(`${protocol}//${host}`);
+    if (
+      isConfiguredOrigin(configuredUrl) &&
+      (!isDirectOrigin(configuredUrl) ||
+        configuredUrl.hostname === requestUrl.hostname)
+    ) {
+      return configuredUrl.origin;
+    }
     return inferApiOrigin(
       requestUrl.protocol,
       requestUrl.hostname,

@@ -34,4 +34,20 @@ describe("DockerCleanupService", () => {
 
     expect(calls).toEqual([["image", "prune", "--all", "--force"]]);
   });
+
+  test("stops the full cleanup and propagates the failing Docker command", async () => {
+    const calls: string[][] = [];
+    const failure = new Error("Docker daemon is unavailable");
+    const service = new DockerCleanupService(async (args) => {
+      calls.push(args);
+      if (args[0] === "image") throw failure;
+      return { stdout: "ok", stderr: "" };
+    });
+
+    await expect(service.run("all")).rejects.toBe(failure);
+    expect(calls).toEqual([
+      ["container", "prune", "--force"],
+      ["image", "prune", "--all", "--force"],
+    ]);
+  });
 });

@@ -46,6 +46,9 @@ interface ServerDomainCardProps {
   certificateId?: string | null;
   setCertificateId?: (id: string | null) => void;
   certificatesList?: CertificateOption[];
+  ipAccessEnabled: boolean;
+  setIpAccessEnabled: (enabled: boolean) => void;
+  canDisableIpAccess: boolean;
   onSave: (e: React.SyntheticEvent) => void;
   isSaving: boolean;
 }
@@ -62,6 +65,9 @@ export function ServerDomainCard({
   certificateId,
   setCertificateId,
   certificatesList = [],
+  ipAccessEnabled,
+  setIpAccessEnabled,
+  canDisableIpAccess,
   onSave,
   isSaving,
 }: ServerDomainCardProps) {
@@ -202,6 +208,34 @@ export function ServerDomainCard({
               </Select>
             </div>
           )}
+
+          <div className="flex items-center justify-between border-border/40 border-t pt-4">
+            <div className="space-y-1">
+              <Label
+                htmlFor="ip-access-toggle"
+                className="cursor-pointer font-semibold text-foreground text-xs"
+              >
+                Direct IP:port access
+              </Label>
+              <p className="max-w-xl text-[11px] text-muted-foreground">
+                Enabled by default so the dashboard, API, and documentation work
+                before DNS is configured. Disable it only after a valid HTTPS
+                domain and certificate are ready.
+              </p>
+              {!canDisableIpAccess && !ipAccessEnabled && (
+                <p className="text-[11px] text-destructive">
+                  Saving these settings will restore direct access until HTTPS
+                  domain configuration is complete.
+                </p>
+              )}
+            </div>
+            <Switch
+              id="ip-access-toggle"
+              checked={ipAccessEnabled}
+              disabled={!canDisableIpAccess}
+              onCheckedChange={setIpAccessEnabled}
+            />
+          </div>
 
           {/* Row 5: Save Action Footer */}
           <div className="flex justify-end pt-2">

@@ -33,4 +33,51 @@ describe("Domain Mapping Wildcard & Cloudflare Support", () => {
     expect(mappings[0]?.host).toBe("*.example.com");
     expect(mappings[0]?.certificateType).toBe("cloudflare");
   });
+
+  test.each([
+    "letsencrypt",
+    "zerossl",
+    "internal",
+    "custom",
+    "cloudflare",
+  ] as const)("supports the %s certificate provider", (provider) => {
+    const mappings = parseDomainMappings(
+      JSON.stringify([
+        {
+          host: `${provider}.example.com`,
+          certificateType: provider,
+          certificateId: provider === "custom" ? "certificate-1" : undefined,
+        },
+      ]),
+    );
+
+    expect(mappings[0]?.certificateType).toBe(provider);
+  });
+
+  test("requires a selected custom certificate for HTTPS routes", () => {
+    expect(() =>
+      parseDomainMappings(
+        JSON.stringify([
+          { host: "secure.example.com", certificateType: "custom" },
+        ]),
+      ),
+    ).toThrow("A custom certificate must be selected");
+  });
+
+  test("does not require a certificate id for HTTP routes", () => {
+    const mappings = parseDomainMappings(
+      JSON.stringify([
+        {
+          host: "insecure.example.com",
+          https: false,
+          certificateType: "custom",
+        },
+      ]),
+    );
+
+    expect(mappings[0]).toMatchObject({
+      https: false,
+      certificateType: "letsencrypt",
+    });
+  });
 });

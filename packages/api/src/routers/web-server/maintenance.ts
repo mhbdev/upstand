@@ -116,61 +116,67 @@ export const webServerMaintenanceProcedures = {
 
   cleanUnusedImages: twoFactorVerifiedProcedure
     .input(CleanupInputSchema)
-    .mutation(({ ctx }) =>
+    .mutation(({ ctx, input }) =>
       runDockerCleanup(
         ctx,
         "docker image prune --all --force",
         "Failed to clean unused images",
+        input.organizationId,
       ),
     ),
 
   cleanUnusedVolumes: twoFactorVerifiedProcedure
     .input(CleanupInputSchema)
-    .mutation(({ ctx }) =>
+    .mutation(({ ctx, input }) =>
       runDockerCleanup(
         ctx,
         "docker volume prune --all --force",
         "Failed to clean unused volumes",
+        input.organizationId,
       ),
     ),
 
   cleanStoppedContainers: twoFactorVerifiedProcedure
     .input(CleanupInputSchema)
-    .mutation(({ ctx }) =>
+    .mutation(({ ctx, input }) =>
       runDockerCleanup(
         ctx,
         "docker container prune --force",
         "Failed to clean stopped containers",
+        input.organizationId,
       ),
     ),
 
   cleanDockerBuilder: twoFactorVerifiedProcedure
     .input(CleanupInputSchema)
-    .mutation(({ ctx }) =>
+    .mutation(({ ctx, input }) =>
       runDockerCleanup(
         ctx,
         "docker builder prune --all --force",
         "Failed to clean docker builder",
+        input.organizationId,
       ),
     ),
 
   cleanDockerPrune: twoFactorVerifiedProcedure
     .input(CleanupInputSchema)
-    .mutation(({ ctx }) =>
+    .mutation(({ ctx, input }) =>
       runDockerCleanup(
         ctx,
         "docker system prune --all --force",
         "Failed to prune docker system",
+        input.organizationId,
       ),
     ),
 
   cleanAll: twoFactorVerifiedProcedure
     .input(CleanupInputSchema)
-    .mutation(({ ctx }) =>
+    .mutation(({ ctx, input }) =>
       runDockerCleanup(
         ctx,
         "docker container prune --force && docker image prune --all --force && docker volume prune --all --force && docker builder prune --all --force && docker system prune --all --force",
         "Failed to run all prunes",
+        input.organizationId,
       ),
     ),
 

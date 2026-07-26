@@ -269,6 +269,83 @@ describe("Caddy domain configuration", () => {
     expect(caddyfile).toContain("tls internal");
   });
 
+  test("renders ZeroSSL ACME configuration with and without an email", () => {
+    const withEmail = generateCaddyfileContent(
+      { letsEncryptEmail: "ops@example.com" },
+      [
+        {
+          id: "zerossl-email",
+          name: "ZeroSSL app",
+          type: "application",
+          appName: "zerossl-app",
+          domains: JSON.stringify([
+            {
+              host: "zerossl.example.com",
+              certificateType: "zerossl",
+            },
+          ]),
+        },
+      ],
+    );
+    const withoutEmail = generateCaddyfileContent({}, [
+      {
+        id: "zerossl-no-email",
+        name: "ZeroSSL app",
+        type: "application",
+        appName: "zerossl-app",
+        domains: JSON.stringify([
+          { host: "zerossl.example.com", certificateType: "zerossl" },
+        ]),
+      },
+    ]);
+
+    expect(withEmail).toContain("tls ops@example.com {");
+    expect(withoutEmail).toContain("tls {");
+    expect(withEmail).toContain("ca https://acme.zerossl.com/v2/DV90");
+    expect(withoutEmail).toContain("ca https://acme.zerossl.com/v2/DV90");
+  });
+
+  test("renders Cloudflare DNS-01 configuration with a fallback token", () => {
+    const caddyfile = generateCaddyfileContent({}, [
+      {
+        id: "cf-fallback",
+        name: "Cloudflare app",
+        type: "application",
+        appName: "cloudflare-app",
+        domains: JSON.stringify([
+          { host: "*.example.com", certificateType: "cloudflare" },
+        ]),
+      },
+    ]);
+
+    expect(caddyfile).toContain("dns cloudflare {env.CLOUDFLARE_API_TOKEN}");
+  });
+
+  test("rejects conflicting certificate strategies on one HTTPS hostname", () => {
+    expect(() =>
+      generateCaddyfileContent({}, [
+        {
+          id: "resource-1",
+          name: "First",
+          type: "application",
+          appName: "first",
+          domains: JSON.stringify([
+            {
+              host: "same.example.com",
+              path: "/one",
+              certificateType: "letsencrypt",
+            },
+            {
+              host: "same.example.com",
+              path: "/two",
+              certificateType: "internal",
+            },
+          ]),
+        },
+      ]),
+    ).toThrow("same certificate strategy");
+  });
+
   test("provisions and references a selected custom certificate", () => {
     const caddyfile = generateCaddyfileContent(
       {},

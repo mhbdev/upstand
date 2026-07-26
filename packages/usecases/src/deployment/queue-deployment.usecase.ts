@@ -49,6 +49,11 @@ export class QueueDeploymentUseCase {
       const project = environment
         ? await tx.projectRepository.findById(environment.projectId)
         : null;
+      if (project?.archivedAt) {
+        throw new ValidationError(
+          "Project is archived. Unarchive it before deploying resources.",
+        );
+      }
       if (
         input.sourceRevision &&
         !/^[0-9a-f]{7,64}$/i.test(input.sourceRevision)

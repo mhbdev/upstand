@@ -58,12 +58,13 @@ Prepare a fresh Linux Virtual Machine matching these requirements:
 
 1. **Host OS**: Ubuntu 24.04 LTS, Ubuntu 22.04 LTS, or Debian 12 (Bookworm) is recommended.
 2. **Hardware**: At least 2 vCPUs, 4 GB of RAM, and 30 GB of SSD storage.
-3. **DNS Configuration**: Configure two A records pointing to your server's public IP:
+3. **DNS Configuration (optional for first boot)**: Configure A records pointing to your server's public IP when you are ready to use the managed HTTPS domain:
    - `app.example.com` (for the dashboard UI)
    - `api.example.com` (for the Hono/tRPC API server)
    - `docs.example.com` (for the documentation app)
 4. **Firewall Rules**:
    - Open public TCP **80** and **443** for Caddy HTTPS certificate generation.
+   - Until a domain is configured, the dashboard, API, and documentation are also reachable on TCP **3001**, **3000**, and **4000** respectively.
    - For multi-node Swarms, restrict TCP **2377** (cluster management), TCP/UDP **7946** (node communication), and UDP **4789** (overlay network ingress) to your internal cluster network.
 
 ---
@@ -83,7 +84,9 @@ The Upstand installer supports two compilation strategies:
   <Step>
     ### Prepare the environment variables
     
-    Before running the installer, export your target domains and production image digests.
+    You can run the installer with no environment variables. It will generate cryptographic secrets under `/etc/upstand/secrets/`, detect a usable host address, and build the release images from the public repository when image digests are not supplied. Missing origins default to the host IP and the published service ports; no synthetic DNS names are assigned.
+
+    For a production deployment with DNS and pre-built immutable images, export your target domains and image digests first:
     
     ```bash
     export BETTER_AUTH_URL=https://api.example.com
@@ -106,6 +109,8 @@ The Upstand installer supports two compilation strategies:
     ```bash
     curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash
     ```
+
+    If the recommended CPU, memory, or Docker disk capacity is unavailable, the installer prints a warning and continues. The minimum recommendation is 2 vCPUs, 4 GB RAM, and 30 GB free Docker storage.
   </Step>
 
   <Step>
@@ -122,6 +127,8 @@ The Upstand installer supports two compilation strategies:
     ```
   </Step>
 </Steps>
+
+After the first boot, open the dashboard at `http://<server-ip>:3001`. The API is at `http://<server-ip>:3000` and documentation is at `http://<server-ip>:4000`. On **Web Server**, configure the server domain and HTTPS certificate. Once that domain is working over HTTPS, clear **Direct IP:port access** and save; Upstand then removes the published control-plane ports while keeping the Caddy domain route active.
 
 ---
 

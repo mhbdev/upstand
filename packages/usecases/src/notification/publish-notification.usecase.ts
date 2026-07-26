@@ -20,10 +20,23 @@ export class PublishNotificationUseCase {
   constructor(private readonly uow: IUnitOfWork) {}
 
   async execute(input: PublishNotificationInput): Promise<number> {
-    const channels = await this.uow.notificationChannelRepository.findByEvent(
-      input.event,
-      input.organizationId,
+    const channelEvents: NotificationEventType[] =
+      input.event === "docker_cleanup_failed"
+        ? ["docker_cleanup_failed", "docker_cleanup_completed"]
+        : [input.event];
+    const channelResults = await Promise.all(
+      channelEvents.map((event) =>
+        this.uow.notificationChannelRepository.findByEvent(
+          event,
+          input.organizationId,
+        ),
+      ),
     );
+    const channels = [
+      ...new Map(
+        channelResults.flat().map((channel) => [channel.id, channel]),
+      ).values(),
+    ];
     if (channels.length === 0) return 0;
 
     const deliveries = await this.uow.transaction(async (tx) => {

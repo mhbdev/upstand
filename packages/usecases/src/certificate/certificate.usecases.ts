@@ -6,7 +6,10 @@ const certificatePem = z
   .string()
   .min(1)
   .refine(
-    (value) => value.includes("-----BEGIN CERTIFICATE-----"),
+    (value) =>
+      /^\s*-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----\s*$/.test(
+        value,
+      ),
     "Certificate must be PEM encoded",
   );
 const privateKeyPem = z
@@ -14,7 +17,9 @@ const privateKeyPem = z
   .min(1)
   .refine(
     (value) =>
-      /-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----/.test(value),
+      /^\s*-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----[\s\S]+-----END PRIVATE KEY-----\s*$/.test(
+        value,
+      ),
     "Private key must be PEM encoded",
   );
 

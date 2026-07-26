@@ -50,5 +50,6 @@ export interface CaddyServicePort {
   getLogs(tail?: number): Promise<string>;
   getAccessLogs(tail?: number): Promise<string>;
   cleanupAccessLogs(): Promise<void>;
+  setControlPlaneIpAccess(enabled: boolean): Promise<void>;
   restartCaddy(): Promise<{ success: boolean; error?: string }>;
 }

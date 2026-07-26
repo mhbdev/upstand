@@ -30,6 +30,7 @@ export const webServerSettings = pgTable("web_server_settings", {
     .default(false)
     .notNull(),
   accessLogsEnabled: boolean("access_logs_enabled").default(false).notNull(),
+  ipAccessEnabled: boolean("ip_access_enabled").default(true).notNull(),
   accessLogCleanupCron: text("access_log_cleanup_cron")
     .default("0 3 * * *")
     .notNull(),

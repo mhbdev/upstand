@@ -298,7 +298,6 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?NEXT_PUBLIC_SERVER_URL is required}
-      NEXT_PUBLIC_IS_CLOUD: ${NEXT_PUBLIC_IS_CLOUD:-false}
     networks:
       upstand-network:
         aliases:

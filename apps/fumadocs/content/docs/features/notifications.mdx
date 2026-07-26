@@ -13,7 +13,7 @@ Provider fields vary. Examples include Slack webhook URL and channel override, T
 
 ## Event types
 
-Available event categories include application deploys and build errors, database/volume/Web Server backups, Docker cleanup, Upstand restart, Swarm initialization and node changes, join-token rotation, and server-threshold alerts. Select only the events the channel should receive; use separate channels for chat, email, and incident tooling when their audiences differ.
+Available event categories include application deploys and build errors, database/volume/Web Server backups, Docker cleanup completion and failure, Upstand restart, Swarm initialization and node changes, join-token rotation, and server-threshold alerts. Select only the events the channel should receive; Docker cleanup failure notifications are also delivered to channels that already subscribe to Docker cleanup completion for backwards compatibility.
 
 ## Delivery operations
 

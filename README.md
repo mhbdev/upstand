@@ -146,6 +146,19 @@ In self-hosted mode, you can deploy applications, databases, and Docker Compose 
 
 To install Self-Hosted Upstand on a fresh Linux Swarm manager node:
 
+The installer also supports a zero-configuration bootstrap. When image digests
+and secrets are omitted, it generates random secrets in `/etc/upstand/secrets/`,
+detects the host address, and builds the images from the public repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash
+```
+
+Without URL variables, the dashboard, API, and docs start on the detected host
+IP at ports `3001`, `3000`, and `4000`. Configure the domain and HTTPS from the
+Web Server page first, then disable **Direct IP:port access** there when the
+domain is ready.
+
 ```bash
 export BETTER_AUTH_URL=https://api.example.com
 export CORS_ORIGIN=https://app.example.com
@@ -171,16 +184,16 @@ export BETTER_AUTH_URL=https://api.example.com
 export CORS_ORIGIN=https://app.example.com
 export NEXT_PUBLIC_SERVER_URL=https://api.example.com
 
-# Pin all release images. The cloud web image contains the cloud client build.
+# Pin all release images. Cloud mode is read from the server at runtime.
 export UPSTAND_SERVER_IMAGE=ghcr.io/mhbdev/upstand-server@sha256:<digest>
-export UPSTAND_WEB_CLOUD_IMAGE=ghcr.io/mhbdev/upstand-web-cloud@sha256:<digest>
+export UPSTAND_WEB_IMAGE=ghcr.io/mhbdev/upstand-web@sha256:<digest>
 export UPSTAND_MONITORING_IMAGE=ghcr.io/mhbdev/upstand-monitoring@sha256:<digest>
 export UPSTAND_DOCS_IMAGE=ghcr.io/mhbdev/upstand-fumadocs@sha256:<digest>
 
 curl -fsSL https://raw.githubusercontent.com/mhbdev/upstand/master/install.sh | sudo bash - --cloud
 ```
 
-The `--cloud` flag sets the server and client cloud modes and selects `UPSTAND_WEB_CLOUD_IMAGE`. The installer validates all configured API, dashboard, and documentation origins from the deployment host before reporting success.
+The `--cloud` flag sets the server cloud mode. The web console reads that mode from the API at runtime, so the same immutable web image is used for cloud and self-hosted installations. The installer validates all configured API, dashboard, and documentation origins from the deployment host before reporting success.
 
 For detailed guides, refer to the local documentation site (`apps/fumadocs`) or navigate to `/docs/getting-started` once deployed.
 

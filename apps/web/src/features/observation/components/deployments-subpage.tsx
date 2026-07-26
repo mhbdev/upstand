@@ -80,6 +80,7 @@ export function DeploymentsSubpage() {
   const [cancelTarget, setCancelTarget] = useState<{
     serverId: string;
     jobId: string;
+    deploymentId: string;
     label: string;
   } | null>(null);
 
@@ -203,8 +204,13 @@ export function DeploymentsSubpage() {
     });
   };
 
-  const handleCancelJob = (serverId: string, jobId: string, label: string) => {
-    setCancelTarget({ serverId, jobId, label });
+  const handleCancelJob = (
+    serverId: string,
+    jobId: string,
+    deploymentId: string,
+    label: string,
+  ) => {
+    setCancelTarget({ serverId, jobId, deploymentId, label });
   };
 
   const getQueueStateBadge = (state: string) => {
@@ -385,7 +391,12 @@ export function DeploymentsSubpage() {
                               variant="ghost"
                               size="icon-sm"
                               onClick={() =>
-                                handleCancelJob(job.serverId, job.id, job.label)
+                                handleCancelJob(
+                                  job.serverId,
+                                  job.id,
+                                  job.deploymentId,
+                                  job.label,
+                                )
                               }
                               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={cancelJobMutation.isPending}
@@ -538,6 +549,7 @@ export function DeploymentsSubpage() {
         onConfirm={() => {
           if (!cancelTarget) return;
           cancelJobMutation.mutate({
+            deploymentId: cancelTarget.deploymentId,
             serverId: cancelTarget.serverId,
             jobId: cancelTarget.jobId,
           });

@@ -4,6 +4,20 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ## Unreleased
 
+## 0.1.152 - 2026-07-26
+
+### Added & Enhanced
+
+- Unified cloud and self-hosted deployments on one runtime-configured web image; cloud mode is now read from the API instead of a compile-time web flag.
+- Added zero-configuration installation with generated secrets, host resource warnings, direct IP access for the control-plane services, and Web Server control over published IP ports.
+- Added HTTPS/domain guardrails and Swarm port reconciliation so direct access can be disabled safely after domain setup.
+- Updated canary and release workflows to publish and verify a single web image.
+
+### Fixed & Verified
+
+- Added the direct-IP access database migration and runtime URL fallback for immutable web images.
+- Hardened deployment authorization/cancellation compile paths and expanded certificate validation coverage.
+
 ## 0.1.151 - 2026-07-26
 
 ### Fixed & Enhanced
@@ -484,7 +498,7 @@ All notable changes to Upstand are recorded here. Release tags use semantic vers
 
 ### Added
 
-- Cloud mode capability via `IS_CLOUD` and `NEXT_PUBLIC_IS_CLOUD` environment variables.
+- Cloud mode capability via the server-side `IS_CLOUD` environment variable and runtime web-console detection.
 - Excluded Local Server deployment target options from resource creation dialogs and General infrastructure tab dropdowns when cloud mode is active.
 - Added client-side and server-side target server validation checks on resource creation, update, and registry creation/updates, preventing cloud tenants from bypassing control plane isolation.
 - Enforced target server selection requirement for Docker Registry credential validation under cloud mode.

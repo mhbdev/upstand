@@ -126,6 +126,8 @@ function getEventEmoji(event?: string): string {
       return "⚡";
     case "docker_cleanup_completed":
       return "🧹";
+    case "docker_cleanup_failed":
+      return "🧹";
     case "cluster_initialized":
       return "🐝";
     case "cluster_node_updated":
@@ -148,6 +150,7 @@ function getEventColor(
   if (
     isFailed ||
     event === "deployment_failed" ||
+    event === "docker_cleanup_failed" ||
     event === "server_threshold_alert" ||
     event === "cluster_node_removed"
   ) {

@@ -16,7 +16,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@upstand/api/router";
 import { DATABASE_IMAGE_OPTIONS, type DatabaseType } from "@upstand/domain";
-import { env } from "@upstand/env/web";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,6 +91,7 @@ import {
   keyValuePairsToRecord,
   recordToKeyValuePairs,
 } from "@/components/shared/key-value-editor";
+import { useSystemConfig } from "@/hooks/use-system-config";
 import type { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
 
@@ -375,8 +375,12 @@ function CreateAppDialog({
   const [name, setName] = useState("");
   const [appName, setAppName] = useState("");
   const [description, setDescription] = useState("");
-  const isCloud = env.NEXT_PUBLIC_IS_CLOUD;
+  const { isCloud } = useSystemConfig();
   const [serverId, setServerId] = useState(() => (isCloud ? "" : "local"));
+
+  useEffect(() => {
+    setServerId(isCloud ? "" : "local");
+  }, [isCloud]);
 
   const { data: servers = [] } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
@@ -523,8 +527,12 @@ function CreateDbDialog({
   );
   const [customImage, setCustomImage] = useState("");
   const [description, setDescription] = useState("");
-  const isCloud = env.NEXT_PUBLIC_IS_CLOUD;
+  const { isCloud } = useSystemConfig();
   const [serverId, setServerId] = useState(() => (isCloud ? "" : "local"));
+
+  useEffect(() => {
+    setServerId(isCloud ? "" : "local");
+  }, [isCloud]);
 
   const { data: servers = [] } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),
@@ -1094,8 +1102,12 @@ function CreateComposeDialog({
     "compose",
   );
   const [description, setDescription] = useState("");
-  const isCloud = env.NEXT_PUBLIC_IS_CLOUD;
+  const { isCloud } = useSystemConfig();
   const [serverId, setServerId] = useState(() => (isCloud ? "" : "local"));
+
+  useEffect(() => {
+    setServerId(isCloud ? "" : "local");
+  }, [isCloud]);
 
   const { data: servers = [] } = useQuery({
     ...trpc.server.list.queryOptions({ organizationId }),

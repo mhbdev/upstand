@@ -9,6 +9,9 @@ readonly INSTALL_DIR="/etc/upstand"
 readonly ENV_FILE="$INSTALL_DIR/.env"
 readonly SOURCE_DIR="$INSTALL_DIR/source"
 readonly NETWORK_NAME="${DOCKER_NETWORK:-upstand-network}"
+readonly RECOMMENDED_CPU_CORES=2
+readonly RECOMMENDED_MEMORY_BYTES=$((4 * 1024 * 1024 * 1024))
+readonly RECOMMENDED_DISK_BYTES=$((30 * 1024 * 1024 * 1024))
 # BASH_SOURCE is an array only when Bash executes a file. A curl | bash install
 # has no array element, so use the scalar expansion with a safe $0 fallback.
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE:-$0}")" && pwd)"
@@ -22,11 +25,11 @@ usage() {
 Usage: install.sh [--interactive] [--cloud|--self-hosted]
 
 The installer is non-interactive by default. Set deployment variables in the
-environment before running it. Use --interactive to prompt for missing public
-origins when installing from a terminal.
+environment before running it. Use --interactive to prompt for the Swarm
+advertise address when installing from a terminal.
 
 Options:
-  --interactive         prompt for missing public origins
+  --interactive         prompt for the Swarm advertise address
   --cloud               install in multi-tenant Cloud mode (open sign-ups enabled)
   --self-hosted         install in single-tenant Self-Hosted mode (default, single owner account)
   --help                show this help
@@ -51,6 +54,10 @@ fail() {
   exit 1
 }
 
+warn() {
+  echo "warning: $*" >&2
+}
+
 require_root() {
   [[ "${EUID}" -eq 0 ]] || fail "run this installer as root"
 }
@@ -63,6 +70,69 @@ require_digest_image() {
   local name="$1"
   local image="${!name:-}"
   [[ "$image" == *@sha256:* ]] || fail "$name must be set to an immutable image digest (for example ghcr.io/acme/image@sha256:...)"
+}
+
+ensure_host_dependencies() {
+  local required_commands=(awk curl df git grep ip openssl)
+  local missing=false
+  local command_name
+
+  for command_name in "${required_commands[@]}"; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+      missing=true
+      break
+    fi
+  done
+
+  if [[ "$missing" == true ]]; then
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        ca-certificates coreutils curl gawk git grep iproute2 openssl
+    elif command -v dnf >/dev/null 2>&1; then
+      dnf install -y ca-certificates coreutils curl gawk git grep iproute openssl
+    elif command -v yum >/dev/null 2>&1; then
+      yum install -y ca-certificates coreutils curl gawk git grep iproute openssl
+    else
+      fail "missing required host utilities and no supported package manager was found"
+    fi
+  fi
+
+  for command_name in "${required_commands[@]}"; do
+    require_command "$command_name"
+  done
+}
+
+check_host_resources() {
+  local cpu_cores memory_bytes docker_root_dir disk_available_kib
+  cpu_cores="$(nproc 2>/dev/null || true)"
+  if [[ ! "$cpu_cores" =~ ^[0-9]+$ ]]; then
+    cpu_cores=""
+  fi
+
+  if [[ -z "$cpu_cores" ]]; then
+    warn "could not determine CPU count; recommended minimum is ${RECOMMENDED_CPU_CORES} vCPUs"
+  elif ((cpu_cores < RECOMMENDED_CPU_CORES)); then
+    warn "host has ${cpu_cores} vCPU(s); Upstand recommends at least ${RECOMMENDED_CPU_CORES}"
+  fi
+
+  memory_bytes="$(awk '/^MemTotal:/ { print $2 * 1024; exit }' /proc/meminfo 2>/dev/null || true)"
+  if [[ ! "$memory_bytes" =~ ^[0-9]+$ ]]; then
+    warn "could not determine host memory; Upstand recommends at least 4 GiB of RAM"
+  elif ((memory_bytes < RECOMMENDED_MEMORY_BYTES)); then
+    warn "host has less than the recommended 4 GiB of RAM; source builds or service startup may be slow"
+  fi
+
+  docker_root_dir="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+  docker_root_dir="${docker_root_dir:-/var/lib/docker}"
+  disk_available_kib="$(df -Pk "$docker_root_dir" 2>/dev/null | awk 'NR == 2 { print $4 }')"
+  if [[ ! "$disk_available_kib" =~ ^[0-9]+$ ]]; then
+    warn "could not determine free disk space for Docker data at ${docker_root_dir}; Upstand recommends at least 30 GiB free"
+  elif ((disk_available_kib * 1024 < RECOMMENDED_DISK_BYTES)); then
+    warn "Docker data path ${docker_root_dir} has less than the recommended 30 GiB free"
+  fi
+
+  echo "Host resource check complete (recommendation: ${RECOMMENDED_CPU_CORES} vCPUs, 4 GiB RAM, 30 GiB free Docker disk)." >&2
 }
 
 ensure_git() {
@@ -92,10 +162,9 @@ build_source_images() {
   UPSTAND_DOCS_IMAGE="upstand-docs:source-${revision}"
   UPSTAND_MONITORING_IMAGE="upstand-monitoring:source-${revision}"
 
-  NEXT_PUBLIC_IS_CLOUD="${NEXT_PUBLIC_IS_CLOUD:-$IS_CLOUD}"
   docker build --file "$SOURCE_DIR/apps/server/Dockerfile" --tag "$UPSTAND_SERVER_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/schedules/Dockerfile" --tag "$UPSTAND_SCHEDULES_IMAGE" "$SOURCE_DIR"
-  docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --build-arg "NEXT_PUBLIC_IS_CLOUD=$NEXT_PUBLIC_IS_CLOUD" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
+  docker build --file "$SOURCE_DIR/apps/web/Dockerfile" --build-arg "NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL" --tag "$UPSTAND_WEB_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/fumadocs/Dockerfile" --tag "$UPSTAND_DOCS_IMAGE" "$SOURCE_DIR"
   docker build --file "$SOURCE_DIR/apps/monitoring/Dockerfile" --tag "$UPSTAND_MONITORING_IMAGE" "$SOURCE_DIR/apps/monitoring"
   SOURCE_BUILD=true
@@ -118,6 +187,9 @@ detect_advertise_address() {
   if [[ -z "$address" ]]; then
     local detected
     detected="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+    if [[ -z "$detected" ]]; then
+      detected="$(ip -4 -o addr show scope global 2>/dev/null | awk '{split($4, address, "/"); print address[1]; exit}' || true)"
+    fi
     if [[ "$INTERACTIVE" == true ]]; then
       read -r -p "Swarm Advertise IP Address [${detected}]: " input_address
       address="${input_address:-$detected}"
@@ -136,7 +208,11 @@ ensure_docker() {
     curl --fail --show-error --silent --location https://get.docker.com | sh
   fi
 
-  systemctl enable --now docker
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable --now docker
+  elif ! docker info >/dev/null 2>&1; then
+    fail "Docker is installed but its daemon is not running and systemctl is unavailable"
+  fi
   docker version >/dev/null
 }
 
@@ -181,42 +257,40 @@ write_environment() {
   local requested_server_image="${UPSTAND_SERVER_IMAGE:-}"
   local requested_schedules_image="${UPSTAND_SCHEDULES_IMAGE:-}"
   local requested_web_image="${UPSTAND_WEB_IMAGE:-}"
-  local requested_web_cloud_image="${UPSTAND_WEB_CLOUD_IMAGE:-}"
   local requested_docs_image="${UPSTAND_DOCS_IMAGE:-}"
   local requested_monitoring_image="${UPSTAND_MONITORING_IMAGE:-}"
   local requested_auto_update="${UPSTAND_AUTO_UPDATE:-}"
   local requested_version="${UPSTAND_VERSION:-}"
+  local direct_origins="${UPSTAND_DIRECT_ORIGINS:-false}"
 
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
     source "$ENV_FILE"
   fi
+  local configured_origin_count=0
+  [[ -n "${BETTER_AUTH_URL:-}" ]] && ((configured_origin_count += 1))
+  [[ -n "${CORS_ORIGIN:-}" ]] && ((configured_origin_count += 1))
+  [[ -n "${NEXT_PUBLIC_SERVER_URL:-}" ]] && ((configured_origin_count += 1))
+  if ((configured_origin_count > 0 && configured_origin_count < 3)); then
+    fail "provide BETTER_AUTH_URL, CORS_ORIGIN, and NEXT_PUBLIC_SERVER_URL together, or omit all three for direct host-IP access"
+  fi
+  if [[ -n "$requested_better_auth_url$requested_cors_origin$requested_server_url" ]]; then
+    direct_origins=false
+  fi
   if [[ -n "$MODE_OVERRIDE" ]]; then
     IS_CLOUD="$MODE_OVERRIDE"
-    NEXT_PUBLIC_IS_CLOUD="$MODE_OVERRIDE"
   fi
 
   # A first-run install should be usable without requiring DNS setup up front.
-  # Use nip.io defaults for a public IPv4 manager; operators can replace these
-  # origins in the environment file and rerun the installer later.
+  # When origins are not supplied, keep the control plane reachable directly by
+  # the detected host IP and its published service ports. Caddy/domain setup
+  # can be enabled later from the Web Server page.
   if [[ -z "${BETTER_AUTH_URL:-}" || -z "${CORS_ORIGIN:-}" || -z "${NEXT_PUBLIC_SERVER_URL:-}" ]]; then
-    if [[ "$advertise_address" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
-      local default_api="https://api.${advertise_address}.nip.io"
-      local default_dashboard="https://app.${advertise_address}.nip.io"
-      if [[ "$INTERACTIVE" == true ]]; then
-        read -r -p "API origin [${BETTER_AUTH_URL:-$default_api}]: " input_api
-        read -r -p "Dashboard origin [${CORS_ORIGIN:-$default_dashboard}]: " input_dashboard
-        BETTER_AUTH_URL="${input_api:-${BETTER_AUTH_URL:-$default_api}}"
-        CORS_ORIGIN="${input_dashboard:-${CORS_ORIGIN:-$default_dashboard}}"
-      else
-        BETTER_AUTH_URL="${BETTER_AUTH_URL:-$default_api}"
-        CORS_ORIGIN="${CORS_ORIGIN:-$default_dashboard}"
-      fi
-      NEXT_PUBLIC_SERVER_URL="${NEXT_PUBLIC_SERVER_URL:-$BETTER_AUTH_URL}"
-      echo "Using default HTTPS origins: API=$BETTER_AUTH_URL dashboard=$CORS_ORIGIN" >&2
-    else
-      fail "set BETTER_AUTH_URL, CORS_ORIGIN, and NEXT_PUBLIC_SERVER_URL, or run on a host with a public IPv4 address for automatic nip.io defaults"
-    fi
+    direct_origins=true
+    BETTER_AUTH_URL="${BETTER_AUTH_URL:-http://${advertise_address}:3000}"
+    CORS_ORIGIN="${CORS_ORIGIN:-http://${advertise_address}:3001}"
+    NEXT_PUBLIC_SERVER_URL="${NEXT_PUBLIC_SERVER_URL:-$BETTER_AUTH_URL}"
+    echo "Using direct HTTP origins for the detected host: API=$BETTER_AUTH_URL dashboard=$CORS_ORIGIN" >&2
   fi
 
   [[ -r "$INSTALL_DIR/secrets/postgres_password" ]] && POSTGRES_PASSWORD="$(cat "$INSTALL_DIR/secrets/postgres_password")"
@@ -247,14 +321,9 @@ write_environment() {
   UPSTAND_SERVER_IMAGE="${requested_server_image:-${UPSTAND_SERVER_IMAGE:-}}"
   UPSTAND_SCHEDULES_IMAGE="${requested_schedules_image:-${UPSTAND_SCHEDULES_IMAGE:-}}"
   UPSTAND_WEB_IMAGE="${requested_web_image:-${UPSTAND_WEB_IMAGE:-}}"
-  UPSTAND_WEB_CLOUD_IMAGE="${requested_web_cloud_image:-${UPSTAND_WEB_CLOUD_IMAGE:-}}"
   UPSTAND_DOCS_IMAGE="${requested_docs_image:-${UPSTAND_DOCS_IMAGE:-}}"
   UPSTAND_MONITORING_IMAGE="${requested_monitoring_image:-${UPSTAND_MONITORING_IMAGE:-}}"
   UPSTAND_AUTO_UPDATE="${requested_auto_update:-${UPSTAND_AUTO_UPDATE:-false}}"
-
-  if [[ "$IS_CLOUD" == true && -n "$UPSTAND_WEB_CLOUD_IMAGE" ]]; then
-    UPSTAND_WEB_IMAGE="$UPSTAND_WEB_CLOUD_IMAGE"
-  fi
 
   local advertise_ip
   advertise_ip="$(detect_advertise_address)"
@@ -273,21 +342,28 @@ write_environment() {
   [[ "$CORS_ORIGIN" == http://* || "$CORS_ORIGIN" == https://* ]] || fail "CORS_ORIGIN must use HTTP or HTTPS"
   [[ "$NEXT_PUBLIC_SERVER_URL" == http://* || "$NEXT_PUBLIC_SERVER_URL" == https://* ]] || fail "NEXT_PUBLIC_SERVER_URL must use HTTP or HTTPS"
 
-  UPSTAND_DASHBOARD_HOST="${CORS_ORIGIN#https://}"
-  UPSTAND_DASHBOARD_HOST="${UPSTAND_DASHBOARD_HOST#http://}"
-  UPSTAND_DASHBOARD_HOST="${UPSTAND_DASHBOARD_HOST%%:*}"
+  if [[ "$direct_origins" == true ]]; then
+    UPSTAND_DASHBOARD_HOST=""
+    UPSTAND_API_HOST=""
+    UPSTAND_DOCS_HOST=""
+  else
+    UPSTAND_DASHBOARD_HOST="${CORS_ORIGIN#https://}"
+    UPSTAND_DASHBOARD_HOST="${UPSTAND_DASHBOARD_HOST#http://}"
+    UPSTAND_DASHBOARD_HOST="${UPSTAND_DASHBOARD_HOST%%:*}"
 
-  UPSTAND_API_HOST="${BETTER_AUTH_URL#https://}"
-  UPSTAND_API_HOST="${UPSTAND_API_HOST#http://}"
-  UPSTAND_API_HOST="${UPSTAND_API_HOST%%:*}"
+    UPSTAND_API_HOST="${BETTER_AUTH_URL#https://}"
+    UPSTAND_API_HOST="${UPSTAND_API_HOST#http://}"
+    UPSTAND_API_HOST="${UPSTAND_API_HOST%%:*}"
+  fi
 
   [[ "$UPSTAND_DASHBOARD_HOST" != */* && "$UPSTAND_API_HOST" != */* ]] || fail "dashboard and API origins must not include a path"
 
+  if [[ -z "${UPSTAND_DOCS_HOST:-}" && "$direct_origins" != true ]]; then
+    UPSTAND_DOCS_HOST="docs.$UPSTAND_API_HOST"
+  fi
+
   if [[ "${UPSTAND_BUILD_FROM_SOURCE:-false}" == true || -z "$UPSTAND_SERVER_IMAGE$UPSTAND_SCHEDULES_IMAGE$UPSTAND_WEB_IMAGE$UPSTAND_DOCS_IMAGE$UPSTAND_MONITORING_IMAGE" ]]; then
     build_source_images
-  fi
-  if [[ "$IS_CLOUD" == true && "${SOURCE_BUILD:-false}" != true && -z "$UPSTAND_WEB_CLOUD_IMAGE" ]]; then
-    fail "UPSTAND_WEB_CLOUD_IMAGE must be set to the immutable cloud web image in cloud mode"
   fi
   if [[ "${SOURCE_BUILD:-false}" != true ]]; then
     require_digest_image UPSTAND_SERVER_IMAGE
@@ -305,17 +381,16 @@ TRUSTED_PROXY_CIDRS=$TRUSTED_PROXY_CIDRS
 NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL
 UPSTAND_DASHBOARD_HOST=$UPSTAND_DASHBOARD_HOST
 UPSTAND_API_HOST=$UPSTAND_API_HOST
-UPSTAND_DOCS_HOST=${UPSTAND_DOCS_HOST:-docs.$UPSTAND_API_HOST}
+UPSTAND_DOCS_HOST=$UPSTAND_DOCS_HOST
 UPSTAND_SERVER_IMAGE=$UPSTAND_SERVER_IMAGE
 UPSTAND_SCHEDULES_IMAGE=$UPSTAND_SCHEDULES_IMAGE
 UPSTAND_WEB_IMAGE=$UPSTAND_WEB_IMAGE
-UPSTAND_WEB_CLOUD_IMAGE=$UPSTAND_WEB_CLOUD_IMAGE
 UPSTAND_DOCS_IMAGE=$UPSTAND_DOCS_IMAGE
 UPSTAND_MONITORING_IMAGE=$UPSTAND_MONITORING_IMAGE
 UPSTAND_AUTO_UPDATE=$UPSTAND_AUTO_UPDATE
 UPSTAND_VERSION=$requested_version
 IS_CLOUD=${IS_CLOUD:-false}
-NEXT_PUBLIC_IS_CLOUD=${NEXT_PUBLIC_IS_CLOUD:-$IS_CLOUD}
+UPSTAND_DIRECT_ORIGINS=$direct_origins
 POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16.4-alpine}
 REDIS_IMAGE=${REDIS_IMAGE:-redis:7.4-alpine}
 UPSTAND_SERVER_PORT=${UPSTAND_SERVER_PORT:-3000}
@@ -405,6 +480,7 @@ validate_external_origins() {
   dashboard_probe="${CORS_ORIGIN%/}/"
   docs_probe="$(
     case "$BETTER_AUTH_URL" in
+      http://*:3000) printf '%s/' "${BETTER_AUTH_URL%:3000}:4000" ;;
       https://*) printf 'https://%s/' "$UPSTAND_DOCS_HOST" ;;
       *) printf 'http://%s/' "$UPSTAND_DOCS_HOST" ;;
     esac
@@ -421,12 +497,9 @@ validate_external_origins() {
 main() {
   parse_args "$@"
   require_root
-  require_command openssl
-  require_command awk
-  require_command ip
-  require_command curl
-  require_command grep
+  ensure_host_dependencies
   ensure_docker
+  check_host_resources
   local advertise_address
   advertise_address="$(detect_advertise_address)"
   ensure_stack_file
@@ -439,6 +512,9 @@ main() {
   validate_external_origins
 
   echo "Upstand has been deployed and all services report ready."
+  echo "Dashboard: $CORS_ORIGIN"
+  echo "API: $BETTER_AUTH_URL"
+  echo "Generated secrets are stored in $INSTALL_DIR/secrets/; back up that directory securely."
   echo "Control-plane state is pinned to node label upstand.control-plane=true."
   echo "Use 'docker stack services upstand' to watch rollout status."
 }

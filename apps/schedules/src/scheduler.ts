@@ -3,6 +3,7 @@ import { DockerCleanupService } from "@upstand/infrastructure";
 import {
   AccessLogCleanupScheduler,
   AutoscalingService,
+  type NotificationPublisher,
   resolveDockerCliEnvironmentForServer,
 } from "@upstand/usecases";
 import {
@@ -21,6 +22,9 @@ import { getServiceProvider } from "./di";
 export class ScheduledDockerCleanup {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastRunDate: string | null = null;
+  private activeDate: string | null = null;
+  private readonly completedTargets = new Set<string>();
+  private running = false;
 
   constructor(
     private readonly dockerCleanupService = new DockerCleanupService(),
@@ -29,6 +33,7 @@ export class ScheduledDockerCleanup {
   start(): void {
     this.timer = setInterval(() => void this.run(), 60 * 60 * 1000);
     this.timer.unref?.();
+    void this.run();
   }
 
   stop(): void {
@@ -38,10 +43,17 @@ export class ScheduledDockerCleanup {
   }
 
   async run(): Promise<void> {
+    if (this.running) return;
+
     const now = new Date();
-    const date = now.toISOString().slice(0, 10);
-    if (now.getHours() !== 3 || this.lastRunDate === date) return;
-    this.lastRunDate = date;
+    const date = getLocalDateKey(now);
+    if (now.getHours() < 3 || this.lastRunDate === date) return;
+
+    if (this.activeDate !== date) {
+      this.activeDate = date;
+      this.completedTargets.clear();
+    }
+    this.running = true;
 
     const scope = getServiceProvider().createScope();
     try {
@@ -49,85 +61,158 @@ export class ScheduledDockerCleanup {
       const settings = await uow.webServerSettingsRepository.findGlobal();
       const publisher = scope.resolve(PublishNotificationUseCaseToken);
 
-      if (settings?.dailyDockerCleanup) {
+      if (settings?.dailyDockerCleanup && !this.completedTargets.has("local")) {
         log.info({ message: "Running scheduled local Docker cleanup... 🧹" });
-        await this.dockerCleanupService.run("all");
-        await publisher
-          .execute({
-            event: "docker_cleanup_completed",
+        try {
+          await this.dockerCleanupService.run("all");
+          this.completedTargets.add("local");
+          await publishDockerCleanupNotification(publisher, {
+            success: true,
             idempotencyKey: `docker-cleanup:local:${date}`,
             title: "🧹 Docker Cleanup Completed",
             message:
               "Upstand successfully executed the scheduled daily cleanup of unused Docker images, stopped containers, and dangling build caches.",
+            metadata: { date, scope: "local" },
+          });
+        } catch (error: unknown) {
+          await publishDockerCleanupNotification(publisher, {
+            success: false,
+            idempotencyKey: `docker-cleanup-failed:local:${date}`,
+            title: "🧹 Docker Cleanup Failed",
+            message: getCleanupErrorMessage(error),
             metadata: {
-              event: "docker_cleanup_completed",
               date,
               scope: "local",
+              error: getCleanupErrorMessage(error),
             },
-          })
-          .catch((notificationError: unknown) => {
-            log.error({
-              message: "Unable to queue local Docker cleanup notification",
-              err:
-                notificationError instanceof Error
-                  ? notificationError.message
-                  : notificationError,
-            });
           });
+          log.error({
+            message: "Failed to run scheduled local Docker cleanup",
+            err: error,
+          });
+        }
       }
 
       const servers = await uow.serverRepository.findMany();
       for (const server of servers.filter(
         (candidate: Server) => candidate.enableDockerCleanup,
       )) {
+        if (this.completedTargets.has(server.id)) continue;
+
+        let remote: Awaited<
+          ReturnType<typeof resolveDockerCliEnvironmentForServer>
+        > | null = null;
         try {
-          const remote = await resolveDockerCliEnvironmentForServer(
-            server.id,
-            uow,
-          );
-          try {
-            log.info({
-              message: `Running scheduled Docker cleanup on remote server '${server.name}'... 🧹`,
+          remote = await resolveDockerCliEnvironmentForServer(server.id, uow);
+          log.info({
+            message: `Running scheduled Docker cleanup on remote server '${server.name}'... 🧹`,
+            serverId: server.id,
+          });
+          await this.dockerCleanupService.run("all", remote.environment);
+          this.completedTargets.add(server.id);
+          await publishDockerCleanupNotification(publisher, {
+            success: true,
+            idempotencyKey: `docker-cleanup:${server.id}:${date}`,
+            title: `🧹 Docker cleanup completed on ${server.name}`,
+            message: `Upstand completed the scheduled cleanup of unused Docker resources on ${server.name}.`,
+            metadata: {
+              date,
+              scope: "remote",
               serverId: server.id,
-            });
-            await this.dockerCleanupService.run("all", remote.environment);
-          } finally {
-            remote.cleanup();
-          }
-          await publisher
-            .execute({
-              event: "docker_cleanup_completed",
-              idempotencyKey: `docker-cleanup:${server.id}:${date}`,
-              title: `Docker cleanup completed on ${server.name}`,
-              message: `Upstand completed the scheduled cleanup of unused Docker resources on ${server.name}.`,
-            })
-            .catch((notificationError: unknown) => {
-              log.error({
-                message: "Unable to queue remote Docker cleanup notification",
-                serverId: server.id,
-                err:
-                  notificationError instanceof Error
-                    ? notificationError.message
-                    : notificationError,
-              });
-            });
+              serverName: server.name,
+            },
+          });
         } catch (error: unknown) {
+          const message = getCleanupErrorMessage(error);
+          await publishDockerCleanupNotification(publisher, {
+            success: false,
+            idempotencyKey: `docker-cleanup-failed:${server.id}:${date}`,
+            title: `🧹 Docker cleanup failed on ${server.name}`,
+            message,
+            metadata: {
+              date,
+              scope: "remote",
+              serverId: server.id,
+              serverName: server.name,
+              error: message,
+            },
+          });
           log.error({
             message: "Failed to run scheduled remote Docker cleanup",
             serverId: server.id,
             err: error,
           });
+        } finally {
+          remote?.cleanup();
         }
       }
+
+      const hasPendingTargets =
+        Boolean(
+          settings?.dailyDockerCleanup && !this.completedTargets.has("local"),
+        ) ||
+        servers.some(
+          (server: Server) =>
+            server.enableDockerCleanup && !this.completedTargets.has(server.id),
+        );
+      if (!hasPendingTargets) this.lastRunDate = date;
     } catch (error: unknown) {
       log.error({
         message: "Failed to run scheduled Docker cleanup",
         err: error,
       });
     } finally {
+      this.running = false;
       await scope.dispose();
     }
   }
+}
+
+function getLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCleanupErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function publishDockerCleanupNotification(
+  publisher: NotificationPublisher,
+  input: {
+    success: boolean;
+    title: string;
+    message: string;
+    metadata: Record<string, unknown>;
+    idempotencyKey: string;
+  },
+): Promise<void> {
+  await publisher
+    .execute({
+      event: input.success
+        ? "docker_cleanup_completed"
+        : "docker_cleanup_failed",
+      idempotencyKey: input.idempotencyKey,
+      title: input.title,
+      message: input.message,
+      metadata: {
+        ...input.metadata,
+        event: input.success
+          ? "docker_cleanup_completed"
+          : "docker_cleanup_failed",
+      },
+    })
+    .catch((notificationError: unknown) => {
+      log.error({
+        message: "Unable to queue Docker cleanup notification",
+        err: getCleanupErrorMessage(notificationError),
+        event: input.success
+          ? "docker_cleanup_completed"
+          : "docker_cleanup_failed",
+      });
+    });
 }
 
 export class UpstandUpdateNotificationScheduler {

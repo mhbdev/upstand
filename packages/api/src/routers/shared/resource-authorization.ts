@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import type { Resource } from "@upstand/domain";
+import type { Project, Resource } from "@upstand/domain";
 import {
   GetEnvironmentUseCaseToken,
   GetProjectUseCaseToken,
@@ -28,7 +28,11 @@ export function createResourceAuthorizer(
 export async function resolveResourceTarget(
   ctx: AuthenticatedContext,
   id: string,
-): Promise<{ resource: Resource; organizationId: string }> {
+): Promise<{
+  resource: Resource;
+  organizationId: string;
+  project: Project;
+}> {
   const resource = await ctx.scope
     .resolve(GetResourceUseCaseToken)
     .execute({ id });
@@ -54,7 +58,7 @@ export async function resolveResourceTarget(
     });
   }
 
-  return { resource, organizationId: project.organizationId };
+  return { resource, organizationId: project.organizationId, project };
 }
 
 /** Loads a resource and enforces its project-scoped permission in one place. */
@@ -64,7 +68,10 @@ export async function authorizeResource(
   options: ResourceAuthorizationOptions,
 ): Promise<Resource> {
   const label = options.resourceLabel ?? "Resource";
-  const { resource, organizationId } = await resolveResourceTarget(ctx, id);
+  const { resource, organizationId, project } = await resolveResourceTarget(
+    ctx,
+    id,
+  );
 
   if (options.expectedType && resource.type !== options.expectedType) {
     throw new TRPCError({
@@ -74,5 +81,13 @@ export async function authorizeResource(
   }
 
   await authorizeContextCapability(ctx, organizationId, options.action);
+
+  if (options.action !== "resource:view" && project.archivedAt) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Project is archived. Unarchive it before modifying resources.",
+    });
+  }
+
   return resource;
 }

@@ -119,6 +119,12 @@ export class GetWebServerSettingsUseCase {
       }
     }
 
+    // Reconcile published control-plane ports as well. A later stack deploy
+    // can recreate services from the compose file, so the persisted Web Server
+    // preference must be enforced whenever settings are loaded.
+    await this.caddyService.setControlPlaneIpAccess(
+      settings.ipAccessEnabled ?? true,
+    );
     await this.caddyService.initializeCaddy(settings);
     const certificates =
       (await this.uow.certificateRepository.findAll?.()) ?? [];

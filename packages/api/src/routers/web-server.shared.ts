@@ -11,12 +11,30 @@ import { requireInstanceOwnerContext } from "../instance-access";
 export async function queueDockerCleanupNotification(
   publisher: NotificationPublisher,
   logger: Pick<AuthenticatedContext["log"], "error">,
+  input: {
+    success: boolean;
+    organizationId?: string;
+    title: string;
+    message: string;
+    metadata?: Record<string, unknown>;
+    idempotencyKey?: string;
+  },
 ): Promise<void> {
   await publisher
     .execute({
-      event: "docker_cleanup_completed",
-      title: "Docker cleanup completed",
-      message: "Upstand completed a Docker cleanup operation.",
+      event: input.success
+        ? "docker_cleanup_completed"
+        : "docker_cleanup_failed",
+      organizationId: input.organizationId,
+      title: input.title,
+      message: input.message,
+      metadata: {
+        ...input.metadata,
+        event: input.success
+          ? "docker_cleanup_completed"
+          : "docker_cleanup_failed",
+      },
+      idempotencyKey: input.idempotencyKey,
     })
     .catch((error) => {
       logger.error(error instanceof Error ? error : String(error), {
@@ -88,20 +106,32 @@ export async function runDockerCleanup(
   ctx: AuthenticatedContext,
   command: string,
   failureMessage: string,
+  organizationId: string,
 ): Promise<{ success: true }> {
   await requireInstanceOwnerContext(ctx);
   const { exec } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execAsync = promisify(exec);
+  const publisher = ctx.scope.resolve(PublishNotificationUseCaseToken);
   try {
     await execAsync(command);
-    await queueDockerCleanupNotification(
-      ctx.scope.resolve(PublishNotificationUseCaseToken),
-      ctx.log,
-    );
+    await queueDockerCleanupNotification(publisher, ctx.log, {
+      success: true,
+      organizationId,
+      title: "🧹 Docker cleanup completed",
+      message: "Upstand completed a Docker cleanup operation.",
+    });
     return { success: true };
   } catch (error) {
-    throw new Error(getErrorMessage(error, failureMessage));
+    const message = getErrorMessage(error, failureMessage);
+    await queueDockerCleanupNotification(publisher, ctx.log, {
+      success: false,
+      organizationId,
+      title: "🧹 Docker cleanup failed",
+      message,
+      metadata: { error: message },
+    });
+    throw new Error(message);
   }
 }
 

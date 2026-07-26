@@ -56,6 +56,8 @@ The expansion engine supports dynamic references like `${{env.API_URL}}` or `${{
 | `UPSTAND_SERVER_UPSTREAM` | Server upstream override. |
 | `UPSTAND_WEB_UPSTREAM` | Web upstream override. |
 | `UPSTAND_FUMADOCS_UPSTREAM` | Fumadocs upstream override. |
+| `UPSTAND_DIRECT_ORIGINS` | Installer-managed mode for direct host-IP origins; defaults to `true` when origins are omitted. |
+| `UPSTAND_SERVER_PORT` / `UPSTAND_WEB_PORT` / `UPSTAND_DOCS_PORT` | Published host ports for the API, dashboard, and documentation services. |
 | `UPSTAND_CONTROL_PLANE_SSH_HOST_KEY_FINGERPRINT` | Optional host-key pin for control-plane SSH operations. |
 
 ## Release and runtime services
@@ -66,7 +68,6 @@ The expansion engine supports dynamic references like `${{env.API_URL}}` or `${{
 | `UPSTAND_AUTO_UPDATE` | Boolean; enables the optional update runtime. Defaults to `false`. |
 | `UPSTAND_SERVER_IMAGE` | Server image reference. |
 | `UPSTAND_WEB_IMAGE` | Web image reference. |
-| `UPSTAND_WEB_CLOUD_IMAGE` | Dedicated cloud-built web image; required for immutable cloud installs. |
 | `UPSTAND_MONITORING_IMAGE` | Monitoring image reference. |
 | `DB_MIGRATIONS_PATH` | Optional database migrations path. |
 | `UPSTAND_POSTGRES_CONTAINER` | Optional PostgreSQL container identifier/name. |
@@ -95,7 +96,13 @@ The expansion engine supports dynamic references like `${{env.API_URL}}` or `${{
 | --- | --- | --- |
 | `NEXT_PUBLIC_SERVER_URL` | Yes | Public API origin used by the browser. |
 | `NEXT_PUBLIC_UPSTAND_VERSION` | No | Version shown by the web console. |
-| `NEXT_PUBLIC_IS_CLOUD` | No | Boolean cloud-mode flag; defaults to `false`. |
+
+Cloud mode is configured with the server-side `IS_CLOUD` variable. The web console reads the authoritative value from the API at runtime, so cloud and self-hosted installations use the same web image.
+
+When the installer has no URL variables, it leaves the control-plane services
+available on the host IP and their published ports. Configure the domain and
+HTTPS certificate in **Web Server** first, then disable **Direct IP:port
+access** to remove those host-port publications.
 
 ## Documentation app
 

@@ -43,6 +43,16 @@ export class BullMqOutboxJobPublisher implements OutboxJobPublisher {
     switch (message.type) {
       case OUTBOX_COMMAND_TYPES.deploy: {
         const payload = deploymentPayloadSchema.parse(message.payload);
+        // A queued deployment can be cancelled after its DB row is created but
+        // before the outbox publisher hands it to BullMQ. Respect that marker
+        // so cancellation cannot be undone by a late publish.
+        if (
+          await this.connection.get(
+            `upstand:deployment:cancel:${payload.deploymentId}`,
+          )
+        ) {
+          return;
+        }
         await this.queue(getDeploymentQueueName(payload.serverId)).add(
           "deploy",
           payload,

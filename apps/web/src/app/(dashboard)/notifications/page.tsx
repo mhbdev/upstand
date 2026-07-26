@@ -408,6 +408,11 @@ const EVENT_OPTIONS: Array<{
     description: "When scheduled Docker cleanup completes.",
   },
   {
+    value: "docker_cleanup_failed",
+    label: "Docker cleanup error",
+    description: "When Docker cleanup fails.",
+  },
+  {
     value: "platform_restart",
     label: "Upstand restart",
     description: "When a platform update starts a restart.",

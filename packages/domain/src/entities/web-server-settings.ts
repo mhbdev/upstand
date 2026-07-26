@@ -22,6 +22,7 @@ export const WebServerSettingsSchema = z.object({
   caddyPorts: z.string(),
   caddyDashboardEnabled: z.boolean(),
   accessLogsEnabled: z.boolean(),
+  ipAccessEnabled: z.boolean().default(true),
   accessLogCleanupCron: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -53,5 +54,6 @@ export interface UpdateWebServerSettingsDTO {
   caddyPorts?: string;
   caddyDashboardEnabled?: boolean;
   accessLogsEnabled?: boolean;
+  ipAccessEnabled?: boolean;
   accessLogCleanupCron?: string;
 }

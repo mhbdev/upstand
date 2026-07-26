@@ -41,7 +41,7 @@ type DeploymentItem = {
 
 type PendingAction =
   | { type: "clear-history"; label: string }
-  | { type: "cancel-queued"; label: string; serverId: string; jobId: string }
+  | { type: "cancel-queued"; label: string; deploymentId: string }
   | { type: "kill-build"; label: string; deploymentId: string }
   | { type: "rollback"; label: string; deploymentId: string }
   | { type: "remove-deployment"; label: string; deploymentId: string };
@@ -211,8 +211,7 @@ export function DeploymentsTab({
                 setPendingAction({
                   type: "cancel-queued",
                   label: queuedDeployment.title,
-                  serverId: resource.serverId ?? "local",
-                  jobId: queuedDeployment.id,
+                  deploymentId: queuedDeployment.id,
                 });
               }}
               variant="destructive"
@@ -439,8 +438,7 @@ export function DeploymentsTab({
               break;
             case "cancel-queued":
               cancelDeploymentMutation.mutate({
-                serverId: pendingAction.serverId,
-                jobId: pendingAction.jobId,
+                deploymentId: pendingAction.deploymentId,
               });
               break;
             case "kill-build":
