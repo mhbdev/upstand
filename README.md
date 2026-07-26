@@ -1,3 +1,7 @@
+> [!WARNING]
+> **This repository is archived.** 
+> All future works, updates, and ongoing development have been moved to [UpstandPlatform](https://github.com/UpstandPlatform/upstand).
+
 <img width="1220" height="685" alt="image" src="https://github.com/user-attachments/assets/4a2d20aa-9bc5-42d5-b3fc-998efa78ec3e" />
 
 # Upstand
